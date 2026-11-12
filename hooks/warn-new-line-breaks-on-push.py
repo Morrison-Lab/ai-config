@@ -45,7 +45,6 @@ unresolvable base ref, or checker execution error.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import re
@@ -53,19 +52,24 @@ import subprocess
 import sys
 
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
+
+
 def _load_sibling():
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-push-without-self-review.py")
-    if not os.path.isfile(path):
+    """`no-push-without-self-review.py`, whose `iter_pushes` decides what a
+    push is, or None (scripts/lib/sibling.py)."""
+    if load_sibling is None:
         return None
-    spec = importlib.util.spec_from_file_location("no_push_without_self_review", path)
-    if spec is None or spec.loader is None:
-        return None
-    module = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(module)
-    except Exception:
-        return None
-    return module
+    return load_sibling(__file__, "no-push-without-self-review.py", "no_push_without_self_review")
 
 
 _SIBLING = _load_sibling()

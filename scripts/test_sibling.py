@@ -130,6 +130,11 @@ USERS = (
     ("flag-self-authored-verdict-echo.py", {
         "_rebuttal": "flag-uncited-rebuttal.py", "_disclosure": "require-agent-disclosure.py",
         "_clean_claim": "flag-clean-claim-over-findings.py"}),
+    ("flag-conflict-with-base.py", {"_SIBLING": "no-push-without-self-review.py"}),
+    ("no-commit-with-conflict-markers.py", {"_SIB": "flag-commit-a-sweeps-submodule.py"}),
+    ("no-push-with-failing-notes-checks.py", {"_SIBLING": "no-push-without-self-review.py"}),
+    ("warn-new-line-breaks-on-push.py", {"_SIBLING": "no-push-without-self-review.py"}),
+    ("warn-new-line-breaks-on-edit.py", {"_PUSH_HOOK": "warn-new-line-breaks-on-push.py"}),
 )
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "
@@ -179,7 +184,9 @@ GUARDED = {
     "flag-unmeasured-timestamp.py", "flag-unread-commit-citation.py",
     "warn-claim-without-comments-read.py", "warn-unmeasured-capability-claim.py",
     "block-redo-denied-write-via-other-tool.py", "no-redundant-push-pr-authorization.py",
-    "flag-self-authored-verdict-echo.py",
+    "flag-self-authored-verdict-echo.py", "flag-conflict-with-base.py",
+    "no-commit-with-conflict-markers.py", "no-push-with-failing-notes-checks.py",
+    "warn-new-line-breaks-on-push.py", "warn-new-line-breaks-on-edit.py",
 }
 check("every GUARDED hook is in USERS", sorted(GUARDED - {h for h, _ in USERS}), [])
 # Deny hooks that stop gating when a sibling is missing, and must say so.

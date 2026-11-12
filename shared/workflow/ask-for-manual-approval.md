@@ -51,11 +51,12 @@ Leaving auto mode is safe without a question first only because the user then ap
 Auto mode drops broad allow rules that `default` mode honours ([permission modes](https://code.claude.com/docs/en/permission-modes)), and other routes allow a command with no prompt at all:
 a `permissions.allow` rule in any settings file that applies, a PreToolUse hook that returns an allow decision, a session "always allow" grant, and `--allowedTools`.
 This repository's [`grant-personal-permissions`](../../hooks/grant-personal-permissions.py) hook allows `gh pr merge` that way.
-So never switch modes yourself for a merge.
+So never switch modes yourself for a merge:
+that hook would let the rerun through with no prompt, and a merge cannot be undone.
 Read the settings files and hooks that apply, and do not switch for an action one of them allows, or when they do not let you tell.
 In those cases ask the user to switch out of auto mode instead, naming the refused command and its stated reason.
 A session grant or `--allowedTools` cannot be read from inside the session.
-Only the user can set one, so a rerun it lets through runs on the user's own grant, and that residual risk is accepted.
+Only the user can set one, so a rerun that such a grant lets through runs on the user's own grant, and that residual risk is accepted.
 Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
 A switch to a lower mode shows no card, so that prompt is the user's only sign of the switch.
 When that tool is not available, ask the user to switch out of auto mode the same way.
@@ -63,7 +64,8 @@ When that tool is not available, ask the user to switch out of auto mode the sam
 A first denial can be a transient misfire (see [`claude-code-hooks`](../../memories/claude-code-hooks.md) on retrying an identical command once).
 Retry the identical command once at most, never rephrased, then switch or ask.
 You cannot tell a `soft_deny` from a `hard_deny` block from inside the turn, so switch or ask once and report the result.
-If the mode is switched, by the user or by you, and the action is still refused, report that and stop.
+If the mode is switched, by the user or by you, and the action is still refused, report that and stop;
+when you switched it yourself, request `auto` again first.
 A managed-settings `permissions.deny` denial applies in every mode, so report it as a denial and do not switch or ask to switch.
 
 For an action outside the hard-prohibited categories that the user has not authorized, do not switch or ask to switch modes.

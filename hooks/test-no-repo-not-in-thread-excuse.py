@@ -20,8 +20,7 @@ COORD = "mcp__hearthbot__message_coordinator"
 
 # (name, tool, text, should_deny)
 CASES = [
-    ("the 2026-11-12 message", COORD,
-     "ai-config isn't in this thread's repos, so could you route that as an issue?", True),
+    ("the 2026-11-12 message", COORD, "ai-config isn't in this thread's repos, so could you route that as an issue?", True),
     ("one of", POST, "ai-config isn't one of this thread's repos.", True),
     ("session repo scope", POST, "I can't search mlr because it isn't in this session's repo scope.", True),
     ("curly apostrophe", POST, "mlr isn’t in this thread’s repositories.", True),
@@ -29,7 +28,6 @@ CASES = [
     ("outside scope", POST, "That repository is outside this session's scope.", True),
     ("not available in", POST, "psw is not available in this thread's repos.", True),
     ("is not part of", POST, "gha is not part of the session's repos, so I stopped.", True),
-    # Phrasings the first draft missed (adversarial review of 60c5ff2).
     ("repos attached to", POST, "ai-config is not in the repos attached to this thread.", True),
     ("my repos", POST, "ai-config isn't in my repos.", True),
     ("don't have X in", POST, "I don't have ai-config in this thread.", True),
@@ -40,14 +38,11 @@ CASES = [
     ("repos don't include", POST, "The thread's repos don't include ai-config.", True),
     ("can't reach", POST, "I can't reach ai-config from this thread.", True),
     ("lab repo name", POST, "mlr isn't in this thread, so I stopped.", True),
-    ("unrelated failure word", POST,
-     "The CI failed, and ai-config isn't in this thread's repos.", True),
+    ("unrelated failure word", POST, "The CI failed, and ai-config isn't in this thread's repos.", True),
     ("second sentence", POST, "CI is green. ai-config isn't in this thread's repos.", True),
     ("newline split", POST, "Done.\nai-config isn't in this thread's repos", True),
-    ("thread tool", "mcp__hearthbot__message_thread",
-     "ai-config isn't in this session's repos.", True),
+    ("thread tool", "mcp__hearthbot__message_thread", "ai-config isn't in this session's repos.", True),
     ("edit tool", "mcp__hearthbot__edit_message", "gha is not in this thread's repos.", True),
-    # Second review round (805f4c1).
     ("isn't added to", POST, "The repo isn't added to this thread, so please file an issue.", True),
     ("has no checkout", COORD, "This session has no ai-config checkout, so route it as an issue.", True),
     ("can't push", POST, "I can't push to ai-config from this session.", True),
@@ -63,18 +58,14 @@ CASES = [
     ("no network access", POST, "This session has no access to the network.", False),
     ("thread scope of", POST, "That change is outside this thread's scope of work.", False),
     # Passes.
-    ("tried and refused", POST,
-     "add_repo refused ai-config, so it is not in this session's repos.", False),
-    ("attach failed", POST,
-     "The attach failed with a 403, so ai-config is not in this thread's repos.", False),
+    ("tried and refused", POST, "add_repo refused ai-config, so it is not in this session's repos.", False),
+    ("attach failed", POST, "The attach failed with a 403, so ai-config is not in this thread's repos.", False),
     ("attached report", POST, "I attached ai-config to this thread and opened a PR.", False),
     ("added after", POST, "I added mlr after it wasn't in this thread's repos.", False),
     ("no repo word", POST, "That file isn't in this thread.", False),
     ("unrelated not in", POST, "The bug is not in this repo's main branch.", False),
-    ("repository checkout", POST,
-     "The failing test is not in this session's repository checkout.", False),
-    ("thread scope of changes", POST,
-     "The typo isn't in this thread's scope of changes, per the repo style.", False),
+    ("repository checkout", POST, "The failing test is not in this session's repository checkout.", False),
+    ("thread scope of changes", POST, "The typo isn't in this thread's scope of changes, per the repo style.", False),
     ("ordinary negation", POST, "The PR is not merged yet, and this thread is waiting.", False),
     ("other tool", "Bash", "ai-config isn't in this thread's repos.", False),
 ]
@@ -103,13 +94,11 @@ def main() -> int:
     if not decision_denied():
         failures += 1
         print("FAIL request_decision option")
-    # Override
     os.environ[hook.OVERRIDE] = "1"
     if hook.denial({"tool_name": POST, "tool_input": {"text": CASES[0][2]}}) is not None:
         failures += 1
         print("FAIL override")
     os.environ.pop(hook.OVERRIDE, None)
-    # End to end through stdin
     out = subprocess.run([sys.executable, SCRIPT], input=json.dumps(
         {"tool_name": COORD, "tool_input": {"text": CASES[0][2]}}),
         capture_output=True, text=True).stdout

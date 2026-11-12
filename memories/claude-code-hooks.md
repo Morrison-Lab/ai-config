@@ -1219,3 +1219,20 @@ The second was checking each new finding with a test that fails when the fix is 
 - **Do:** check each fix with a test that fails on a mutant copy of the hook with the fix undone.
 - **Don't:** patch a failing-open relaxation with a narrower relaxation.
   On #5333 that produced new fail-opens in rounds 38 and 39.
+
+## A hook that wraps a third-party guard: pin its config to tighten-only, and remember a failed fetch
+
+`hooks/run-cc-safety-net.py` wraps CC Safety Net v2.7.12 (ai-config#5482).
+An adversarial review of commit 1bd11ccb on 2026-11-12 found two defects in the wrapper, neither in the wrapped package's own checks.
+
+First, the package reads a `.cc-safety-net/policy.json` from the working repository, and by default that file can loosen its policy.
+A repository carrying `{"destructive_command_protection":{"enabled":false}}` let `git reset --hard HEAD~3` and `cat ~/.ssh/id_ed25519` through.
+The fix runs the child with `CC_SAFETY_NET_PROJECT_TIGHTEN_ONLY=1`.
+
+Second, with no cached release and an unreachable npm registry, every tool call re-ran `npm pack`, about 70 s each, because the hook did not remember a failed fetch.
+`--silent` hid npm's error, so the notice said only "no output".
+The fix records the failure with a timestamp, skips fetches for an hour, and runs npm with `--loglevel=error`.
+
+- **Do:** before wrapping a third-party guard, list every config file and environment variable it reads from the working directory, and set the one that stops a repository loosening it.
+- **Do:** in a per-call hook, record a failed network step and back off, and pass the tool's own error into the notice.
+- **Don't:** treat "it fails open with a notice" as enough for a per-call hook whose failure path itself takes a minute.

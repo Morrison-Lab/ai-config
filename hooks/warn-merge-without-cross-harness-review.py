@@ -474,11 +474,34 @@ def all_routes_probed(clis, cleared, last_push):
         "absent:" + c, -1) > last_push) for c in clis)
 
 
+def _push_block_ids(sib, rec, clis):
+    """The ids of the tool_use blocks in *rec* that push, by MCP or shell."""
+    ids = set()
+    for b in sib._blocks(rec):
+        if b.get("type") != "tool_use":
+            continue
+        name = b.get("name")
+        if name in sib.MCP_PUSH_TOOLS:
+            ids.add(b.get("id"))
+            continue
+        cmd = _shell_command(b.get("input") or {})
+        if name not in sib.SHELL_TOOLS or not isinstance(cmd, str):
+            continue
+        try:
+            if any(k == "push" for k, _p in _shell_events(sib, cmd, clis)):
+                ids.add(b.get("id"))
+        except Exception:
+            continue
+    return ids
+
+
 def scan(sib, path, clis, recs=None):
     """Return (last_push_seq, [seq of successful reviewer calls], cleared).
 
     A push and a review in one command count the push at seq - 0.5, a review
     that `_fresh` places after every push at seq, and any other at seq - 1.
+    A call in the same record as a separate push block (parallel tool calls,
+    run in no known order) also counts at seq - 1 (ai-config#5382).
     `cleared` maps each route to the seq of the last non-sidechain call that
     cleared it for the waiver: an attempt with any result (key: the route),
     or a presence probe that found a CLI absent (key: "absent:<cli>").
@@ -489,6 +512,7 @@ def scan(sib, path, clis, recs=None):
     cleared = {}
     stream = recs if recs is not None else sib.records(path)
     for seq, rec in enumerate(stream):
+        pushes = _push_block_ids(sib, rec, clis)
         for b in sib._blocks(rec):
             kind = b.get("type")
             if kind == "tool_use":
@@ -507,12 +531,16 @@ def scan(sib, path, clis, recs=None):
                     if rec.get("isSidechain"):
                         continue
                     attempts, probes = _route_calls(sib, cmd, clis)
+                    # A push in a parallel block of this record may have run
+                    # after this call, so the call counts as before it (ai-config#5382).
+                    parallel_push = bool(pushes - {b.get("id")})
                     review_seq = None
                     if "review" in kinds:
-                        review_seq = seq if _fresh(events) else seq - 1
+                        review_seq = (seq if _fresh(events) and not parallel_push
+                                      else seq - 1)
                     if review_seq is not None or attempts or probes:
                         # An attempt sharing a call with a push may precede it (a probe never shares one).
-                        seq_call = seq - 1 if "push" in kinds else seq
+                        seq_call = seq - 1 if "push" in kinds or parallel_push else seq
                         pending[b.get("id")] = (seq_call, review_seq,
                                                 attempts, probes)
                 except Exception:

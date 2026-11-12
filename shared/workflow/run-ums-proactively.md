@@ -8,7 +8,7 @@ Ezra: "you should have run UMS as soon as you realized this".)
 
 In a Claude project the admission goes out through a reply tool (`post_message`), not as assistant text,
 and the admission hooks read only assistant text until 2026-11-12, so nothing fired when that rule was broken the same day.
-They now read reply-tool text, and `hooks/remind-ums-after-error.py` also blocks the turn's end until the pass runs.
+They now read reply-tool text, and `hooks/remind-ums-after-error.py` also blocks the turn's end once when no pass ran in that turn, so the pass happens before the turn ends rather than after the user asks.
 
 - **Do:** run the pass in the turn that notices the mistake, and say in the reply what it recorded.
 - **Don't:** admit the mistake in a reply and leave the pass for the user to ask for.

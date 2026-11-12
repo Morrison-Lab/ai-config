@@ -96,8 +96,10 @@ REMIND = [
     ([txt("Correcting my earlier count of the fragments.")], "correcting my"),
     ([ADMIT, tool("Edit", {"file_path": "R/foo.R"})],
      "a write that is NOT to a memory/skill path does not clear it"),
-    ([tool("Edit", {"file_path": "memories/tools.md"}), ADMIT],
-     "a recording BEFORE the admission does not clear it"),
+    ([tool("Edit", {"file_path": "memories/tools.md"}), user("next task"), ADMIT],
+     "a recording in an EARLIER turn does not clear it"),
+    ([ADMIT, tool("Bash", {"command": "cat /x/ai-config/memories/tools.md"})],
+     "a Bash READ of a memory file does not clear it"),
     # Omission self-critique (ai-config#1751). "should have" + past
     # participle is retrospective, distinct from every pattern above, which
     # all catch a FACTUAL retraction rather than a behavioral gap.
@@ -216,6 +218,20 @@ SILENT = [
            {"text": "You're right, I was wrong on two counts."}),
       tool("Write", {"file_path": "/x/ai-config/memories/claude-app-projects.md"})],
      "post_message admission followed by a memory write"),
+    # A project thread runs the pass, then reports the mistake in its reply.
+    ([user("why?"),
+      tool("Write", {"file_path": "/x/ai-config/memories/claude-app-projects.md"}),
+      tool("mcp__hearthbot__post_message",
+           {"text": "I was wrong about the threads; recorded it in memories."})],
+     "a pass EARLIER in the same turn clears a reply-tool admission"),
+    ([ADMIT, tool("Bash", {"command": "cat /tmp/l >> /x/ai-config/memories/tools.md"})],
+     "a Bash append into a memory file clears it"),
+    ([ADMIT, tool("Bash", {"command": "printf x | tee -a shared/workflow/a.md"})],
+     "a tee into a shared fragment clears it"),
+    ([ADMIT, tool("mcp__github__create_or_update_file", {"path": "memories/tools.md"})],
+     "a GitHub MCP file write to a memory path clears it"),
+    ([ADMIT, tool("mcp__github__push_files", {"files": [{"path": "skills/ums/SKILL.md"}]})],
+     "a GitHub MCP push_files to a skill path clears it"),
     ([tool("mcp__github__add_issue_comment", {"body": "I was wrong about this."})],
      "a GitHub comment is not a reply-tool admission"),
     # A word ending in "i" followed by an admission verb. Without a `\b` before
@@ -648,6 +664,9 @@ try:
     rc, out = stop_run({"stop_hook_active": True}, tmp_b)
     stop_checks.append((rc == 0 and "decision" not in out,
                         "never blocks while stop_hook_active is set"))
+    rc, out = stop_run({}, tmp_b)
+    stop_checks.append((rc == 0 and out.get("decision") == "block",
+                        "a stop_hook_active Stop does not use up the one block"))
 finally:
     os.unlink(stop_path)
     shutil.rmtree(tmp_a, ignore_errors=True)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UserPromptSubmit reminder: an admitted error owes a UMS pass.
+"""UserPromptSubmit reminder, and once-per-turn Stop block: an admitted error owes a UMS pass.
 
 CLAUDE.md's "Run UMS proactively" section makes discovering you were wrong a
 trigger in its own right. It is the trigger with no artifact: nothing merges,
@@ -7,8 +7,8 @@ no check turns green, and the correction *feels* like the completion when it
 is only the input. So the pass is skipped, and the same class of error recurs
 within hours.
 
-WHY THIS INJECTS RATHER THAN BLOCKS
------------------------------------
+WHY THE PROMPT-TIME REGISTRATION INJECTS RATHER THAN BLOCKS
+-----------------------------------------------------------
 The obvious shape here is a `Stop` hook that blocks the outgoing message,
 copying `no-offer-to-file.py`. That shape is wrong for this rule, and the
 distinction is the whole reason this file exists.
@@ -22,8 +22,9 @@ between the model and the user -- silently remove the very signal that would
 have surfaced the mistake. Admitting must always be free and immediate; it is
 the RECORDING that has to follow.
 
-So this fires on the next prompt instead, and only ever adds context. There is
-no code path here that can suppress, delay, or alter a message.
+So the UserPromptSubmit registration only ever adds context. No code path
+here can suppress, delay, or alter a message; the Stop registration described
+below blocks only the END of a turn whose admission was already delivered.
 
 MECHANISM
 ---------
@@ -46,7 +47,15 @@ is also registered on Stop with AI_CONFIG_STOP=1. By the time Stop runs the
 admission has already been delivered, so blocking the stop suppresses nothing
 -- the objection above is to blocking the MESSAGE, which this never does. It
 blocks at most once per turn and never while `stop_hook_active` is set
-(scripts/lib/agent_notice.py), so it cannot hold a session in a loop.
+(scripts/lib/agent_notice.py), so it cannot hold a session in a loop. A Stop
+that arrives with `stop_hook_active` set exits before the sentinel, so it does
+not use up the admission's one block.
+
+A project thread usually runs the pass and THEN reports the mistake in its
+reply, so UMS work earlier in the same turn (after the last user message)
+discharges an admission too, not only work after it. A Bash redirect or `tee`
+into a memory, skill or shared path, and a GitHub MCP file write to one,
+count as UMS work, since those are how a cloud session records a learning.
 
 It stays silent when the pass already happened: a memory/skills/shared write, a
 UMS-mentioning subagent dispatch, or a `ums` invocation recorded LATER in the
@@ -354,6 +363,26 @@ def visible_prose(text):
     return TICKED.sub(" ", text)
 
 
+# A shell write into a memory, skill or shared path: a redirect or `tee`
+# whose target names one. A bare read (`cat memories/x.md`) is not a write.
+SHELL_UMS_WRITE = re.compile(
+    r"(?:>>?|\btee\b(?:\s+-a)?)\s*[\"']?[^\s\"'|;&<>]*"
+    r"(?:memories?/|MEMORY\.md|CLAUDE\.md|skills/|shared/)",
+    re.I,
+)
+GITHUB_FILE_WRITES = ("mcp__github__create_or_update_file", "mcp__github__push_files")
+
+
+def _is_user_text(m, blocks):
+    """True for a user record carrying typed text (not a tool result)."""
+    if m.get("type") != "user" and m.get("role") != "user":
+        return False
+    if isinstance(blocks, str):
+        return bool(blocks.strip())
+    return any(isinstance(b, dict) and b.get("type") == "text"
+               and (b.get("text") or "").strip() for b in blocks or [])
+
+
 def records(path):
     with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
@@ -364,8 +393,14 @@ def records(path):
 
 
 def scan(path):
-    """Return (admission_text, admitted_at, recorded_at)."""
+    """Return (admission_text, admitted_at, recorded_at).
+
+    `recorded_at` is raised to `admitted_at` when UMS work happened earlier in
+    the admission's own turn, so a pass followed by the reply that reports the
+    mistake counts as discharged.
+    """
     admit_txt, admit_at, ums_at = None, -1, -1
+    user_at, admit_turn = -1, -1
 
     for i, m in enumerate(records(path)):
         # A subagent's own turns are not my outgoing message.
@@ -387,6 +422,9 @@ def scan(path):
 
         is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant"
         blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+        if _is_user_text(m, blocks):
+            user_at = i
+            continue
         if isinstance(blocks, list):
             for b in blocks:
                 if isinstance(b, dict):
@@ -429,11 +467,20 @@ def scan(path):
             hit = ADMISSION.search(visible_prose(raw_text))
             if hit:
                 admit_txt, admit_at = hit.group(0).strip(), i
+                admit_turn = user_at
 
         for name, inp in tool_calls:
             if not isinstance(inp, dict):
                 continue
             blob = ""
+            if name in GITHUB_FILE_WRITES:
+                paths = [str(inp.get("path") or "")]
+                files = inp.get("files")
+                if isinstance(files, list):
+                    paths += [str(f.get("path") or "") for f in files if isinstance(f, dict)]
+                if any(UMS_PATH.search(p) for p in paths):
+                    ums_at = i
+                continue
             if name in ("Write", "Edit", "NotebookEdit", "write", "edit", "write_to_file", "replace_file_content"):
                 blob = str(inp.get("file_path") or inp.get("path") or inp.get("TargetFile") or inp.get("target_file") or "")
                 if UMS_PATH.search(blob):
@@ -464,10 +511,15 @@ def scan(path):
                 blob = " ".join(ums_parts)
             elif name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
                 blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
+                if SHELL_UMS_WRITE.search(blob):
+                    ums_at = i
             elif name == "Skill":
                 blob = str(inp.get("skill", ""))
             if blob and UMS_WORD.search(blob):
                 ums_at = i
+
+        if admit_at >= 0 and admit_turn < ums_at < admit_at:
+            ums_at = admit_at
 
     return admit_txt, admit_at, ums_at
 
@@ -506,13 +558,16 @@ def main() -> int:
     # The mode is in the key: the UserPromptSubmit and Stop registrations each
     # owe their own firing, as in no-mistake-without-a-hook.py.
     mode = os.getenv("AI_CONFIG_STOP") or ""
+    if mode == "1" and payload.get("stop_hook_active"):
+        # Leave the sentinel unused, so the next plain Stop still blocks once.
+        return 0
     key = hashlib.sha256(f"{path}:{admit_txt}:{mode}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-ums-after-error-{key}")
     if not _sentinel_gate(sentinel, admit_at):
         return 0
 
     message = (
-        "UMS reminder: an earlier turn in this session admitted an error "
+        "UMS reminder: this session admitted an error "
         f'("{admit_txt}"), and no memory, skill, or shared-fragment write has '
         "been recorded since.\n"
         "CLAUDE.md ('Run UMS proactively') makes discovering you were wrong a "
@@ -525,8 +580,9 @@ def main() -> int:
         "If this reminder is a false positive (you were correcting someone "
         "else's claim, quoting the rule, or writing a hypothetical such as "
         "'even if I misread it'), disregard it and carry on. Writing about the "
-        "misfire will not re-fire it: this fires once per distinct phrase per "
-        "session, and a phrase wrapped in backticks is not matched at all."
+        "misfire will not re-fire it: the same phrase within a few transcript "
+        "records does not fire again, and a phrase wrapped in backticks is "
+        "not matched at all."
     )
     if mode == "1":
         # Stop: the admission has already been delivered, so blocking the
@@ -536,7 +592,7 @@ def main() -> int:
         if stop_notice is not None:
             print(stop_notice(payload, message, "remind-ums-after-error"))
         else:
-            print(json.dumps({"decision": "block", "reason": message}))
+            print(json.dumps({"decision": "block", "reason": message}))  # stop_hook_active checked above
     else:
         print(message)
     return 0

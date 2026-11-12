@@ -650,6 +650,35 @@ def test_changed_list_handoff():
                 os.environ["RLV_CHANGED_FILES"] = old
 
 
+def test_bash_skips_a_shell_that_cannot_run_steps():
+    """A bash that fails the probe is passed over (ai-config#3724).
+
+    The WSL launcher on a Windows runner with no distribution exits 1 on any
+    command; a stand-in that does the same must lose to a real bash, and one
+    that exits 0 must win, which shows AI_SESSION_BASH is consulted at all.
+    """
+    saved = (rlv._BASH, os.environ.get("AI_SESSION_BASH"))
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            for name, rc in (("broken", 1), ("working", 0)):
+                fake = Path(tmp) / name
+                fake.write_text(f"#!/bin/sh\nexit {rc}\n")
+                fake.chmod(0o755)
+                os.environ["AI_SESSION_BASH"] = str(fake)
+                rlv._BASH = None
+                chosen = rlv.bash()
+                if rc:
+                    check("a bash that fails the probe is skipped", chosen != str(fake))
+                else:
+                    check("AI_SESSION_BASH is chosen when it passes the probe", chosen == str(fake))
+        finally:
+            rlv._BASH = saved[0]
+            if saved[1] is None:
+                os.environ.pop("AI_SESSION_BASH", None)
+            else:
+                os.environ["AI_SESSION_BASH"] = saved[1]
+
+
 def main():
     print('running test_changed_list_handoff()', flush=True)
     test_changed_list_handoff()
@@ -687,6 +716,8 @@ def main():
     test_live_workflow_derives_every_python_test_suite()
     print('running test_equivalents_table_covers_all_uses_jobs()', flush=True)
     test_equivalents_table_covers_all_uses_jobs()
+    print('running test_bash_skips_a_shell_that_cannot_run_steps()', flush=True)
+    test_bash_skips_a_shell_that_cannot_run_steps()
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

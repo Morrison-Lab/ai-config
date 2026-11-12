@@ -4,7 +4,7 @@ Worked-example case records for the rules in [`CLAUDE.md`](CLAUDE.md), moved
 here to keep them out of the auto-loaded context.
 Each heading names the section and the rule the record supports.
 A few sections have since left CLAUDE.md as duplicates of the [`AGENTS.md`](AGENTS.md) section of the same name (ai-config#5310).
-Their records support that section and the fragment it links, which holds the numbered points the records cite.
+Their records support that section and the fragment it links; the "Keep ai-config and repo checkouts fresh" records cite numbered points, which are in that fragment.
 
 The wording is unchanged from `CLAUDE.md`, word for word.
 Three things about the text itself did change in the move, because relocated

@@ -22,7 +22,8 @@ from findbash import find_bash  # noqa: E402
 # checkout's script (ai-config#5503), so probe for one that can.
 BASH = find_bash(RUNNER, probe_args=("true",))
 if BASH is None:
-    sys.exit("error: no bash here can run plugins/ai-config-hooks/run-hook.sh; "
+    sys.exit("error: no bash tried (AI_SESSION_BASH if set, bash on PATH, Git for Windows, "
+             "/bin/bash) can run plugins/ai-config-hooks/run-hook.sh; "
              "set AI_SESSION_BASH to one that can")
 
 passes = 0
@@ -53,10 +54,10 @@ def run(home: Path, project: Path, *args: str, stdin: str = "") -> subprocess.Co
     )
 
 
-# Git Bash on Windows exports a POSIX path (/c/..., /tmp/...); cygpath -w turns
+# Git Bash on Windows exports a POSIX path (/c/..., /tmp/...); cygpath -wl turns
 # it back into the native form RUNNER.parent.resolve() gives (ai-config#5516).
 ECHO = ('cat; r="${CLAUDE_PLUGIN_ROOT}"; '
-        'if command -v cygpath >/dev/null; then r="$(cygpath -w "$r")"; fi; echo "root=$r"')
+        'if command -v cygpath >/dev/null; then r="$(cygpath -wl "$r")"; fi; echo "root=$r"')
 
 with tempfile.TemporaryDirectory() as td:
     tmp = Path(td)

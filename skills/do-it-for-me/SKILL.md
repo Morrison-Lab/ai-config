@@ -43,14 +43,14 @@ It does not lift the prohibited-action rules.
    Check the switch conditions in `ask-for-manual-approval`'s "When to switch or ask" first:
    a dispatched subagent reports up its dispatch chain instead,
    and in an `away` session, or a CI or `@claude` run, record a pending decision instead.
-   For a merge, an action any allow route in that section covers, or one where you cannot tell, never switch yourself:
+   For a merge, an action any allow route in that section covers, or one where the settings files and hooks that apply do not let you tell, never switch yourself:
    ask the user to switch out of auto mode.
    Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available,
    read the original mode with `mcp__ccd_session_mgmt__get_session`,
    switch the session to `default`, and run the command once.
-   Restore the original mode once the actions that need approval are done,
-   even if a command failed or timed out,
-   as that fragment's "Say when it is over" says.
+   Restore the original mode right after that one step,
+   even if a command failed or timed out:
+   `difm` covers one step, so the stretch that fragment's "Say when it is over" ends is that step alone.
    When that tool is not available, ask the user to switch out of auto mode,
    naming the refused command and its stated reason.
    The self-switch, the stop conditions, and the managed-settings exception

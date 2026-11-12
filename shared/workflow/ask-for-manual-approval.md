@@ -52,7 +52,7 @@ Auto mode drops broad allow rules that `default` mode honours ([permission modes
 a `permissions.allow` rule in any settings file that applies, a PreToolUse hook that returns an allow decision, a session "always allow" grant, and `--allowedTools`.
 This repository's [`grant-personal-permissions`](../../hooks/grant-personal-permissions.py) hook allows `gh pr merge` that way.
 So never switch modes yourself for a merge, and do not switch for any action one of those routes covers, or where the settings files and hooks that apply do not let you tell;
-a session grant or `--allowedTools` you cannot see is a grant the user already made, not a reason to ask;
+a session grant or `--allowedTools` you cannot see may let the rerun run with no prompt, so it is a reason to ask the user to switch rather than to switch yourself;
 ask the user to switch out of auto mode instead, naming the refused command and its stated reason.
 Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
 A switch to a lower mode shows no card, so that prompt is the user's only sign of the switch.

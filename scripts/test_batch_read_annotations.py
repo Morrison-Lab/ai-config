@@ -90,17 +90,18 @@ check("a group is known only when every member matches",
 # An unfinished run and a short read are named and left out of the id list.
 api, calls = fake_api({31: [ann("a")], 32: [ann("b")], 33: [ann("c")]},
                       status={31: "in_progress"}, report={32: 2})
-code, out, err = run([], api)
-check("unfinished and short-read runs exit 2, named, and only complete runs are listed",
+code, out, err = run([], api, sleeps := [])
+check("unfinished and short-read runs exit 2, named, only complete runs listed, one pause",
       code == 2 and out.strip().splitlines()[-1] == "33"
       and "run 31 is in_progress" in err and "run 32: read 1 annotations, GitHub reports 2" in err
-      and not any("/check-runs/31/" in c for c in calls))
+      and not any("/check-runs/31/" in c for c in calls) and sleeps == [1.0])
 
 # 503 - listing - run 11 - run 12 = 500; run 13 would leave 499, below the floor.
-api, calls = fake_api(RUNS, remaining=503)
+api, calls = fake_api(RUNS, remaining=503, status={14: "in_progress"})
 code, out, err = run(["--floor", "500"], api)
-check("the floor stops the read (exit 3), names budget and reset, lists only runs read",
+check("the floor stops the read (exit 3), names budget, reset and the unfinished run",
       code == 3 and "STOPPED: 500 core request(s) left, floor 500" in err
+      and "run 14 is in_progress" in err and "1 run(s) unread" in err
       and "00:00 UTC" in err and out.strip().splitlines()[-1] == "11,12"
       and not any("/check-runs/13/" in c for c in calls))
 code, out, err = run([], fake_api(RUNS, fail=True)[0])

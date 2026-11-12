@@ -84,11 +84,10 @@ def main(argv=None, api=gh_api, sleep=time.sleep):
         runs = [r for r in pages(api, f"repos/{args.repo}/commits/{args.sha}/check-runs",
                                  "check_runs")
                 if (r.get("output") or {}).get("annotations_count")]
-        for n, run in enumerate(runs):
+        bad = [f"run {r['id']} is {r.get('status')}; its annotations may not exist yet"
+               for r in runs if r.get("status") != "completed"]
+        for n, run in enumerate(r for r in runs if r.get("status") == "completed"):
             rid, count = run["id"], run["output"]["annotations_count"]
-            if run.get("status") != "completed":
-                bad.append(f"run {rid} is {run.get('status')}; its annotations may not exist yet")
-                continue
             if n:
                 sleep(args.pause)
             remaining, reset = core_budget(api)

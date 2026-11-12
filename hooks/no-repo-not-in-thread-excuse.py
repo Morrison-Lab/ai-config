@@ -53,7 +53,9 @@ LIST_NEG = re.compile(
 ATTACH_VERB = re.compile(rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b"
     rf"(?=\s+(?:both\s+|the\s+)?(?:it|them|repo|repository|{NAMED.pattern})(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)|\s*(?:[.,;]|$)|\s+now\b)"
     rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\b(?:added|cloned|cloning)\s+(?:it|them|the\s+repo(?:sitory)?|{NAMED.pattern})\b(?!\s+(?:to|in)\s+(?!{PLACE}|/))"
-    r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned)\b", re.I)
+    r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned|fixed)\b"
+    r"|\b(?:fixed|attached|added)\s+(?:\w+\s+){0,3}?(?:with|via|using)\s+add_repo\b", re.I)
+OUTAGE = re.compile(r"\b(?:down|outage|offline|proxy|network|disk|quota|rate.limit\w*|timed?\s*out|DNS|SSL|TLS|[45]\d\d|[45]\d\ds)\b", re.I)
 OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo|scope)\b"
                          rf"|\b{NEG}\s+(?:\w+\s+)?(?:in|on|part\s+of|among|one\s+of|available)\b))", re.I)
 DONE = re.compile(r"\b(?:I|[Ww]e)\s+(?:(?:just|then|also|finally|now)\s+)?$")  # "until I attached it" is done
@@ -92,7 +94,7 @@ def names_repo(sentence: str) -> bool:
             return True
     for rx in (OBJECT, LIST_NEG):
         obj = rx.search(sentence)
-        if obj and any(g and REPO_NAME.search(g) for g in obj.groups()) and not OTHER_CAUSE.match(sentence, obj.end()):
+        if obj and any(g and REPO_NAME.search(g) for g in obj.groups()) and not (OTHER_CAUSE.match(sentence, obj.end()) or OUTAGE.search(sentence)):
             return True
     return False
 
@@ -104,9 +106,9 @@ def plain(sentence: str) -> str:
 
 
 def attaches(sentence: str) -> bool:
-    return bool(TRIED.search(sentence) or any(
-        DONE.search(before) or not NOT_YET.search(before) for before in
-        (sentence[max(0, m.start() - 40):m.start()] for m in ATTACH_VERB.finditer(sentence))))
+    return bool(TRIED.search(sentence) or any(  # an add_repo subject ("until add_repo attached it") reports a run
+        "add_repo" in m.group().lower() or DONE.search(sentence[max(0, m.start() - 40):m.start()])
+        or not NOT_YET.search(sentence[max(0, m.start() - 40):m.start()]) for m in ATTACH_VERB.finditer(sentence)))
 
 
 def is_excuse(sentence: str) -> bool:

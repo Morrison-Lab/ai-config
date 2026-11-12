@@ -440,6 +440,7 @@ its description does not use (ai-config#949).
 | `shared/writing/explain-analysis-choices.md` | Ezra's rule (2026-11-03, ai-config#4905): every time you make an arbitrary analysis choice, explain the decision in detail in the prose next to it. |  |
 | `shared/writing/fact-check-prose.md` | When reviewing prose in a PR/MR --- documentation, lecture notes, a README, any non-code narrative content --- assess it for **accuracy and clarity**, not ju... |  |
 | `shared/writing/forward-references.md` | A **forward reference** is any mention that points a reader ahead to content they haven't reached yet --- a phrase like "as discussed below", "in the followi... |  |
+| `shared/writing/graph-and-equation-defaults.md` | Moved verbatim from `AGENTS.md`'s section of the same name (ai-config#5310), which now states the principle and links here. |  |
 | `shared/writing/grouping-levels.md` | A grouping level must earn its place: introducing one costs the reader a level of nesting, and that cost is only repaid when the level actually separates som... |  |
 | `shared/writing/hyperlink-liberally.md` | Make it easy for readers to find more information by hyperlinking liberally. When writing documentation, guides, READMEs, rules, skills, memories, PR descrip... |  |
 | `shared/writing/hypothetical-examples.md` | A worked example that illustrates a definition or theorem with **invented, round-number quantities** --- "Suppose a binary covariate Z...", "If 20% of the ex... |  |

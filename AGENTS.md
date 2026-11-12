@@ -295,7 +295,7 @@ Have your work reviewed independently before it ships or reaches a person, and k
   Dispatch the review with an adversarial brief to a separate reviewer, address, rebut, or defer every finding, and push only on a `clean` verdict for HEAD ([`adversarial-self-review`](shared/workflow/adversarial-self-review.md)).
 - **Get a clean automated review before asking a person to review:** never ask a person to review any work product, on any forge, or report it as awaiting human review, until its automated review is clean or deadlocked.
   Trigger the automated reviews yourself after the round's last push, and iterate (`ardi`) until clean ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
-- **Put PRs in ready mode when they are ready for review**, except an empty PR opened on claim, until its implementation lands, and a draft-gated dependent PR, until its prerequisites merge.
+- **Put PRs in ready mode when they are ready for review**, except an empty PR opened on claim, until its implementation lands and checks pass, and a draft-gated dependent PR, until its prerequisites merge.
   Marking a PR ready grants no merge authority ([`put-prs-in-ready-mode`](shared/workflow/put-prs-in-ready-mode.md)).
 - **Always arm a persistent PR loop** when you open, push to, or take over a PR, if one is not already running, and keep it running until the PR merges or closes, or the user stops it.
   A one-shot poll or webhook subscription is not a loop, so re-arm periodic wakes, and after every push poll CI and review until both are terminal ([`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md)).

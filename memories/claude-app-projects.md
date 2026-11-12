@@ -88,6 +88,11 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16, wit
   It refuses a decision-card tap, a message the coordinator relayed, and a project-chat message.
   When a thread will need the device after the user approves, ask for a typed reply in the thread instead of a decision card,
   so the approval also serves as the message the session starts from.
+  Before sending a device work that needs WWU CS hosts (cf463-01, cf463-02, the HTCondor heads), check which devices are serving with `list_devices`.
+  On 2026-11-12 only the XPS was serving.
+  It sat on a home network with no VPN and resolved no internal WWU CS name,
+  so a rebuild of `lds-ci.sif` (Morrison-Lab/gha#1645) could not run from it.
+  If no device on the WWU network is serving, say so and offer the routes, rather than brief a device that cannot reach the host.
 - **Transfer GitHub issues from a device session.**
   GitHub has no REST endpoint for an issue transfer: it needs the GraphQL `transferIssue` mutation,
   and cloud sessions are refused GraphQL.

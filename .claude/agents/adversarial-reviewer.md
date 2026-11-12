@@ -230,6 +230,14 @@ On a diff, brief or transcript, check that no command or Read prints a credentia
 A substitution passed as another program's argument is fine.
 Read the diff, not a hook's output; see [`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#credential-files-printed).
 
+## One-sided conflict resolution
+
+On a merge commit or a PR whose history resolved conflicts, check whether a hunk was resolved by keeping one side whole (`checkout --ours`/`--theirs`, `-X ours`/`theirs`) when the other side added lines that belong in the result.
+Check too whether a `-s ours` merge dropped the other branch's changes entirely when some of them belong in the result.
+Compare the result against both parents' changes since the merge base;
+do not report the warning hook's output as your finding.
+See [`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md#anti-patterns).
+
 ## Rules and skills without eval cases
 
 On a diff that adds or changes a rule or a skill whose behaviour one prompt can show, check that it adds or updates a case under `evals/`, and that every trigger case has a negative twin.

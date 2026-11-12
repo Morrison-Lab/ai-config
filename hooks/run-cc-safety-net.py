@@ -28,7 +28,7 @@ FAILS OPEN, VISIBLY, when CC Safety Net cannot run: no `node` (it needs
 Node.js 22 or later), no `npm` for the first fetch, a failed or mismatched
 download, a crash, or a timeout. The tool call then proceeds and the agent
 is told, once per session, that the base guard did not run and why. The
-ai-config guards around it still run. Failing closed instead would stop
+other ai-config guards still run. Failing closed instead would stop
 every tool call on a machine without Node.js.
 
 A failed fetch is recorded in the cache, and no fetch is tried again for
@@ -146,7 +146,8 @@ def unpack(tarball: Path, dest: Path) -> None:
         root = dest.resolve()
         for member in tar.getmembers():
             target = (dest / member.name).resolve()
-            if root not in target.parents or not (member.isfile() or member.isdir()):
+            inside = target == root or root in target.parents
+            if not inside or not (member.isfile() or member.isdir()):
                 raise Unavailable(f"tarball member {member.name!r} is unsafe")
         tar.extractall(dest)
 
@@ -283,9 +284,13 @@ def main() -> int:
         return 0
     payload = fill_empty_cwd(payload)
     try:
-        session_id = str(json.loads(payload or b"{}").get("session_id") or "unknown")
+        session_id = str(json.loads(payload or b"{}").get("session_id") or "")
     except (ValueError, AttributeError):
-        session_id = "unknown"
+        session_id = ""
+    if not session_id:
+        # A payload without a session id would share one marker forever;
+        # key it by day so the notice still comes back.
+        session_id = "unknown-" + time.strftime("%Y-%m-%d")
     try:
         proc = run(entry_point(load_pin()), payload)
     except (Unavailable, OSError, ValueError, tarfile.TarError) as exc:

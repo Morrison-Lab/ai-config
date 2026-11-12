@@ -45,7 +45,7 @@ Ezra, 2026-11-12, chose to adopt [CC Safety Net](https://github.com/kenryu42/cc-
 It fails open, with a notice once per session, where Node.js 22 or npm is missing, and after a failed fetch it waits an hour before fetching again.
 A `.cc-safety-net/policy.json` committed to a repository can add blocks but cannot turn any off.
 
-The standard level, not strict, because replaying the 797 distinct Bash commands of one ai-config session through each level (2026-11-12) gave:
+It runs at the standard level, not strict, because replaying the 797 distinct Bash commands of one ai-config session through each level (2026-11-12) gave:
 
 | Level | Commands refused | What it refused |
 | --- | --- | --- |
@@ -55,7 +55,7 @@ The standard level, not strict, because replaying the 797 distinct Bash commands
 - **Do:** when it refuses a command, read the rule it names and narrow the command, as its message says.
 - **Don't:** route around a refusal with an equivalent command it does not recognize.
   Ask Ezra instead, naming the rule.
-- **Do:** before moving the pin, run `CC_SAFETY_NET_LIVE=1 python3 hooks/test-run-cc-safety-net.py` and feed the new release this table's incident commands.
+- **Do:** before moving the pin, run `CC_SAFETY_NET_LIVE=1 python3 hooks/test-run-cc-safety-net.py` and feed the new release the incident commands in the failure-pattern table above.
 
 ## Rules for the patterns no hook decides yet
 

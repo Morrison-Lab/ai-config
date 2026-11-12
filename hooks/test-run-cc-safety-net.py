@@ -118,6 +118,8 @@ class Sandbox:
         payload = {"session_id": session, "hook_event_name": "PreToolUse",
                    "tool_name": "Bash", "tool_input": {"command": command},
                    "cwd": str(self.root) if cwd is None else cwd}
+        if session is None:
+            del payload["session_id"]
         environ = {"PATH": str(self.bin), "HOME": str(self.root),
                    "FAKE_NPM_LOG": str(self.log), "FAKE_TGZ": str(self.tgz),
                    "AI_CONFIG_CC_SAFETY_NET_CACHE": str(self.cache), **env}
@@ -216,6 +218,17 @@ class FailsOpenVisibly(unittest.TestCase):
         self.assertIn("did not run", context(first))
         self.assertEqual(second.stdout, "")
         self.assertIn("did not run", context(other))
+
+    def test_a_payload_without_a_session_keys_its_marker_by_day(self):
+        # Every such payload would otherwise share one marker forever.
+        self.box.write_pin("sha512-" + base64.b64encode(b"x" * 64).decode())
+        first = self.box.run("echo 1", session=None)
+        second = self.box.run("echo 2", session=None)
+        self.assertIn("did not run", context(first))
+        self.assertEqual(second.stdout, "")
+        key = "unknown-" + time.strftime("%Y-%m-%d")
+        name = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+        self.assertTrue((self.box.cache / "warned" / name).is_file())
 
     def test_a_failed_fetch_names_npm_error(self):
         proc = self.box.run("DENYME", FAKE_NPM_FAIL="1")

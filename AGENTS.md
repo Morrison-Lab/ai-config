@@ -90,6 +90,7 @@ See [`use-real-world-examples`](shared/principles/use-real-world-examples.md) (p
 
 Before answering that a permission, policy or tool does not exist, for you or for another session, and before implementing a new policy or capability, search the full policy corpus (`AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`) and the issue tracker.
 See [`check-tools-before-saying-cant`](shared/workflow/check-tools-before-saying-cant.md), [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md), [`issue-first`](shared/workflow/issue-first.md) for the all-state search, and [`AGENTS.cases.md`](AGENTS.cases.md).
+When the search finds a recorded answer to the user's question, give a brief direct answer and link the recorded answer for more ([`answer-briefly-link-the-record`](shared/workflow/answer-briefly-link-the-record.md)).
 
 ## Track each useful resource in each notes repo whose topic it covers
 

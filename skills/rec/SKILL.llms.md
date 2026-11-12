@@ -36,6 +36,12 @@ Lead with the specific action, followed by the trade-off rationale.
 
 Distinguish genuine decisions from authorized or standard workflow steps: - If an action is already in scope or required by standing rules (e.g., running tests, fixing lints, ARDI loops, drafting issues), perform the work and report in the past tense rather than asking “Let me know if you want me to do X”. - Reserve recommendations for genuine forks in design, architecture, scope trade-offs, or external intent.
 
+### 5. Open-ended prompts, status lines, and whether-or-how questions
+
+A soft, open-ended prompt that presents choices is a decision point too, and carries a concrete recommendation. Repeat the recommendation in one line whenever a status list restates a decision item. A user’s whether-or-how question is not an instruction: recommend, then ask whether to start now or file it ([`start-or-file`](../../shared/workflow/start-or-file.md)).
+
+- **Do:** write every pending-decision line as “decide X — I recommend Y, because Z”.
+
 ## Procedure
 
 ### Step 1 — Identify the choice or question

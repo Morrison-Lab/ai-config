@@ -25,21 +25,23 @@ NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
        rf"can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
-# The subject form takes only a presence word, so "lds is not changed in" passes.
 SUBJ_NEG = re.compile(
     rf"\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really)\s+)?"
-    r"(?:in|part\s+of|attached|among|one\s+of|within|available|accessible|reachable|"
-    r"checked\s+out|cloned|added)\b|\b(?:outside|unavailable)\b", re.I)
-ANY_NEG = re.compile(rf"\b{NEG}\b|\b(?:outside|unavailable|lack\w*|no)\b", re.I)
+    r"(?:(?:in|within)(?=\s+(?:this|the|my|our|that|current|any)\b)|part\s+of|attached|among|one\s+of|"
+    r"available|accessible|reachable|checked\s+out|cloned|added)\b|\b(?:outside|unavailable|missing\s+from)\b", re.I)
 PLACE = rf"(?:this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
 LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b|\bhere\b", re.I)
 REPO_LIST = re.compile(
-    rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope)\b"
+    rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list)\b"
     r"(?![\w'\u2019])(?!\s+(?:checkout|clone|directory|folder|tree|root|branch|files?|of)\b)"
     r"|\bmy\s+(?:repos|repositories)\b(?!['\u2019])"
     r"|\bthe\s+(?:repos|repositories)\s+(?:attached|available|in|on|for)\b",
     re.I)
-LAB_REPOS = (r"ai-config|gha|macros|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"
+LIST_NEG = re.compile(
+    rf"(?:\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:in|on|one\s+of|part\s+of|among|within|available|attached|added|see)"
+    rf"|\b(?:outside|missing\s+from))\s+(?:\S+\s+){{0,4}}?(?:{REPO_LIST.pattern})"
+    rf"|(?:{REPO_LIST.pattern})\s+(?:{NEG})\s+(?:include|includes|have|has|list)\b", re.I)
+LAB_REPOS = (r"ai-config|gha|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"
              r"ids|dds|vds|ccds|cds|epi\d+|lds-site|mcsg|stats-allowlist|teaching-tools")
 NAMED = re.compile(rf"\b[\w-]{{1,39}}/[\w-]{{1,100}}\b(?![/.]\w)|\b(?:{LAB_REPOS})\b", re.I)
 REPO_NAME = re.compile(rf"\b(?:repo|repos|repository|repositories)\b|{NAMED.pattern}", re.I)
@@ -47,21 +49,21 @@ SUBJECT = re.compile(rf"(?:{REPO_NAME.pattern})[\s`'\"\u2019]*(?:(?:is|are|was|w
 # The object must end its phrase: "I don't have the lds preview URL" passes.
 DET = r"(?:(?:the|a|an|that|this|any)\s+)?"
 TOK = r"`?([\w-]{1,39}(?:/[\w-]{1,100})?)`?"
-END = r"(?=\s*(?:[.,;:!?)]|$|(?:in|on|from|here|to|into|within|checked|cloned|attached)\b))"
+END = r"(?=\s*(?:[.,;:!?)]|$|(?:in|on|from|here|to|into|within|checked|cloned|attached|repo|repository)\b))"
+ACCESS = r"(?:(?:write|push|read)\s+)?access\s+to\s+"
 OBJECT = re.compile(
-    rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:have|has|include|includes|see)\s+(?:access\s+to\s+)?{DET}{TOK}{END}"
+    rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:have|has|include|includes|see)\s+(?:{ACCESS})?{DET}{TOK}{END}"
     # Action verbs need a can't: "I did not push to lds in this session" passes.
     rf"|\b{MODAL}\s+(?:\w+\s+)?(?:reach|access|push|edit|write|commit|clone|modify|open\s+a\s+PR\s+(?:on|in|against))"
     rf"\s+(?:to\s+|into\s+)?{DET}{TOK}{END}"
-    # "has no X" needs a checkout or access word: "we have no gha changes" passes.
     rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
-    rf"(?:access\s+to\s+{DET}{TOK}|(?:checkout|clone|copy)\s+of\s+{DET}{TOK}"
+    rf"(?:{ACCESS}{DET}{TOK}|(?:checkout|clone|copy)\s+of\s+{DET}{TOK}"
     rf"|{DET}{TOK}\s+(?:checkout|clone|copy|access|repo|repository)\b)"
-    rf"|\black\w*\s+access\s+to\s+{DET}{TOK}",
+    rf"|\black\w*\s+{ACCESS}{DET}{TOK}",
     re.I)
 ATTACHED = re.compile(
-    rf"\b(?:I|we)\s+(?:have\s+|{APOS}ve\s+|just\s+|then\s+)?(?:added|attached|cloned)\s+(?:(?:the|a|an)\s+)?(\S+)", re.I)
-FAIL = r"(?:refused|denied|declined|failed|rejected|returned|errored)"
+    rf"\b(?:I|we)\s+(?:have\s+|{APOS}ve\s+|just\s+|then\s+)?(?:added|attached|cloned)\s+(?:(?:the|a|an)\s+)?`?([\w/-]+)", re.I)
+FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
     r"\b(?:add_repo|attach|attaching)\b(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,2}?"
     rf"\s+(?:was\s+|itself\s+)?{FAIL}\b", re.I)
@@ -86,11 +88,14 @@ def message_text(tool_input: dict) -> str:
 
 
 def names_repo(sentence: str) -> bool:
-    if REPO_LIST.search(sentence) and ANY_NEG.search(sentence):
+    if LIST_NEG.search(sentence):
         return True
-    if any(SUBJECT.search(sentence[max(0, m.start() - 200):m.start()])
-           for m in SUBJ_NEG.finditer(sentence)):
-        return True
+    for m in SUBJ_NEG.finditer(sentence):
+        window = sentence[max(0, m.start() - 200):m.start()]
+        subj = SUBJECT.search(window)
+        # "The fix for lds isn't in" names lds as an object, not the subject.
+        if subj and not re.search(r"\b(?:for|to|on|in|of|with|from|about|by)\s+$", window[:subj.start()], re.I):
+            return True
     obj = OBJECT.search(sentence)
     if not obj:
         return False
@@ -102,7 +107,10 @@ def is_excuse(sentence: str) -> bool:
         return False
     att = ATTACHED.search(sentence)
     named = {m.group(0).lower() for m in NAMED.finditer(sentence)}
-    if att and REPO_NAME.search(att.group(1)) and named <= {att.group(1).lower()}:
+    obj = att and att.group(1).lower()
+    if obj == "it" and len(named) == 1:
+        obj = next(iter(named))
+    if obj and REPO_NAME.search(obj) and named <= {obj}:
         return False
     if TRIED.search(sentence):
         return False

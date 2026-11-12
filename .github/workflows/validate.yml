@@ -46,7 +46,10 @@ jobs:
         # earlier equation is added. This replays that assignment.
         run: python3 scripts/test_resolve_equation_anchors.py
       - name: Check ASCII punctuation in source files
-        # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
+        # ai-config#2550. The rule covers every tracked source file, .md included
+        # (ai-config#3284), but this whole-tree scan stays on .py and .R until the
+        # .md backlog is cleared (ai-config#735). "Check lines the PR adds for
+        # non-ASCII punctuation" in the new-line-breaks job covers the rest per PR.
         run: python3 scripts/check-ascii-punctuation.py
       - name: Run check-ascii-punctuation tests
         run: python3 scripts/test_check_ascii_punctuation.py

@@ -60,7 +60,7 @@ Ezra, 2026-11-12 (`cai:`, [ai-config#5568](https://github.com/Morrison-Lab/ai-co
 
 When a notes repo's full render (the publish on `main`, or a full PR preview) takes excessively long,
 consider splitting the repo into several topic repos, and bring Ezra a recommendation.
-The split itself is his decision.
+The split itself is Ezra's decision.
 
 - **Measure first.**
   Find where the time goes before blaming the repo's size:

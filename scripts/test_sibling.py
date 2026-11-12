@@ -191,7 +191,9 @@ GUARDED = {
     "no-commit-with-conflict-markers.py", "no-push-with-failing-notes-checks.py",
     "warn-new-line-breaks-on-push.py", "warn-new-line-breaks-on-edit.py",
     "flag-unattributable-reviewer-request.py", "no-push-without-self-review.py",
-    "warn-merge-without-cross-harness-review.py",
+    "warn-merge-without-cross-harness-review.py", "no-mwc-ask-for-infra-pr.py",
+    "no-announced-work-in-post-message.py", "no-interpreter-heredoc.py",
+    "require-ums-before-resolve.py",
 }
 # Deny hooks that stop gating when a sibling is missing, and must say so.
 NOT_GATING = {"block-redo-denied-write-via-other-tool.py", "no-commit-with-conflict-markers.py",
@@ -239,6 +241,11 @@ REQUIRED = (
     ("no-push-without-self-review.py", "_load_sibling", "no-unreviewed-pr.py"),
     ("warn-merge-without-cross-harness-review.py", "_sibling",
      "warn-merge-without-fully-clean.py"),
+    ("no-mwc-ask-for-infra-pr.py", "load_merge_hook", "no-unauthorized-merge.py"),
+    ("no-announced-work-in-post-message.py", "_load_stop_hook",
+     "no-announced-start-without-starting.py"),
+    ("no-interpreter-heredoc.py", "_load_heredoc_parser", "warn-heredoc-doubled-backslash.py"),
+    ("require-ums-before-resolve.py", "_load_ums_hook", "remind-ums-after-error.py"),
 )
 CALL_PROBE = ("import importlib.util as u, sys; "
               "s = u.spec_from_file_location('h', sys.argv[1]); "

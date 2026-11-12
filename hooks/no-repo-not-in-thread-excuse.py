@@ -51,10 +51,10 @@ LIST_NEG = re.compile(
     rf"|(?:{REPO_LIST.pattern})\s+(?:{NEG})\s+(?:include|includes|have|has|list)\s+{DET}{TOK}", re.I)
 # "I attached it", "I added it" and "ran add_repo" report the fix; "the attached patch", a request, a negation does not.
 ATTACH_VERB = re.compile(rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b"
-    rf"(?=\s+(?:both\s+|the\s+)?(?:it|them|repo|repository|{NAMED.pattern})(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)|\s*(?:[.,;]|$)|\s+now\b)"
+    rf"(?=\s+(?:both\s+|the\s+)?(?:it|them|repo|repository|{NAMED.pattern})(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)|(?:\s+both)?\s*(?:[.,;]|$)|\s+now\b)"
     rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\b(?:added|cloned|cloning)\s+(?:it|them|the\s+repo(?:sitory)?|{NAMED.pattern})\b(?!\s+(?:to|in)\s+(?!{PLACE}|/))"
-    r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned|fixed)\b"
-    r"|\b(?:fixed|attached|added)\s+(?:\w+\s+){0,3}?(?:with|via|using)\s+add_repo\b", re.I)
+    r"|\b(?:ran|running|called|calling|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:(?!(?:would|could|might|may|will|should|not|never)\b)\S+\s+){0,3}?(?:attached|added|cloned|fixed|succeeded|worked)\b"
+    r"|\b(?:fixed|attached|added|adding)\s+(?:\w+\s+){0,3}?(?:with|via|using)\s+add_repo\b", re.I)
 OUTAGE = re.compile(r"\b(?:down|outage|offline|proxy|network|disk|quota|rate.limit\w*|timed?\s*out|DNS|SSL|TLS|[45]\d\d|[45]\d\ds)\b", re.I)
 OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to|until|while)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo)\b"
                          rf"|\b{PLACE}\b))", re.I)  # "because it isn't in this thread's repos" is the excuse again
@@ -64,7 +64,7 @@ CLAUSE_START = re.compile(rf"(?:^|[,;(]\s*|\b(?:but|so|because|since|yet|while|a
                           r"|(?<!for\s)(?<!in\s)(?<!on\s)(?<!of\s)(?<!to\s)(?<!by\s)(?<!about\s)(?<!against\s)(?<!with\s)(?<!from\s)\bthat\s+)"
                           rf"(?:(?:the|our|my|this|that|both|and|either)\s+|(?:{REPO_NAME.pattern})[`'\"\s,]*(?:or\s+)?)*$", re.I)
 NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|nothing|no\s+one|once|when|until|unless|of|without|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
-FAIL = r"(?:refused|denied|declined|failed|rejected|errored|blocked|(?:needs|awaits|waiting\s+(?:on|for))\s+(?:your\s+)?approval|waiting\s+for\s+you|(?:returned|responded\s+with|came\s+back\s+with)\s+(?:an?\s+)?(?:error|[45]\d\d))"
+FAIL = r"(?:refused|denied|declined|failed|rejected|errored|blocked|pending|timed\s+out|asking\s+for\s+(?:your\s+)?approval|(?:needs|awaits|waiting\s+(?:on|for))\s+(?:your\s+)?approval|waiting\s+for\s+you|(?:returned|responded\s+with|came\s+back\s+with)\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
     r"\b(?:add_repo|attach|attaching)\b(?:\(\S{0,100}\))?(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,4}?"
     rf"\s+(?:was\s+|itself\s+)?{FAIL}\b|\b(?:attach|add_repo)\b[^.;]{{0,80}}?\b(?:(?:got|received)\s+[\"'\u2018\u201c]|(?:returned|responded|answered|said|replied)\b[^.;\"]{{0,40}}?[\"\u201c])"

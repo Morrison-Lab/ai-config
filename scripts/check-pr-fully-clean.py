@@ -1017,7 +1017,7 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} passed but carries "
                 f"{cr['annotations_count']} annotation(s) not yet read: run "
                 f"`gh api repos/{repo}/check-runs/{cr.get('id')}/annotations` "
-                "(for many runs, scripts/summarize-pr-annotations.sh), "
+                f"(for many runs, `{BATCH_READ_CMD.format(repo=repo, sha=sha)}`), "
                 "fix each or report it as a false positive in the PR, then "
                 f"rerun with `--annotations-read {cr.get('id')}`")
         elif conclusion not in ("success", "neutral", "skipped"):
@@ -1040,7 +1040,35 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")
 
+    unread = sum("annotation(s) not yet read" in i for i in issues)
+    if unread > UNREAD_RUNS_BUDGET_THRESHOLD:
+        issues.append(_core_budget_note(unread, repo, sha))
     return all(i.startswith("NOTE: ") for i in issues), issues
+
+
+# Above this many unread annotation runs, name the shared core budget before
+# the reads start (ai-config#5045): one call per run exhausted it once.
+UNREAD_RUNS_BUDGET_THRESHOLD = 5
+BATCH_READ_CMD = "scripts/batch-read-annotations.py --repo {repo} --sha {sha}"
+
+
+def _core_budget_note(unread: int, repo: str, sha: str) -> str:
+    """A NOTE naming the core budget from GET /rate_limit, which costs nothing.
+
+    A failed read is stated in the NOTE, never dropped: the budget is advice
+    about how to read the runs, and the unread runs already block on their own.
+    """
+    try:
+        core = json.loads(fetch(["gh", "api", "rate_limit"]))["resources"]["core"]
+        reset = datetime.fromtimestamp(core["reset"], tz=timezone.utc)
+        budget = (f"has {core['remaining']} request(s) left until "
+                  f"{reset.strftime('%H:%M UTC')}")
+    except (RuntimeError, PayloadError, ValueError, KeyError, TypeError) as exc:
+        budget = f"could not be read ({type(exc).__name__}: {exc})"
+    return (f"NOTE: {unread} run(s) carry unread annotations, and the GitHub "
+            f"core budget every agent shares {budget}; read them with "
+            f"`{BATCH_READ_CMD.format(repo=repo, sha=sha)}`, "
+            "not one call per run (ai-config#5045)")
 
 
 WORKFLOW_DIR = ".github/workflows/"

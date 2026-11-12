@@ -10563,6 +10563,33 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         checker._ANNOTATIONS_READ.discard("all")
         check("--annotations-read all clears every annotation finding", all_ok)
 
+    # ai-config#5045: above the threshold, name the shared core budget and the
+    # batched read, from GET /rate_limit (free).
+    def budget_issues(n, core):
+        def route(cmd):
+            if cmd == ["gh", "api", "rate_limit"]:
+                if core is None:
+                    raise RuntimeError("HTTP 403")
+                return json.dumps({"resources": {"core": core}})
+            return json.dumps({"check_runs": [
+                {"id": 100 + i, "name": f"job{i}", "status": "completed",
+                 "conclusion": "success", "output": {"annotations_count": 1}}
+                for i in range(n)]}) if "check-runs" in " ".join(cmd) else "{}"
+        with patch.object(checker, "run_cmd", side_effect=route):
+            return checker.check_ci_runs("sha123", TEST_REPO)[1]
+
+    limit = checker.UNREAD_RUNS_BUDGET_THRESHOLD
+    core = {"remaining": 1234, "reset": 1767225600}  # 2026-01-01 00:00 UTC
+    many = budget_issues(limit + 1, core)
+    check("above the threshold, a budget NOTE names remaining, reset and the batched command",
+          many[-1].startswith("NOTE: ") and "1234 request(s) left until 00:00 UTC" in many[-1]
+          and "batch-read-annotations.py --repo" in many[-1] and "--sha sha123" in many[-1]
+          and all("batch-read-annotations.py" in i for i in many))
+    check("at the threshold, no budget NOTE",
+          not any("core budget" in i for i in budget_issues(limit, core)))
+    check("a failed /rate_limit read is stated in the NOTE, not dropped",
+          "could not be read (RuntimeError: HTTP 403)" in budget_issues(limit + 1, None)[-1])
+
     parsed = checker.parse_args(
         ["1", "--annotations-read", "5", "--annotations-read", "6,7"])
     check("repeated --annotations-read keeps every value (ai-config#4980)",

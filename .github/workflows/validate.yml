@@ -111,6 +111,9 @@ jobs:
       - name: Run diff-annotations-vs-base tests
         # ai-config#5281: per-name annotation diff over every page.
         run: python3 scripts/test_diff_annotations_vs_base.py
+      - name: Run batch-read-annotations tests
+        # ai-config#5045: annotation reads within the shared REST budget.
+        run: python3 scripts/test_batch_read_annotations.py
       - name: Run check-mr-fully-clean tests
         # ai-config#3021: GitLab's equivalent fully-clean merge gate.
         run: python3 scripts/test_check_mr_fully_clean.py

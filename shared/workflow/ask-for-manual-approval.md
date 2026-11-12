@@ -29,8 +29,8 @@ Related: [ai-config#4286](https://github.com/Morrison-Lab/ai-config/issues/4286)
 
 Approval never makes a hard-prohibited category acceptable.
 The list is not exhaustive: credentials, financial transfers, permanent deletion, and CAPTCHAs are examples, and each agent's own safety rules hold the full list.
-For those, state the rule, describe the action, and let the user decide whether to do it;
-do not hand the user a command to run.
+For those, state the rule and describe the action, and tell the user that doing it is theirs to choose and to do by hand.
+Never do it yourself on their yes, and do not hand them a command to run.
 When no one can answer (an `away` session, or a CI or `@claude` run), record it as a pending decision instead.
 A dispatched subagent reports it to the session that dispatched it, which handles it the same way.
 
@@ -42,17 +42,19 @@ Leave auto mode for an action only when all of these hold (the switch conditions
 - The action is outside those hard-prohibited categories.
 - The user is present to answer a prompt, so this is not an `away` session or a CI or `@claude` run.
 - The session that would take the action is not a dispatched subagent.
-  No user answers a dispatched subagent's prompt, since the user sees only what its caller reports, so the prompt a switch would raise reaches nobody.
-  A denied subagent reports the refused command and the stated reason to the session that dispatched it, and never switches modes itself;
+  A mode switch changes the mode of the whole session, which a subagent does not own, and the caller holds the context the user needs to decide.
+  So a denied subagent reports the refused command and the stated reason to the session that dispatched it, and never switches modes itself;
   the report passes up the dispatch chain until it reaches the first session that can ask the user, and that session decides.
 
-When the switch conditions hold and `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
-The switch needs no question first, because the user approves or refuses the action itself at the prompt;
-the 2026-10-22 case under "Do and Don't" records the user being asked "disable auto?" when the agent could have switched itself.
-That reasoning holds only while the rerun raises a prompt.
-Auto mode ignores broad allow rules that `default` mode honours, so before switching, read the `permissions.allow` rules in every settings file that applies;
-if one matches the denied command, the rerun would run with no prompt, so ask the user instead of switching.
-When the switch conditions hold but that tool is not available, ask the user to switch out of auto mode, naming the refused command and its stated reason.
+When the switch conditions hold, the next step depends on whether the rerun will raise a prompt.
+Leaving auto mode is safe without a question first only because the user then approves or refuses the action at that prompt.
+Auto mode drops broad allow rules that `default` mode honours ([permission modes](https://code.claude.com/docs/en/permission-modes)), and other routes allow a command with no prompt at all:
+a `permissions.allow` rule in any settings file that applies, a PreToolUse hook that returns an allow decision, a session "always allow" grant, and `--allowedTools`.
+This repository's [`grant-personal-permissions`](../../hooks/grant-personal-permissions.py) hook allows `gh pr merge` that way.
+So never switch modes yourself for a merge, and do not switch for any action one of those routes covers, or where you cannot tell;
+ask the user to switch out of auto mode instead, naming the refused command and its stated reason.
+Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
+When that tool is not available, ask the user to switch out of auto mode the same way.
 
 A first denial can be a transient misfire (see [`claude-code-hooks`](../../memories/claude-code-hooks.md) on retrying an identical command once).
 Retry the identical command once at most, never rephrased, then switch or ask.
@@ -60,7 +62,7 @@ You cannot tell a `soft_deny` from a `hard_deny` block from inside the turn, so 
 If the mode is switched, by the user or by you, and the action is still refused, report that and stop.
 A managed-settings `permissions.deny` denial applies in every mode, so report it as a denial and do not switch or ask to switch.
 
-If the user has not authorized the action, do not switch or ask to switch modes.
+If the user has not authorized an action outside the hard-prohibited categories, do not switch or ask to switch modes.
 Ask the user whether to do it at all, and proceed only on a yes.
 When no one can answer, record it as a pending decision instead (an `away` session, or a CI or `@claude` run), or report it up the dispatch chain (a dispatched subagent).
 
@@ -82,33 +84,22 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
 
 ## Do and Don't
 
-- **Do:** on a classifier denial of an action that meets the switch conditions, name the refused command and its stated reason, and leave auto mode as "When to switch or ask" says: switch yourself where the tool is available, otherwise ask the user to switch so they can approve it.
+- **Do:** on a classifier denial, make the one identical retry, then leave auto mode or report as [When to switch or ask](#when-to-switch-or-ask) says, in the session the classifier denied.
+  (2026-10-22, `apply-all.sh --apply`: two classifier denials, labelled "Modify Shared Resources" then "Auto-Mode Bypass", despite the user's typed "go".
+  The user was told to "approve the prompt" when none existed, and was asked "retry?" and "disable auto?" instead of the agent switching the session itself;
+  after the user answered `daytb`, the self-switch to `default` let the apply run.)
 - **Do:** batch the actions that need approval into one manual-mode stretch, then end it as "Say when it is over" describes.
+- **Do:** in a Claude Project, when the user answers the coordinator instead of the denied thread, the coordinator tells that thread, with the user's message attached by id, to ask the user again in its own thread.
+  The relayed message is not approval.
 - **Don't:** end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
 - **Don't:** retry a denied command more than once, or rephrase it.
   A rerun through a real approval prompt, after the session has left auto mode, is not a retry.
 - **Don't:** route around a denial, or hand the user a script to run in place of the approval.
 - **Don't:** hand a denied action to another session to run instead: a subagent, or in a Claude Project another thread or the coordinator ([`claude-app-projects`](../../memories/claude-app-projects.md)).
   That is routing around the denial too.
-  The one exception is a dispatched subagent returning its denied action up its own dispatch chain, as "When to switch or ask" says: the first session up the chain that can ask the user owns that action, so the return is not a handoff.
+  The one exception is a dispatched subagent returning its denied action up its own dispatch chain, as [When to switch or ask](#when-to-switch-or-ask) says.
   (2026-11-11: after the classifier denied a thread's merge of [gha#1910](https://github.com/Morrison-Lab/gha/pull/1910), the coordinator declined to hand the merge to the project's runner thread.)
-- **Do:** after a classifier denial, keep the recovery in the session the classifier denied, unless that session is a dispatched subagent.
-  That session makes its one identical retry, then, when the switch conditions hold, switches modes itself or follows "What to say" (otherwise it handles the action as "When to switch or ask" says), and then reruns the action only through the approval prompt that the rerun raises once the session has left auto mode.
-- **Do:** when the denied session is a dispatched subagent, have it report the refused command and the stated reason to its caller, and never switch modes itself, even when the tool is listed.
-  The report goes up the dispatch chain, each subagent passing it to the session that dispatched it, until it reaches the first session that can ask the user.
-  When the chain ends at a session no one can answer (an `away` session, or a CI or `@claude` run), that session records the action as a pending decision.
-  When the switch conditions hold for the action, the session that can ask switches modes itself or asks under "What to say";
-  otherwise it handles the action as "When to switch or ask" says.
-  When it runs the action, it runs it only through the approval prompt in its own session, never through a subagent or another session.
-- **Do:** in a Claude Project, when the user answers the coordinator instead of the denied thread, the coordinator tells that thread, with the user's message attached by id, to ask the user again in its own thread.
-  The relayed message is not approval.
 - **Don't:** switch or ask to leave auto mode for a hard-prohibited category, or for an action the user has not authorized.
-- **Do:** when `mcp__ccd_session_mgmt__set_session_permission_mode` is available and the switch conditions hold, switch the session to `default` yourself, rerun the command once, and request `auto` again afterwards, as "When to switch or ask" says;
-  the case below shows the cost of asking instead.
-  (2026-10-22, `apply-all.sh --apply`: two classifier denials, labelled "Modify Shared Resources" then "Auto-Mode Bypass", despite the user's typed "go";
-  after the user answered `daytb` to "disable auto?", the self-switch to `default` let the apply run.
-  The user had been told to "approve the prompt" when none existed, and was asked "retry?" and "disable auto?" instead of the agent switching the session itself.)
 - **Don't:** tell the user to approve a prompt after a classifier denial;
   the denial shows none.
   Say "no prompt was shown".
-- **Don't:** ask the user "retry?" or "disable auto?" when you can switch the session yourself under "When to switch or ask".

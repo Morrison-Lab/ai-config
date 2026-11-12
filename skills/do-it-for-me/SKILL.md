@@ -46,8 +46,8 @@ It does not lift the prohibited-action rules.
    Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available,
    read the original mode with `mcp__ccd_session_mgmt__get_session`,
    switch the session to `default`, and run the command once.
-   Batch any other actions that need approval into the same stretch,
-   then restore the original mode once they are done, even if a command failed or timed out,
+   Restore the original mode once the actions that need approval are done,
+   even if a command failed or timed out,
    as that fragment's "Say when it is over" says.
    When that tool is not available, ask the user to switch out of auto mode,
    naming the refused command and its stated reason.
@@ -56,7 +56,7 @@ It does not lift the prohibited-action rules.
    How a standing grant interacts with a denial is in
    [`default-to-action-grants`](../../shared/workflow/default-to-action-grants.md).
 4. **Verify and report in the past tense**:
-   what ran, the read-back or exit status, and, when you switched modes yourself, that auto mode was restored.
+   what ran, the read-back or exit status, and, when you switched modes yourself, that the original mode was restored.
    Count attempts honestly: "denied N times, succeeded on run N+1", never "cannot".
 
 ## What it does not grant

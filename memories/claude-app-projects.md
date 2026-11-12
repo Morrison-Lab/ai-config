@@ -67,10 +67,11 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16, wit
 - **Link both the PR and its thread** whenever a message names a PR: the full PR URL, and the thread as `[title](#cmsg_...)`.
 - **Broadcast to every open thread, not a remembered subset.**
   When asked to tell "all relevant threads" something, list every non-resolved thread, read each one's latest status (including threads bucketed "completed", which can be stalled on a blocked merge), and then choose recipients.
-  A bulk action across threads, such as moving every thread to another model, covers every thread:
-  enumerate with `list_threads` (every page, every state, resolved threads included, since the action applies to all of them, not only open ones), act on each, and re-list to confirm none was missed.
+- **Apply a bulk action to every thread, resolved ones included.**
+  This is wider than the broadcast rule above.
+  For an action such as moving every thread to another model, enumerate with `list_threads` (every page, every state, resolved threads included, since the action applies to all of them, not only open ones), act on each, and re-list to confirm none was missed.
   When the user says "all", do all of them, and never ask "do you want me to switch all of them?"
-  (2nd occurrence, 2026-11-12: the coordinator messaged threads one at a time from memory, missed some, then asked;
+  (2nd occurrence of the broadcast rule's remembered-subset miss, 2026-11-12: the coordinator messaged threads one at a time from memory, missed some, then asked;
   Ezra: "obviously yes; this shouldn't have been a question".)
 - **Know ai-config's skills and commands by name.**
   A coordinator or thread may not have the plugin's skill list in context, so read the `skills/*/SKILL.md` and `commands/*.md` frontmatter in this repo (or the project's memory index of them) before saying what a named skill or command does.

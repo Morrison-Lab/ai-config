@@ -83,7 +83,7 @@ VALIDATE = "scripts/validate-skills.py"
 COMPONENTS = {
     "SessionStart core rules": (
         lambda: hook_context("hooks/inject-core-rules.py", "SessionStart"),
-        "chars", core_hook.CAP, "hooks/inject-core-rules.py cuts at it",
+        "chars", core_hook.CAP, "hooks/test-inject-core-rules.py",
     ),
     "AGENTS.md": (
         lambda: file_size(ROOT / "AGENTS.md", "bytes"),
@@ -98,7 +98,8 @@ COMPONENTS = {
         "bytes", closure.DEFAULT_BUDGET_BYTES, CLOSURE,
     ),
     "subagent rules file": (
-        lambda: file_size(subagent_hook.RULES, "chars"),
+        # Counted as the test counts it, every character, comments included.
+        lambda: len(subagent_hook.RULES.read_text(encoding="utf-8")),
         "chars", subagent_hook.RULES_BUDGET, "hooks/test-inject-subagent-rules.py",
     ),
     "Antigravity plugin rules": (

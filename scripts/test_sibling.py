@@ -123,6 +123,13 @@ USERS = (
         "_dupe": "warn-pr-create-without-dupe-check.py", "_rebuttal": "flag-uncited-rebuttal.py"}),
     ("warn-unmeasured-capability-claim.py", {
         "_disclosure": "require-agent-disclosure.py", "_rebuttal": "flag-uncited-rebuttal.py"}),
+    ("block-redo-denied-write-via-other-tool.py", {
+        "_REMIND": "remind-retry-before-declaring-blocked.py",
+        "_MERGE": "block-merge-without-clean-checker.py"}),
+    ("no-redundant-push-pr-authorization.py", {"_offer": "no-offer-to-file.py"}),
+    ("flag-self-authored-verdict-echo.py", {
+        "_rebuttal": "flag-uncited-rebuttal.py", "_disclosure": "require-agent-disclosure.py",
+        "_clean_claim": "flag-clean-claim-over-findings.py"}),
 )
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "
@@ -171,6 +178,8 @@ GUARDED = {
     "no-unread-issue-claim.py", "flag-uncounted-comment-claims.py", "flag-unmeasured-digest.py",
     "flag-unmeasured-timestamp.py", "flag-unread-commit-citation.py",
     "warn-claim-without-comments-read.py", "warn-unmeasured-capability-claim.py",
+    "block-redo-denied-write-via-other-tool.py", "no-redundant-push-pr-authorization.py",
+    "flag-self-authored-verdict-echo.py",
 }
 check("every GUARDED hook is in USERS", sorted(GUARDED - {h for h, _ in USERS}), [])
 GUARD_RE = re.compile(r"^try:\n    from sibling import load_sibling\n", re.M)

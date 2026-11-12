@@ -365,8 +365,7 @@ Each fact below was measured in a claude.ai cloud session on the date given, so 
 - The reviewer differs from Claude in model and harness, so it meets the independence rule in [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
   The data rules apply here as to any hosted model, so use it only for work no data trigger covers.
 - When posting the result, use the envelope above with `(Ollama Cloud <model>)` in the heading.
-- `hooks/warn-merge-without-cross-harness-review.py` does not yet count a call to `api.ollama.com`, so it warns on a merge after this review ([ai-config#4849](https://github.com/Morrison-Lab/ai-config/issues/4849)).
-  The warning is a false positive when the transcript shows the review.
+- `hooks/warn-merge-without-cross-harness-review.py` counts a `curl` POST to `https://api.ollama.com/api/chat` as a cross-harness review call ([ai-config#4849](https://github.com/Morrison-Lab/ai-config/issues/4849)).
 
 Write the brief and the diff to files in the scratchpad first, and set `BRIEF` and `DIFF` to their paths.
 The brief must ask the model to end with one line, `VERDICT: CLEAN` or `VERDICT: NOT_CLEAN`.

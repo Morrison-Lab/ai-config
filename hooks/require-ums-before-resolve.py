@@ -20,12 +20,15 @@ Two entry points, one rule (AGENTS.md "Run UMS before every pause" and
 WHAT COUNTS AS UMS
 ------------------
 The same words the sibling reminders use (`remind-ums-after-error.UMS_WORD`)
-on a Skill name, an Agent or Task prompt, or a Bash command, or a Write or
-Edit under an ai-config memory or shared path. Prose saying "I ran UMS" does
-not count: the tool call is the evidence.
+on a Skill name, a subagent brief, or a shell command, or a write under an
+ai-config memory or shared path (tool spellings in scripts/lib/tool_names.py).
+Prose saying "I ran UMS" does not count: the tool call is the evidence.
 
 Fails OPEN and SILENT on any parse trouble. The deny is the only blocking
-path in this file, and it fires at most once per thread.
+path in this file, and it fires at most once per thread. If
+scripts/lib/tool_names.py cannot load, the deny is off: the hook writes the
+reason to stderr, which a PreToolUse hook exiting 0 shows to nobody, so the
+merge-event reminder (which needs no tool names) says so too.
 """
 import hashlib
 import importlib.util
@@ -36,15 +39,25 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.realpath(__file__))
+
+# Tool-name aliases are shared (ai-config#4266). A broken install fails open:
+# the resolve is never denied (see the docstring for who is told).
+try:
+    _LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    import tool_names
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"require-ums-before-resolve: cannot load scripts/lib/tool_names.py ({_exc}); "
+          f"a thread resolve will not be checked for UMS", file=sys.stderr)
+    tool_names = None
+
 RESOLVE_TOOL = "set_thread_resolved"
 
 EVENT = re.compile(r"<event\b([^>]*\bsource=\"github\"[^>]*)>(.*?)</event>", re.DOTALL)
 MERGED = re.compile(r"\bkind=\"[^\"]*merged[^\"]*\"|\"merged\"\s*:\s*true|\"state\"\s*:\s*\"merged\"", re.I)
 
 UMS_PATH = re.compile(r"(?:^|/)(?:memories|shared)/|(?:^|/)(?:AGENTS|CLAUDE)\.md$|ai-config")
-WRITE_TOOLS = {"write", "edit", "multiedit", "notebookedit", "write_to_file", "replace_file_content"}
-BASH_TOOLS = {"bash", "run_command", "execute_command", "terminal", "shell"}
-AGENT_TOOLS = {"task", "agent", "invoke_subagent"}
 
 
 def load_ums_word():
@@ -110,37 +123,15 @@ def ums_since_last_user_message(path, ums_word):
                 name_low = (name or "").lower()
                 if not isinstance(inp, dict):
                     inp = {}
-                if name_low in WRITE_TOOLS:
-                    target = str(inp.get("file_path") or inp.get("path") or inp.get("TargetFile") or "")
-                    if UMS_PATH.search(target):
+                if tool_names.is_write_tool(name_low):
+                    if UMS_PATH.search(tool_names.write_target(inp)):
                         evidence = i
                     continue
                 blob = ""
-                if name_low in AGENT_TOOLS:
-                    ums_parts = [
-                        str(inp.get("prompt") or inp.get("Prompt") or ""),
-                        str(inp.get("description") or ""),
-                        str(inp.get("toolAction") or ""),
-                        str(inp.get("toolSummary") or ""),
-                    ]
-                    subagents = inp.get("Subagents") or inp.get("subagents")
-                    if isinstance(subagents, str):
-                        try:
-                            subagents = json.loads(subagents)
-                        except Exception:
-                            ums_parts.append(subagents)
-                            subagents = None
-                    if isinstance(subagents, list):
-                        for sa in subagents:
-                            if isinstance(sa, dict):
-                                ums_parts.append(str(sa.get("Prompt") or sa.get("prompt") or ""))
-                                ums_parts.append(str(sa.get("Role") or sa.get("role") or ""))
-                                ums_parts.append(str(sa.get("TypeName") or sa.get("typeName") or ""))
-                            elif isinstance(sa, str):
-                                ums_parts.append(sa)
-                    blob = " ".join(ums_parts)
-                elif name_low in BASH_TOOLS:
-                    blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
+                if tool_names.is_subagent_tool(name_low):
+                    blob = tool_names.subagent_brief(inp)
+                elif tool_names.is_shell_tool(name_low):
+                    blob = tool_names.shell_command(inp)
                 elif name_low == "skill":
                     blob = str(inp.get("skill") or "") + " " + str(inp.get("args") or "")
                 if blob and ums_word.search(blob):
@@ -182,6 +173,8 @@ MERGE_REMINDER = (
 
 
 def handle_pre_tool_use(payload):
+    if tool_names is None:
+        return 0
     name = str(payload.get("tool_name") or "")
     inp = payload.get("tool_input")
     if not name.endswith(RESOLVE_TOOL) or not isinstance(inp, dict) or inp.get("resolved") is not True:
@@ -210,6 +203,9 @@ def handle_prompt(payload):
         if MERGED.search(attrs) or MERGED.search(body):
             if first_time("merge:" + hashlib.sha256(body.encode()).hexdigest()):
                 print(MERGE_REMINDER)
+                if tool_names is None:
+                    print("[hook: require-ums-before-resolve] scripts/lib/tool_names.py "
+                          "did not load, so resolving a thread is not checked for UMS.")
             return 0
     return 0
 

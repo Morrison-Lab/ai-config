@@ -2606,7 +2606,8 @@ def read_latest_review_with_unparsed(
     `history`, when given, receives every admitted `(verdict, shas)` in
     transcript order, so a caller can key verdicts by commit (ai-config#4006).
     An unparsed report enters it as `"unparsed"`, which blocks like
-    `needs_work` wherever it sits.
+    `needs_work` the commits it names; as the LAST report it blocks every
+    push, since it may supersede any earlier verdict (`saw_unparsed_later`).
     """
     reviewer_call_ids: set[str] = set()
     reviewer_task_ids: set[str] = set()
@@ -2902,6 +2903,10 @@ def _opencode_transcript_fallback(session_id) -> str:
     return os.path.join(base, "transcripts", f"{raw}.jsonl")
 
 
+_VERDICT_WORDS = {"clean": "clean report", "needs_work": "blocking verdict",
+                  "unparsed": "report with an unparsed verdict line"}
+
+
 def _verdict_map_covers(history: list[tuple[str, list[str]]],
                         directory: str | None, argv: list[str],
                         env: list[str]) -> tuple[str, str]:
@@ -2920,9 +2925,10 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
     cannot be told from a fabricated one; so does a clean report with no
     fingerprint. A clean report with a fingerprint that does not resolve here
     binds nothing and is skipped, which is what lets a review of another
-    repository leave this one's verdict standing. A shipped commit no verdict
-    names, and any doubt (a timeout, a git error, an unknown payload, a ref
-    deletion), return ("", "").
+    repository leave this one's verdict standing. A refusal names each
+    vetoed commit with what vetoed it. A shipped commit no verdict ever named
+    (and no blocking ancestor), and any doubt (a timeout, a git error, an
+    unknown payload, a ref deletion), return ("", "").
     """
     if len(history) < 2:
         return "", ""  # one verdict: the map and the caller's checks agree
@@ -2931,7 +2937,7 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
         if not commits:
             return "", ""
         latest: dict[str, tuple[str, int]] = {}
-        wiped: set[str] = set()
+        vetoed: dict[str, str] = {}  # commit -> what wiped its verdict
         resolved_cache: dict[str, str | None] = {}
         for seq, (found, shas) in enumerate(history):
             for sha in shas:
@@ -2942,14 +2948,17 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
             if found == "clean" and len(hits) < len(shas):
                 continue  # an unresolvable fingerprint voids a clean report
             if not hits or len(hits) < len(shas):
-                cleared = {c for c, (f, _) in latest.items() if f == "clean"}
-                # with no fingerprint, the caller's messages already name the cause
-                wiped = wiped | cleared if shas else wiped - cleared
+                cause = (f"a later {_VERDICT_WORDS[found]} with no Reviewed-Commit line"
+                         if not shas else f"a later {_VERDICT_WORDS[found]} naming a "
+                         "commit that does not resolve here")
+                for c, (f, _) in latest.items():
+                    vetoed[c] = (f"{cause} vetoed its clean verdict" if f == "clean"
+                                 else f"its latest verdict was a {_VERDICT_WORDS[f]}")
                 latest.clear()  # an unbound report vetoes all before it
             for hit in hits:
                 latest[hit] = (found, seq)
         for c in sorted(commits):
-            found, since = latest.get(c, ("", 0))
+            found, since = latest.get(c, ("", -1))
             if found == "unparsed":
                 return "", (f"The latest reviewer report naming {c[:12]} has a verdict "
                             f"line this guard cannot parse; it accepts {ACCEPTED_VERDICT_PHRASES}.\n"
@@ -2959,23 +2968,23 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                             "a blocking verdict.\nAddress, rebut, or defer every finding, "
                             "commit, and re-dispatch the reviewer.")
             for sha, (f, seq) in latest.items():
-                if f != "clean" and seq > since and found and _run_git(
+                if f != "clean" and seq > since and _run_git(
                         directory, env, "merge-base", "--is-ancestor", sha, c,
                         unreadable_raises=True) is not None:
-                    kind = "blocking verdict" if f == "needs_work" else (
-                        f"report whose verdict line this guard cannot parse (it accepts "
-                        f"{ACCEPTED_VERDICT_PHRASES})")
-                    return "", (f"A later {kind} names {sha[:12]}, an ancestor of "
-                                f"{c[:12]}, so this push ships code a review flagged.\n"
+                    what = ("code a review flagged" if f == "needs_work" else
+                            "code whose review this guard cannot read (it accepts "
+                            f"{ACCEPTED_VERDICT_PHRASES})")
+                    return "", (f"A later {_VERDICT_WORDS[f]} names {sha[:12]}, an ancestor of "
+                                f"{c[:12]}, so this push ships {what}.\n"
                                 "Address it, then re-dispatch the reviewer against what you push.")
         missing = sorted(c for c in commits if c not in latest)
         if not missing:
             return ("Clean adversarial self-review verified at "
                     f"{', '.join(sorted(commits))} (latest verdict naming each)."), ""
-        if set(missing) <= wiped:
-            return "", (f"A later blocking or unparsed report names a commit that does not "
-                        f"resolve here, which vetoes the clean verdict for {missing[0][:12]}.\n"
-                        "Re-dispatch the reviewer against what you push.")
+        if missing and all(c in vetoed for c in missing):
+            return "", ("No verdict covers " + "; ".join(
+                f"{c[:12]} ({vetoed[c]})" for c in missing) + ".\n"
+                "Re-dispatch the reviewer against what you push.")
     except Exception as exc:  # the caller's stricter checks still decide
         print(f"no-push-without-self-review: verdict map skipped ({exc})", file=sys.stderr)
     return "", ""

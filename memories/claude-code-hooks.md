@@ -1236,3 +1236,11 @@ The fix records the failure with a timestamp, skips fetches for an hour, and run
 - **Do:** before wrapping a third-party guard, list every config file and environment variable it reads from the working directory, and set the one that stops a repository loosening it.
 - **Do:** in a per-call hook, record a failed network step and back off, and pass the tool's own error into the notice.
 - **Don't:** treat "it fails open with a notice" as enough for a per-call hook whose failure path itself takes a minute.
+
+The Cursor adapter (`.cursor/hooks/adapt-claude-hooks.py`) sends `"cwd": ""` when Cursor names no project directory.
+`scripts/test_cursor_hook_adapter.py` runs every registered PreToolUse hook on such payloads (the "live catalog" checks).
+CC Safety Net 2.7.12 fails closed on an empty cwd and denied even `git status`, which turned validate red on #5482 (measured 2026-11-12).
+A missing `cwd` key is fine.
+
+- **Do:** run `python3 scripts/test_cursor_hook_adapter.py` locally before pushing any new PreToolUse hook, and test the hook on a payload with `"cwd": ""`.
+- **Don't:** treat a hook's own self-test passing as evidence that the adapters' payloads work.

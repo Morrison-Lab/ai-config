@@ -1976,6 +1976,34 @@ RX_REQ_FAILED = re.compile(
     re.I,
 )
 
+# An `update_pull_request(draft=False)` error raised BEFORE the PR can have left
+# draft (ai-config#1095, gap 2). Dropping a mark-ready obligation is the
+# DANGEROUS direction -- it forgets a PR that may now be ready and unreviewed --
+# so it needs positive evidence the transition did not apply, and is_error alone
+# is not that: github-mcp-server's UpdatePullRequest (pkg/github/pullrequests.go)
+# runs the REST edit, then the GraphQL lookup and markPullRequestReadyForReview,
+# then the reviewer request, then a final `PullRequests.Get`, and an error in
+# the last two steps comes back with is_error set on a PR that IS ready.
+# So this lists only the messages returned at or before the mutation:
+#   "failed to update pull request"      REST edit, before the mutation
+#   "Failed to find pull request"        GraphQL lookup, before the mutation
+#   "Failed to mark pull request ready"  the mutation itself failed
+#   "failed to get GitHub GraphQL client"
+# and deliberately omits "Failed to get pull request" (the final Get) and the
+# bare "failed to get GitHub client" (raised both before the REST edit and
+# before the final Get). The reviewer request's "failed to request reviewers"
+# also comes after the mutation and is not listed, which is what lets a
+# mark-ready with reviewers carry the same flag. Matched with upstream's exact
+# casing, since that is what the server emits. An unrecognised message keeps
+# the obligation -- the
+# safe over-warn direction -- so a renamed upstream string degrades to the
+# old behaviour rather than to a silent discharge.
+RX_READY_NOT_APPLIED = re.compile(
+    r"failed to update pull request|Failed to find pull request"
+    r"|Failed to mark pull request ready for review"
+    r"|failed to get GitHub GraphQL client"
+)
+
 
 def input_ident(inp):
     """(num, repo) from a structured tool's input fields."""
@@ -2544,6 +2572,12 @@ def scan(path):
                             keep.append(ob)
                             continue
                         ob["res"] = True
+                        # A mark-ready that failed before the PR left draft
+                        # (is_error AND a pre-mutation message): the PR is
+                        # still a draft, so there is nothing to review yet.
+                        if ob.get("ready") and err \
+                                and RX_READY_NOT_APPLIED.search(body):
+                            continue
                         idx = matched.index(ob)
                         res_pair = paired[idx]
                         onum_i, orepo_i = res_pair if res_pair else (None, None)
@@ -2763,9 +2797,19 @@ def scan(path):
                         pending_clear[tid] = (num, repo, True)
                     elif inp.get("draft") is False:
                         # Structured, atomic: slast=True, reviewers target num.
-                        obligations.append(_new_obl(
+                        # Appended NOW, not deferred, so a successful mark-ready
+                        # can never lose its obligation; the result loop drops
+                        # it only on positive evidence the PR is still a draft
+                        # (`ready`, RX_READY_NOT_APPLIED). With reviewers in
+                        # the same call the reviewer-add runs AFTER the
+                        # mutation, and its failure message ("failed to
+                        # request reviewers") is not in that list, so such a
+                        # failure still keeps the PR tracked.
+                        obl = _new_obl(
                             num, repo, tid, bool(inp.get("reviewers")),
-                            True, num, repo))
+                            True, num, repo)
+                        obl["ready"] = True
+                        obligations.append(obl)
                     if inp.get("reviewers") and inp.get("draft") is not False:
                         # A structured tool call is atomic -- one tool_use, one
                         # result -- so is_error reflects THIS request, with no

@@ -10576,6 +10576,14 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         other_ok, _ = checker.check_ci_runs(
             "sha1234abc", TEST_REPO, comments=other, commit_date=head_date)
         check("a disposition comment for another head does not count", not other_ok)
+        quoted = [dict(dispo[0], body="The checker asks for `Annotation dispositions for head sha1234:`")]
+        quoted_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=quoted, commit_date=head_date)
+        check("a comment that only quotes the marker mid-text does not count", not quoted_ok)
+        same = [dict(dispo[0], createdAt=head_date)]
+        same_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=same, commit_date=head_date)
+        check("a disposition comment stamped with the head's own time does not count", not same_ok)
         checker._ANNOTATIONS_READ.discard(77)
         checker._ANNOTATIONS_READ.add("all")
         all_ok, _ = checker.check_ci_runs(

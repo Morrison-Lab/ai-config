@@ -1074,14 +1074,17 @@ def _has_disposition_comment(pr) -> bool:
         return False
     head_date = pr.commit_date or ""
     for comment in pr.get_comments():
-        body = comment.body or ""
-        at = body.find(DISPOSITION_MARKER)
-        if at < 0:
+        # The comment must BEGIN with the marker: a quote of it inside some
+        # other comment (a review, this checker's own message) is no record.
+        body = (comment.body or "").lstrip()
+        if not body.startswith(DISPOSITION_MARKER):
             continue
-        if not body[at + len(DISPOSITION_MARKER):].lstrip().lower().startswith(sha7):
+        if not body[len(DISPOSITION_MARKER):].lstrip().lower().startswith(sha7):
             continue
-        # ISO 8601 UTC timestamps from one API compare correctly as strings.
-        if head_date and (comment.created_at or "") < head_date:
+        # ISO 8601 UTC timestamps from one API compare correctly as strings;
+        # "newer" is strict, so a comment stamped with the head's own second
+        # does not count.
+        if head_date and (comment.created_at or "") <= head_date:
             continue
         return True
     return False

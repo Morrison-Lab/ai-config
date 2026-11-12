@@ -310,8 +310,11 @@ allowing a command it had correctly denied.)
 
 The section above covers the submodule-plus-symlink path.
 The other way a repo consumes ai-config is the **plugin marketplace** ---
-`.claude/settings.json`'s `extraKnownMarketplaces` / `enabledPlugins` for a
-web/cloud session, and gha's `use-ai-config` input for the bots.
+`.claude/settings.json`'s `extraKnownMarketplaces` / `enabledPlugins`,
+and gha's `use-ai-config` input for the bots.
+A web or cloud session does not install a plugin its settings declare (#4519);
+there the environment's Setup script installs it
+([`docs/delivery-paths.md`](../docs/delivery-paths.md)).
 That path has a failure mode the submodule path does not, and it is worth
 knowing because the obvious diagnosis is the wrong one.
 

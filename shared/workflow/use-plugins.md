@@ -63,9 +63,12 @@ Claude Code supports plugins distributed via Git marketplaces and official regis
    claude plugin install <plugin-name>@<marketplace-name>
    ```
 
-   For web/cloud sessions or repository-level defaults,
+   For repository-level defaults,
    declare the plugin under `enabledPlugins` in `.claude/settings.json` or `~/.claude/settings.json`,
    and register external repositories under `extraKnownMarketplaces`.
+   A declaration does not install the plugin in a web or cloud session (#4519):
+   install it there from the environment's Setup script,
+   the path [`docs/delivery-paths.md`](../../docs/delivery-paths.md) names for ai-config.
    Always read the marketplace name from the source `.claude-plugin/marketplace.json` manifest
    rather than inferring it from the URL.
 

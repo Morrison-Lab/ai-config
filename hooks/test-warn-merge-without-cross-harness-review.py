@@ -430,6 +430,39 @@ def main():
           run(MERGE, [step("curl -sS https://example.com"
                            " -d https://api.ollama.com/api/chat")])[0] and run(MERGE, [step("curl --form-string https://api.ollama.com/api/chat https://example.com")])[0]
           and run(MERGE, [step("curl --data-ascii https://api.ollama.com/api/chat https://x.org")])[0])
+    # ai-config#5383: every curl option that takes a value, not a short list.
+    for opt in ("-w", "--write-out", "-o", "--output", "-e", "--referer",
+                "--trace", "-sw", "-so"):
+        check("warns when the Ollama URL is the value of " + opt,
+              run(MERGE, [step("curl -d @x %s https://api.ollama.com/api/chat"
+                               " https://example.com" % opt)])[0])
+    check("silent when --url names the Ollama chat API",
+          not run(MERGE, [step("curl -sS -d @req.json"
+                               " --url https://api.ollama.com/api/chat")])[0])
+    for opt in ("-4w", "-#o", "--proxy1.0", "--ech", "--haproxy-clientip",
+                "--expand-header", "--expand-data"):
+        check("warns when the Ollama URL is the value of " + opt,
+              run(MERGE, [step("curl -d @x %s https://api.ollama.com/api/chat"
+                               " https://example.com" % opt)])[0])
+    # A value attached to its letter is self-contained, so the next word is the URL.
+    for opt in ("-XPOST", "-sXPOST", "-oout", "-uuser", "-fsSLoout", "-4", "-L1"):
+        check("silent after %s before the Ollama URL" % opt,
+              not run(MERGE, [step("curl -d @x %s"
+                                   " https://api.ollama.com/api/chat" % opt)])[0])
+    check("silent after -XPOST before the opencode.ai URL",
+          not run(MERGE, [step("curl -d @x -XPOST"
+                               " https://opencode.ai/zen/go/v1/chat/completions")])[0])
+    check("warns when the Ollama URL is only a --write-out= value",
+          run(MERGE, [step("curl -d @x --write-out=https://api.ollama.com/api/chat"
+                           " https://example.com")])[0])
+    check("silent when the Ollama URL follows --",
+          not run(MERGE, [step("curl -d @x -- https://api.ollama.com/api/chat")])[0])
+    for cmd in ("-d -e", "--data -t", "-d x -H -x"):
+        check("silent when an option value looks like an option: " + cmd,
+              not run(MERGE, [step("curl %s https://api.ollama.com/api/chat" % cmd)])[0])
+    check("silent when a bundled flag takes no value before the URL",
+          not run(MERGE, [step("curl -sS -d @req.json -sS"
+                               " https://api.ollama.com/api/chat")])[0])
     check("silent after an explicit -X POST to Ollama Cloud",
           not run(MERGE, [step("curl -sS -X POST https://api.ollama.com/api/chat"
                                " -d @req.json")])[0])

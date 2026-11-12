@@ -120,11 +120,49 @@ HTTP_ROUTES = (
 # Presence probes, and the routes a presence probe alone cannot clear.
 PROBE_WORDS = frozenset({"which", "command"})
 NEEDS_ATTEMPT = frozenset({"opencode"})
-# curl options whose next word is a value, never the request URL.
+# curl options whose next word is a value, never the request URL: every
+# option `curl --help all` (curl 8.5.0) shows taking an argument, plus
+# `--haproxy-clientip` (its help line omits the argument), `--ech` (curl 8.8)
+# and the bundled `-sd`/`-sF`. `--url` is left out, since its value is the
+# target (ai-config#5383).
 CURL_VALUE_OPTS = frozenset({
-    "-d", "-F", "-sd", "-sF", "--data", "--data-ascii", "--data-binary", "--data-raw",
-    "--data-urlencode", "--form", "--form-string", "--json", "-H", "--header", "-e",
-    "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
+    "--abstract-unix-socket", "--alt-svc", "--aws-sigv4", "--cacert",
+    "--capath", "--cert", "--cert-type", "--ciphers", "--config",
+    "--connect-timeout", "--connect-to", "--continue-at", "--cookie",
+    "--cookie-jar", "--create-file-mode", "--crlfile", "--curves", "--data",
+    "--data-ascii", "--data-binary", "--data-raw", "--data-urlencode",
+    "--delegation", "--dns-interface", "--dns-ipv4-addr", "--dns-ipv6-addr",
+    "--dns-servers", "--doh-url", "--dump-header", "--ech", "--egd-file",
+    "--engine", "--haproxy-clientip",
+    "--etag-compare", "--etag-save", "--expect100-timeout", "--form",
+    "--form-string", "--ftp-account", "--ftp-alternative-to-user",
+    "--ftp-method", "--ftp-port", "--ftp-ssl-ccc-mode",
+    "--happy-eyeballs-timeout-ms", "--header", "--help", "--hostpubmd5",
+    "--hostpubsha256", "--hsts", "--interface", "--ipfs-gateway", "--json",
+    "--keepalive-time", "--key", "--key-type", "--krb", "--libcurl",
+    "--limit-rate", "--local-port", "--login-options", "--mail-auth",
+    "--mail-from", "--mail-rcpt", "--max-filesize", "--max-redirs",
+    "--max-time", "--netrc-file", "--noproxy", "--oauth2-bearer",
+    "--output", "--output-dir", "--parallel-max", "--pass",
+    "--pinnedpubkey", "--preproxy", "--proto", "--proto-default",
+    "--proto-redir", "--proxy", "--proxy1.0", "--proxy-cacert", "--proxy-capath",
+    "--proxy-cert", "--proxy-cert-type", "--proxy-ciphers",
+    "--proxy-crlfile", "--proxy-header", "--proxy-key", "--proxy-key-type",
+    "--proxy-pass", "--proxy-pinnedpubkey", "--proxy-service-name",
+    "--proxy-tls13-ciphers", "--proxy-tlsauthtype", "--proxy-tlspassword",
+    "--proxy-tlsuser", "--proxy-user", "--pubkey", "--quote",
+    "--random-file", "--range", "--rate", "--referer", "--request",
+    "--request-target", "--resolve", "--retry", "--retry-delay",
+    "--retry-max-time", "--sasl-authzid", "--service-name", "--socks4",
+    "--socks4a", "--socks5", "--socks5-gssapi-service", "--socks5-hostname",
+    "--speed-limit", "--speed-time", "--stderr", "--telnet-option",
+    "--tftp-blksize", "--time-cond", "--tls-max", "--tls13-ciphers",
+    "--tlsauthtype", "--tlspassword", "--tlsuser", "--trace",
+    "--trace-ascii", "--trace-config", "--unix-socket", "--upload-file",
+    "--url-query", "--user", "--user-agent", "--variable", "--write-out",
+    "-A", "-C", "-D", "-E", "-F", "-H", "-K", "-P", "-Q", "-T", "-U", "-X",
+    "-Y", "-b", "-c", "-d", "-e", "-h", "-m", "-o", "-r", "-sF", "-sd",
+    "-t", "-u", "-w", "-x", "-y", "-z",
 })
 # Claude Code's "Exit code N" or Antigravity's header, never a refusal: an attempt at any exit, a probe at 1 only.
 RX_RAN_FAILED = re.compile(r"^(?:\s|\\n)*(?:Exit code [1-9]|Command timed out)|^(?:\w+ At: .*\n)*(?:the )?command exited with code [1-9]", re.I)
@@ -219,6 +257,26 @@ def _peel_wrappers(rest):
     return rest
 
 
+def _takes_value(word):
+    """True when curl reads the word after *word* as an option's value.
+
+    A cluster of short options (`-sw`, `-4o`) is read as curl reads it:
+    the first letter that takes a value takes the rest of the word when any
+    is left (`-XPOST`, `-oout`), and the next word only when it is last.
+    """
+    if word in CURL_VALUE_OPTS:
+        return True
+    # curl 8.3+ takes `--expand-<option>` wherever `--<option>` takes a value.
+    if word.startswith("--expand-"):
+        return "--" + word[len("--expand-"):] in CURL_VALUE_OPTS
+    if not word.startswith("-") or word.startswith("--"):
+        return False
+    for pos, letter in enumerate(word[1:], start=2):
+        if "-" + letter in CURL_VALUE_OPTS:
+            return pos == len(word)
+    return False
+
+
 def _curl_route(rest):
     """The HTTP_ROUTES entry a `curl` POST in *rest* reaches, else None."""
     if HELP_FLAGS.intersection(rest[1:]):
@@ -241,9 +299,19 @@ def _curl_route(rest):
         if (verb is not None and verb.upper() != "POST") or arg in (
                 "-G", "--get", "-I", "--head"):
             return None
+    # Only a bare URL word is the target, never an option value (`-d URL`, `--form-string URL`).
+    # Walk from the left, so a value that looks like an option (`-d -e`) takes nothing.
+    values, takes = set(), False
     for i, arg in enumerate(args):
-        # Only a bare URL word is the target, never an option value (`-d URL`, `--form-string URL`).
-        if not arg.lower().startswith(("http://", "https://")) or (i and args[i - 1] in CURL_VALUE_OPTS):
+        if takes:
+            values.add(i)
+            takes = False
+        elif arg == "--":
+            break
+        else:
+            takes = _takes_value(arg)
+    for i, arg in enumerate(args):
+        if not arg.lower().startswith(("http://", "https://")) or i in values:
             continue
         try:
             parts = urllib.parse.urlsplit(arg)

@@ -2048,6 +2048,18 @@
             "why": "Denies sending email: a mail-sender command (sendmail, mail, mutt, msmtp, git send-email, smtp URLs) in Bash, or an MCP tool whose action is send/reply/forward on a mail account. Drafting stays allowed. User directive 2026-11-04: \"never send emails for me\". No override."
           }
         ]
+      },
+      {
+        "matcher": "Bash|PowerShell|Monitor|Read|Write|Edit|MultiEdit|NotebookEdit|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/run-cc-safety-net.py\"",
+            "timeout": 160,
+            "script": "run-cc-safety-net.py",
+            "why": "ai-config#5474 (part of #5317). Ezra, 2026-11-12, chose \"Adopt CC Safety Net, pinned\": the MIT-licensed CC Safety Net is the base guard for every agent, with ai-config hooks only for the gaps it leaves. Runs the release hooks/cc-safety-net.pin.json names (fetched once with npm pack --ignore-scripts, sha512-checked against the pin, cached under ~/.cache/ai-config) and passes its deny through unchanged. Fails open with a once-per-session notice when Node.js 22 or npm is missing or the download fails, since failing closed would stop every tool call on a machine without Node.js; a tarball that does not match the pin is never run. The timeout covers the first call's fetch."
+          }
+        ]
       }
     ],
     "PostToolUse": [

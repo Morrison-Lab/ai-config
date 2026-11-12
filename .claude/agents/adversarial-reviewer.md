@@ -218,6 +218,14 @@ A fix for one permission error changes the one path that raised it.
 Read the diff; do not report `hooks/no-recursive-chown-system-path.py`'s verdict as your finding.
 See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#recursive-ownership-and-mode-changes).
 
+## Commands that discard work or data
+
+On a diff, script or command, look for a step that discards work or data with no way back: `rm -rf` of `/`, the home directory or the current tree, `git reset --hard`, `git checkout -- .`, `git restore`, `git clean -f`, `git stash drop` or `git stash clear`, `git branch -D`, a push with `--delete` or a bare `--force`, `git worktree remove --force`, a download piped into a shell, or a read of an SSH key or `.env` file.
+Expand each variable as empty as well as set.
+Read the diff; do not report `hooks/run-cc-safety-net.py`'s verdict as your finding.
+On a diff that moves `hooks/cc-safety-net.pin.json`, check that `version` and `integrity` change together and that the PR reports a live run of `hooks/test-run-cc-safety-net.py`.
+See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#the-base-guard-cc-safety-net).
+
 ## Word field codes
 
 On a diff or a delivered `.docx` produced by an edit that merged runs, check that each field code (a citation, cross-reference or HYPERLINK) still has its own `begin`, `instrText`, `separate` and `end` runs and that the field's text is where it was.

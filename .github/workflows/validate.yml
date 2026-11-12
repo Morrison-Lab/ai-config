@@ -546,6 +546,13 @@ jobs:
         # An unresolved INLINE @token is reported but does not fail, since
         # most are prose -- see the script's docstring.
         run: python3 scripts/check-context-closure.py --strict
+      - name: Report what each session kind loads at start
+        # ai-config#1138, #5310 step 1. Report-only: the gates above and in
+        # validate-skills.py fail at each cap; this shows every component
+        # against a target of 75% of its cap, so the headroom is visible.
+        run: |
+          python3 scripts/test_measure_session_start.py
+          python3 scripts/measure-session-start.py
       - name: Report this PR's context-closure delta; gate root-file growth near the cap
         # ai-config#1373. The step above reports the closure's LEVEL against a
         # budget; this reports what THIS branch did to it. Those are different

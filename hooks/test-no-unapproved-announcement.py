@@ -9,8 +9,7 @@ import tempfile
 SUBJECT, TMP = sys.argv[1], tempfile.mkdtemp()
 WAKE = ('<wake reason="mention"><project id="p"><thread ts="t"><message from="human" '
         'trust="principal" id="c1">{}</message></thread></project></wake>')
-RELAY = ('<coordinator-relay><relay from="coordinator"><cited author="user">{}</cited>'
-         '<note>{}</note></relay></coordinator-relay>')
+RELAY = '<relay from="coordinator" session="s"><cited author="user">{}</cited><note>{}</note></relay>'
 POST = {"command": "canvas announcements create --course 1 --title Hi"}
 URL = "https://x/api/v1/courses/1/discussion_topics"
 OK = "post the announcement"
@@ -18,6 +17,10 @@ OK = "post the announcement"
 
 def user(text, **extra):
     return dict({"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}, **extra)
+
+
+def meta(text):  # how the harness logs a relay
+    return user(text, isMeta=True, promptSource="system")
 
 
 def call(uid, tool="Bash", inp=None):
@@ -41,26 +44,24 @@ def run(tool, inp, *entries):
     return out and out["hookSpecificOutput"]["permissionDecision"] or None
 
 
-WRITES = [
-    ("Bash", POST), ("Bash", {"command": "git status && " + POST["command"]}), ("Monitor", POST),
-    ("Bash", {"command": f"curl -X POST {URL} -F is_announcement=true"}),
-    ("Bash", {"command": f"curl -X PUT {URL}/55 -F message=New"}),
-    ("Bash", {"command": f"curl -XPUT {URL}/55 -Fmessage=New"}),
-    ("Bash", {"command": f"curl -T b.json {URL}/55"}),
-    ("Bash", {"command": 'curl -X POST "$C/$EP" -F is_announcement=true'}),
-    ("Bash", {"command": f"echo \"$(curl -X POST {URL} -F title=Hi)\""}),
-    ("Bash", {"command": f"canvas api PUT {URL}/55"}),
-    ("Bash", {"command": f"wget --post-data 'title=Hi' {URL}"}), ("Bash", {"command": f"http put {URL}/55 m=N"}),
-    ("Bash", {"command": "curl https://x/api/graphql --json '{\"query\": \"mutation{createDiscussionTopic}\"}'"}),
-    ("Bash", {"command": "python3 -c \"a=c.get_announcements(x)[0]; a.update(topic={})\""}),
-    ("Bash", {"command": f"python3 -c \"requests.request('put', '{URL}/55')\""}),
-    ("Bash", {"command": "python3 -c \"c.get_course(1).create_discussion_topic(is_announcement=True)\""}),
+BASH = [
+    POST["command"], "git status && " + POST["command"], f"curl -X POST {URL} -F is_announcement=true",
+    f"curl -X PUT {URL}/55 -F message=New", f"curl -XPUT {URL}/55 -Fmessage=New", f"curl -T b.json {URL}/55",
+    'curl -X POST "$C/$EP" -F is_announcement=true', f"echo \"$(curl -X POST {URL} -F title=Hi)\"",
+    f"canvas api PUT {URL}/55", f"wget --post-data 'title=Hi' {URL}", f"http put {URL}/55 m=N",
+    "curl https://x/api/graphql --json '{\"query\": \"mutation{createDiscussionTopic}\"}'",
+    "python3 -c \"a=c.get_announcements(x)[0]; a.update(topic={})\"", f"curl -sXPUT '{URL}/55'",
+    f"python3 -c \"requests.request('put', '{URL}/55')\"", f"curl -sd @a.json {URL}",
+    "python3 -c \"c.get_course(1).create_discussion_topic(is_announcement=True)\"",
+    f"node -e \"fetch('{URL}/55', {{method: 'PUT'}})\"",
+]
+WRITES = [("Bash", {"command": c}) for c in BASH] + [
+    ("Monitor", POST), ("PowerShell", {"command": f"Invoke-RestMethod -Method Put -Uri {URL}/55"}),
     ("mcp__canvas__create_announcement", {"id": 1}), ("mcp__CANVAS__publish_announcement", {}),
     ("mcp__Canvas__createAnnouncement", {}), ("mcp__canvas__update_topic", {}),
     ("mcp__instructure__create_announcement", {}), ("mcp__lms__create_discussion_topic", {}),
     ("mcp__canvas__api_request", {"method": "POST", "path": "courses/1/discussion_topics"}),
-    ("mcp__http__request", {"method": "PUT", "url": URL + "/55"}), ("Bash", {"command": f"curl -sXPUT '{URL}/55'"}),
-    ("PowerShell", {"command": f"Invoke-RestMethod -Method Put -Uri {URL}/55"}),
+    ("mcp__http__request", {"method": "PUT", "url": URL + "/55"}),
 ]
 OTHER = [
     ("Bash", {"command": f"curl -f {URL}?only_announcements=true"}), ("Bash", {"command": "canvas announcements list"}),
@@ -105,6 +106,8 @@ for tool, inp in WRITES:
     for prior in ([call("a")], [call("a"), result("a")], [call("a"), result("a", error=True)]):
         assert run(tool, inp, user(OK), *prior, now) == "deny", (tool, prior)
     assert run(tool, inp, user(OK), call("now", tool, inp), result("now")) == "deny", (tool, "unlogged retry")
+    assert run(tool, inp, user("draft it"), meta(RELAY.format(OK, "go")), now) is None, (tool, "real relay")
+    assert run(tool, inp, user(OK), meta(RELAY.format("wait", OK)), now) == "deny", (tool, "relay retraction")
     assert run(tool, inp, now) == "deny", (tool, "no user turn")
     assert run(tool, inp, user("draft it"), *SDK, now) == "deny", (tool, "scheduled prompt")
     assert run(tool, inp, user(OK), NOTE, now) is None, (tool, "harness note")

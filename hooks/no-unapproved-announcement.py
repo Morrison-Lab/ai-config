@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """PreToolUse guard: no class announcement without the user's approval.
 
-Ezra, 2026-10-27, said twice: never post a class announcement without his
-review and approval of its exact text (ai-config#4780, from mlg#228).
-Fails closed on the CLI, `is_announcement`, a network command naming a topic or
-announcement (a plain `curl` read passes) and an MCP announcement write. The
-user's last message must be only "post the announcement" ("yes, post it",
-...); one write each. Gaps (script files, run-time URLs, exact-text binding)
-are ai-config#5453; draft-in-ezras-voice and adversarial-reviewer cover them.
+Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval
+of its exact text (ai-config#4780, from mlg#228). Fails closed on the CLI, `is_announcement`, a
+network command naming a topic or announcement (a plain `curl` read passes) and an MCP announcement
+write. The user's last message must be only "post the announcement" ("yes, post it", ...); one
+write each. Gaps (script files, run-time URLs, exact-text binding) are ai-config#5453.
 """
 import json
 import os
@@ -24,8 +22,10 @@ except Exception:  # detection still runs; a detected write is then denied
 CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
 TOPIC = re.compile(r"discussion(_|%5f)?topic|announcement", re.I)
 ANNOUNCE = re.compile(r"is_announcement|get_announcements.*\.(edit|update)\(", re.I | re.S)
-NET = re.compile(r"\b(curl|wget|requests|urllib|httpx|canvasapi|graphql|canvas\s+api|Invoke-\w+)\b", re.I)
-WRITE = re.compile(r"(-\w*X|--request|-Method)[\s=]*[\"']?(?i:POST|PUT)|(^|\s)(-d|-F|-T|--data|--form|--json|--upload-file)")
+NET = re.compile(r"\b(curl|wget|requests|urllib|httpx|canvasapi|graphql|canvas\s+api|Invoke-\w+)\b|"
+                 r"(https?://|/api/v1/).*(['\"](?i:put|post)['\"]|\.(put|post)\()", re.I | re.S)
+WRITE = re.compile(r"(-\w*X|--request|-Method)[\s=]*[\"']?(?i:POST|PUT)|(^|\s)(-[a-zA-Z]*[dFT]|"
+                   r"--data|--form|--json|--upload-file)")
 SAFE_FIRST = {"git", "gh", "grep", "egrep", "rg"}
 COMPOUND = re.compile(r"[;&|`\n<>]|\$\(|\bgh\s+api\b")
 MCP_READ = re.compile(r"^(get|list|search|read|find|fetch|show|count)", re.I)
@@ -54,16 +54,15 @@ def is_announcement_write(tool, inp):
     return bool(TOPIC.search(flat) and re.search(r"is_announcement|\b(POST|PUT)\b", flat, re.I))
 
 
-def user_words(text):
-    """The user's own messages: outside every tag, or in a principal message or
-    a cited user entry that sits directly in its wake or relay."""
+def user_words(text, top=True):
+    """User text: untagged (if `top`), a principal wake message, or a relay's cited entry."""
     out, stack, pos = [], [], 0
     for m in TAG.finditer(text):
         path = [t for t, _ in stack]
         in_wake = (path[:1] == ["wake"] and path[-1:] == ["message"]
                    and set(path[1:-1]) <= {"project", "thread"})
         cited = path[-2:] == ["relay", "cited"] and path[:-2] in ([], ["coordinator-relay"])
-        if not stack or (in_wake or cited) and stack[-1][1]:
+        if (top and not stack) or stack and (in_wake or cited) and stack[-1][1]:
             out.append(text[pos:m.start()])
         closing, tag, attrs = m.group(1), m.group(2).lower(), m.group(3)
         if closing:
@@ -74,7 +73,7 @@ def user_words(text):
                   else 'author="user"' in attrs if tag == "cited" else True)
             stack.append((tag, ok and (not stack or stack[-1][1])))
         pos = m.end()
-    return [p for p in out + ([text[pos:]] if not stack else []) if p.strip()]
+    return [p for p in out + ([text[pos:]] if top and not stack else []) if p.strip()]
 
 
 def _blocks(entry):
@@ -85,12 +84,13 @@ def _blocks(entry):
 
 def _user_text(entry):
     att = entry.get("attachment") or {}
+    att = entry.get("attachment") or {}
     if att.get("type") == "queued_command" and att.get("commandMode") != "task-notification":
-        return str(att.get("prompt") or "")
-    if is_real_user_turn(entry) and entry.get("promptSource") != "sdk":
-        return "\n".join(strip_injected_text(b.get("text") or "")
-                         for b in _blocks(entry) if b.get("type") == "text")
-    return None
+        return str(att.get("prompt") or ""), True
+    if entry.get("type") != "user" or entry.get("promptSource") == "sdk":
+        return None, False
+    text = "\n".join(strip_injected_text(b.get("text") or "") for b in _blocks(entry) if b.get("type") == "text")
+    return text, bool(is_real_user_turn(entry))  # a meta entry (a relay) counts only for cited words
 
 
 def verdict(path, tool, inp):
@@ -105,8 +105,8 @@ def verdict(path, tool, inp):
     answered = {b.get("tool_use_id") for e in entries for b in _blocks(e) if b.get("type") == "tool_result"}
     writes = []  # every write since the approval, failed ones included
     for entry in reversed(entries):
-        text = _user_text(entry)
-        words = "\n".join(user_words(text)) if text is not None else ""
+        text, top = _user_text(entry)
+        words = "\n".join(user_words(text, top)) if text is not None else ""
         if words.strip():  # a harness note with no user words is skipped
             if not APPROVAL.fullmatch(words):
                 return "the user's latest message is not only an approval of posting it"

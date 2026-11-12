@@ -7,10 +7,11 @@ and several sit within a few characters of their cap, so every new rule turns
 into a budgeting exercise (ai-config#5310, step 1; ai-config#1138).
 
 This prints one table per session kind: each component it loads at start,
-its size, the cap that component is gated against, and a target. The target
-is TARGET_FRACTION of the cap, so the corpus has room to grow before a gate
-fails instead of meeting it at the gate. The caps are imported from the
-scripts and tests that enforce them rather than restated.
+its size, the cap that gates that component, and a target. The target is
+TARGET_FRACTION of the cap, so the corpus has room to grow before a gate
+fails instead of meeting it at the gate. Every cap is imported from the
+script or hook that holds it rather than restated here. The session kinds
+follow docs/delivery-paths.md, which names what each supported path delivers.
 
 Report-only by default. `--strict` exits 1 when a component is over target.
 """
@@ -31,26 +32,24 @@ ROOT = Path(__file__).resolve().parent.parent
 # kept free (ai-config#5310, "a target well under the caps rather than at them").
 TARGET_FRACTION = 0.75
 
-# The hook tests assert these budgets inline rather than as named constants:
-# hooks/test-inject-core-rules.py and hooks/test-inject-subagent-rules.py.
-HOOK_CONTEXT_CAP_CHARS = 10_000
 
-
-def load(name: str):
-    """Import a hyphen-named script from scripts/ as a module."""
-    path = ROOT / "scripts" / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), path)
+def load(rel: str):
+    """Import a hyphen-named script or hook as a module."""
+    path = ROOT / rel
+    spec = importlib.util.spec_from_file_location(path.stem.replace("-", "_"), path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-closure = load("check-context-closure")
-skills = load("validate-skills")
+closure = load("scripts/check-context-closure.py")
+skills = load("scripts/validate-skills.py")
+core_hook = load("hooks/inject-core-rules.py")
+subagent_hook = load("hooks/inject-subagent-rules.py")
 
 
-def file_size(rel: str, unit: str) -> int:
-    text = (ROOT / rel).read_text(encoding="utf-8")
+def file_size(path: Path, unit: str) -> int:
+    text = path.read_text(encoding="utf-8")
     if unit == "bytes":
         return len(text.encode("utf-8"))
     return closure.cli_char_count(text)
@@ -65,61 +64,65 @@ def hook_context(rel: str, event: str) -> int:
         input=json.dumps(payload), capture_output=True, text=True, env=env, check=True,
     ).stdout
     data = json.loads(out)
-    return len(data.get("hookSpecificOutput", data).get("additionalContext", ""))
+    return len(data["hookSpecificOutput"]["additionalContext"])
 
 
-def skill_listing() -> int:
-    entries = []
-    for skill_md in sorted((ROOT / "skills").glob("*/SKILL.md")):
-        fm = skills.parse_frontmatter(skill_md.read_text(encoding="utf-8"), str(skill_md))
-        if fm and isinstance(fm.get("name"), str) and isinstance(fm.get("description"), str):
-            entries.append((fm["name"], fm["description"]))
+def listing(directory: str) -> int:
+    entries = skills.listing_entries(sorted((ROOT / directory).glob("*/SKILL.md")))
     return skills.listing_chars(entries)
 
 
 def cursor_rules() -> int:
-    return sum(file_size(str(p.relative_to(ROOT)), "chars") for p in sorted((ROOT / ".cursor/rules").glob("*.mdc")))
+    return sum(file_size(p, "chars") for p in sorted((ROOT / "cursor-rules").glob("*.mdc")))
 
 
-# name -> (measure, unit, cap or None, where the cap is enforced)
+CLOSURE = "scripts/check-context-closure.py"
+VALIDATE = "scripts/validate-skills.py"
+
+# name -> (measure, unit, cap or None, the script or test that fails over the cap)
 COMPONENTS = {
     "SessionStart core rules": (
         lambda: hook_context("hooks/inject-core-rules.py", "SessionStart"),
-        "chars", HOOK_CONTEXT_CAP_CHARS, "hooks/test-inject-core-rules.py",
+        "chars", core_hook.CAP, "hooks/inject-core-rules.py cuts at it",
     ),
     "AGENTS.md": (
-        lambda: file_size("AGENTS.md", "bytes"),
-        "bytes", closure.DEFAULT_AGENTS_MD_CAP_BYTES, "Codex project_doc_max_bytes",
+        lambda: file_size(ROOT / "AGENTS.md", "bytes"),
+        "bytes", closure.DEFAULT_AGENTS_MD_CAP_BYTES, CLOSURE,
     ),
-    "skill listing": (
-        skill_listing, "chars", skills.SKILL_LISTING_BUDGET_CHARS, "scripts/validate-skills.py",
+    "skill listing": (lambda: listing("skills"), "chars", skills.SKILL_LISTING_BUDGET_CHARS, VALIDATE),
+    "Codex skill listing": (
+        lambda: listing("codex-skills"), "chars", skills.SKILL_LISTING_BUDGET_CHARS, VALIDATE,
     ),
     "CLAUDE.md": (
-        lambda: file_size("CLAUDE.md", "chars"),
-        "chars", closure.DEFAULT_BUDGET_BYTES, "scripts/check-context-closure.py",
+        lambda: file_size(ROOT / "CLAUDE.md", "bytes"),
+        "bytes", closure.DEFAULT_BUDGET_BYTES, CLOSURE,
     ),
-    "SubagentStart rules": (
-        lambda: hook_context("hooks/inject-subagent-rules.py", "SubagentStart"),
-        "chars", HOOK_CONTEXT_CAP_CHARS, "hooks/test-inject-subagent-rules.py",
+    "subagent rules file": (
+        lambda: file_size(subagent_hook.RULES, "chars"),
+        "chars", subagent_hook.RULES_BUDGET, "hooks/test-inject-subagent-rules.py",
     ),
-    "GEMINI.md": (lambda: file_size("GEMINI.md", "chars"), "chars", None, "none"),
     "Antigravity plugin rules": (
-        lambda: file_size("plugins/ai-config/rules/ai-config.md", "chars"), "chars", None, "none",
+        lambda: file_size(ROOT / "plugins/ai-config/rules/ai-config.md", "chars"), "chars", None, "",
     ),
-    "Cursor rules": (cursor_rules, "chars", None, "none"),
+    "Cursor plugin rules": (cursor_rules, "chars", None, ""),
 }
 
-# What each session kind loads at start, by component name.
+# What each session kind loads from ai-config at start, per docs/delivery-paths.md.
 # A Claude Code session reads AGENTS.md because the core-rules hook tells it to.
-# A subagent also loads the repository's CLAUDE.md unless its definition sets
-# omitClaudeMd (skills/agent-builder/SKILL.md); that file is the consumer's.
+# A subagent loads the repository's CLAUDE.md unless its definition sets
+# omitClaudeMd (skills/agent-builder/SKILL.md); built-in subagents cannot opt
+# out. The CLAUDE.md here is ai-config's own, so the second subagent row is
+# a subagent working in ai-config; elsewhere it is that repository's file.
 SESSION_KINDS = {
     "Claude Code, plugin, any repo": ["SessionStart core rules", "AGENTS.md", "skill listing"],
     "Claude Code, in ai-config": ["SessionStart core rules", "AGENTS.md", "skill listing", "CLAUDE.md"],
-    "Claude Code subagent": ["SubagentStart rules"],
-    "Codex": ["AGENTS.md"],
-    "Antigravity": ["GEMINI.md", "Antigravity plugin rules"],
-    "Cursor": ["Cursor rules"],
+    "Claude Code subagent with omitClaudeMd": ["subagent rules file"],
+    "Claude Code subagent in ai-config, without omitClaudeMd": ["subagent rules file", "CLAUDE.md"],
+    "Codex": ["AGENTS.md", "Codex skill listing"],
+    "Gemini CLI": ["AGENTS.md", "skill listing"],
+    "Antigravity": ["AGENTS.md", "Antigravity plugin rules", "skill listing"],
+    "Cursor": ["Cursor plugin rules", "skill listing"],
+    "opencode": ["AGENTS.md"],
 }
 
 
@@ -131,7 +134,7 @@ def main(argv=None) -> int:
     sizes = {name: spec[0]() for name, spec in COMPONENTS.items()}
     over = []
     for kind, names in SESSION_KINDS.items():
-        print(f"\n{kind}: {sum(sizes[n] for n in names):,} loaded at start")
+        print(f"\n{kind}: about {sum(sizes[n] for n in names):,} characters at start")
         for name in names:
             _, unit, cap, where = COMPONENTS[name]
             if cap is None:

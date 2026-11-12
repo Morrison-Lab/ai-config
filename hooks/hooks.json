@@ -1706,6 +1706,18 @@
         ]
       },
       {
+        "matcher": "Bash|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-credential-file-read.py\"",
+            "timeout": 10,
+            "script": "no-credential-file-read.py",
+            "why": "ai-config#4780. Ezra, 2026-10-27: never print a credential file. Denies the Read tool, and a Bash reader (`cat`, `sed`, `head`, `grep`, `base64`, ...), on a known credential path under the home directory (`~/.netrc`, `~/.config/canvas/*`, `~/.config/gh/hosts.yml`, `*token*` under `~/.config`, private SSH keys, ...). A reader inside `$( ... )` stays allowed, since its output is passed on rather than printed. Override for an approved read: prefix the Bash command with ALLOW_CREDENTIAL_READ=1."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__claude-in-chrome__navigate|mcp__Claude_Browser__navigate|mcp__Claude_Browser__preview_start|mcp__computer-use__request_access|mcp__remote-devices__Claude_Browser__navigate|mcp__remote-devices__Claude_Browser__preview_start|mcp__remote-devices__.*request_access",
         "hooks": [
           {

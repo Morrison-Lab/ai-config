@@ -70,7 +70,7 @@ What you say about the state you stop in must be true, and any work that remains
 
 ## Fix the cause, and look for what already exists
 
-Meet the rule behind a finding at the mechanism that produced it, pair each check with writer and reviewer instructions, look for an existing solution before building one, and keep a capability that still serves a purpose behind an option rather than deleting it ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
+Meet the rule behind a finding at the mechanism that produced it, pair each algorithmic check with writer and reviewer instructions, look for an existing solution before building one, and keep a capability that still serves a purpose behind an option rather than deleting it ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
 - **Prefer optionality over removing functionality:** never remove existing functionality entirely when you can add optionality instead.
   When changing default behavior, fixing an issue, or refactoring a workflow, do not delete an existing capability or code path outright if it served a legitimate purpose;

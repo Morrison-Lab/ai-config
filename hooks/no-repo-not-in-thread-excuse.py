@@ -67,7 +67,7 @@ NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|nothing|no\s+one|once|when|until
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
     r"\b(?:add_repo|attach|attaching)\b(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,2}?"
-    rf"\s+(?:was\s+|itself\s+)?{FAIL}\b|\b(?:attach|add_repo)\b[^.;]{{0,80}}?\b(?:got|received)\s+[\"'\u2018\u201c]"
+    rf"\s+(?:was\s+|itself\s+)?{FAIL}\b|\b(?:attach|add_repo)\b[^.;]{{0,80}}?\b(?:(?:got|received)\s+[\"'\u2018\u201c]|(?:returned|responded|answered|said|replied)\b[^.;\"]{{0,40}}?[\"\u201c])"
     rf"|\b(?:tried|attempted)\s+(?:to\s+)?(?:attach|run\s+add_repo|add_repo)\b[^.;]{{0,80}}?\bbut\s+(?:it\s+|that\s+)?(?:was\s+)?{FAIL}", re.I)
 
 REASON = (
@@ -122,8 +122,8 @@ def excuse(text: str):
     """The first sentence that calls a repo out of this thread's reach, or None."""
     sentences = [plain(x) for x in re.split(r"(?<=[.!?])\s+|\n+", text)]
     for i, sentence in enumerate(sentences):
-        # "X wasn't in this thread's repos. I attached it." reports the fix in the next sentence.
-        if is_excuse(sentence) and not (i + 1 < len(sentences) and attaches(sentences[i + 1])):
+        # "X wasn't in this thread's repos. I attached it." reports the fix in a neighbouring sentence.
+        if is_excuse(sentence) and not any(attaches(sentences[j]) for j in (i - 1, i + 1) if 0 <= j < len(sentences)):
             return " ".join(sentence.split())
     return None
 

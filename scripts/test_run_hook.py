@@ -54,10 +54,12 @@ def run(home: Path, project: Path, *args: str, stdin: str = "") -> subprocess.Co
     )
 
 
-# Git Bash on Windows exports a POSIX path (/c/..., /tmp/...); cygpath -wl turns
+# Git Bash on Windows exports a POSIX path (/c/..., /tmp/...); there, and only
+# there (an unrelated cygpath elsewhere is left alone), cygpath -wl turns
 # it back into the native form RUNNER.parent.resolve() gives (ai-config#5516).
 ECHO = ('cat; r="${CLAUDE_PLUGIN_ROOT}"; '
-        'if command -v cygpath >/dev/null; then r="$(cygpath -wl "$r")"; fi; echo "root=$r"')
+        'case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) r="$(cygpath -wl "$r")";; esac; '
+        'echo "root=$r"')
 
 with tempfile.TemporaryDirectory() as td:
     tmp = Path(td)

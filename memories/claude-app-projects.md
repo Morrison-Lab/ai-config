@@ -89,7 +89,7 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16, wit
   GitHub has no REST endpoint for an issue transfer: it needs the GraphQL `transferIssue` mutation,
   and cloud sessions are refused GraphQL.
   Run `gh issue transfer` on the user's device instead.
-  On the XPS the auto-mode check blocked it as an "External System Write" until the user typed approval in the thread.
+  On the user's device, the auto-mode check blocked it as an "External System Write" until the user typed approval in the thread.
   A transferred issue keeps its sub-issue link to a parent in the original repository (rme#1460, 69 issues, 2026-11-11).
 - **Check a PR preview yourself.**
   Open the deployed preview in Playwright Chromium and confirm the change, rather than handing the check to the user.

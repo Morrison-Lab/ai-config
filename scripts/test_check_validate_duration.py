@@ -42,10 +42,9 @@ check("the report names the step that grew", "Run enforcement-hook tests: 500s -
 check("a step that did not grow is listed after it",
       report.index("enforcement-hook") < report.index("Lint"), report)
 
-code, _ = judge(runs([1050] * 5, [500] * 5), old)
-check("exactly at the limit passes", code == 0)
-code, _ = judge(runs([1051] * 5, [500] * 5), old)
-check("just past the limit fails", code == 1)
+check("exactly at the limit passes", judge(runs([1050] * 5, [500] * 5), old)[0] == 0)
+check("just past the limit fails", judge(runs([1051] * 5, [500] * 5), old)[0] == 1)
+check("a zero baseline median is judged, not a crash", judge(runs([1] * 5, [0] * 5), runs([0] * 25, [0] * 25))[0] == 1)
 
 code, report = judge(runs([3000, 700, 700, 700, 700], [500] * 5), old)
 check("one 50-minute stall does not fail the check", code == 0, report)

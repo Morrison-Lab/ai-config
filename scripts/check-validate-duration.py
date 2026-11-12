@@ -59,7 +59,7 @@ def judge(now_runs: list[dict], old_runs: list[dict], recent: int, baseline: int
     now = statistics.median(r["job"] for r in now_runs)
     before = statistics.median(r["job"] for r in old_runs)
     head = (f"{JOB} job: median of the last {recent} runs {now:.0f}s, "
-            f"of {baseline} baseline runs {before:.0f}s ({now / before:.2f}x; limit {ratio}x)")
+            f"of {baseline} baseline runs {before:.0f}s ({now / max(before, 1):.2f}x; limit {ratio}x)")
     if now <= before * ratio:
         return 0, head
     names = {name for r in now_runs + old_runs for name in r["steps"]}

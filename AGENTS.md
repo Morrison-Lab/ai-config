@@ -225,13 +225,6 @@ On moving to native agent plugins, [remove submodules that duplicated them](shar
 
 At three open PRs per repo, open no fourth ([`wip-cap`](shared/workflow/wip-cap.md)).
 
-## Verify changes before pushing
-
-Always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
-At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
-Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
-Parse changed data files: [rule](shared/workflow/parse-data-files.md).
-
 ## Canonical sources vs generated output
 
 Always edit canonical source files, never generated outputs (`.qmd`/`.R` vs `_site/`/`docs/`;
@@ -261,12 +254,6 @@ Fix a new rule's violations in passages you edit anyway.
 Sweep only if Ezra explicitly says "sweep" (`Sweep authorized:` in the PR body);
 checks default to changed lines.
 See [`no-sweeps-by-default`](shared/workflow/no-sweeps-by-default.md).
-
-## Check the remote immediately before every push
-
-Run `git ls-remote --heads origin <branch>` **immediately** before every `git push`, and reconcile what it shows rather than overwriting it.
-Never bare `git push --force`; always use `--force-with-lease --force-if-includes`.
-See [`check-before-pushing`](shared/workflow/check-before-pushing.md).
 
 ## Timestamp recaps in local time
 
@@ -305,19 +292,6 @@ See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) 
 
 - **Don't:** link a `#NNN` a passage is displaying rather than citing, or leave referenced tools, forge items or policies unlinked.
 
-## Deliver completed implementation work
-
-When asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to clean verdict, push, open/update PR, request AI review, and drive to clean.
-This grants no merge authority: the strict merge policy below still applies.
-
-## Commit, push, and PR any potentially-reusable work you produce
-
-Potentially-reusable work produced incidentally in any medium (math derivations, comparisons, scripts, prose) must be committed, pushed, and PRed into an owning repository.
-Commit it when reproducing it costs more than a moment **and** something durable cites it, or will;
-re-check the committed form before publishing.
-See [`commit-reusable-work`](shared/workflow/commit-reusable-work.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
-
-[Port content by script](shared/workflow/port-by-script.md).
 ## Never dispatch a worker on Fable without explicit, specific permission
 
 Workers without an explicit model inherit the conductor's: never dispatch a worker on Fable without explicit, specific permission.
@@ -398,6 +372,23 @@ Have your work reviewed independently before it ships or reaches a person, and k
   Baking a self-merge directive into the loop prompt is allowed only under a standing `mwc` grant ([`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md)).
 - **Monitor scoped open PRs and MRs:** continuously derive and monitor them in the repositories you are actively working in, not in every accessible repository, and within them only the items passing the [PR scope test](shared/workflow/pr-scope.md), including items you opened, pushed to, or were handed to drive.
   Re-query that scoped set at every wake, inspecting mergeability, CI, and review state until each item merges, closes, or is released ([`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md)).
+
+## Ship work through a verified push and a PR
+
+Verify every push first, and carry work worth keeping through to a PR ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
+
+- **Commit, push, and PR any potentially-reusable work you produce:** potentially-reusable work produced incidentally in any medium (math derivations, comparisons, scripts, prose) must be committed, pushed, and PRed into an owning repository.
+  Commit it when reproducing it costs more than a moment **and** something durable cites it, or will;
+  re-check the committed form before publishing ([`commit-reusable-work`](shared/workflow/commit-reusable-work.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
+  [Port content by script](shared/workflow/port-by-script.md).
+- **Deliver completed implementation work:** when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
+  This grants no merge authority: the Strict Merge Control Policy still applies.
+- **Verify changes before pushing:** always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
+  At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
+  Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
+  Parse changed data files: [rule](shared/workflow/parse-data-files.md).
+- **Check the remote immediately before every push:** run `git ls-remote --heads origin <branch>` **immediately** before every `git push`, and reconcile what it shows rather than overwriting it.
+  Never bare `git push --force`; always use `--force-with-lease --force-if-includes` ([`check-before-pushing`](shared/workflow/check-before-pushing.md)).
 
 ## Cursor Cloud specific instructions
 

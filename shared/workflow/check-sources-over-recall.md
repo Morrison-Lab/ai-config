@@ -13,6 +13,11 @@ The project library at `/mnt/project-files` held it.
 - A hedge such as "from memory" or "not checked against" is a defect, not a disclosure: replace it with the check.
 - If no source exists, say what you searched and that the claim rests on inference.
 
+Enforced by `hooks/no-answer-from-recall.py`, which denies a reply that says it answers from memory or recall in the first person.
+"Not checked against" and asking where a source lives are not matched, because every pattern for them over-matched ordinary prose or missed real cases.
+Those two rest on this rule alone (#4959).
+Related: [`live-state-over-notes`](live-state-over-notes.md) (a note's claim about a changing condition), `hooks/flag-book-unavailable-without-library-search.py`, [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
+
 ## Hyperlink the evidence for every factual claim
 
 Ezra, 2026-11-12, after a coordinator post hedged a claim with "I may be out of date on that":
@@ -20,7 +25,7 @@ Ezra, 2026-11-12, after a coordinator post hedged a claim with "I may be out of 
 then "correction: need *evidence* hyperlinked to current information",
 then "(in other words, don't rely on your neural memory)" ([#5588](https://github.com/Morrison-Lab/ai-config/issues/5588)).
 
-- **Do:** link each factual claim in a message to a person to the live evidence it rests on,
+- **Do:** in every message to the user, link each factual claim to the live evidence it rests on,
   such as the PR, issue, commit, workflow run, file at a sha or doc page you read this turn.
   This covers status, PR, CI and review state, settings, file contents, tool behaviour and dates.
 - **Don't:** state a fact from model recall, or hedge it ("I may be out of date") instead of checking it.
@@ -29,8 +34,3 @@ then "(in other words, don't rely on your neural memory)" ([#5588](https://githu
 
 No hook: whether a sentence is a factual claim is not lexically decidable,
 so this rests on the rule, as [#5215](https://github.com/Morrison-Lab/ai-config/issues/5215) concluded for its sibling.
-
-Enforced by `hooks/no-answer-from-recall.py`, which denies a reply that says it answers from memory or recall in the first person.
-"Not checked against" and asking where a source lives are not matched, because every pattern for them over-matched ordinary prose or missed real cases.
-Those two rest on this rule alone (#4959).
-Related: [`live-state-over-notes`](live-state-over-notes.md) (a note's claim about a changing condition), `hooks/flag-book-unavailable-without-library-search.py`, [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).

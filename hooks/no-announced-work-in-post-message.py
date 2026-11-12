@@ -35,9 +35,6 @@ import json
 import os
 import sys
 
-HERE = os.path.dirname(os.path.realpath(__file__))
-
-
 _LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
                     "scripts", "lib")
 if _LIB not in sys.path:

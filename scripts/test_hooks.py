@@ -248,7 +248,12 @@ def _run_in_env(test_path, subject, timeout, rel_test, env):
     """Run the suite under env and print its verdict. 0 = pass, 1 = fail."""
     proc = subprocess.Popen(
         [sys.executable, test_path, subject],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env,
+        # Decode as UTF-8 and replace what does not decode: a suite whose
+        # output came out in the console's encoding (cp1252, ai-config#1288)
+        # made text=True raise UnicodeDecodeError here and abort the sweep,
+        # instead of reporting that one suite's verdict.
+        encoding="utf-8", errors="replace")
     try:
         stdout, stderr = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:

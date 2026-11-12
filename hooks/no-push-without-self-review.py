@@ -2942,7 +2942,9 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
             if found == "clean" and len(hits) < len(shas):
                 continue  # an unresolvable fingerprint voids a clean report
             if not hits or len(hits) < len(shas):
-                wiped |= {c for c, (f, _) in latest.items() if f == "clean"}
+                cleared = {c for c, (f, _) in latest.items() if f == "clean"}
+                # with no fingerprint, the caller's messages already name the cause
+                wiped = wiped | cleared if shas else wiped - cleared
                 latest.clear()  # an unbound report vetoes all before it
             for hit in hits:
                 latest[hit] = (found, seq)
@@ -2960,7 +2962,10 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                 if f != "clean" and seq > since and found and _run_git(
                         directory, env, "merge-base", "--is-ancestor", sha, c,
                         unreadable_raises=True) is not None:
-                    return "", (f"A later blocking verdict names {sha[:12]}, an ancestor of "
+                    kind = "blocking verdict" if f == "needs_work" else (
+                        f"report whose verdict line this guard cannot parse (it accepts "
+                        f"{ACCEPTED_VERDICT_PHRASES})")
+                    return "", (f"A later {kind} names {sha[:12]}, an ancestor of "
                                 f"{c[:12]}, so this push ships code a review flagged.\n"
                                 "Address it, then re-dispatch the reviewer against what you push.")
         missing = sorted(c for c in commits if c not in latest)

@@ -2396,7 +2396,8 @@ def verdict_map_cases() -> tuple[int, int]:
     def verdicts(*pairs):
         events = []
         for verdict, commit in pairs:
-            events += reviewed(body(verdict=verdict, commit=commit))
+            events += reviewed(body(verdict=verdict, commit=commit) if commit
+                               else body(verdict=verdict, fingerprint=False))
         return events
 
     def check(label, cmd, events, want_block):
@@ -2469,6 +2470,12 @@ def verdict_map_cases() -> tuple[int, int]:
              ((clean, HEAD), ("Looks bad", HEAD), (clean, FEATURE)), "cannot parse", None),
             ("the refusal names the veto", PUSH,
              ((clean, HEAD), (nmw, OTHER_HEAD), (clean, FEATURE)), f"clean verdict for {HEAD[:12]}", None),
+            ("an unparsed report on the base is named as unparsed", push_feature,
+             ((clean, FEATURE), ("Looks bad", HEAD), (clean, OTHER_HEAD)), "cannot parse", None),
+            ("a later clean report with no fingerprint keeps the existing message", PUSH,
+             ((clean, HEAD), (clean, None)), "Reviewed-Commit", None),
+            ("a later blocking report with no fingerprint keeps the existing message", PUSH,
+             ((clean, HEAD), (nmw, None)), "returned a blocking verdict", None),
             ("a map that runs out of time still refuses", PUSH,
              ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", {"NPWSR_BUDGET_SECONDS": "0"})):
         rc, out = run_hook(cmd, verdicts(*pairs), extra_env=env)

@@ -839,9 +839,10 @@ Measured on `test-guard-slide-major-tag.py` before the sweep, invoking it throug
 Running a suite against the real registration path is the natural way to reproduce this by hand, and under the lexical spelling the suite cannot run at all.
 Both halves are swept, and `scripts/check-hook-file-resolution.py` covers both.
 `no-push-without-self-review.py` was the visible one only because it fails closed --- with its detector unreachable it fell into degraded mode and denied any push-shaped command, including a heredoc whose body merely *quoted* a push line while writing an issue body, leaving `ALLOW_UNREVIEWED_PUSH=1` as the only way to run anything.
-The hooks that load a sibling for context fail the other way, silently: `no-empty-promise.py`'s `_sibling()` catches a bare `Exception` --- the error actually raised is a `FileNotFoundError` out of `spec.loader.exec_module` --- and returns `None`, so it simply runs without its sibling's code-region stripping.
+A hook that loads part of its detector from a sibling can fail the other way, silently: `no-empty-promise.py`'s `_sibling()` caught a bare `Exception` --- the error actually raised was a `FileNotFoundError` out of `spec.loader.exec_module` --- and returned `None`, and the hook then returns 0 on every input when the sibling's `visible_prose` is missing, so the guard was off with nothing said.
 Measured the same day in the layout above --- `sibling loaded: False` under `abspath`, `True` under `realpath` --- for that hook;
 the remaining sites were fixed by inspection rather than each measured.
+Later, ai-config#2018 moved `no-empty-promise.py`'s loader to the shared `scripts/lib/sibling.py`, which still returns `None` but says why on stderr.
 
 `realpath` resolves symlinks before collapsing `..`, and is identical to `abspath` wherever no symlink is involved, so it strictly widens the set of layouts that work.
 It was already the idiom in the newer hooks (`no-commit-chained-to-push.py`, `warn-heredoc-doubled-backslash.py`).
@@ -1180,5 +1181,24 @@ What ended the oscillation was a structural rule, not a sharper pattern.
 - **Do:** reuse the sibling hooks' regexes (`flag-idea-without-issue.py`, `no-unfiled-finding.py`) for discharge detection, and fail open when they cannot load.
 - **Don't:** widen or narrow one pattern per review round.
   The third round on the same pattern is the signal to restructure.
+
+## A hook that parses git or shell commands must follow git's grammar and the user's git config
+
+Three hook PRs in one wave surfaced gaps where a hook read a command differently from git or `gh`, through the issue it fixed or through review rounds before merge.
+
+- **Working directory** (`hooks/guard-slide-major-tag.py`, fixed in [ai-config#5445](https://github.com/Morrison-Lab/ai-config/pull/5445)): `git ls-tree` paths and `git diff` pathspecs are relative to the current directory, so a run from a subdirectory compared no files and allowed the slide.
+- **User git config** (the same hook and PR): `diff.noprefix` removes the `a/` and `b/` prefixes and `diff.mnemonicPrefix` replaces them, so a parser keyed on them found no files.
+  `diff.relative` makes diff paths relative to the current directory and drops changes outside it, which running from the toplevel cures.
+- **Short-flag clusters** (`hooks/no-unreviewed-pr.py`, fixed in [ai-config#5459](https://github.com/Morrison-Lab/ai-config/pull/5459) for [ai-config#1397](https://github.com/Morrison-Lab/ai-config/issues/1397)): the issue was a request that omitted `-X POST`, since `gh` sends POST once a field is given.
+  Rewriting the parser also showed that `gh api -iX POST` and `-iXPOST` set the method inside a cluster, which the old exact `-X` and `-XPOST` token check missed.
+- **Long-option prefixes** (`hooks/warn-one-sided-conflict-resolution.py`, added in [ai-config#5461](https://github.com/Morrison-Lab/ai-config/pull/5461) for [ai-config#5407](https://github.com/Morrison-Lab/ai-config/issues/5407)): git accepts any unique prefix of a long option, and uniqueness depends on the subcommand.
+  `--t` abbreviates `--theirs` on `git restore` but is ambiguous on `git checkout`, which also has `--track`.
+
+- **Do:** resolve the working directory from the hook payload, then run every git call from its `git rev-parse --show-toplevel`, and decide explicitly whether the hook fails open when that call fails.
+- **Do:** pass `--src-prefix=a/ --dst-prefix=b/` to any `git diff` whose output the hook parses.
+- **Do:** read short-flag clusters and unique long-option prefixes per subcommand, from `git <sub> -h` or `gh <cmd> --help`.
+- **Do:** add each spelling (cluster, prefix, subdirectory run, non-default config) to the hook's suite as a must-catch case.
+- **Don't:** test a hook only from the repo root under a default git config, with every flag spelled out in full.
+- **Don't:** match a flag as a separate exact token, such as `-X`, when git or `gh` also accepts it inside a cluster or as a prefix.
 
 See also `scripts/check-text-encoding.py`, which flags bare `write_text` (give `encoding=`), and `skills/mwc/SKILL.md`, which names the `expectedHeadSha` pin the GitHub MCP `merge_pull_request` takes.

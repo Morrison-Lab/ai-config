@@ -92,7 +92,6 @@ owe, such as scheduling a timer or other PR-watcher to trigger the next step
 of the ardi loop when it is time".
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -105,6 +104,15 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 _LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
+
+# The shared sibling loader (ai-config#2018). A broken install that lacks it
+# loads no sibling, and the hook runs without it; say so on stderr.
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
 try:
     from transcript_meta import is_skill_load_meta
 except Exception as _exc:  # broken install: degrade, do not fail open silently
@@ -119,14 +127,7 @@ except Exception as _exc:  # broken install: degrade, do not fail open silently
 
 def _sibling(name):
     """Import a hyphenated sibling module, or None if unavailable."""
-    path = os.path.join(HERE, name)
-    try:
-        spec = importlib.util.spec_from_file_location("_sib", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+    return load_sibling(__file__, name) if load_sibling else None
 
 
 _ums = _sibling("remind-ums-after-error.py")

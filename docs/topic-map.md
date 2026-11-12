@@ -374,7 +374,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/put-prs-in-ready-mode.md` | A Pull Request that is ready for review must be in ready mode, not left in draft. |  |
 | `shared/workflow/quotable-findings.md` | Drop any review finding you are about to post if it cannot quote the passage it is about. |  |
 | `shared/workflow/read-canonical-doc-before-starting.md` | When a repo's own `CLAUDE.md` (or an equivalent short orientation file) names a fuller document as the actual authority --- `.github/copilot-instructions.md`... |  |
-| `shared/workflow/read-instructions-fully.md` | AGENTS.md's "Interpret instructions broadly" section sets the breadth of a reading. This fragment covers two habits that keep a reading complete, each one a... |  |
+| `shared/workflow/read-instructions-fully.md` | The "Interpret instructions broadly and maximize safe progress" bullet of AGENTS.md's "Act on the whole request, and decide rather than ask" section sets the... |  |
 | `shared/workflow/read-published-html-from-gh-pages.md` | Every Morrison-Lab notes repo (`lds`, `mds`, `pds`, `sds`, `rme` and the rest) publishes its rendered site to the `gh-pages` branch. Pull request previews si... |  |
 | `shared/workflow/recheck-review-findings.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the queries, the login-... |  |
 | `shared/workflow/record-every-decision.md` | Ezra, 2026-10-22 (ai-config#4676): every decision gets documented somewhere outside the thread, typically in a repo file. |  |
@@ -408,7 +408,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/surface-merge-order.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/sync-with-main.md` | Whenever `main` has moved ahead of a PR branch you're working on, **merge `main` into the PR branch** before the next push or review trigger. Don't wait for... |  |
 | `shared/workflow/terminate-superseded-tasks.md` | When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate th... |  |
-| `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps a short summary of the rule, one pattern/anti-pattern pair, and a link here for the fu... |  |
+| `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568). `AGENTS.md`'s section of the same name states the rule and links here for the full pairs, the plat... |  |
 | `shared/workflow/track-useful-resources.md` | A notes repo is a site listed in `course-sequence` or in the notes repository registry of `send-notes`. Track every useful resource (textbooks, articles, sof... |  |
 | `shared/workflow/triage-backlog.md` | Triage the issue backlog on a fixed cadence, and treat closing an issue as not-planned as a normal outcome of that pass rather than as a failure to do the work. |  |
 | `shared/workflow/triage-new-asks.md` | Triage a new ask against the current backlogs before acting on it, so it joins the work that already owns it instead of spawning parallel work. |  |

@@ -141,7 +141,10 @@ SCRIPTS = {"python3 sub/post.py": "deny", "cd sub && python3 post.py": "deny", "
            "python3 -c 'import sub.post'": "deny",
            "python3 repo/hooks/test-no-unapproved-announcement.py": None, "python3 sub/test-no-unapproved-announcement.py": "deny",
            "python3 repo/hooks/post2.py": "deny",
-           "python3 -c 'from sub import post'": "deny", "python3 -u -m sub.post": "deny"}
+           "python3 -c 'from sub import post'": "deny", "python3 -u -m sub.post": "deny",
+           "python3 -c 'import json, sub.post'": "deny", "python3 -W ignore -m sub.post": "deny", "python3 -msub.post": "deny",
+           "cd 'repo' && python3 hooks/test-no-unapproved-announcement.py": None, "cd 'sub' && python3 post.py": "deny",
+           "cd \"$WT\" && python3 hooks/test-no-unapproved-announcement.py": None}
 for c, want in SCRIPTS.items():
     assert run("Bash", {"command": c}, user("hello"), cwd=TMP) == want, c
 S = {"command": "python3 sub/post.py"}

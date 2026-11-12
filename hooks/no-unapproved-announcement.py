@@ -69,6 +69,23 @@ def script_names(cmd):
                     break
 
 
+def modules_run(cmd):
+    """Modules `python -m X` (or `-mX`) runs, read word by word so options and their values are skipped."""
+    for seg in re.split(r"[;&|\n(){}]", cmd):
+        words = [w.strip("'\"") for w in seg.split()]
+        for i, w in enumerate(words):
+            if not re.match(r"python[\d.]*$", w.rsplit("/", 1)[-1]):
+                continue
+            for j, x in enumerate(words[i + 1:], i + 1):
+                if x == "-m" and j + 1 < len(words):
+                    yield words[j + 1]
+                if x == "-m" or x == "-c" or EXT.match(x):
+                    break
+                if x.startswith("-m") and len(x) > 2:
+                    yield x[2:]
+                    break
+
+
 def is_self(script, code):
     """The script is this hook or its tests in an ai-config checkout, or an exact copy: they name writes, making none."""
     root = os.path.dirname(os.path.dirname(os.path.realpath(script)))
@@ -85,12 +102,13 @@ def is_self(script, code):
 
 def script_writes(cmd, cwd):
     """A script file the command runs makes a network topic write, or cannot be read (#5453)."""
-    cds = [os.path.expanduser(d) for d in re.findall(r"\bcd\s+([\w./~-]+)", cmd)]
+    cds = [os.path.expanduser(d) for d in re.findall(r"\b(?:cd|pushd)\s+['\"]?([\w./~-]+)", cmd)]
     dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in cds]
     code_args = " ".join(a or b for a, b in re.findall(r"-c\s+(?:'([^']*)'|\"([^\"]*)\")", cmd))
-    modules = re.findall(r"\b(?:import|from)\s+([\w.]+)", code_args)
-    modules += re.findall(r"\bpython[\d.]*\s+(?:-\w+\s+)*-m\s+([\w.]+)", cmd)
+    names = [n.split() for found in re.findall(r"\bimport\s+([\w., ]+)", code_args) for n in found.split(",")]
+    modules = [n[0] for n in names if n] + re.findall(r"\bfrom\s+([\w.]+)", code_args)  # `import a, b as c`
     modules += [f"{a}.{b}" for a, b in re.findall(r"\bfrom\s+([\w.]+)\s+import\s+(\w+)", code_args)]
+    modules += list(modules_run(cmd))
     imported = {m.replace(".", "/") + ".py" for m in modules}  # a local module `-c` code loads or `-m` runs
     for name in [*script_names(cmd), *sorted(imported)]:
         paths = [p for p in (os.path.join(d, os.path.expanduser(name)) for d in dirs) if os.path.isfile(p)]
@@ -98,7 +116,8 @@ def script_writes(cmd, cwd):
             with open(paths[-1], encoding="utf-8", errors="ignore") as fh:
                 code = fh.read(1 << 20)
         except (IndexError, OSError):
-            if TOPIC.search(cmd) and name not in imported:
+            own = os.path.basename(name) in [os.path.basename(p) for p in SELF]  # this hook or its tests, run elsewhere
+            if TOPIC.search(cmd) and name not in imported and not own:
                 return True
             continue
         if is_self(paths[-1], code):

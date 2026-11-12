@@ -47,6 +47,18 @@ CASES = [
     ("thread tool", "mcp__hearthbot__message_thread",
      "ai-config isn't in this session's repos.", True),
     ("edit tool", "mcp__hearthbot__edit_message", "gha is not in this thread's repos.", True),
+    # Second review round (805f4c1).
+    ("isn't added to", POST, "The repo isn't added to this thread, so please file an issue.", True),
+    ("has no checkout", COORD, "This session has no ai-config checkout, so route it as an issue.", True),
+    ("can't push", POST, "I can't push to ai-config from this session.", True),
+    ("outside scope bare", POST, "mlr is outside this thread's scope.", True),
+    ("hyphenated word", POST, "The merge-ready PR isn't in this thread yet.", False),
+    ("tool not installed", POST, "pre-commit isn't installed in this session.", False),
+    ("bug in thread's repo", POST, "The bug is not in this thread's repo, it is in lds-site.", False),
+    ("repos' lockfile", POST, "The cached build isn't in my repos' lockfile.", False),
+    ("has no changes", POST, "We have no gha changes in this thread.", False),
+    ("no network access", POST, "This session has no access to the network.", False),
+    ("thread scope of", POST, "That change is outside this thread's scope of work.", False),
     # Passes.
     ("tried and refused", POST,
      "add_repo refused ai-config, so it is not in this session's repos.", False),

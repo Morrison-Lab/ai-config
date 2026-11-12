@@ -14,14 +14,16 @@ request_decision, message_coordinator, message_thread), in every session.
 
 A sentence is denied when it holds all three of:
   * a negated presence or access ("isn't in", "not one of", "doesn't have",
-    "can't reach", "don't include", "outside");
+    "can't reach", "can't push to", "don't include", "outside", "has no X
+    checkout");
   * a thread or session as the place ("this thread", "the session's repos",
     "my repos", "attached here");
   * a repository: a list of the thread's repos ("this thread's repos"), or a
-    repo word or repo-like name (a hyphenated name, owner/name, a code span or a
-    lab repo name) before the negation or as the object of have, include,
-    access or reach.
-A sentence that reports an attach (added, attached, cloned) passes, and so does
+    repo word or repo-like name (owner/name, a code span or a lab repo name)
+    before the negation or as the object of have, include, access, reach,
+    push, edit, write or commit. A bare hyphenated word does not count, since
+    "merge-ready" and "pre-commit" are not repos.
+A sentence that reports an attach by I or we passes, and so does
 one that says add_repo or the attach was refused, denied, declined or failed.
 
 A deny, not a reminder, because the failing shape is lexical (ai-config#4741).
@@ -42,28 +44,38 @@ NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
        rf"can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 PRESENCE = (r"(?:in|part\s+of|attached|among|one\s+of|within|available|include|"
-            r"includes|have|has|access|reach|checked\s+out|cloned|on)")
-NEG_PRESENCE = re.compile(rf"\b{NEG}\s+(?:\w+\s+){{0,3}}?{PRESENCE}\b|\boutside\b", re.I)
+            r"includes|have|has|access|reach|checked\s+out|cloned|added|push|edit|"
+            r"write|commit|on)")
+NEG_PRESENCE = re.compile(
+    rf"\b{NEG}\s+(?:\w+\s+){{0,3}}?{PRESENCE}\b|\boutside\b"
+    rf"|\b(?:has|have)\s+no\b|\bthere(?:{APOS}s|\s+is|\s+are)\s+no\b",
+    re.I)
 PLACE = rf"(?:this|the|my|our|that|current)\s+(?:thread|session)"
 LOC = re.compile(
     rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b"
     r"|\b(?:attached|checked\s+out|cloned|available)\s+here\b",
     re.I)
 REPO_LIST = re.compile(
-    rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repo|repos|repository|repositories)"
-    r"(?:\s+scope)?\b(?!\s+(?:checkout|clone|directory|tree|root|branch|files?)\b)"
-    r"|\bmy\s+(?:repos|repositories)\b"
+    rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|scope)\b"
+    r"(?![\w'’])(?!\s+(?:checkout|clone|directory|tree|root|branch|files?|of)\b)"
+    r"|\bmy\s+(?:repos|repositories)\b(?!['’])"
     r"|\bthe\s+(?:repos|repositories)\s+(?:attached|available|in|on|for)\b",
     re.I)
 LAB_REPOS = (r"ai-config|gha|macros|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"
              r"ids|dds|vds|ccds|cds|epi\d+|lds-site|mcsg|stats-allowlist|teaching-tools")
 REPO_NAME = re.compile(
     rf"\b(?:repo|repos|repository|repositories)\b|`[^`]+`|\b[\w.-]+/[\w.-]+\b"
-    rf"|\b[a-z0-9]+(?:-[a-z0-9]+)+\b|\b(?:{LAB_REPOS})\b",
+    rf"|\b(?:{LAB_REPOS})\b",
     re.I)
 OBJECT = re.compile(
-    rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:have|has|include|includes|access|reach)\s+"
-    r"(?:access\s+to\s+)?(?:the\s+)?(\S+)",
+    rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?"
+    r"(?:have|has|include|includes|access|reach|push|edit|write|commit)\s+"
+    r"(?:access\s+to\s+|to\s+|into\s+)?(?:the\s+)?(\S+)"
+    # "has no X checkout", "there is no access to X": the bare "has no X"
+    # form ("we have no gha changes") is not an excuse, so a checkout or
+    # access word must come with it.
+    rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
+    r"(?:access\s+to\s+(?:the\s+)?(\S+)|(?:the\s+)?(\S+)\s+(?:checkout|clone|copy|access)\b)",
     re.I)
 ATTACHED = re.compile(
     rf"\b(?:I|we)\s+(?:have\s+|{APOS}ve\s+|just\s+|then\s+)?(?:added|attached|cloned)\b", re.I)
@@ -97,7 +109,9 @@ def names_repo(sentence: str, neg: re.Match) -> bool:
     if REPO_NAME.search(sentence[:neg.start()]):
         return True
     obj = OBJECT.search(sentence)
-    return bool(obj and REPO_NAME.search(obj.group(1)))
+    if not obj:
+        return False
+    return any(g and REPO_NAME.search(g) for g in obj.groups())
 
 
 def is_excuse(sentence: str) -> bool:

@@ -52,8 +52,8 @@ One run per arm, Sonnet, each row at the commit that added its case (2026-11-11 
 | `trigger-ardi` | 0 | 0 | [ai-config#5331](https://github.com/Morrison-Lab/ai-config/issues/5331) |
 | `trigger-memorize` | 0 | 0 | [ai-config#5331](https://github.com/Morrison-Lab/ai-config/issues/5331) |
 | `injection-*`, `no-trigger-*` | 1 | 1 | The base model already passes; these guard against regressions. |
-| `attach-missing-repo` | 1.00 | 0.25 | Two runs per arm, 2026-11-12. The rule changes behaviour: without it, the reply hands the fix to someone else ([ai-config#5490](https://github.com/Morrison-Lab/ai-config/issues/5490)). |
-| `no-attach-attached-repo` | 0.75 | 1.00 | Negative twin, same runs. One plugin-arm reply tripped `no-excuse`; three more plugin-arm runs scored 1.00. |
+| `attach-missing-repo` | 0.00 | 0.17 | Three runs per arm, 2026-11-12. Known failing: with the plugin, every reply still asks before calling `add_repo` ([ai-config#5553](https://github.com/Morrison-Lab/ai-config/issues/5553)). |
+| `no-attach-attached-repo` | 1.00 | 0.67 | Negative twin, same runs. |
 
 One run is a smoke check, not a measurement of rates;
 use `--runs 3` or more before drawing conclusions from a difference.

@@ -19,7 +19,7 @@ such as a coordinator telling Ezra that a thread has no tool for a step.
 Your own tool list does not show another session's tools.
 
 Ezra, 2026-11-12 (Data 571): the project coordinator told him that no tool let a thread switch its own auto mode.
-Threads have one, and this file and two others already documented it.
+Threads have one, already documented in this file (`grep -rln set_session_permission_mode shared skills` finds three).
 Ezra: "remember this and record it in ai-config".
 
 Before any claim about another session's abilities:

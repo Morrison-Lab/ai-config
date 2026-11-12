@@ -14,8 +14,8 @@ Only the adversarial reviewer caught it (the `main` figure is reproducible: `wc 
 - **Don't:** append a paragraph to `AGENTS.md` without measuring the cap, least of all when the last run reported tight headroom ([ai-config#4214](https://github.com/Morrison-Lab/ai-config/issues/4214)).
 
 **Condensing a rule drops its qualifiers.**
-Measured 2026-11-12 on the [#2889](https://github.com/Morrison-Lab/ai-config/issues/2889) composition: folding six `AGENTS.md` sections into one-sentence bullets dropped eight qualifiers, found over four review rounds.
-They were two exemptions, an alternative remedy, one of three listed mechanisms, a clock-time report, a do-not-wait clause, and two of three triggers.
+Measured 2026-11-12 on the [#2889](https://github.com/Morrison-Lab/ai-config/issues/2889) composition: folding six `AGENTS.md` sections into one-sentence bullets dropped nine qualifiers, found over five review rounds.
+They were two exemptions, an alternative remedy, one of three listed mechanisms, a clock-time report, a do-not-wait clause, two of three triggers, and a scope limit.
 Each change tightened or loosened a rule while the bullet still read as the same rule.
 
 - **Do:** before committing a condensed rule, list every clause of the original and point to where the condensed text keeps it, or to the fragment that carries it.

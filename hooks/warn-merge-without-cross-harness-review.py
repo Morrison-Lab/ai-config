@@ -92,8 +92,6 @@ import re
 import sys
 import urllib.parse
 
-HERE = os.path.dirname(os.path.realpath(__file__))
-
 # Reviewer CLIs, one per harness. The session's own harness is removed at run
 # time, so `claude` counts only from a non-Claude session.
 CROSS_HARNESS_CLIS = frozenset({

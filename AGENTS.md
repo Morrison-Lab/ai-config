@@ -202,7 +202,7 @@ Use no robot emoji anywhere in the footer, since review parsers can misinterpret
 ## File formatting & links
 
 When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
-Follow [`file-formatting-and-links`](shared/writing/file-formatting-and-links.md) for the rest: markdown flavour, links to files and symbols, the displayed-`#NNN` exception, and line breaks.
+Follow [`file-formatting-and-links`](shared/writing/file-formatting-and-links.md) for the rest: markdown flavour, liberal hyperlinking of tools, forge items and policies, links to files and symbols, the displayed-`#NNN` exception, and line breaks.
 
 ## Never dispatch a worker on Fable without explicit, specific permission
 

@@ -2,7 +2,7 @@
 """UMS is owed before a thread is resolved, and when its PR merges.
 
 Two entry points, one rule (AGENTS.md "Leave every pause honest and resumable",
-its "Run UMS" bullet; ai-config#4480):
+its two "Run UMS" bullets; ai-config#4480):
 
   * PreToolUse on `mcp__hearthbot__set_thread_resolved` with `resolved: true`.
     A resolved thread loses its message box, so the learnings from the thread

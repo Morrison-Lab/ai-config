@@ -13,13 +13,6 @@ Every rule here serves these three, each an act you can observe:
 - **Diligent:** verify before claiming: re-query state rather than recall it ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)), and view a rendered deliverable before calling it ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
 
   Don't be lazy; be proactive, detail-oriented, and thorough in your work.
-## Get a clean automated review before asking a person to review
-
-Never ask a person to review a PR, GitLab MR, document, or other work product, on any forge, repo or project, or report one as awaiting human review, until its automated review is clean or deadlocked.
-Trigger the automated reviews yourself after the round's last push (or confirm a run on that head), and iterate (`ardi`) until clean.
-A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and if it still cannot give a verdict, a clean posted adversarial review stands in.
-See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for steps and exceptions.
-
 ## Instruction layering
 
 `AGENTS.md` is the compact, unconditional cross-agent contract.
@@ -70,7 +63,8 @@ What you say about the state you stop in must be true, and any work that remains
   a promise to return is not a mechanism, and a verified clean stop needs no timer.
 - **Say whether the session is done when reporting stopping point status**, confirming UMS ran (or no new learnings accumulated) and noticed follow-ups are filed;
   never say done with uncommitted, unpushed, or un-PRed changes, or open PRs the session authored ([`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md)).
-- **Run UMS before every pause**, first, before ending a turn to wait on anything (CI, a review round, a subagent, or an answer from the user), if learnings have accumulated, and **run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn, without waiting for a clean verdict, an accepted finding, or a first-person admission;
+- **Run UMS before every pause**, first, before ending a turn to wait on anything (CI, a review round, a subagent, or an answer from the user), if learnings have accumulated ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
+- **Run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn, without waiting for a clean verdict, an accepted finding, or a first-person admission;
   answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
 - **Terminate superseded and abandoned background tasks** (commands, monitors, subagents dispatched to inspect, search, or diagnose) once their purpose is met, their findings are superseded, or the session moves on, and sweep them before declaring anything complete ([`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md)).
 
@@ -335,23 +329,6 @@ See [`no-fable-subagents`](shared/workflow/no-fable-subagents.md).
 Draft iteratively: write substantively-correct first drafts, then hand off to specialized editor agents (prose editor, code editor) for style compliance.
 See [`iterative-editing`](shared/workflow/iterative-editing.md).
 
-## Every self-review is an adversarial review by a separate subagent
-
-Never push code to a remote branch blind, and never review your own diff in the context that wrote it.
-Whenever reviewing your own work is called for --- before `git push`, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to a separate reviewer agent with an adversarial brief (the `adversarial-reviewer` subagent, or a separate CLI where no subagent tool exists), against `git diff origin/<default-branch>...HEAD`.
-Address, rebut, or defer every finding, and obtain a clean verdict before pushing.
-Do not push unless the verdict is `clean` and the fingerprint prefix-matches HEAD.
-See [`adversarial-self-review`](shared/workflow/adversarial-self-review.md).
-
-## Put PRs in ready mode when they are ready for review
-
-A Pull Request that is ready for review must be in ready mode, not left in draft.
-Leaving a completed PR in draft hides it from reviewers and blocks review workflows.
-Two exceptions: up-front empty PRs on claim (`pr-on-claim`), un-drafted once implementation lands and checks pass;
-and draft-gated dependent PRs held until prerequisites merge.
-Marking a PR ready grants no merge authority.
-See [`put-prs-in-ready-mode`](shared/workflow/put-prs-in-ready-mode.md).
-
 ## Antigravity Workspace Rules & Activation Scopes
 
 See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravity.md) for Antigravity-specific workspace rules, activation scopes, manifests, and hook integration.
@@ -401,22 +378,26 @@ A review-only run dispatched naming the target PR reviews and stops there.
 Every review you post or produce, including a local report or one composed in-transcript, carries both the Markdown report and the `review-data` JSON payload.
 Detail: [`pr-scope`](shared/workflow/pr-scope.md) and [`memories/reviewing-prs.md`](memories/reviewing-prs.md).
 
-## Always arm a persistent PR loop
+## Review your work before anyone sees it, and watch every PR you drive
 
-When you open, push to, or take over a PR, arm a persistent monitoring loop if one is not already running, and keep it running until the PR merges, closes, or the user stops it.
-A one-shot poll or webhook subscription is not a loop;
-re-arm periodic check-ins using the session's wake mechanism.
-After every push, actively poll forge CI and review state with `gh` or `glab` until terminal.
-Baking a self-merge directive into the loop prompt is allowed only under a standing `mwc` grant.
-See [`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md).
+Have your work reviewed independently before it ships or reaches a person, and keep every PR you drive watched until it ends ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-## Monitor scoped open PRs and MRs
-
-Continuously derive and monitor open PRs and MRs in repositories the agent is actively working in;
-do not sweep every accessible repository.
-Within an active repository, monitor only items passing the PR scope test, including items opened, pushed to, or handed to drive.
-Re-query the scoped open set at every wake, inspecting mergeability, CI, and review state until the item merges, closes, or is released.
-See [`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md).
+- **Every self-review is an adversarial review by a separate subagent:** never push code blind, and never review your own diff in the context that wrote it.
+  Whenever reviewing your own work is called for (before `git push`, as the fallback when the external reviewer is down, or the project-conventions pass), dispatch it with an adversarial brief to a separate reviewer (the `adversarial-reviewer` subagent, or a separate CLI where no subagent tool exists) against `git diff origin/<default-branch>...HEAD`.
+  Address, rebut, or defer every finding, and push only on a `clean` verdict whose fingerprint prefix-matches HEAD ([`adversarial-self-review`](shared/workflow/adversarial-self-review.md)).
+- **Get a clean automated review before asking a person to review:** never ask a person to review a PR, GitLab MR, document, or other work product, on any forge, repo, or project, or report one as awaiting human review, until its automated review is clean or deadlocked.
+  Trigger the automated reviews yourself after the round's last push (or confirm a run on that head), and iterate (`ardi`) until clean.
+  A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and if it still cannot give a verdict, a clean posted adversarial review stands in.
+  See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for steps and exceptions.
+- **Put PRs in ready mode when they are ready for review**, since a draft hides a PR from reviewers and blocks review workflows;
+  the two exceptions are an up-front empty PR on claim (`pr-on-claim`), un-drafted once its implementation lands and checks pass, and a draft-gated dependent PR held until its prerequisites merge.
+  Marking a PR ready grants no merge authority ([`put-prs-in-ready-mode`](shared/workflow/put-prs-in-ready-mode.md)).
+- **Always arm a persistent PR loop** when you open, push to, or take over a PR, if one is not already running, and keep it running until the PR merges, closes, or the user stops it.
+  A one-shot poll or webhook subscription is not a loop: re-arm periodic check-ins with the session's wake mechanism.
+  After every push, actively poll forge CI and review state with `gh` or `glab` until terminal.
+  Baking a self-merge directive into the loop prompt is allowed only under a standing `mwc` grant ([`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md)).
+- **Monitor scoped open PRs and MRs:** continuously derive and monitor them in the repositories you are actively working in, not in every accessible repository, and within them only the items passing the [PR scope test](shared/workflow/pr-scope.md), including items you opened, pushed to, or were handed to drive.
+  Re-query that scoped set at every wake, inspecting mergeability, CI, and review state until each item merges, closes, or is released ([`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md)).
 
 ## Cursor Cloud specific instructions
 

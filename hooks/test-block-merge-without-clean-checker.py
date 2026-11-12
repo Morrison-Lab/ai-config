@@ -240,6 +240,26 @@ def main():
               len(list(_mod._raw_records(_tpath))) == 2)
     finally:
         os.unlink(_tpath)
+    check("with the sibling present, _records is the sibling's reader",
+          _mod._records is not _mod._raw_records)
+    # A copy of the hook with scripts/lib but no sibling falls back.
+    import shutil as _sh
+    with tempfile.TemporaryDirectory() as _root:
+        os.makedirs(os.path.join(_root, "hooks"))
+        _sh.copytree(os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(HOOK))),
+                                  "scripts", "lib"),
+                     os.path.join(_root, "scripts", "lib"))
+        _copy = os.path.join(_root, "hooks", os.path.basename(HOOK))
+        _sh.copy(HOOK, _copy)
+        _probe = subprocess.run(
+            [sys.executable, "-I", "-c",
+             "import importlib.util as u, sys; "
+             "s = u.spec_from_file_location('h', sys.argv[1]); "
+             "m = u.module_from_spec(s); s.loader.exec_module(m); "
+             "print(m._SIB_WMWFC is None, m._records is m._raw_records)", _copy],
+            capture_output=True, text=True, timeout=30)
+        check("without the sibling, _records falls back to _raw_records",
+              _probe.stdout.strip() == "True True")
 
     # --- allows: relayed evidence (cloud) ---------------------------------
     check("allows a RELAYED line in a user-role message (RC session output)",

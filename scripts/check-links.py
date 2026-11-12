@@ -127,13 +127,13 @@ def anchors_in(md: Path) -> tuple[frozenset[str], frozenset[str]]:
     return frozenset(ids), frozenset(keys)
 
 
-def check_fragment(fragment: str, page: Path, target: str, md: Path, root: Path) -> None:
-    """Fail a fragment that names no anchor or heading in `page`.
+def report(md: Path, root: Path, target: str, why: str) -> None:
+    rel = md.relative_to(root) if md.is_relative_to(root) else md
+    broken.append(f"{rel} -> {target} ({why})")
 
-    Headings match on loose keys (see the module docstring for the one kind
-    of heading that can fail wrongly), at the cost of missing a rename that
-    changes only punctuation, spacing or a trailing -N.
-    """
+
+def check_fragment(fragment: str, page: Path, target: str, md: Path, root: Path) -> None:
+    """Fail a fragment that names no anchor, or no heading by loose key, in `page`."""
     global checked
     checked += 1
     fragment = urllib.parse.unquote(fragment).removeprefix("user-content-")
@@ -142,11 +142,7 @@ def check_fragment(fragment: str, page: Path, target: str, md: Path, root: Path)
         return
     if "plain=1" in target and LINE_ANCHOR.fullmatch(fragment):
         return  # a source-view line anchor, e.g. file.md?plain=1#L3
-    try:
-        rel = md.relative_to(root)
-    except ValueError:
-        rel = md
-    broken.append(f"{rel} -> {target} (no such heading)")
+    report(md, root, target, "no such heading")
 
 
 def is_external(target: str) -> bool:
@@ -241,9 +237,7 @@ def check_target(target: str, md: Path, root: Path = ROOT) -> None:
             # Only a file listing, so no heading for the fragment to name;
             # another README format (readme.rst) is left unchecked.
             checked += 1
-            rel = md.relative_to(root) if md.is_relative_to(root) else md
-            broken.append(f"{rel} -> {target} (no README for the heading)")
-            return
+            return report(md, root, target, "no README for the heading")
     if resolved is not None and fragment and resolved.suffix == ".md":
         check_fragment(fragment, resolved, target, md, root)
     elif resolved is not None:

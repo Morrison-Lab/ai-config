@@ -332,12 +332,8 @@ Two lightweight checks keep the skill catalog well-formed:
   (every `SKILL.md` has valid frontmatter, `codex-skills/` is in sync, and the
   manifests are valid JSON) and `scripts/check-links.py` (no broken relative
   markdown links) on every push and PR.
-  `check-links.py` also fails a `#fragment`, on its own or on a link to a
-  Markdown file or a directory's README, that names no heading or HTML
-  anchor in its target.
-  On a "(no such heading)" report, point the link at the heading's current
-  slug, or restore the heading
-  ([`reorganize-prose`](shared/writing/reorganize-prose.md#do-and-dont)).
+  `check-links.py` also fails a `#fragment` (alone, or on a link to a Markdown file or a directory's README) that names no heading or HTML anchor in its target.
+  On a "(no such heading)" report, point the link at the heading's current slug, or restore the heading ([`reorganize-prose`](shared/writing/reorganize-prose.md#do-and-dont)).
 - **Pre-commit** (`.pre-commit-config.yaml`) adds local secret-scanning
   ([gitleaks](https://github.com/gitleaks/gitleaks)) plus the same two
   validators. Enable once with `pre-commit install`.

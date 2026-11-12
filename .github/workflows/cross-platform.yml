@@ -1,0 +1,74 @@
+name: cross-platform
+
+# validate.yml runs on ubuntu-latest only, so defects that need macOS path
+# aliasing (/var -> /private/var), a case-insensitive filesystem, or Windows
+# Git Bash never show in CI (ai-config#1843). This runs the same derived step
+# list on macOS and Windows through the local runner that already derives it
+# from validate.yml. It runs weekly and on demand, and on a pull request only
+# when this file changes, so a checker change reaches these platforms after
+# it merges; a red scheduled run opens or updates a tracking issue.
+
+on:
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/cross-platform.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-platform-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: true
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Provide python3 on Windows
+        # The derived steps call python3, and setup-python installs only
+        # python.exe on Windows.
+        if: runner.os == 'Windows'
+        run: cp "$(command -v python)" "$(dirname "$(command -v python)")/python3.exe"
+      - name: Install dependencies
+        run: python3 -m pip install pyyaml==6.0.2 pytest==8.3.5
+      - name: Run the validate.yml steps
+        run: python3 scripts/run-local-validation.py --no-other-workflows --base origin/main
+
+  report:
+    needs: validate
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the tracking issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="cross-platform validation failed on the weekly run"
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --title "$title" --body "The weekly macOS and Windows run of the validate steps failed: $RUN_URL (ai-config#1843)."
+          fi

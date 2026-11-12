@@ -130,6 +130,23 @@ for parse, bad in ((mod.lag_arg, "0"), (mod.ratio_arg, "1"), (mod.ratio_arg, "0.
     except mod.argparse.ArgumentTypeError:
         rejected = True
     check(f"{parse.__name__} rejects {bad}", rejected)
+
+
+def timed_api(recent_seconds: int):
+    """Recent runs take `recent_seconds`, baseline runs (those with a cutoff) 700 s."""
+    def api(path: str) -> dict:
+        if "/workflows/" in path:
+            base = 1000 if "created" in path else 0
+            return {"workflow_runs": [{"id": base + i} for i in range(25 if base else 5)]}
+        took = 700 if int(path.split("/runs/")[1].split("/")[0]) >= 1000 else recent_seconds
+        end = mod.datetime(2026, 11, 12, 5, 0, tzinfo=mod.timezone.utc) + mod.timedelta(seconds=took)
+        return {"jobs": [{"name": "validate", "started_at": "2026-11-12T05:00:00Z",
+                          "completed_at": end.strftime("%Y-%m-%dT%H:%M:%SZ"), "steps": []}]}
+    return api
+
+
+check("the default ratio is 1.5: 1050 s against 700 s passes", mod.run([], api=timed_api(1050)) == 0)
+check("the default ratio is 1.5: 1051 s against 700 s fails", mod.run([], api=timed_api(1051)) == 1)
 mod.run, real_run = (lambda: 1 / 0), mod.run
 check("an unexpected error exits 3, not 1", mod.main() == 3)
 mod.run = real_run

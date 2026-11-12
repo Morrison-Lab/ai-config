@@ -72,6 +72,7 @@ It runs at the standard level, not strict, because replaying the 797 distinct Ba
   `$HOME` in a fresh shell is the real home directory ([#75859](https://github.com/anthropics/claude-code/issues/75859)).
 - **Don't:** use a variable in a deletion path that an earlier Bash call set.
   Each call starts a fresh shell.
+  `no-recursive-rm-unset-variable.py` denies a recursive delete through one, and [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#recursive-deletes-through-a-variable) looks for it.
 - **Do:** check that a directory exists after creating it, before moving anything into it.
 - **Don't:** answer a refused `--force-with-lease` with a plain `--force`.
   Read the remote branch first ([`check-before-pushing`](check-before-pushing.md)).

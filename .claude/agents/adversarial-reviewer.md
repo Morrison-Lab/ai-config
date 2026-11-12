@@ -218,6 +218,13 @@ A fix for one permission error changes the one path that raised it.
 Read the diff; do not report `hooks/no-recursive-chown-system-path.py`'s verdict as your finding.
 See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#recursive-ownership-and-mode-changes).
 
+## Recursive deletes through a variable
+
+On a diff, script or command that runs `rm -r` or `find ... -delete`, check that every variable in a target is set in the same shell before the delete, or guarded with `${VAR:?}`.
+A variable set by an earlier Bash call is empty in a new one, so `"$d/"` is then `/`.
+Read the diff; do not report `hooks/no-recursive-rm-unset-variable.py`'s verdict as your finding.
+See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#rules-for-the-patterns-no-hook-decides-yet).
+
 ## Commands that discard work or data
 
 On a diff, script or command, look for a step that discards work or data with no way back: `rm -rf` of `/`, the home directory or the current tree, `git reset --hard`, `git checkout -- .`, `git restore`, `git clean -f`, `git stash drop` or `git stash clear`, `git branch -D`, a push with `--delete` or a bare `--force`, `git worktree remove --force`, a download piped into a shell, or a read of an SSH key or `.env` file.

@@ -66,15 +66,10 @@ class Guard(unittest.TestCase):
         for text in ("`$D`", "`$D/`", "${D:?}", "ALLOW_RM_UNSET_VARIABLE=1", "#75859"):
             self.assertIn(text, result["permissionDecisionReason"])
 
-    def test_denied(self):
-        for command in DENIED:
-            with self.subTest(command=command):
-                self.assertIsNotNone(run(command), f"expected a deny for: {command}")
-
-    def test_passed(self):
-        for command in PASSED:
-            with self.subTest(command=command):
-                self.assertIsNone(run(command), f"expected a pass for: {command}")
+    def test_denied_and_passed(self):
+        for command, denied in [(c, True) for c in DENIED] + [(c, False) for c in PASSED]:
+            with self.subTest(command=command, expect_deny=denied):
+                self.assertEqual(run(command) is not None, denied)
 
     def test_environment_value(self):
         self.assertIsNotNone(run('rm -rf "$D/"', env={"D": ""}))

@@ -12,6 +12,7 @@ expands the arguments first. `${D:-x}` and `${D:?}` pass. Not read: positional
 parameters, `${!D}`, `xargs rm`, function bodies, whether an assignment runs,
 and anything after `source`, `.` or `eval`. Escape hatch: a leading
 `ALLOW_RM_UNSET_VARIABLE=1`, with the reason in the reply. Fails open.
+Writer and reviewer layers: destructive-actions-catalog.md, adversarial-reviewer.md.
 """
 import json
 import os
@@ -40,11 +41,10 @@ READERS = {"read", "mapfile", "readarray", "getopts"}
 SOURCING = {"source", ".", "eval"}
 FIND_EXEC = {"-exec", "-execdir", "-ok", "-okdir"}
 
-DENY = ("Blocked: `{segment}` deletes through `{ref}`, unset in this shell: a variable set "
-        "in an earlier Bash call is empty here, so `{target}` loses it (anthropics/claude-code"
-        "#75859, ai-config#5476). Assign `{name}` in this command, write `${{{name}:?}}`, or "
-        "write the literal path. If it is meant to be empty, prefix the delete with "
-        "`{override}` and say why in your reply.")
+DENY = ("Blocked: `{segment}` deletes through `{ref}`, unset here: a variable set in an "
+        "earlier Bash call is empty in this one, so `{target}` loses it (anthropics/claude-code"
+        "#75859). Assign `{name}` in this command, write `${{{name}:?}}` or the literal path, "
+        "or prefix the delete with `{override}` and say why in your reply.")
 
 
 def _mask(text):
@@ -68,8 +68,7 @@ def _mask(text):
 
 
 def _unset_reference(token, assigned):
-    """`(reference, name)` for the first reference in TOKEN, outside a command
-    substitution, that is empty here."""
+    """`(reference, name)` of the first reference outside `$(...)` that is empty here."""
     while SUBSTITUTION.search(token):
         token = SUBSTITUTION.sub("", token)
     for match in REFERENCE.finditer(token):
@@ -101,10 +100,8 @@ def _program(argv):
 
 def _record_assignments(argv, assigned):
     """Add the names ARGV assigns; True when ARGV sources or evaluates text."""
-    for tok in argv:
-        for match in REFERENCE.finditer(tok):
-            if match.group(1) and (match.group(2) or "").startswith((":=", "=")):
-                assigned.add(match.group(1))
+    assigned.update(m.group(1) for tok in argv for m in REFERENCE.finditer(tok)
+                    if m.group(1) and (m.group(2) or "").startswith((":=", "=")))
     words = list(argv)
     while words and words[0] in SHELL_KEYWORDS - {"for"}:
         words = words[1:]

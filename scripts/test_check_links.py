@@ -308,12 +308,12 @@ class TestFragments(unittest.TestCase):
 
     def test_renamed_heading_is_broken(self):
         # The leading BOM is skipped, as cmark-gfm skips it.
-        broken = self.run_doc("﻿# Real heading\n\n## Step 2\n\n## Ⅻ rules\n\n"
+        broken = self.run_doc("﻿# Real heading\n\n## Step 2\n\n## Ⅻ rules\n\n## ![logo](i.png)\n\n"
                               "[gone](#renamed-heading) [ok](#step-2) [other](#step-3)"
-                              " [numeral](#rules) [first](#real-heading)\n")
+                              " [numeral](#rules) [first](#real-heading) [dashes](#---)\n")
         self.assertEqual(broken, ["doc.md -> #renamed-heading (no such heading)",
                                   "doc.md -> #step-3 (no such heading)",
-                                  "doc.md -> #rules (no such heading)"])
+                                  "doc.md -> #rules (no such heading)", "doc.md -> #--- (no such heading)"])
 
     def test_code_span_comment_opener_hides_no_heading(self):
         broken = self.run_doc("# Writing `<!--` markers\n\n## Middle\n\nClose with `-->`.\n\n[x](#middle)\n")
@@ -332,8 +332,8 @@ class TestFragments(unittest.TestCase):
 
     def test_html_anchors(self):
         broken = self.run_doc('<div data-id="dataid"></div>\n\n<!-- <a id="commented"></a> -->\n\n'
-                              '`<a id="spanned"></a>`\n\n<span name="real"></span>\n\n'
-                              "Text <a id=bare></a> and <a\nid='split'></a> here.\n\n"
+                              '`<a id="spanned"></a>`\n\n<span NAME="real"></span>\n\n'
+                              "Text <a ID=bare></a> and <a\nid='split'></a> here.\n\n"
                               "[a](#dataid) [b](#commented) [c](#spanned) [d](#real) [e](#bare)"
                               " [f](#split)\n")
         self.assertEqual(broken, [f"doc.md -> #{a} (no such heading)"

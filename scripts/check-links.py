@@ -6,11 +6,11 @@ directory's README, must also name a heading or an HTML `id`/`name` there:
 renaming a heading otherwise breaks every link to it silently (ai-config#3630).
 A fragment on a link to a directory with no README at all fails too.
 Files are parsed as CommonMark with markdown-it-py. A heading matches when its
-text and the fragment have the same letters, marks and digits. GitHub's slug
-keeps all of these except letters and marks added in Unicode 14 or later,
-which github-slugger 2.0.0 drops, so the check fails no link GitHub resolves
-unless its heading holds such a letter. The cost: a rename that changes only
-punctuation or spacing, or a trailing -N on a fragment, is not caught.
+text and the fragment have the same letters, marks, digits and letter-numbers,
+and the text has at least one. GitHub's slug keeps all of these except letters
+and marks added in Unicode 14 or later, which github-slugger 2.0.0 drops, so
+the check fails no link GitHub resolves unless its heading holds such a letter.
+Not caught: a rename changing only punctuation or spacing, or a fragment's -N.
 markdown-it-py takes quadratic time on a long run of emphasis delimiters
 (140 KB of "_a __b " takes several seconds), which ordinary prose does not
 contain. The writer and reviewer instructions for the same defect are in
@@ -67,7 +67,7 @@ EMAIL_RE = re.compile(
 MARKDOWN = MarkdownIt("commonmark")
 FRONT_MATTER = re.compile(r"\A---\r?\n.*?\r?\n---[ \t]*\r?\n", re.DOTALL)
 TAG = re.compile(r"<[A-Za-z][^<>]*>")
-ID_ATTR = re.compile(r"""(?<![\w-])(?:id|name)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))""")
+ID_ATTR = re.compile(r"""(?<![\w-])(?:id|name)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))""", re.I)
 LINE_ANCHOR = re.compile(r"L[0-9]+(?:C[0-9]+)?(?:-L[0-9]+(?:C[0-9]+)?)?")
 NUMBERED = re.compile(r"-[0-9]+$")  # github-slugger's suffix on a repeated heading
 NUMBERS = {"Nd", "Nl"}  # digits and letter-numbers (U+216B, Roman XII), which GitHub's slug keeps
@@ -124,7 +124,7 @@ def anchors_in(md: Path) -> tuple[frozenset[str], frozenset[str]]:
         if token.type == "heading_open":
             parts = tokens[i + 1].children or []
             keys.add(loose("".join(c.content for c in parts if c.type in ("text", "code_inline"))))
-    return frozenset(ids), frozenset(keys)
+    return frozenset(ids), frozenset(keys - {""})  # no text, no heading key
 
 
 def report(md: Path, root: Path, target: str, why: str) -> None:

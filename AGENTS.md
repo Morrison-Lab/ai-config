@@ -170,6 +170,7 @@ Never use a pay-per-use API anywhere (Ezra, 2026-10-17); see that file.
 
 Before starting work, update the current checkout and relevant submodules (`git pull --ff-only`, `git submodule update --init --recursive`).
 When working in a consumer repo, check if the `.ai-config` submodule is outdated relative to `origin/main` of `ai-config` and update it if appropriate.
+[`keep-checkouts-fresh`](shared/workflow/keep-checkouts-fresh.md) gives the four checks (the ai-config checkout, the consumer install, the working repo's `main`, the `.ai-config` pin), how to run each, how each fails, and the cases behind them.
 
 ## Remove redundant submodules when using native plugins
 

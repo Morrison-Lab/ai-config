@@ -119,7 +119,7 @@ def _load_sibling():
 _SIB = _load_sibling()
 if _SIB is None:
     print("no-commit-with-conflict-markers: cannot load "
-          "flag-commit-a-sweeps-submodule.py; inert", file=sys.stderr)
+          "flag-commit-a-sweeps-submodule.py; inert, not gating", file=sys.stderr)
 
 # Subcommands whose `--continue` makes a commit from the index.
 _CONTINUES = {"merge", "rebase", "cherry-pick", "revert", "am"}

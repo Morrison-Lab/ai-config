@@ -123,6 +123,9 @@ def _load_sibling():
 
 
 _SIBLING = _load_sibling()
+if _SIBLING is None:
+    print(f"{os.path.basename(__file__)}: cannot load "
+          "no-push-without-self-review.py; not gating", file=sys.stderr)
 
 
 def _git(args, cwd=None, timeout=10):

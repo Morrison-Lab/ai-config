@@ -190,7 +190,8 @@ GUARDED = {
 }
 check("every GUARDED hook is in USERS", sorted(GUARDED - {h for h, _ in USERS}), [])
 # Deny hooks that stop gating when a sibling is missing, and must say so.
-NOT_GATING = {"block-redo-denied-write-via-other-tool.py"}
+NOT_GATING = {"block-redo-denied-write-via-other-tool.py", "no-commit-with-conflict-markers.py",
+              "no-push-with-failing-notes-checks.py"}
 GUARD_RE = re.compile(r"^try:\n    from sibling import load_sibling\n", re.M)
 for hook_name, sibs in USERS:
     # Siblings missing, loader present: each sibling attribute is None, and

@@ -87,19 +87,16 @@ try:
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
-# Each migrated hook, and the module attribute it binds to each sibling it
-# loads. The probe reads that attribute, so a hook that stops loading a
-# sibling fails here. Every probe runs in a fresh `python3 -I` process, so
-# the hook must find the loader through its own sys.path setup, not through
-# this test's.
+# Each migrated hook and the attribute it binds to each sibling, which the
+# probe reads, in a fresh `python3 -I` process: the hook must find the
+# loader through its own sys.path setup, not through this test's.
 HOOKS = os.path.join(os.path.dirname(HERE), "hooks")
 USERS = (
     ("no-empty-promise.py", {"_ums": "remind-ums-after-error.py"}),
     ("no-mistake-without-a-hook.py", {"_ums": "remind-ums-after-error.py"}),
     ("remind-learn-from-review.py", {"_ums": "remind-ums-after-error.py"}),
-    ("no-user-correction-without-mechanism.py",
-     {"_corr": "remind-encode-user-correction.py",
-      "_mist": "no-mistake-without-a-hook.py"}),
+    ("no-user-correction-without-mechanism.py", {
+        "_corr": "remind-encode-user-correction.py", "_mist": "no-mistake-without-a-hook.py"}),
 )
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "

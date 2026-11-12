@@ -57,16 +57,16 @@ Before filing a PR in an external repository, read and follow its `CONTRIBUTING.
 
 What you say about the state you stop in must be true, and any work that remains needs something that will resume it ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-- **No empty promises:** a commitment about your own future behaviour ships an implemented mechanism in the same turn (a rule or memory entry at minimum, a hook when decidable, an armed timer, schedule, or PR watcher that reports its clock time for an owed action), or is not made;
-  for a claim that automation will finish later, state its current status or arm monitoring for the result ([`no-empty-promises`](shared/workflow/no-empty-promises.md)).
-- **Resume every non-clean pause:** whenever work remains, arm a timer or equivalent wake that will resume the next step, and report what fires and its clock time;
-  a promise to return is not a mechanism, and a verified clean stop needs no timer.
+- **No empty promises:** a commitment about your own future behaviour ships an implemented mechanism in the same turn, or is not made,
+  and a claim that automation will finish later states its live status or arms a monitor ([`no-empty-promises`](shared/workflow/no-empty-promises.md)).
+- **Resume every non-clean pause:** whenever work remains, arm a timer or equivalent wake that will resume the next step, and report what fires and its clock time ([`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md)).
 - **Say whether the session is done when reporting stopping point status**, confirming UMS ran (or no new learnings accumulated) and noticed follow-ups are filed;
   never say done with uncommitted, unpushed, or un-PRed changes, or open PRs the session authored ([`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md)).
 - **Run UMS before every pause**, first, before ending a turn to wait on anything (CI, a review round, a subagent, or an answer from the user), if learnings have accumulated ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
-- **Run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn, without waiting for a clean verdict, an accepted finding, or a first-person admission;
+- **Run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn;
   answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
-- **Terminate superseded and abandoned background tasks** (commands, monitors, subagents dispatched to inspect, search, or diagnose) once their purpose is met, their findings are superseded, or the session moves on, and sweep them before declaring anything complete ([`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md)).
+- **Terminate superseded and abandoned background tasks** (diagnostic commands, monitors, subagents) once their purpose is met, their findings are superseded, or the session moves on,
+  and sweep them before declaring anything complete ([`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md)).
 
 ## Fix the cause, and look for what already exists
 
@@ -305,9 +305,8 @@ Have your work reviewed independently before it ships or reaches a person, and k
 
 Verify every push first, and carry work worth keeping through to a PR ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-- **Commit, push, and PR any potentially-reusable work you produce:** potentially-reusable work produced incidentally in any medium (math derivations, comparisons, scripts, prose) must be committed, pushed, and PRed into an owning repository.
-  Commit it when reproducing it costs more than a moment **and** something durable cites it, or will;
-  re-check the committed form before publishing ([`commit-reusable-work`](shared/workflow/commit-reusable-work.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
+- **Commit, push, and PR any potentially-reusable work you produce:** commit work produced incidentally in any medium to an owning repository
+  when reproducing it costs more than a moment **and** something durable cites it, or will ([`commit-reusable-work`](shared/workflow/commit-reusable-work.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
   [Port content by script](shared/workflow/port-by-script.md).
 - **Deliver completed implementation work:** when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
   This grants no merge authority: the Strict Merge Control Policy still applies.
@@ -315,8 +314,8 @@ Verify every push first, and carry work worth keeping through to a PR ([#2889](h
   At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
   Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
   Parse changed data files: [rule](shared/workflow/parse-data-files.md).
-- **Check the remote immediately before every push:** run `git ls-remote --heads origin <branch>` **immediately** before every `git push`, and reconcile what it shows rather than overwriting it.
-  Never bare `git push --force`; always use `--force-with-lease --force-if-includes` ([`check-before-pushing`](shared/workflow/check-before-pushing.md)).
+- **Check the remote immediately before every push:** run `git ls-remote --heads origin <branch>` **immediately** before every `git push`, and reconcile what it shows.
+  Never force-push without `--force-with-lease --force-if-includes` ([`check-before-pushing`](shared/workflow/check-before-pushing.md)).
 
 ## Cursor Cloud specific instructions
 

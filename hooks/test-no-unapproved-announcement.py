@@ -19,10 +19,6 @@ def user(text, **extra):
     return dict({"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}, **extra)
 
 
-def meta(text):  # how the harness logs a relay
-    return user(text, isMeta=True, promptSource="system")
-
-
 def call(uid, tool="Bash", inp=None):
     return {"type": "assistant", "message": {"role": "assistant", "content": [
         {"type": "tool_use", "id": uid, "name": tool, "input": POST if inp is None else inp}]}}
@@ -45,7 +41,8 @@ def run(tool, inp, *entries):
 
 
 BASH = [
-    POST["command"], "git status && " + POST["command"], f"curl -X POST {URL} -F is_announcement=true",
+    POST["command"], "git status && " + POST["command"], "cd c\n" + POST["command"], "sudo " + POST["command"],
+    'bash -c "canvas announcements create"', f"curl -X POST {URL} -F is_announcement=true",
     f"curl -X PUT {URL}/55 -F message=New", f"curl -XPUT {URL}/55 -Fmessage=New", f"curl -T b.json {URL}/55",
     'curl -X POST "$C/$EP" -F is_announcement=true', f"echo \"$(curl -X POST {URL} -F title=Hi)\"",
     f"canvas api PUT {URL}/55", f"wget --post-data 'title=Hi' {URL}", f"http put {URL}/55 m=N",
@@ -68,10 +65,13 @@ OTHER = [("Bash", {"command": c}) for c in [
     "git commit -m 'Gate canvas announcements create (#4780)'", "git commit -m \"x\n\nCloses #4780\"",
     "gh issue comment 1 --body 'gate POST discussion_topics, https://x'", "grep -nE 'is_announcement|topic' f",
     "echo 'Announcement: see https://x/syllabus' > a.md", "sed -n '/is_announcement/p' post.py",
+    "gh api repos/x/y/issues/1/comments -f body='denies curl posts to discussion_topics'",
+    "cat > announcement.md <<'EOF'\nRegrade requests are due.\nEOF", "echo 'canvas announcements create' >> a",
 ]] + [("mcp__github__create_discussion", {}), ("mcp__gitlab__create_discussion", {}),
       ("mcp__hearthbot__post_message", {"text": "Draft announcement. Reply post the announcement to POST it."}),
       ("mcp__canvas__list_announcements", {}), ("Read", {"file_path": "/tmp/announcement.md"})]
 APPROVING = [OK, "Looks good. Post the announcement.", "post the announcement please", "LGTM, post it",
+             f"<ide_opened_file>a.md</ide_opened_file>\n{OK}",
              WAKE.format("yes, post it"), RELAY.format("ok, publish the announcement", "Ezra approved it."),
              f'<relay from="coordinator"><cited author="user">{OK}</cited><note>go</note></relay>']
 NOT_APPROVING = [
@@ -89,7 +89,16 @@ NOT_APPROVING = [
     '</message></message></thread></project></wake>',
 ]
 NOTE = {"type": "attachment", "attachment": {"type": "queued_command", "prompt": "<system-note>1m ago</system-note>"}}
+QUEUED = {"type": "attachment", "attachment": {"type": "queued_command", "prompt": "wait, the date"}}
 SDK = [{"type": "queue-operation", "operation": "enqueue", "content": OK}, user(OK, isMeta=True, promptSource="sdk")]
+IMAGE = {"type": "user", "message": {"role": "user", "content": [{"type": "image", "source": {}}]}}
+RELAYED = [user(RELAY.format(t, n), isMeta=True, promptSource="system") for t, n in ((OK, "go"), ("wait", OK))]
+CASES = [  # (entries before the judged call, the call allowed?)
+    ([user(OK), user("wait, change the date")], False), ([user(OK), QUEUED], False), ([user(OK), IMAGE], False),
+    ([user("draft it")] + SDK, False), ([user(OK), call("a")], False), ([user(OK), call("a"), result("a")], False),
+    ([user(OK), call("a"), result("a", error=True)], False), ([], False), ([user(OK), NOTE], True),
+    ([user("draft it"), RELAYED[0]], True), ([user(OK), RELAYED[1]], False),
+]
 
 for tool, inp in WRITES:
     now = call("now", tool, inp)
@@ -97,17 +106,9 @@ for tool, inp in WRITES:
         assert run(tool, inp, user(text), now) is None, (tool, inp, text)
     for text in NOT_APPROVING:
         assert run(tool, inp, user(text), now) == "deny", (tool, inp, text)
-    for later in [user("wait, change the date"), user(OK, isMeta=True, promptSource="sdk"), dict(
-            NOTE, attachment={"type": "queued_command", "prompt": "wait, the date"})]:
-        assert run(tool, inp, user("draft it" if "isMeta" in later else OK), later, now) == "deny", (tool, later)
-    for prior in ([call("a")], [call("a"), result("a")], [call("a"), result("a", error=True)]):
-        assert run(tool, inp, user(OK), *prior, now) == "deny", (tool, prior)
+    for entries, allowed in CASES:
+        assert (run(tool, inp, *entries, now) is None) == allowed, (tool, entries)
     assert run(tool, inp, user(OK), call("now", tool, inp), result("now")) == "deny", (tool, "unlogged retry")
-    assert run(tool, inp, user("draft it"), meta(RELAY.format(OK, "go")), now) is None, (tool, "real relay")
-    assert run(tool, inp, user(OK), meta(RELAY.format("wait", OK)), now) == "deny", (tool, "relay retraction")
-    assert run(tool, inp, now) == "deny", (tool, "no user turn")
-    assert run(tool, inp, user("draft it"), *SDK, now) == "deny", (tool, "scheduled prompt")
-    assert run(tool, inp, user(OK), NOTE, now) is None, (tool, "harness note")
 for tool, inp in OTHER:
     assert run(tool, inp, user("hello")) is None, (tool, inp)
 

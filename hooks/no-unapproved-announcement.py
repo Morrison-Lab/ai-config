@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """PreToolUse guard: no class announcement without the user's approval.
 
-Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval
-of its exact text (ai-config#4780, from mlg#228). Fails closed on the CLI, `is_announcement`, a
-network command naming a topic or announcement (a plain `curl` read passes) and an MCP announcement
-write. The user's last message must be only "post the announcement" ("yes, post it", ...); one
-write each. Gaps (script files, run-time URLs, exact-text binding) are ai-config#5453.
+Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval of its exact text
+(ai-config#4780). Denies the CLI, `is_announcement`, a network write naming a topic and an MCP announcement write
+unless the user's last message is only "post the announcement" ("yes, post it", ...); one write each. Gaps: #5453.
 """
 import json
 import os
@@ -18,17 +16,16 @@ try:
 except Exception:  # detection still runs; a detected write is then denied
     is_real_user_turn = None
 
-CLI = re.compile(r"(^|[;&|(]\s*)canvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
-CODE = re.compile(r"\b(python3?|node|ruby|perl)\b\s+(-c|-e|-\s)|<<")
+CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
+CODE = re.compile(r"\b(python3?|node|ruby|perl|Rscript)\b\s+(-c|-e|-\s)|<<")
 QUOTED = re.compile(r"'[^']*'|\"(\\.|[^\"\\$`])*\"")  # a double-quoted span with $ or ` stays
 TOPIC = re.compile(r"discussion(_|%5f)?topic|announcement", re.I)
 ANNOUNCE = re.compile(r"is_announcement|get_announcements.*\.(edit|update)\(", re.I | re.S)
-NET = re.compile(r"\b(curl|wget|requests|urllib|httpx|canvasapi|graphql|canvas\s+api|Invoke-\w+)\b|"
+NET = re.compile(r"\b(curl|wget|requests\.\w+|urllib\.request|httpx\.\w+|httr::\w+|canvasapi|canvas\s+api|Invoke-\w+)\b|"
                  r"(https?://|/api/v1/).*(['\"](?i:put|post)['\"]|\.(put|post)\()", re.I | re.S)
-WRITE = re.compile(r"(-\w*X|--request|-Method)[\s=]*[\"']?(?i:POST|PUT)|(^|\s)(-[a-zA-Z]*[dFT]|"
-                   r"--data|--form|--json|--upload-file)")
+WRITE = re.compile(r"(-\w*X|--request|-Method)[\s=]*[\"']?(?i:POST|PUT)|(^|\s)(-[a-zA-Z]*[dFT]|--data|--form|--json|--upload-file)")
 SAFE_FIRST = {"git", "gh", "grep", "egrep", "rg"}
-COMPOUND = re.compile(r"[;&|`\n<>]|\$\(|\bgh\s+api\b")
+COMPOUND = re.compile(r"[;&|`\n<>]|\$\(")
 MCP_READ = re.compile(r"^(get|list|search|read|find|fetch|show|count)", re.I)
 APPROVAL = re.compile(r"\s*((yes|ok|okay|approved|looks good|lgtm)[,.!]*\s*)?(please\s+)?(go ahead and\s+)?"
                       r"((post|publish)\s+(it|the announcement|this announcement|that announcement)"
@@ -41,12 +38,14 @@ def is_announcement_write(tool, inp):
     if tool in ("Bash", "Monitor", "PowerShell"):
         cmd = inp.get("command") or ""
         first = (cmd.split() or [""])[0].rsplit("/", 1)[-1]
-        plain = not COMPOUND.search(QUOTED.sub("", cmd))  # operators outside quotes
+        bare = QUOTED.sub("", cmd)  # the command outside its quoted text
+        plain = not COMPOUND.search(bare)
         if first in SAFE_FIRST and plain:  # one plain command
             return False
         net = NET.search(cmd) or first in ("http", "https", "xh")
         curl_read = first == "curl" and not WRITE.search(cmd) and plain
-        return bool(CLI.search(cmd) or ANNOUNCE.search(cmd) and (net or CODE.search(cmd))
+        cli = CLI.search(bare) or re.search(r"\b(ba|z)?sh\s+-c\b", cmd) and CLI.search(cmd)
+        return bool(cli or ANNOUNCE.search(cmd) and (net or CODE.search(cmd))
                     or TOPIC.search(cmd) and net and not curl_read)
     name = tool.lower()
     if not name.startswith("mcp__"):
@@ -57,15 +56,14 @@ def is_announcement_write(tool, inp):
         return True
     flat = json.dumps(inp).replace('\\"', '"')
     return bool(re.search(r"canvas|lms|instructure|http|\bapi_|\brequest\b", name.split("__")[1] + " " + verb)
-                and TOPIC.search(flat)
-                and re.search(r"is_announcement|\b(POST|PUT)\b|\"method\": \"(?i:post|put)\"", flat))
+                and TOPIC.search(flat) and re.search(r"is_announcement|\b(POST|PUT)\b|\"method\": \"(?i:post|put)\"", flat))
 
 
 def user_words(text, top=True):
     """User text: untagged (if `top`), a principal wake message, or a relay's cited entry."""
     out, stack, pos = [], [], 0
     for m in TAG.finditer(text):
-        if "-" not in m.group(2) and m.group(2).lower() not in ENVELOPE:
+        if not re.search(r"[-_]", m.group(2)) and m.group(2).lower() not in ENVELOPE:
             continue  # the user's own markup, such as <b>, stays text
         path = [t for t, _ in stack]
         in_wake = (path[:1] == ["wake"] and path[-1:] == ["message"]
@@ -78,8 +76,7 @@ def user_words(text, top=True):
             while tag in [t for t, _ in stack] and stack.pop()[0] != tag:  # stray: ignored
                 pass
         elif not attrs.rstrip().endswith("/"):
-            ok = ('trust="principal"' in attrs if tag == "message"
-                  else 'author="user"' in attrs if tag == "cited" else True)
+            ok = 'trust="principal"' in attrs if tag == "message" else 'author="user"' in attrs if tag == "cited" else True
             stack.append((tag, ok and (not stack or stack[-1][1])))
         pos = m.end()
     return [p for p in out + ([text[pos:]] if top and not stack else []) if p.strip()]
@@ -93,12 +90,14 @@ def _blocks(entry):
 
 def _user_text(entry):
     att = entry.get("attachment") or {}
-    if att.get("type") == "queued_command" and att.get("commandMode") != "task-notification":
+    if att.get("type") == "queued_command" and att.get("commandMode") != "task-notification" \
+            and (att.get("origin") or {}).get("kind") != "peer":
         return str(att.get("prompt") or ""), True
     if entry.get("type") != "user" or entry.get("promptSource") == "sdk":
         return None, False
     text = "\n".join(strip_injected_text(b.get("text") or "") for b in _blocks(entry) if b.get("type") == "text")
-    return text, bool(is_real_user_turn(entry))  # a meta entry (a relay) counts only for cited words
+    real = bool(is_real_user_turn(entry)) or not entry.get("isMeta") and any(b.get("type") == "image" for b in _blocks(entry))
+    return text if text.strip() or not real else "[a message with no text]", real
 
 
 def verdict(path, tool, inp):

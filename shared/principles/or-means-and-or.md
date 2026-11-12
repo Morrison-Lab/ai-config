@@ -1,6 +1,6 @@
 # "Or" always means "and/or", not xor, unless xor is explicitly specified
 
-In instructions, requirements, prompts, checklists, and specifications, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated.
+In instructions, requirements, prompts, checklists, specifications, and issue descriptions, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated.
 Never interpret an unadorned "or" as an exclusive disjunction (XOR) that excuses dropping, ignoring, or omitting one of the alternatives when both apply.
 
 ## Why

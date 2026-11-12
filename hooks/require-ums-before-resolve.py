@@ -27,8 +27,8 @@ Prose saying "I ran UMS" does not count: the tool call is the evidence.
 Fails OPEN and SILENT on any parse trouble. The deny is the only blocking
 path in this file, and it fires at most once per thread. If
 scripts/lib/tool_names.py cannot load, the deny is off: the hook writes the
-reason to stderr, which a PreToolUse hook exiting 0 shows to nobody, so the
-merge-event reminder (which needs no tool names) says so too.
+reason to stderr, and says so to the user and the model on each resolve and
+in the merge-event reminder, since stderr from a hook exiting 0 reaches nobody.
 """
 import hashlib
 import importlib.util
@@ -172,12 +172,19 @@ MERGE_REMINDER = (
 )
 
 
+NOT_LOADED = ("[hook: require-ums-before-resolve] scripts/lib/tool_names.py "
+              "did not load, so resolving a thread is not checked for UMS.")
+
+
 def handle_pre_tool_use(payload):
-    if tool_names is None:
-        return 0
     name = str(payload.get("tool_name") or "")
     inp = payload.get("tool_input")
     if not name.endswith(RESOLVE_TOOL) or not isinstance(inp, dict) or inp.get("resolved") is not True:
+        return 0
+    if tool_names is None:
+        # systemMessage reaches the user; additionalContext reaches the model.
+        print(json.dumps({"systemMessage": NOT_LOADED, "hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "additionalContext": NOT_LOADED}}))
         return 0
     path = payload.get("transcript_path") or ""
     if not isinstance(path, str) or not os.path.isfile(path):
@@ -204,8 +211,7 @@ def handle_prompt(payload):
             if first_time("merge:" + hashlib.sha256(body.encode()).hexdigest()):
                 print(MERGE_REMINDER)
                 if tool_names is None:
-                    print("[hook: require-ums-before-resolve] scripts/lib/tool_names.py "
-                          "did not load, so resolving a thread is not checked for UMS.")
+                    print(NOT_LOADED)
             return 0
     return 0
 

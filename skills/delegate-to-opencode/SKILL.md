@@ -197,6 +197,10 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   - `iceman-contributor-free` gave a bare verdict on one review, and a reasoned one on another whose brief asked for reasons.
   - `longcat-2.5-free`'s one streamed review produced only reasoning and no answer.
 
+  Later that day, on [#5472](https://github.com/Morrison-Lab/ai-config/pull/5472) and [#5486](https://github.com/Morrison-Lab/ai-config/pull/5486), `beam-free` returned empty content both streamed and not, and `iceman-contributor-free` returned a bare `VERDICT: CLEAN` when not streamed, after one HTTP 502 that a retry cleared.
+  Send the request with `curl` and `--data-binary @body.json`, in the same turn as the merge.
+  `hooks/warn-merge-without-cross-harness-review.py` counted that curl call as a review, and it did not count the same request made from Python's `urllib`, which also got a 403 when it carried a dummy `Authorization` header.
+
   Check `/models` for the current free ids and try them before relying on this route.
 - **A review through `cat-jam-free` and `longcat-2.5-preview-free` worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
   Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`;

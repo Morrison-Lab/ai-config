@@ -248,7 +248,7 @@ A clean automated review from every available provider evaluating the current HE
   Re-hit 2026-10-07 (Antigravity session, working `Morrison-Lab/lds` [PR #454](https://github.com/Morrison-Lab/lds/pull/454) and `Morrison-Lab/mds` [PR #191](https://github.com/Morrison-Lab/mds/pull/191)):
   after autonomous merge was denied by safety hook, reported PR #454 as clean and yielded turn without setting a timer/schedule to watch PR #454 for base drift or merges on `origin/main`, remaining idle until prompted by user.
   Always arm a timer (`schedule`) or watcher whenever an open PR authored by the session remains unmerged.
-- **Canonical Rule**: `AGENTS.md` ("Leave every pause honest and resumable", "No empty promises" bullet): an owed action needs "an armed timer, schedule, or PR watcher", a mechanism that will fire, not only a record.
+- **Canonical Rule**: `AGENTS.md` ("Leave every pause honest and resumable", "No empty promises" bullet): an action still to be done needs "an armed timer, schedule, or PR watcher", a mechanism that will fire, not only a record.
 - **Fix**: Whenever pausing execution, stopping for user input, or waiting for a condition, ALWAYS use the `schedule` tool to set a timer (one-shot or cron) so the agent automatically wakes up to check status, rather than waiting indefinitely.
 
 ## Pattern 15: Widening a Fail-Closed Instrument's Exemption Without a Base-Parity Proof

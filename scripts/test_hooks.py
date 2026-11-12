@@ -249,10 +249,11 @@ def _run_in_env(test_path, subject, timeout, rel_test, env):
     proc = subprocess.Popen(
         [sys.executable, test_path, subject],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env,
-        # Decode as UTF-8 and replace what does not decode: a suite whose
-        # output came out in the console's encoding (cp1252, ai-config#1288)
-        # made text=True raise UnicodeDecodeError here and abort the sweep,
-        # instead of reporting that one suite's verdict.
+        # Decode as UTF-8 and replace what does not decode. A suite that wrote
+        # cp1252 bytes (its PYTHONIOENCODING was cp1252, ai-config#1288) made
+        # text=True, decoding with this runner's UTF-8 locale, raise
+        # UnicodeDecodeError here and abort the sweep, instead of reporting
+        # that one suite's verdict.
         encoding="utf-8", errors="replace")
     try:
         stdout, stderr = proc.communicate(timeout=timeout)

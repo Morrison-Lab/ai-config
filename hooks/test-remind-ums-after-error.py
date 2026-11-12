@@ -584,13 +584,15 @@ for got, desc in mutation_2997:
 # the reminder quotes a curly-quoted admission, which cp1252 wrote as 0x92.
 print("\ncp1252 console:")
 fd, cp_path = tempfile.mkstemp(suffix=".jsonl")
-with os.fdopen(fd, "w") as fh:
-    fh.write(json.dumps(txt("I should" + chr(0x2019) + "ve verified that first.")) + "\n")
+# ensure_ascii=False, so the transcript holds the real character, not an escape.
+with os.fdopen(fd, "w", encoding="utf-8") as fh:
+    fh.write(json.dumps(txt("I should" + chr(0x2019) + "ve verified that first."),
+                        ensure_ascii=False) + "\n")
 cp_dir = tempfile.mkdtemp()
 try:
     cp = subprocess.run(
         [sys.executable, HOOK], input=json.dumps({"transcript_path": cp_path}).encode(),
-        capture_output=True,
+        capture_output=True, timeout=60,
         env=dict(os.environ, TMPDIR=cp_dir, PYTHONIOENCODING="cp1252"),
     )
 finally:

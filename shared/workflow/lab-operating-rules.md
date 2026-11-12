@@ -93,7 +93,8 @@ The rest are prose because no condition in the transcript can decide them.
 
 - Before resolving a thread because its work or open question moved to another thread, post one line in it saying why, with a link to the thread that took the work over, as you would when closing an issue as a duplicate.
   A thread resolved without a word looks like a dropped question.
-  Ezra, 2026-11-12, after a coordinator resolved a thread that still held an open question: "should the coordinator post a message in the resolved thread explaining why it was resolved, like we would do when we close an issue as a duplicate?" ([ai-config#5572](https://github.com/Morrison-Lab/ai-config/issues/5572)).
+  Ezra, 2026-11-12, after a coordinator resolved a thread that still held an open question: "should the coordinator post a message in the resolved thread explaining why it was resolved, like we would do when we close an issue as a duplicate?"
+  ([ai-config#5572](https://github.com/Morrison-Lab/ai-config/issues/5572)).
   Not yet hookable: a thread session cannot see the coordinator's resolve and post tools, so a deny hook on a resolve with no pointer posted waits on checking them (follow-up in ai-config#5572).
 
 ## Actions budget

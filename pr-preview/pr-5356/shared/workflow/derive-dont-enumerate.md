@@ -36,6 +36,10 @@ Give the recipient the derivation, not its result:
 When you genuinely must name specific items --- a stacked merge order, an exclusion --- say what the list is *for* and that it is a snapshot, so the recipient knows to re-derive rather than trust it.
 The distinction is between a list used as an **index** of the work, which rots, and one used as a **constraint** on it, which does not.
 
+A deferral is a list of this kind too: filing "the same fix belongs in X" claims X is the whole of the scope.
+On [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) the deferral to [ai-config#3161](https://github.com/Morrison-Lab/ai-config/issues/3161) named one sibling skill, and a grep over `skills/*/SKILL.md` found four (2026-09-03).
+Derive a deferral's population before filing it, and record the query in the issue.
+
 ## A derivation is still an enumeration of one pattern
 
 Everything above treats the query as the safe end of the trade, and against the failure it targets it is: a query re-derives the set, so it survives whatever gets added while you work.

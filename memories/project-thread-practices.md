@@ -47,3 +47,13 @@ A new `## section` failed `validate` by 347 characters on the branch for ai-conf
 Put new rules in `shared/workflow/<name>.md` or a `memories/` file, fold at most a one-line pointer into an existing section, and run `python3 scripts/check-context-closure.py` before pushing.
 A red main is a request for the fix, not a reason to wait on Ezra (2026-10-16;
 see [`red-main`](../shared/workflow/red-main.md)).
+
+## Confirm which thread owns a PR before fixing a relayed finding
+
+On 2026-11-12 the coordinator relayed Flash verdicts on three PRs to one thread.
+That thread fixed all three, but gha#1930 belonged to another thread, which pushed its own answer minutes earlier.
+The first thread's fix was dropped.
+
+- **Do:** before editing for a relayed finding, run `git ls-remote` on the PR branch and read the PR's latest comments.
+- **Do:** if another session pushed or commented since the reviewed head, ask the coordinator which thread owns the PR.
+- **Don't:** treat every PR named in a relayed message as yours to fix.

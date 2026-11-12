@@ -40,11 +40,11 @@ try:
     real = os.path.join(tmp, "real")
     os.mkdir(real)
     hook = os.path.join(real, "my-hook.py")
-    with open(hook, "w") as fh:
+    with open(hook, "w", encoding="utf-8") as fh:
         fh.write("")
-    with open(os.path.join(real, "good-sibling.py"), "w") as fh:
+    with open(os.path.join(real, "good-sibling.py"), "w", encoding="utf-8") as fh:
         fh.write("VALUE = 7\n")
-    with open(os.path.join(real, "bad-sibling.py"), "w") as fh:
+    with open(os.path.join(real, "bad-sibling.py"), "w", encoding="utf-8") as fh:
         fh.write("raise RuntimeError('boom')\n")
 
     mod = load_sibling(hook, "good-sibling.py")

@@ -91,7 +91,7 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
 - **Do:** batch the actions that need approval into one manual-mode stretch, then end it as "Say when it is over" describes.
 - **Do:** in a Claude Project, when the user answers the coordinator instead of the denied thread, the coordinator tells that thread, with the user's message attached by id, to ask the user again in its own thread.
   The relayed message is not approval.
-- **Don't:** when the user is present and the session is not a dispatched subagent, end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
+- **Don't:** when the switch conditions hold, end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
 - **Don't:** retry a denied command more than once, or rephrase it.
   A rerun through a real approval prompt, after the session has left auto mode, is not a retry.
 - **Don't:** route around a denial, or hand the user a script to run in place of the approval.

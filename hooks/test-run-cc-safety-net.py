@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -31,6 +32,7 @@ FAKE_GUARD = """
 const d = require('fs').readFileSync(0, 'utf8');
 if (process.argv.slice(2).join(' ') !== 'hook --coding-cli') process.exit(9);
 if (process.env.CC_SAFETY_NET_NO_UPDATE_CHECK !== '1') process.exit(8);
+if (process.env.CC_SAFETY_NET_PROJECT_TIGHTEN_ONLY !== '1') process.exit(7);
 if (d.includes('DENYME')) {
   process.stdout.write(JSON.stringify({hookSpecificOutput: {
     hookEventName: 'PreToolUse', permissionDecision: 'deny',
@@ -51,6 +53,11 @@ with open(os.environ["FAKE_NPM_LOG"], "a") as log:
     log.write(" ".join(args) + "\\n")
 if args[0] != "pack" or "--ignore-scripts" not in args:
     sys.exit(3)
+if os.environ.get("FAKE_NPM_FAIL"):
+    sys.stderr.write("npm error code ECONNREFUSED\\n"
+                     "npm error FetchError: request to registry failed\\n"
+                     "npm error A complete log of this run can be found in: x.log\\n")
+    sys.exit(1)
 dest = args[args.index("--pack-destination") + 1]
 shutil.copy(os.environ["FAKE_TGZ"], os.path.join(dest, "fake-1.0.0.tgz"))
 """
@@ -198,6 +205,27 @@ class FailsOpenVisibly(unittest.TestCase):
         self.assertEqual(second.stdout, "")
         self.assertIn("did not run", context(other))
 
+    def test_a_failed_fetch_names_npm_error(self):
+        proc = self.box.run("DENYME", FAKE_NPM_FAIL="1")
+        self.assertIn("FetchError: request to registry failed", context(proc))
+
+    def test_a_failed_fetch_is_not_retried_at_once(self):
+        self.box.run("echo 1", session="a", FAKE_NPM_FAIL="1")
+        second = self.box.run("echo 2", session="b", FAKE_NPM_FAIL="1")
+        self.assertEqual(len(self.box.npm_calls()), 1, self.box.npm_calls())
+        self.assertIn("not retried for another", context(second))
+        self.assertIn("FetchError", context(second))
+
+    def test_an_old_failure_is_retried_and_then_cleared(self):
+        failed = self.box.cache / "1.0.0.fetch-failed"
+        self.box.cache.mkdir()
+        old = {"time": time.time() - 2 * 3600, "reason": "old failure"}
+        failed.write_text(json.dumps(old), encoding="utf-8")
+        proc = self.box.run("DENYME")
+        self.assertIn("fake deny", proc.stdout)
+        self.assertEqual(len(self.box.npm_calls()), 1)
+        self.assertFalse(failed.exists())
+
     def test_a_crash_is_reported(self):
         proc = self.box.run("CRASHME")
         self.assertEqual(proc.returncode, 0)
@@ -295,15 +323,16 @@ class LivePinnedRelease(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.root, ignore_errors=True)
 
-    def decide(self, command):
+    def decide(self, command, repo=None):
+        repo = repo or self.repo
         payload = {"session_id": "live", "hook_event_name": "PreToolUse",
                    "tool_name": "Bash", "tool_input": {"command": command},
-                   "cwd": str(self.repo), "transcript_path": str(self.root / "t.jsonl")}
+                   "cwd": str(repo), "transcript_path": str(self.root / "t.jsonl")}
         env = dict(os.environ, HOME=str(self.root),
                    AI_CONFIG_CC_SAFETY_NET_CACHE=str(self.root / "cache"))
         proc = subprocess.run([sys.executable, str(HOOK)], input=json.dumps(payload),
                               capture_output=True, text=True, env=env,
-                              cwd=self.repo, timeout=300)
+                              cwd=repo, timeout=300)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         if not proc.stdout.strip():
             return "allow"
@@ -315,6 +344,19 @@ class LivePinnedRelease(unittest.TestCase):
         for command, want in LIVE_CASES:
             with self.subTest(command=command):
                 self.assertEqual(self.decide(command), want)
+
+    def test_a_repository_policy_cannot_turn_the_denies_off(self):
+        loose = self.root / "loose"
+        subprocess.run(["git", "init", "-q", str(loose)], check=True)
+        (loose / ".cc-safety-net").mkdir()
+        policy = {"version": 1,
+                  "destructive_command_protection": {"enabled": False},
+                  "secret_protection": {"enabled": False}}
+        (loose / ".cc-safety-net" / "policy.json").write_text(
+            json.dumps(policy), encoding="utf-8")
+        for command in ("git reset --hard HEAD~3", "cat ~/.ssh/id_ed25519"):
+            with self.subTest(command=command):
+                self.assertEqual(self.decide(command, repo=loose), "deny")
 
 
 if __name__ == "__main__":

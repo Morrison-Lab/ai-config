@@ -31,7 +31,15 @@ is told, once per session, that the base guard did not run and why. The
 ai-config guards around it still run. Failing closed instead would stop
 every tool call on a machine without Node.js.
 
+A failed fetch is recorded in the cache, and no fetch is tried again for
+`FETCH_BACKOFF` seconds, so a machine that cannot reach the npm registry
+pays the fetch's wait once an hour rather than on every tool call.
+
 A tarball whose sha512 differs from the pin is never unpacked or run.
+
+The child runs with `CC_SAFETY_NET_PROJECT_TIGHTEN_ONLY=1`, so a
+`.cc-safety-net/policy.json` committed to a repository the agent works in
+can add blocks but cannot turn any off.
 
 Set `AI_CONFIG_CC_SAFETY_NET=off` in the agent's environment to turn the
 hook off. It must be set where the agent starts, since a variable set on a
@@ -58,6 +66,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -65,7 +74,12 @@ PIN_FILE = HERE / "cc-safety-net.pin.json"
 OFF_VAR = "AI_CONFIG_CC_SAFETY_NET"
 CACHE_VAR = "AI_CONFIG_CC_SAFETY_NET_CACHE"
 FETCH_TIMEOUT = 120
+FETCH_BACKOFF = 3600
 RUN_TIMEOUT = 30
+CHILD_ENV = {
+    "CC_SAFETY_NET_NO_UPDATE_CHECK": "1",
+    "CC_SAFETY_NET_PROJECT_TIGHTEN_ONLY": "1",
+}
 
 
 class Unavailable(Exception):
@@ -102,19 +116,26 @@ def fetch_tarball(pin: dict, dest: Path) -> Path:
     spec = f"{pin['package']}@{pin['version']}"
     try:
         proc = subprocess.run(
-            [npm, "pack", spec, "--ignore-scripts", "--silent",
+            [npm, "pack", spec, "--ignore-scripts", "--loglevel=error",
              "--pack-destination", str(dest)],
             capture_output=True, text=True, timeout=FETCH_TIMEOUT, cwd=dest,
         )
     except subprocess.TimeoutExpired:
         raise Unavailable(f"npm pack {spec} timed out after {FETCH_TIMEOUT}s") from None
     if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout).strip().splitlines()[-1:] or ["no output"]
-        raise Unavailable(f"npm pack {spec} failed: {tail[0]}")
+        raise Unavailable(f"npm pack {spec} failed: {npm_reason(proc)}")
     tarballs = sorted(dest.glob("*.tgz"))
     if len(tarballs) != 1:
         raise Unavailable(f"npm pack {spec} left {len(tarballs)} tarballs, expected 1")
     return tarballs[0]
+
+
+def npm_reason(proc: subprocess.CompletedProcess) -> str:
+    """The line of npm's output that names the error, such as a FetchError."""
+    lines = [line.strip() for line in (proc.stderr or proc.stdout or "").splitlines()]
+    lines = [line for line in lines if line]
+    named = [line for line in lines if "Error:" in line]
+    return (named or lines or [f"exit {proc.returncode}, no output"])[0][:300]
 
 
 def unpack(tarball: Path, dest: Path) -> None:
@@ -167,15 +188,44 @@ def entry_point(pin: dict) -> Path:
             raise Unavailable(
                 f"{version_dir} exists but does not hold the pinned release; "
                 "remove it so the hook can fetch the release again")
-        install(pin, version_dir)
+        failed = version_dir.with_name(version_dir.name + ".fetch-failed")
+        recent_failure(failed)
+        try:
+            install(pin, version_dir)
+        except Unavailable as exc:
+            record_failure(failed, str(exc))
+            raise
+        failed.unlink(missing_ok=True)
     return version_dir / "package" / "dist" / "bin" / "cc-safety-net.js"
+
+
+def recent_failure(failed: Path) -> None:
+    """Raise the recorded reason if a fetch failed under FETCH_BACKOFF ago."""
+    try:
+        record = json.loads(failed.read_text(encoding="utf-8"))
+        age = time.time() - float(record["time"])
+        reason = str(record["reason"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return
+    if 0 <= age < FETCH_BACKOFF:
+        wait = int(FETCH_BACKOFF - age) // 60 + 1
+        raise Unavailable(f"{reason} (fetch not retried for another {wait} min; "
+                          f"delete {failed} to retry now)")
+
+
+def record_failure(failed: Path, reason: str) -> None:
+    try:
+        failed.write_text(json.dumps({"time": time.time(), "reason": reason}),
+                          encoding="utf-8")
+    except OSError:
+        pass
 
 
 def run(entry: Path, payload: bytes) -> subprocess.CompletedProcess:
     node = shutil.which("node")
     if not node:
         raise Unavailable("node is not on PATH (CC Safety Net needs Node.js 22 or later)")
-    env = dict(os.environ, CC_SAFETY_NET_NO_UPDATE_CHECK="1")
+    env = dict(os.environ, **CHILD_ENV)
     try:
         proc = subprocess.run(
             [node, str(entry), "hook", "--coding-cli"],

@@ -42,7 +42,8 @@ a row says so where its source was not.
 
 Ezra, 2026-11-12, chose to adopt [CC Safety Net](https://github.com/kenryu42/cc-safety-net) (MIT) as the base guard for every agent, pinned, with ai-config hooks only for the gaps it leaves ([ai-config#5474](https://github.com/Morrison-Lab/ai-config/issues/5474)).
 [`hooks/run-cc-safety-net.py`](../../hooks/run-cc-safety-net.py) runs the release [`hooks/cc-safety-net.pin.json`](../../hooks/cc-safety-net.pin.json) names, at its standard level, on every shell and file tool call.
-It fails open, with a notice once per session, where Node.js 22 or npm is missing.
+It fails open, with a notice once per session, where Node.js 22 or npm is missing, and after a failed fetch it waits an hour before fetching again.
+A `.cc-safety-net/policy.json` committed to a repository can add blocks but cannot turn any off.
 
 The standard level, not strict, because replaying the 797 distinct Bash commands of one ai-config session through each level (2026-11-12) gave:
 

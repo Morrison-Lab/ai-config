@@ -67,6 +67,16 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16), wh
 - **Link both the PR and its thread** whenever a message names a PR: the full PR URL, and the thread as `[title](#cmsg_...)`.
 - **Broadcast to every open thread, not a remembered subset.**
   When asked to tell "all relevant threads" something, list every non-resolved thread, read each one's latest status (including threads bucketed "completed", which can be stalled on a blocked merge), and then choose recipients.
+  The same holds for a bulk action across threads, such as moving every thread to another model:
+  enumerate with `list_threads` (every page, every state), act on each, and re-list to confirm none was missed.
+  When the user says "all", do all of them, and never ask "do you want me to switch all of them?"
+  (2nd occurrence, 2026-11-12: the coordinator messaged threads one at a time from memory, missed some, then asked;
+  Ezra: "obviously yes; this shouldn't have been a question".)
+- **Know ai-config's skills and commands by name.**
+  A coordinator or thread may not have the plugin's skill list in context, so read the `skills/*/SKILL.md` frontmatter (or the project's memory index of them) before saying what a named skill does.
+  Run a skill the user names, such as `ums`, without asking what it is
+  (Ezra, 2026-11-12: "UMS is a skill in ai-config;
+  you should know the names of all the skills and commands in ai-config").
 - **A thread starts its own Remote Control sessions.**
   Where the user has granted a device, call `start_rc_session` yourself and never ask the user to start a session or run a terminal command.
 - **Check a PR preview yourself.**

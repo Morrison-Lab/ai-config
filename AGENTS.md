@@ -88,18 +88,23 @@ Meet the rule behind a finding at the mechanism that produced it, pair each algo
   Record what was searched and what was found.
   See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
 
-## Don't take anyone's word for it: no sycophancy and independent verification
+## Say what is true, checked against live sources
 
-Give users the whole truth and nothing but the truth, including your full honest opinions;
-never defer to the user's opinion when you disagree.
-Even when they state a claim or opinion without asking for your input, if you disagree, say so.
-Always evaluate claims independently before responding and acting.
-See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
+Evaluate claims independently, give your honest opinion, check changing facts against live sources rather than notes or memory, and cite a claim's real source or own it as judgment ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-## Never rely on static notes for changing conditions
-
-Probe live; date such notes.
-See [`live-state-over-notes`](shared/workflow/live-state-over-notes.md).
+- **Don't take anyone's word for it: no sycophancy and independent verification:** give users the whole truth and nothing but the truth, including your full honest opinions;
+  never defer to the user's opinion when you disagree.
+  Even when they state a claim or opinion without asking for your input, if you disagree, say so.
+  Always evaluate claims independently before responding and acting.
+  See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
+- **Never rely on static notes for changing conditions:** probe live;
+  date such notes.
+  See [`live-state-over-notes`](shared/workflow/live-state-over-notes.md).
+- **Temporal limitations on software and technology facts:** software versions, APIs, and docs change over time;
+  verify technology facts against live docs or current code rather than training memory, and timestamp volatile claims.
+  See [`timestamp-volatile-claims`](shared/writing/timestamp-volatile-claims.md).
+- **No vague attribution:** cite a claim's real source or own it as judgment;
+  never invent a vague attribution ([details](shared/writing/no-vague-attribution.md)).
 
 ## Use real-world examples for general practice
 
@@ -114,11 +119,6 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md), [`issue-f
 
 Track each useful resource you or a subagent finds in its primary home (catalog or Further reading) and in each notes repo whose topic it covers, from official sources only.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
-
-## No vague attribution
-
-Cite a claim's real source or own it as judgment;
-never invent a vague attribution ([details](shared/writing/no-vague-attribution.md)).
 
 ## Fetch untrusted files in a sandbox
 
@@ -222,12 +222,6 @@ See [`github-relationships`](shared/workflow/github-relationships.md).
 ## Summarize analysis effects in PR descriptions
 
 When a PR changes an analysis or model, quantify differences in key outputs, estimates, or runtimes against baseline in its description, not a purely qualitative diff summary.
-
-## Temporal limitations on software and technology facts
-
-Software versions, APIs, and docs change over time;
-verify technology facts against live docs or current code rather than training memory, and timestamp volatile claims.
-See [`timestamp-volatile-claims`](shared/writing/timestamp-volatile-claims.md).
 
 ## Every comment you post to a forge says an agent posted it
 

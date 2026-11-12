@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """Read the annotations on a head's check runs within the shared REST budget.
 
-Every agent shares one core budget (ai-config#5045), so this reads runs one at
-a time with a --pause, checks GET /rate_limit (free) before each, and stops
-before the budget would fall below --floor, naming the reset time. Identical
-messages are grouped and counted; known runner notices and fixtures are marked.
-Last line: the run ids read in full, for check-pr-fully-clean.py's
---annotations-read. Exit 0 all read, 2 a failed read, 3 stopped at the floor.
-"""
+One budget is shared (ai-config#5045): runs are read one at a time with a
+--pause, and the read stops above --floor (GET /rate_limit is free). Messages
+are grouped; a group is known only if every member is, and each unknown
+member's path:line is printed. Last line: ids for --annotations-read.
+Exit 0 all read; 2 a failed, unfinished or short read; 3 stopped at the floor."""
 import argparse
 import collections
 import json
@@ -21,14 +19,13 @@ PER_PAGE = 100
 
 # Each pattern matches "path:line: message" and cites where it is recorded.
 KNOWN = [
-    # Runner-wide notice GitHub puts on every Actions job (ai-config#5045).
-    ("ubuntu-latest migration notice", r"ubuntu-latest\b.*(migrat|will use ubuntu-\d)"),
+    # Runner-wide notice on every Actions job (ai-config#5045): path .github, line 1.
+    ("ubuntu-latest migration notice", r'^\.github:1: "?The ubuntu-latest label will migrate to Ubuntu'),
     # .github/workflows/jules-review.yml, "Pin Node 24" step comment.
-    ("Node.js 20 deprecation", r"Node\.js 20\b.*deprecated"),
+    ("Node.js 20 deprecation", r"^\.github:1: Node\.js 20 is deprecated\. "),
     # gha check-markdown splice check (memories/gha-reusable-workflows.md).
     ("list-item splice skip", r"Skipping list-item merge splice check"),
-    # Empty-population negative controls in check-leadin-counts.py and
-    # check-reviewer-placeholders.py, exercised by their validate.yml tests.
+    # Negative controls in check-leadin-counts.py and check-reviewer-placeholders.py.
     ("examined-0 negative control", r"examined 0 files -- the (check|gate) did not run"),
     # NEGATIVE_CONTROL fixture in scripts/test_check_leadin_counts.py.
     ("bad.md:5 lead-in fixture", r"(^|/)bad\.md:5: lead-in says"),
@@ -65,12 +62,6 @@ def pages(api, path, key=None):
         page += 1
 
 
-def annotated_runs(api, repo, sha):
-    runs = pages(api, f"repos/{repo}/commits/{sha}/check-runs", "check_runs")
-    return [(r["id"], r["output"]["annotations_count"]) for r in runs
-            if (r.get("output") or {}).get("annotations_count")]
-
-
 def known_label(ann):
     key = f"{ann['path']}:{ann.get('start_line')}: {ann['message']}"
     for label, pattern in KNOWN:
@@ -82,47 +73,59 @@ def known_label(ann):
 def main(argv=None, api=gh_api, sleep=time.sleep):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--repo", required=True, help="OWNER/REPO")
-    src = p.add_mutually_exclusive_group(required=True)
-    src.add_argument("--sha", help="head commit; reads every run with annotations")
-    src.add_argument("--runs", help="comma-separated check-run ids the checker listed")
+    p.add_argument("--sha", required=True, help="head commit; reads every run with annotations")
     p.add_argument("--pause", type=float, default=1.0, help="seconds between runs (default 1)")
     p.add_argument("--floor", type=int, default=500,
                    help="stop before the core budget would fall below this (default 500)")
     args = p.parse_args(argv)
+    groups = collections.defaultdict(lambda: {"n": 0, "labels": set(), "unknown": []})
+    done, bad, stopped = [], [], None
     try:
-        if args.sha:
-            runs = annotated_runs(api, args.repo, args.sha)
-        else:
-            runs = [(int(i), None) for i in args.runs.split(",") if i]
-        groups, known, done, stopped = collections.Counter(), {}, [], None
-        for n, (rid, count) in enumerate(runs):
+        runs = [r for r in pages(api, f"repos/{args.repo}/commits/{args.sha}/check-runs",
+                                 "check_runs")
+                if (r.get("output") or {}).get("annotations_count")]
+        for n, run in enumerate(runs):
+            rid, count = run["id"], run["output"]["annotations_count"]
+            if run.get("status") != "completed":
+                bad.append(f"run {rid} is {run.get('status')}; its annotations may not exist yet")
+                continue
             if n:
                 sleep(args.pause)
             remaining, reset = core_budget(api)
-            need = -(-count // PER_PAGE) if count else 1
-            if remaining - need < args.floor:
+            if remaining - -(-count // PER_PAGE) < args.floor:
                 stopped = (remaining, reset)
                 break
-            for ann in pages(api, f"repos/{args.repo}/check-runs/{rid}/annotations"):
-                first = (ann["message"] or "").split("\n")[0][:200]
-                key = (ann["annotation_level"], first)
-                groups[key] += 1
-                known[key] = known.get(key) or known_label(ann)
-            done.append(rid)
+            anns = pages(api, f"repos/{args.repo}/check-runs/{rid}/annotations")
+            for ann in anns:
+                g = groups[(ann["annotation_level"], (ann["message"] or "").split("\n")[0][:200])]
+                g["n"] += 1
+                label = known_label(ann)
+                if label:
+                    g["labels"].add(label)
+                else:
+                    g["unknown"].append(f"{ann['path']}:{ann.get('start_line')}")
+            if len(anns) != count:
+                bad.append(f"run {rid}: read {len(anns)} annotations, GitHub reports {count}")
+            else:
+                done.append(rid)
     except (ReadError, KeyError, ValueError) as exc:
         print(f"ERROR: incomplete read: {exc}", file=sys.stderr)
         return 2
     print(f"read {len(done)} of {len(runs)} run(s), "
-          f"{sum(groups.values())} annotation(s) in {len(groups)} group(s)")
-    for (level, msg), n in sorted(groups.items(), key=lambda kv: (bool(known[kv[0]]), -kv[1])):
-        tag = f"known: {known[(level, msg)]}" if known[(level, msg)] else "UNKNOWN"
-        print(f"{n:5d}  {level:8s} [{tag}] {msg}")
+          f"{sum(g['n'] for g in groups.values())} annotation(s) in {len(groups)} group(s)")
+    for (level, msg), g in sorted(groups.items(), key=lambda kv: (not kv[1]["unknown"], -kv[1]["n"])):
+        tag = "UNKNOWN" if g["unknown"] else "known: " + ", ".join(sorted(g["labels"]))
+        print(f"{g['n']:5d}  {level:8s} [{tag}] {msg}")
+        for where in g["unknown"]:
+            print(f"         at {where}")
+    for why in bad:
+        print(f"INCOMPLETE: {why}; not listed for --annotations-read", file=sys.stderr)
     if stopped:
         print(f"STOPPED: {stopped[0]} core request(s) left, floor {args.floor}; "
-              f"budget resets at {stopped[1]}; {len(runs) - len(done)} run(s) unread",
+              f"budget resets at {stopped[1]}; {len(runs) - len(done) - len(bad)} run(s) unread",
               file=sys.stderr)
     print(",".join(str(r) for r in done))
-    return 3 if stopped else 0
+    return 3 if stopped else 2 if bad else 0
 
 
 if __name__ == "__main__":

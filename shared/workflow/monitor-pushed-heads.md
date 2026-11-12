@@ -30,3 +30,4 @@ Re-derive it from a live query rather than trusting the earlier verdict.
 **Every poller shares one GitHub REST budget, so run one checker poller at a time.**
 All agents and tools on the account draw on the same 5,000 core requests an hour, and several `Monitor` pollers each re-running `check-pr-fully-clean.py` for different PRs exhausted it on 2026-11-06 ([ai-config#5045](https://github.com/Morrison-Lab/ai-config/issues/5045)).
 Poll one PR's checker at a time, and read a head's annotations with `scripts/batch-read-annotations.py`, which pauses between runs and stops above a budget floor, rather than with one call per run.
+To list only the annotations that are not on the base, use `scripts/summarize-pr-annotations.sh` with `BASE_SHA`.

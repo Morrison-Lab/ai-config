@@ -150,5 +150,8 @@ with tempfile.TemporaryDirectory() as tmp:
     ctx = context(run(deep, consumer))
     assert len(ctx) < 10_000, len(ctx)
     assert "section index omitted" not in ctx, "index no longer fits the cap"
+    # Composed sections keep each rule's name in the index as a bullet lead.
+    assert "  - Put PRs in ready mode when they are ready for review\n" in ctx, ctx
+    assert "  - Do\n" not in ctx and "  - Don't\n" not in ctx, ctx
 
 print("ok: inject-core-rules.py, 10 cases")

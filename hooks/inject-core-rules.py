@@ -25,7 +25,8 @@ the cap (the test pins it against the real AGENTS.md):
 
   - a header naming AGENTS.md and CLAUDE.md by absolute path, with the order
     to read AGENTS.md in full before the first action;
-  - an index of AGENTS.md's section headings, so every rule's name is in
+  - an index of AGENTS.md's section headings, with the bold lead of each
+    top-level rule bullet under its heading, so every rule's name is in
     context even before the read.
 
 CLAUDE.md is named, never ordered read in full: it is several times the size
@@ -101,11 +102,33 @@ def project_dir(payload: dict) -> Path:
     return Path(raw) if raw else Path.cwd()
 
 
+RULE_LEAD = re.compile(r"^- \*\*(.+?)\*\*")
+NOT_A_RULE_NAME = ("Do:", "Don't:", "Don’t:")
+
+
+def index_lines(agents_text: str) -> list[str]:
+    """One line per `##` heading, then one indented line per rule bullet.
+
+    A section that composes several rules keeps each as a bullet led by the
+    rule's name in bold (ai-config#2889), so the index lists those leads too;
+    otherwise composing headings would drop rule names from it.
+    """
+    lines = []
+    for line in agents_text.splitlines():
+        if line.startswith("## "):
+            lines.append(f"- {line[3:].strip()}\n")
+            continue
+        lead = RULE_LEAD.match(line)
+        if lead and lines and not lead.group(1).startswith(NOT_A_RULE_NAME):
+            lines.append(f"  - {lead.group(1).rstrip(':').strip()}\n")
+    return lines
+
+
 def render(root: Path) -> str:
     agents = root / "AGENTS.md"
     text = HEADER.format(agents=agents, claude=root / "CLAUDE.md", root=root)
-    headings = re.findall(r"^## (.+)$", agents.read_text(encoding="utf-8"), re.MULTILINE)
-    index = "\nAGENTS.md sections:\n" + "".join(f"- {h.strip()}\n" for h in headings)
+    index = "\nAGENTS.md sections:\n" + "".join(
+        index_lines(agents.read_text(encoding="utf-8")))
     if len(text) + len(index) > CAP:
         index = "\n(AGENTS.md section index omitted: it would exceed the hook output cap.)\n"
     return text + index

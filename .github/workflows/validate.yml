@@ -109,7 +109,7 @@ jobs:
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
       - name: Run check-validate-duration tests
-        # ai-config#3384: the regression judge behind validate-duration.yml.
+        # ai-config#3384: the judge that flags a slower validate job on main.
         run: python3 scripts/test_check_validate_duration.py
       - name: Run diff-annotations-vs-base tests
         # ai-config#5281: per-name annotation diff over every page.

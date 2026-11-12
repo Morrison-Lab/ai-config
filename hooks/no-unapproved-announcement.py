@@ -13,13 +13,14 @@ import re
 import sys
 
 try:
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
-        os.path.realpath(__file__))), "scripts", "lib"))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"))
     from transcript_meta import is_real_user_turn, strip_injected_text
 except Exception:  # detection still runs; a detected write is then denied
     is_real_user_turn = None
 
-CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
+CLI = re.compile(r"(^|[;&|(]\s*)canvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
+CODE = re.compile(r"\b(python3?|node|ruby|perl)\b\s+(-c|-e|-\s)|<<")
+QUOTED = re.compile(r"'[^']*'|\"(\\.|[^\"\\$`])*\"")  # a double-quoted span with $ or ` stays
 TOPIC = re.compile(r"discussion(_|%5f)?topic|announcement", re.I)
 ANNOUNCE = re.compile(r"is_announcement|get_announcements.*\.(edit|update)\(", re.I | re.S)
 NET = re.compile(r"\b(curl|wget|requests|urllib|httpx|canvasapi|graphql|canvas\s+api|Invoke-\w+)\b|"
@@ -33,16 +34,20 @@ APPROVAL = re.compile(r"\s*((yes|ok|okay|approved|looks good|lgtm)[,.!]*\s*)?(pl
                       r"((post|publish)\s+(it|the announcement|this announcement|that announcement)"
                       r"|send\s+(the|this|that)\s+announcement)(\s+(now|as written|please))*[\s.!]*", re.I)
 TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
+ENVELOPE = {"wake", "project", "thread", "message", "relay", "cited", "note"}  # and every hyphenated tag
 
 
 def is_announcement_write(tool, inp):
     if tool in ("Bash", "Monitor", "PowerShell"):
         cmd = inp.get("command") or ""
         first = (cmd.split() or [""])[0].rsplit("/", 1)[-1]
-        if first in SAFE_FIRST and not COMPOUND.search(cmd):  # one plain command
+        plain = not COMPOUND.search(QUOTED.sub("", cmd))  # operators outside quotes
+        if first in SAFE_FIRST and plain:  # one plain command
             return False
-        curl_read = first == "curl" and not WRITE.search(cmd) and not COMPOUND.search(cmd)
-        return bool(CLI.search(cmd) or ANNOUNCE.search(cmd) or (TOPIC.search(cmd) and (NET.search(cmd) or first in ("http", "https", "xh")) and not curl_read))
+        net = NET.search(cmd) or first in ("http", "https", "xh")
+        curl_read = first == "curl" and not WRITE.search(cmd) and plain
+        return bool(CLI.search(cmd) or ANNOUNCE.search(cmd) and (net or CODE.search(cmd))
+                    or TOPIC.search(cmd) and net and not curl_read)
     name = tool.lower()
     if not name.startswith("mcp__"):
         return False
@@ -51,13 +56,17 @@ def is_announcement_write(tool, inp):
             "discussion" in verb or "topic" in verb)) and not MCP_READ.search(verb):
         return True
     flat = json.dumps(inp).replace('\\"', '"')
-    return bool(TOPIC.search(flat) and re.search(r"is_announcement|\b(POST|PUT)\b", flat, re.I))
+    return bool(re.search(r"canvas|lms|instructure|http|\bapi_|\brequest\b", name.split("__")[1] + " " + verb)
+                and TOPIC.search(flat)
+                and re.search(r"is_announcement|\b(POST|PUT)\b|\"method\": \"(?i:post|put)\"", flat))
 
 
 def user_words(text, top=True):
     """User text: untagged (if `top`), a principal wake message, or a relay's cited entry."""
     out, stack, pos = [], [], 0
     for m in TAG.finditer(text):
+        if "-" not in m.group(2) and m.group(2).lower() not in ENVELOPE:
+            continue  # the user's own markup, such as <b>, stays text
         path = [t for t, _ in stack]
         in_wake = (path[:1] == ["wake"] and path[-1:] == ["message"]
                    and set(path[1:-1]) <= {"project", "thread"})
@@ -84,7 +93,6 @@ def _blocks(entry):
 
 def _user_text(entry):
     att = entry.get("attachment") or {}
-    att = entry.get("attachment") or {}
     if att.get("type") == "queued_command" and att.get("commandMode") != "task-notification":
         return str(att.get("prompt") or ""), True
     if entry.get("type") != "user" or entry.get("promptSource") == "sdk":
@@ -94,7 +102,6 @@ def _user_text(entry):
 
 
 def verdict(path, tool, inp):
-    """None to allow, or why the write is refused."""
     if is_real_user_turn is None:
         return "scripts/lib/transcript_meta.py could not be loaded"
     try:
@@ -115,9 +122,8 @@ def verdict(path, tool, inp):
                 writes.remove(now[0])
             return "an announcement was already posted after that approval" if writes else None
         if entry.get("type") == "assistant":
-            writes += [[b.get("name"), b.get("input"), b.get("id")] for b in _blocks(entry)
-                       if b.get("type") == "tool_use"
-                       and is_announcement_write(b.get("name") or "", b.get("input") or {})]
+            writes += [[b.get("name"), b.get("input"), b.get("id")] for b in _blocks(entry) if b.get("type")
+                       == "tool_use" and is_announcement_write(b.get("name") or "", b.get("input") or {})]
     return "no message from the user approves posting it"
 
 
@@ -143,11 +149,9 @@ def main() -> int:
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
             "permissionDecisionReason": (
-                f"Refused: this posts or edits a class announcement, and {why} "
-                "(Ezra, 2026-10-27, ai-config#4780: never post an announcement "
-                "without his review and approval of its exact text).\n\nShow "
-                "the exact text in chat and ask the user to reply with only "
-                "\"post the announcement\"; then post that text once."),
+                f"Refused: this posts or edits a class announcement, and {why} (Ezra, 2026-10-27, ai-config#4780: "
+                "never post an announcement without his review and approval of its exact text).\n\nShow the exact "
+                "text in chat and ask the user to reply with only \"post the announcement\"; then post that text once."),
         }}))
     return 0
 

@@ -2926,9 +2926,9 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
     fingerprint. A clean report with a fingerprint that does not resolve here
     binds nothing and is skipped, which is what lets a review of another
     repository leave this one's verdict standing. A refusal names each
-    vetoed commit with what vetoed it. A shipped commit no verdict ever named
-    (and no blocking ancestor), and any doubt (a timeout, a git error, an
-    unknown payload, a ref deletion), return ("", "").
+    commit no verdict covers, with what vetoed it if anything did. Any doubt
+    (a timeout, a git error, an unknown payload, a ref deletion) returns
+    ("", "").
     """
     if len(history) < 2:
         return "", ""  # one verdict: the map and the caller's checks agree
@@ -2974,17 +2974,21 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                     what = ("code a review flagged" if f == "needs_work" else
                             "code whose review this guard cannot read (it accepts "
                             f"{ACCEPTED_VERDICT_PHRASES})")
-                    return "", (f"A later {_VERDICT_WORDS[f]} names {sha[:12]}, an ancestor of "
+                    own = (f"No verdict names {c[:12]}, and a" if since < 0
+                           else f"A later")
+                    return "", (f"{own} {_VERDICT_WORDS[f]} names {sha[:12]}, an ancestor of "
                                 f"{c[:12]}, so this push ships {what}.\n"
                                 "Address it, then re-dispatch the reviewer against what you push.")
         missing = sorted(c for c in commits if c not in latest)
         if not missing:
             return ("Clean adversarial self-review verified at "
                     f"{', '.join(sorted(commits))} (latest verdict naming each)."), ""
-        if missing and all(c in vetoed for c in missing):
-            return "", ("No verdict covers " + "; ".join(
-                f"{c[:12]} ({vetoed[c]})" for c in missing) + ".\n"
-                "Re-dispatch the reviewer against what you push.")
+        return "", ("No verdict covers " + "; ".join(
+            f"{c[:12]} ({vetoed.get(c, 'no verdict names it')})" for c in missing)
+            + ", but this push would ship it.\nA push ships commits, so whatever no "
+            "verdict covers -- a later commit, a `main` merge, a rebase, or a branch "
+            "other than the reviewed one -- is unreviewed. Re-dispatch the reviewer "
+            "against what you are actually pushing.")
     except Exception as exc:  # the caller's stricter checks still decide
         print(f"no-push-without-self-review: verdict map skipped ({exc})", file=sys.stderr)
     return "", ""

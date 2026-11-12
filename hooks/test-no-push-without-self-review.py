@@ -2484,7 +2484,11 @@ def verdict_map_cases() -> tuple[int, int]:
             ("an unparsed base is not called flagged", push_feature,
              ((clean, FEATURE), ("Looks bad", HEAD), (clean, OTHER_HEAD)), "review this guard cannot read", None),
             ("a commit with no verdict still gets the ancestor refusal", push_feature,
-             ((nmw, HEAD), (clean, OTHER_HEAD)), "an ancestor of", None),
+             ((nmw, HEAD), (clean, OTHER_HEAD)), f"No verdict names {FEATURE[:12]}, and a", None),
+            ("an unnamed commit is not blamed on another repository's review", PUSH,
+             ((clean, FEATURE), (clean, OTHER_HEAD)), f"{HEAD[:12]} (no verdict names it)", None),
+            ("an unnamed commit is not blamed on a descendant's blocking verdict", PUSH,
+             ((clean, FEATURE), (nmw, FEATURE)), f"{HEAD[:12]} (no verdict names it)", None),
             ("a map that runs out of time still refuses", PUSH,
              ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", {"NPWSR_BUDGET_SECONDS": "0"})):
         rc, out = run_hook(cmd, verdicts(*pairs), extra_env=env)

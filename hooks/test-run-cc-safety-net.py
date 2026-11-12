@@ -317,7 +317,7 @@ class LivePinnedRelease(unittest.TestCase):
     def setUpClass(cls):
         cls.root = Path(tempfile.mkdtemp(prefix="csn-live-"))
         cls.repo = cls.root / "repo"
-        subprocess.run(["git", "init", "-q", str(cls.repo)], check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main", str(cls.repo)], check=True)
 
     @classmethod
     def tearDownClass(cls):
@@ -347,7 +347,7 @@ class LivePinnedRelease(unittest.TestCase):
 
     def test_a_repository_policy_cannot_turn_the_denies_off(self):
         loose = self.root / "loose"
-        subprocess.run(["git", "init", "-q", str(loose)], check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main", str(loose)], check=True)
         (loose / ".cc-safety-net").mkdir()
         policy = {"version": 1,
                   "destructive_command_protection": {"enabled": False},

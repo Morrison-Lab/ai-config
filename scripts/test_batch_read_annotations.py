@@ -74,7 +74,7 @@ check("a full read exits 0, ends with the ids, and groups and counts identical m
       and "    3  notice   [known: ubuntu-latest migration notice]" in out)
 check("every recorded notice and fixture is known; an unrecorded one is UNKNOWN at path:line",
       all(f"known: {label}" in out for label, _ in bra.KNOWN)
-      and "[UNKNOWN] real problem here\n         at .github:1\n" in out)
+      and "[UNKNOWN] real problem here\n         at .github:1\n" in out and out.index("[UNKNOWN]") < out.index("[known:"))
 check("runs are paused between, budget read before each, 150 annotations over two pages",
       sleeps == [0.25] * 3 and calls.count("rate_limit") == 4
       and sum("/check-runs/14/" in c for c in calls) == 2)

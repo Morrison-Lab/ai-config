@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """PreToolUse: never say a repository isn't in this thread; attach it.
 
-Ezra, 2026-11-12: "cai: never say a repo isn't in a thread; add it". The rule,
-its scope and its exemptions are in shared/workflow/no-cant-from-session-excuses.md
-and this hook's hooks.json "why". A deny because the shape is lexical
-(ai-config#4741). `ALLOW_REPO_NOT_IN_THREAD=1` overrides. Fails open on parse trouble.
+Ezra, 2026-11-12: "cai: never say a repo isn't in a thread; add it". Rule, scope and exemptions:
+shared/workflow/no-cant-from-session-excuses.md and this hook's hooks.json "why". A deny because the
+shape is lexical (ai-config#4741). `ALLOW_REPO_NOT_IN_THREAD=1` overrides. Fails open on parse trouble.
 """
 import json
 import os
@@ -38,33 +37,34 @@ LAB_REPOS = (r"ai-config|gha|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"
 NAMED = re.compile(rf"\b[\w-]{{1,39}}/[\w-]{{1,100}}\b(?![/.]\w)|\b(?:{LAB_REPOS})\b", re.I)
 REPO_NAME = re.compile(rf"\b(?:repo|repos|repository|repositories)\b|{NAMED.pattern}", re.I)
 SUBJECT = re.compile(rf"(?:{REPO_NAME.pattern})[\s`'\"\u2019]*(?:(?:is|are|was|were)\s+)?$", re.I)
-# The object must end its phrase: "I don't have the lds preview URL" passes.
 DET = r"(?:(?:the|a|an|that|this|any)\s+)?"
 TOK = r"`?([\w-]{1,39}(?:/[\w-]{1,100})?)`?"
-END = r"(?=\s*(?:[.,;:!?)](?=\s|$)|$|(?:in|on|from|here|to|into|within|checked|cloned|attached|repo|repository)\b))"
+# The object ends its phrase or a thread place: "I didn't see lds in this thread's PR list" passes.
+END = (r"(?=(?:\s+(?:repo|repository|checkout|clone|copy|access|checked\s+out|cloned|attached))?"
+       rf"(?:\s*[.,;:!?)](?=\s|$)|\s*$|\s+here\b|\s+(?:in|on|from|to|into|within){TARGET}))")
 ACCESS = r"(?:read\s+)?access\s+to\s+"
 OBJECT = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:have|has|include|includes|see)\s+(?:{ACCESS})?{DET}{TOK}{END}"
     rf"|\b{MODAL}\s+(?:\w+\s+)?(?:reach|access|clone|see)\s+(?:to\s+|into\s+)?{DET}{TOK}{END}"
     rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
     rf"(?:{ACCESS}{DET}{TOK}|(?:checkout|clone|copy)\s+of\s+{DET}{TOK}"
-    rf"|{DET}{TOK}\s+(?:checkout|clone|copy|access|repo|repository)\b)"
-    rf"|\black\w*\s+{ACCESS}{DET}{TOK}",
-    re.I)
+    rf"|{DET}{TOK}(?=\s+(?:checkout|clone|copy|access|repo|repository)\b)){END}"
+    rf"|\black\w*\s+{ACCESS}{DET}{TOK}{END}", re.I)
 LIST_NEG = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:see|find)\s+{DET}{TOK}\s+(?:in|among|on)\s+(?:{REPO_LIST.pattern})"
     rf"|(?:{REPO_LIST.pattern})\s+(?:{NEG})\s+(?:include|includes|have|has|list)\s+{DET}{TOK}", re.I)
-# A sentence about running add_repo reports the attach, unless it is hypothetical.
-ADD_REPO = re.compile(r"\badd_repo\b(?!\s+(?:\w+\s+)?(?:would|will|could|might|may|has|had|returned\s+2\d\d)\b)", re.I)
-# An attach in progress or done ("I attached it", "attaching mlg", "added X to this thread") reports
-# the fix; the adjective ("the attached patch"), a negation or a hypothetical does not.
+# An attach or add_repo run in progress or done ("I added it", "ran add_repo") reports the fix; the adjective
+# ("the attached patch"), a request, a negation or a hypothetical ("it must be attached") does not.
 ATTACH_VERB = re.compile(
-    rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}", re.I)
-NOT_YET = re.compile(rf"\b(?:{NEG}|will|would|could|should|if|to|please|can|{APOS}ll)\s+(?:\w+\s+)?$", re.I)
+    rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)"
+    rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\badded\s+(?:it|them)\b(?!\s+(?:to|in)\s+(?!{PLACE}))"
+    r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned)\b", re.I)
+NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|no\s+one|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
     r"\b(?:add_repo|attach|attaching)\b(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,2}?"
-    rf"\s+(?:was\s+|itself\s+)?{FAIL}\b|\b(?:attach|add_repo)\b[^.;]{{0,80}}?\b(?:got|received)\s+[\"'\u2018\u201c]", re.I)
+    rf"\s+(?:was\s+|itself\s+)?{FAIL}\b|\b(?:attach|add_repo)\b[^.;]{{0,80}}?\b(?:got|received)\s+[\"'\u2018\u201c]"
+    rf"|\b(?:tried|attempted)\s+(?:to\s+)?(?:attach|run\s+add_repo|add_repo)\b[^.;]{{0,80}}?\bbut\s+(?:it\s+|that\s+)?(?:was\s+)?{FAIL}", re.I)
 
 REASON = (
     '[hook: no-repo-not-in-thread-excuse] "{sentence}" says a repository is not in this '
@@ -105,7 +105,7 @@ def plain(sentence: str) -> str:
 
 
 def attaches(sentence: str) -> bool:
-    return bool(ADD_REPO.search(sentence) or TRIED.search(sentence) or any(
+    return bool(TRIED.search(sentence) or any(
         not NOT_YET.search(sentence[max(0, m.start() - 40):m.start()]) for m in ATTACH_VERB.finditer(sentence)))
 
 

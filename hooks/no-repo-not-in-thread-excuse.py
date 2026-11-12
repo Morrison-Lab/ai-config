@@ -3,17 +3,15 @@
 
 Ezra, 2026-11-12: "cai: never say a repo isn't in a thread; add it". Rule, scope and exemptions:
 shared/workflow/no-cant-from-session-excuses.md and this hook's hooks.json "why". A deny because the
-shape is lexical (ai-config#4741). `ALLOW_REPO_NOT_IN_THREAD=1` overrides. Fails open on parse trouble.
-"""
+shape is lexical (ai-config#4741). `ALLOW_REPO_NOT_IN_THREAD=1` overrides. Fails open on parse trouble."""
 import json
 import os
 import re
 import sys
 
-OVERRIDE = "ALLOW_REPO_NOT_IN_THREAD"
+OVERRIDE, APOS = "ALLOW_REPO_NOT_IN_THREAD", r"(?:'|\u2019)"
 TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|request_decision|message_coordinator|message_thread)$")
 
-APOS = r"(?:'|\u2019)"
 NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
        rf"hasn{APOS}t|haven{APOS}t|has\s+not|have\s+not|can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
@@ -24,8 +22,8 @@ TARGET = (rf"\s+(?:{PLACE}(?:{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\
           r"right|today|currently|either|even|i|we|it|you|is|was)\b)[a-z])|my\s+(?:repos|repositories)\b|the\s+(?:repos|repositories)\s+(?:attached|available|in|for)\b)")
 SUBJ_NEG = re.compile(
     rf"(?:\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really|been)\s+){{0,2}}(?:in|on|within|part\s+of|among|one\s+of|"
-    rf"(?:attached|added|available|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?)"
-    rf"|\b(?:outside|unavailable\s+(?:in|from|to)|missing\s+from)){TARGET}", re.I)
+    rf"(?:attached|added|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?)"
+    rf"|\b(?:outside|missing\s+from)){TARGET}", re.I)  # not "available": "mlr is not available" may be the R package
 LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b", re.I)
 REPO_LIST = re.compile(
     rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list)\b"
@@ -52,15 +50,16 @@ LIST_NEG = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:see|find)\s+{DET}{TOK}\s+(?:in|among|on)\s+(?:{REPO_LIST.pattern})"
     rf"|(?:{REPO_LIST.pattern})\s+(?:{NEG})\s+(?:include|includes|have|has|list)\s+{DET}{TOK}", re.I)
 # "I attached it", "I added it" and "ran add_repo" report the fix; "the attached patch", a request, a negation does not.
-ATTACH_VERB = re.compile(
-    rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b"
+ATTACH_VERB = re.compile(rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b"
     rf"(?=\s+(?:both\s+|the\s+)?(?:it|them|repo|repository|{NAMED.pattern})(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)|\s*(?:[.,;]|$)|\s+now\b)"
     rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\b(?:added|cloned|cloning)\s+(?:it|them|the\s+repo(?:sitory)?|{NAMED.pattern})\b(?!\s+(?:to|in)\s+(?!{PLACE}|/))"
     r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned)\b", re.I)
 OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo|scope)\b"
                          rf"|\b{NEG}\s+(?:\w+\s+)?(?:in|on|part\s+of|among|one\s+of|available)\b))", re.I)
+DONE = re.compile(r"\b(?:I|[Ww]e)\s+(?:(?:just|then|also|finally|now)\s+)?$")  # "until I attached it" is done
 # The repo starts its clause: "The PR against lds isn't in this thread" and "Updating lds is not in" name lds as an object.
-CLAUSE_START = re.compile(rf"(?:^|[,;:(]\s*|\b(?:but|so|because|since|yet|while|although|though|that|as)\s+)"
+CLAUSE_START = re.compile(rf"(?:^|[,;:(]\s*|\b(?:but|so|because|since|yet|while|although|though)\s+"
+                          r"|(?<!for\s)(?<!in\s)(?<!on\s)(?<!of\s)(?<!to\s)(?<!by\s)(?<!about\s)(?<!against\s)(?<!with\s)(?<!from\s)\bthat\s+)"
                           rf"(?:(?:the|our|my|this|that|both|and|either)\s+|(?:{REPO_NAME.pattern})[`'\"\s,]*(?:and\s+|or\s+)?)*$", re.I)
 NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|nothing|no\s+one|once|when|until|unless|of|without|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
@@ -106,7 +105,8 @@ def plain(sentence: str) -> str:
 
 def attaches(sentence: str) -> bool:
     return bool(TRIED.search(sentence) or any(
-        not NOT_YET.search(sentence[max(0, m.start() - 40):m.start()]) for m in ATTACH_VERB.finditer(sentence)))
+        DONE.search(before) or not NOT_YET.search(before) for before in
+        (sentence[max(0, m.start() - 40):m.start()] for m in ATTACH_VERB.finditer(sentence))))
 
 
 def is_excuse(sentence: str) -> bool:

@@ -45,7 +45,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
   Corrected by user with `cai: you should have pushed a PR without me having to tell you`.
   Re-hit 2026-09-29 (Antigravity session, working `Morrison-Lab/lds` [PR #265](https://github.com/Morrison-Lab/lds/pull/265)): updated syllabus links to mds, pds, sds, and lds, verified renders across HTML, revealjs, and PDF, but presented stopping point recap without committing, pushing, or opening a PR until user asked "pr?".
   Corrected by user with `cai: you should have created that PR without me having to ask`.
-- **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work"): commit → push → PR → share link, as one automatic sequence.
+- **Canonical Rule**: `AGENTS.md` ("Ship work through a verified push and a PR", "Deliver completed implementation work" bullet): commit → push → PR → share link, as one automatic sequence.
 - **Fix**: Before acting on a task, grep AGENTS.md and project CLAUDE.md for rules that apply.
   After a correction, record it in mistake-patterns.md (don't just say you'll remember --- the next session won't have this conversation).
 
@@ -75,7 +75,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
 - **Mistake**: Getting corrected, acknowledging the fix verbally ("I'll internalize that"), but not recording it --- so the next session makes the same mistake.
 - **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`): corrected three times (didn't push, didn't open PR, declared ready with failing CI).
   Each time acknowledged the fix but only recorded it after being told to, and the first two corrections weren't recorded at all until prompted.
-- **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work") plus the UMS principle: every correction is a learning to bank, not a conversation to end.
+- **Canonical Rule**: `AGENTS.md` ("Ship work through a verified push and a PR", "Deliver completed implementation work" bullet) plus the UMS principle: every correction is a learning to bank, not a conversation to end.
 - **Fix**: After any correction, immediately record it in `mistake-patterns.md` (or the appropriate memory file) with enough context that a cold reader can avoid it.
   Don't wait to be told to learn --- the correction IS the instruction.
 
@@ -552,8 +552,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Do**: When executing implementation work on a branch, complete the full delivery cycle automatically: run tests, commit scoped changes, run adversarial self-review, check remote branch, push, open/update PR, and request AI review.
 - **Don't**: Stop after writing files or tests and report "done" or wait for a follow-up prompt to commit and open a PR.
 - **Example**: 2026-08-30 session (`Morrison-Lab/ai-config` on branch `structured_review_bot_output`): implemented structured review JSON parsing in `check-pr-fully-clean.py` and updated reviewer prompts, verified all tests pass, wrote walkthrough artifact, but stopped without committing, pushing, or opening a PR until the user prompted "where's my PR? ums".
-- **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work"): "When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted worktree.
-  Complete the delivery cycle: create the applicable tracking issue when issue-first workflow applies, commit the scoped changes, run local adversarial self-review to a clean verdict, push the branch, open or update its Pull Request, request AI review after the final push, and drive CI and review findings to a clean result."
+- **Canonical Rule**: `AGENTS.md` ("Ship work through a verified push and a PR", "Deliver completed implementation work" bullet): when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
 - **Fix**: Never terminate an implementation turn at uncommitted files or a local-only commit.
   Complete the full chain (commit -> self-review -> push -> PR -> review request) in that same turn.
 
@@ -694,7 +693,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Don't**: Analyze the review question or execute downstream tasks locally/in chat without posting the written answer or resolution directly to the forge PR review thread.
 - **Example**: 2026-09-01 session (Antigravity, working `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98)): user linked review `https://github.com/ucdavis/matt.contracts/pull/98#pullrequestreview-5075093750` ("how much of this content can we externalize to hac.sap and load from there?").
   The agent analyzed the architectural boundaries internally and proceeded to work on multi-format rendering in `hac.sap#9`, but failed to post the written architectural breakdown reply to the PR thread on GitHub until prompted "why didn't you do that hours ago?".
-- **Canonical Rule**: `AGENTS.md` ("Status and diagnostic requests do not make issues report-only", "Deliver completed implementation work"), and [`skills/ard/SKILL.md`](../skills/ard/SKILL.md) (Address, rebut, or defer review items).
+- **Canonical Rule**: `AGENTS.md` ("Status and diagnostic requests do not make issues report-only", and "Ship work through a verified push and a PR"'s "Deliver completed implementation work" bullet), and [`skills/ard/SKILL.md`](../skills/ard/SKILL.md) (Address, rebut, or defer review items).
 - **Fix**: When given a PR review reference or question, immediately post the direct response comment to the PR thread on the forge before or alongside related code updates.
 
 ## Pattern 40: Merging Over Unaddressed Review Bot Findings Due to Incomplete Bot Identity and Verdict Header Scanning in ARDI Verifier

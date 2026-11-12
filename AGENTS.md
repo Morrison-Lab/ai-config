@@ -64,11 +64,11 @@ Before filing a PR in an external repository, read and follow its `CONTRIBUTING.
 
 What you say about the state you stop in must be true, and any work that remains needs something that will resume it ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-- **No empty promises:** a commitment about your own future behaviour ships an implemented mechanism in the same turn (a rule or memory entry at minimum, a hook when decidable, an armed timer or PR watcher for an owed action), or is not made;
+- **No empty promises:** a commitment about your own future behaviour ships an implemented mechanism in the same turn (a rule or memory entry at minimum, a hook when decidable, an armed timer, schedule, or PR watcher for an owed action), or is not made;
   for a claim that automation will finish later, state its current status or arm monitoring for the result ([`no-empty-promises`](shared/workflow/no-empty-promises.md)).
 - **Resume every non-clean pause:** whenever work remains, arm a timer or equivalent wake that will resume the next step, and report what fires and its clock time;
   a promise to return is not a mechanism, and a verified clean stop needs no timer.
-- **Say whether the session is done when reporting stopping point status**, confirming UMS ran and noticed follow-ups are filed;
+- **Say whether the session is done when reporting stopping point status**, confirming UMS ran (or no new learnings accumulated) and noticed follow-ups are filed;
   never say done with uncommitted, unpushed, or un-PRed changes, or open PRs the session authored ([`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md)).
 - **Run UMS before every pause** if learnings have accumulated, and **run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn;
   answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).

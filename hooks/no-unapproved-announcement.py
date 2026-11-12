@@ -44,8 +44,8 @@ EXT = re.compile(r"[\w./~-]+\.(py|R|r|js|mjs|ts|sh|rb|pl|ps1)$")
 CODE_WRITE = re.compile(r"\b(post|put|edit|update|PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|"
                         r"-X\s*(POST|PUT)|\b(Request|urlopen)\([^)]*\bdata\s*=")
 SELF = (os.path.basename(__file__), "test-no-unapproved-announcement.py")  # this hook and its tests
-COPY = re.compile(r"^def is_announcement_write\(|^SUBJECT\b[^=\n]*= sys\.argv\[1\]", re.M)  # the hook's, or its tests', own lines
-CLIENT = re.compile(r"[rbuRBU]*(['\"])(curl|wget|xh|https?|Invoke-WebRequest|Invoke-RestMethod|POST|PUT|post|put)\1$")
+COPY = ((r"^def is_announcement_write\(", r"^def main\("),  # lines every version of the hook, or of its tests, has
+        (r"^SUBJECT\b[^=\n]*= sys\.argv\[1\]", r"^def run\(tool, inp"))
 HEREDOC = re.compile(r"(<<-?\s*(['\"]?)(\w+)\2[^\n]*)\n.*?\n[ \t]*\3[ \t]*(?=\n|$)", re.S)  # its body is text
 UV_VALUE = ("--with", "--python", "-p", "--from", "--env-file", "--config")  # uv or deno options that take a value
 
@@ -119,7 +119,7 @@ def modules_run(cmd):
 
 
 def code_only(code):
-    """Python code with its comments and string literals blanked, except a literal naming an HTTP client or method.
+    """Python code with its comments and string literals blanked.
 
     The hook and its tests hold write patterns only as literals; None when the code does not tokenize."""
     starts = [0]
@@ -130,7 +130,7 @@ def code_only(code):
                                                    for k in "FT" for p in ("START", "MIDDLE", "END")}
     try:
         for t in tokenize.generate_tokens(io.StringIO(code).readline):
-            if t.type in blank and not CLIENT.match(t.string):
+            if t.type in blank:
                 a, b = starts[t.start[0] - 1] + t.start[1], starts[t.end[0] - 1] + t.end[1]
                 text[a:b] = " " * (b - a)
     except (tokenize.TokenError, SyntaxError):
@@ -159,7 +159,7 @@ def script_writes(cmd, cwd):
             if TOPIC.search(cmd) and name not in imported and not own:
                 return True
             continue
-        if COPY.search(code):  # a copy of this hook or its tests: read only its code
+        if any(all(re.search(p, code, re.M) for p in pair) for pair in COPY):  # a copy of this hook or its tests
             code = code_only(code) or code
         if (ANNOUNCE.search(code) or TOPIC.search(code)) and NET.search(code) and CODE_WRITE.search(code):
             return True

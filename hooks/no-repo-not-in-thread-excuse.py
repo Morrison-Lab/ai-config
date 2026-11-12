@@ -18,27 +18,21 @@ TOOL = re.compile(
 APOS = r"(?:'|\u2019)"
 NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
-       rf"can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
+       rf"hasn{APOS}t|haven{APOS}t|has\s+not|have\s+not|can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
 PLACE = rf"(?:this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
 # The place is the thread itself or its repo list: "lds is not in this thread's queue" passes.
 TARGET = (rf"\s+(?:{PLACE}(?:{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list|scope))?"
           rf"(?![\w'\u2019])|my\s+(?:repos|repositories)\b|the\s+(?:repos|repositories)\s+(?:attached|available|in|for)\b)")
 SUBJ_NEG = re.compile(
-    rf"(?:\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really)\s+)?(?:in|within|part\s+of|among|"
+    rf"(?:\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really|been)\s+){{0,2}}(?:in|on|within|part\s+of|among|one\s+of|"
     rf"(?:attached|added|checked\s+out|cloned|available|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?)"
     rf"|\b(?:outside|unavailable\s+(?:in|from|to)|missing\s+from)){TARGET}", re.I)
 LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b", re.I)
 REPO_LIST = re.compile(
     rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list)\b"
     r"(?![\w'\u2019])(?!\s+(?:checkout|clone|directory|folder|tree|root|branch|files?|of)\b)"
-    r"|\bmy\s+(?:repos|repositories)\b(?!['\u2019])"
-    r"|\bthe\s+(?:repos|repositories)\s+(?:attached|available|in|on|for)\b",
-    re.I)
-LIST_NEG = re.compile(
-    rf"(?:\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:in|on|one\s+of|part\s+of|among|within|available|attached|added|see)"
-    rf"|\b(?:outside|missing\s+from))\s+(?:\S+\s+){{0,4}}?(?:{REPO_LIST.pattern})"
-    rf"|(?:{REPO_LIST.pattern})\s+(?:{NEG})\s+(?:include|includes|have|has|list)\b", re.I)
+    r"|\bmy\s+(?:repos|repositories)\b(?!['\u2019])|\bthe\s+(?:repos|repositories)\s+(?:attached|available|in|on|for)\b", re.I)
 LAB_REPOS = (r"ai-config|gha|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"
              r"ids|dds|vds|ccds|cds|epi\d+|lds-site|mcsg|stats-allowlist|teaching-tools")
 NAMED = re.compile(rf"\b[\w-]{{1,39}}/[\w-]{{1,100}}\b(?![/.]\w)|\b(?:{LAB_REPOS})\b", re.I)
@@ -51,16 +45,20 @@ END = r"(?=\s*(?:[.,;:!?)](?=\s|$)|$|(?:in|on|from|here|to|into|within|checked|c
 ACCESS = r"(?:(?:write|push|read)\s+)?access\s+to\s+"
 OBJECT = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:have|has|include|includes|see)\s+(?:{ACCESS})?{DET}{TOK}{END}"
-    rf"|\b{MODAL}\s+(?:\w+\s+)?(?:reach|access|clone|see)"
-    rf"\s+(?:to\s+|into\s+)?{DET}{TOK}{END}"
+    rf"|\b{MODAL}\s+(?:\w+\s+)?(?:reach|access|clone|see)\s+(?:to\s+|into\s+)?{DET}{TOK}{END}"
     rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
     rf"(?:{ACCESS}{DET}{TOK}|(?:checkout|clone|copy)\s+of\s+{DET}{TOK}"
     rf"|{DET}{TOK}\s+(?:checkout|clone|copy|access|repo|repository)\b)"
     rf"|\black\w*\s+{ACCESS}{DET}{TOK}",
     re.I)
-ATTACH_TOOL = re.compile(r"\b(?:ran|called|used|via)\s+add_repo\b|\badd_repo\s+(?:attached|added|cloned)\b", re.I)
+LIST_NEG = re.compile(
+    rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:see|find)\s+{DET}{TOK}\s+(?:in|among|on)\s+(?:{REPO_LIST.pattern})"
+    rf"|(?:{REPO_LIST.pattern})\s+(?:{NEG})\s+(?:include|includes|have|has|list)\s+{DET}{TOK}", re.I)
+# A sentence about running add_repo reports the attach, unless it is hypothetical.
+ADD_REPO = re.compile(r"\badd_repo\b(?!\s+(?:\w+\s+)?(?:would|will|could|might|may|has|had|returned\s+2\d\d)\b)", re.I)
 ATTACHED = re.compile(
-    rf"\b(?:I|we)(?:{APOS}ve|\s+have|\s+just|\s+then)?\s+(?:just\s+)?(?:added|attached|cloned)\s+(?:(?:the|a|an)\s+)?`?([\w/-]+)", re.I)
+    rf"(?:\b(?:I|we)(?:{APOS}ve)?(?:\s+(?!not\b|never\b)\w+){{0,3}}?\s+|^\s*)(?:added|attached|cloned)\s+(?:(?:the|a|an)\s+)?([\w/-]{{1,140}})\b"
+    r"|(?<![\w/-])([\w/-]{1,140})\s+(?:is|was|has\s+been)\s+(?:now\s+)?(?:attached|added|cloned)\b", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
     r"\b(?:add_repo|attach|attaching)\b(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,2}?"
@@ -68,11 +66,10 @@ TRIED = re.compile(
 
 REASON = (
     '[hook: no-repo-not-in-thread-excuse] "{sentence}" says a repository is not in this '
-    "thread or session. Ezra, 2026-11-12: \"never say a repo isn't in a thread; add it\". "
-    "Call mcp__claude-code-remote__add_repo (load it with ToolSearch "
-    '"select:mcp__claude-code-remote__add_repo"), clone it, do the work, and report it in '
-    "the past tense. If add_repo itself refuses, say so in the same sentence and quote "
-    "its reason. shared/workflow/no-cant-from-session-excuses.md. "
+    "thread or session. Ezra, 2026-11-12: \"never say a repo isn't in a thread; add it\". Call "
+    'mcp__claude-code-remote__add_repo (ToolSearch "select:mcp__claude-code-remote__add_repo"), clone it, '
+    "do the work, and report it in the past tense. If add_repo itself refuses, say so in the same sentence "
+    "and quote its reason. shared/workflow/no-cant-from-session-excuses.md. "
     "Set ALLOW_REPO_NOT_IN_THREAD=1 only when the user asked for this wording."
 )
 
@@ -85,34 +82,39 @@ def message_text(tool_input: dict) -> str:
     return "\n".join(p for p in parts if isinstance(p, str))
 
 
+def norm(name: str) -> str:
+    return name.lower().rsplit("/", 1)[-1]
+
+
 def names_repo(sentence: str, attached: set) -> bool:
-    if not attached and LIST_NEG.search(sentence):
-        return True
     for m in SUBJ_NEG.finditer(sentence):
         window = sentence[max(0, m.start() - 200):m.start()]
         subj = SUBJECT.search(window)
         # "The fix for lds isn't in" names lds as an object, not the subject.
-        tok = subj and subj.group(0).strip(" `'\"\u2019").split()[0].lower()
+        tok = subj and norm(subj.group(0).strip(" `'\"\u2019").split()[0])
         if subj and tok not in attached and not (attached and tok in ("repo", "repository")) and not re.search(r"\b(?:for|to|on|in|of|with|from|about|by)\s+$", window[:subj.start()], re.I):
             return True
-    obj = OBJECT.search(sentence)
-    if not obj:
-        return False
-    return any(g and REPO_NAME.search(g) and g.lower() not in attached for g in obj.groups())
+    for rx in (OBJECT, LIST_NEG):
+        obj = rx.search(sentence)
+        if obj and any(g and REPO_NAME.search(g) and norm(g) not in attached for g in obj.groups()):
+            return True
+    return False
 
 
 def is_excuse(sentence: str) -> bool:
-    sentence = re.sub(r"https?://[^\s)]*", "", sentence)
-    if not LOC.search(sentence):
+    # Read [text](url), **bold** and `code` as their text.
+    sentence = re.sub(r"\[([^\]\[]{0,300})\]\([^)\s]{0,500}\)", r"\1", sentence)
+    sentence = re.sub(r"https?://[^\s)]*|\*\*|`", "", sentence)
+    if not LOC.search(sentence) or ADD_REPO.search(sentence) or TRIED.search(sentence):
         return False
-    if ATTACH_TOOL.search(sentence) or TRIED.search(sentence):
-        return False
-    attached = set()
+    attached, last_it = set(), -1
     for m in ATTACHED.finditer(sentence):
-        obj = m.group(1).lower()
-        # "mlg wasn't in this thread's repos, so I attached it": it is the repo named before.
-        attached |= ({n.group(0).lower() for n in NAMED.finditer(sentence, 0, m.start())}
-                     if obj == "it" else {obj})
+        obj = norm(m.group(1) or m.group(2))
+        if obj in ("it", "repo", "repository"):
+            last_it = m.start()
+        attached.add(obj)
+    # "mlg wasn't in this thread's repos, so I attached it": it is a repo named before.
+    attached |= {norm(n.group(0)) for n in NAMED.finditer(sentence, 0, max(last_it, 0))}
     return names_repo(sentence, {a for a in attached if REPO_NAME.search(a)})
 
 

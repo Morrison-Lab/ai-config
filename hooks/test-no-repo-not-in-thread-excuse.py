@@ -23,7 +23,7 @@ CASES = [
     ("the 2026-11-12 message", COORD, "ai-config isn't in this thread's repos, so could you route that as an issue?", True),
     ("one of", POST, "ai-config isn't one of this thread's repos.", True),
     ("session repo scope", POST, "I can't search mlr because it isn't in this session's repo scope.", True),
-    ("curly apostrophe", POST, "mlr isn’t in this thread’s repositories.", True),
+    ("curly apostrophe", POST, "mlr isn\u2019t in this thread\u2019s repositories.", True),
     ("not attached", POST, "The repo is not attached to this session.", True),
     ("outside scope", POST, "That repository is outside this session's scope.", True),
     ("not available in", POST, "psw is not available in this thread's repos.", True),

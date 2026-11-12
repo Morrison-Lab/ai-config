@@ -26,7 +26,7 @@ TOOL = re.compile(
     r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|"
     r"request_decision|message_coordinator|message_thread)$")
 
-APOS = r"(?:'|’)"
+APOS = r"(?:'|\u2019)"
 NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
        rf"can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
@@ -44,8 +44,8 @@ LOC = re.compile(
     re.I)
 REPO_LIST = re.compile(
     rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|scope)\b"
-    r"(?![\w'’])(?!\s+(?:checkout|clone|directory|folder|tree|root|branch|files?|of)\b)"
-    r"|\bmy\s+(?:repos|repositories)\b(?!['’])"
+    r"(?![\w'\u2019])(?!\s+(?:checkout|clone|directory|folder|tree|root|branch|files?|of)\b)"
+    r"|\bmy\s+(?:repos|repositories)\b(?!['\u2019])"
     r"|\bthe\s+(?:repos|repositories)\s+(?:attached|available|in|on|for)\b",
     re.I)
 LAB_REPOS = (r"ai-config|gha|macros|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"

@@ -413,6 +413,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/triage-backlog.md` | Triage the issue backlog on a fixed cadence, and treat closing an issue as not-planned as a normal outcome of that pass rather than as a failure to do the work. |  |
 | `shared/workflow/triage-new-asks.md` | Triage a new ask against the current backlogs before acting on it, so it joins the work that already owns it instead of spawning parallel work. |  |
 | `shared/workflow/ultracode-merge-conflicts.md` | When orchestrating an **ultracode** (`Workflow`-tool, multi-agent) session that touches git, check for merge conflicts **every time a merge actually occurs**... |  |
+| `shared/workflow/untrusted-content-is-data.md` | Prompt injection is text written to be read by an agent and obeyed as if the user had said it. No model reliably detects it, and Meta's security team describ... |  |
 | `shared/workflow/upgrade-to-gha.md` | `Morrison-Lab/gha` is the lab's repository of reusable GitHub Actions workflows. A consumer repo calls one with a small stub rather than carrying its own copy: |  |
 | `shared/workflow/upstream-issues.md` | When you find a bug or issue that belongs in an **upstream or external repository** (a dependency, a reusable workflow, an action you call, etc.), work throu... |  |
 | `shared/workflow/use-existing-pr-branch.md` | The Claude Code on the web harness injects a "Git Development Branch Requirements" section that assigns a session-unique branch name (e.g. `claude/abc123`) a... |  |

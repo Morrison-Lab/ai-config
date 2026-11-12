@@ -34,23 +34,26 @@ TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 ENVELOPE = {"wake", "project", "thread", "message", "relay", "cited", "note"}  # and every hyphenated tag
 
 
-SCRIPT = re.compile(r"(?:\b(?:python3?|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source)\s+(?:-\S+\s+)*|"
-                    r"(?:^|[\s;&|(])(?=\./))([\w./~-]+)")
+SCRIPT = re.compile(r"(?:\b(?:python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source|uv run)\s+(?:-[^\smc]\S*\s+)*|"
+                    r"(?:^|[\s;&|(])(?=\./))([\w./~-]+\.(?:py|R|r|js|mjs|ts|sh|rb|pl|ps1))\b")
+CODE_WRITE = re.compile(r"\.(post|put|edit|update)\(|\b(PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|-X\s*(POST|PUT)")
 
 
 def script_writes(cmd, cwd):
-    """A script file the command runs posts an announcement, or cannot be read (#5453). Tests are skipped."""
+    """A script file the command runs makes a network topic write, or cannot be read (#5453). test_/test- skipped."""
+    dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in re.findall(r"\bcd\s+([\w./~-]+)", cmd)]
     for name in SCRIPT.findall(cmd):
-        if name.startswith("-") or os.path.basename(name).startswith("test"):
-            continue
+        paths = [p for p in (os.path.join(d, os.path.expanduser(name)) for d in dirs) if os.path.isfile(p)]
+        if re.match(r"test[-_]", os.path.basename(name)) or paths and os.path.samefile(paths[-1], __file__):
+            continue  # a test file, or this hook itself
         try:
-            with open(os.path.join(cwd or ".", os.path.expanduser(name)), encoding="utf-8", errors="ignore") as fh:
+            with open(paths[-1], encoding="utf-8", errors="ignore") as fh:
                 code = fh.read(1 << 20)
-        except OSError:
+        except (IndexError, OSError):
             if TOPIC.search(cmd):
                 return True
             continue
-        if ANNOUNCE.search(code) or TOPIC.search(code) and re.search(r"\b(post|put)\b", code, re.I):
+        if (ANNOUNCE.search(code) or TOPIC.search(code)) and NET.search(code) and CODE_WRITE.search(code):
             return True
     return False
 
@@ -163,7 +166,7 @@ def main() -> int:
     if not hit:
         return 0
     try:
-        why = ("it runs in a subagent, which the user's approval does not reach (#5453)" if payload.get("agent_id")
+        why = ("it runs in a subagent or teammate, which the user's approval does not reach (#5453)" if payload.get("agent_id")
                else verdict(payload.get("transcript_path") or "", tool, inp))
     except Exception as exc:  # a detected write: fail closed
         why = f"the check failed ({exc})"

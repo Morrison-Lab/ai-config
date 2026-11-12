@@ -261,6 +261,7 @@ Read a request for everything it plainly asks, do every safe step it covers, and
 - **Silence is not permission:** an unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask ([`silence-is-not-permission`](shared/principles/silence-is-not-permission.md)).
 - **Default to action without asking:** take non-destructive steps, installs, `add_repo` and posted reviews included, and report them in the past tense.
   Ask only for destructive, high-impact, or blocking decisions, and never hand the owner a step you could do.
+  Never act [irreversibly](shared/workflow/irreversible.md) without the user's direct, explicit word.
   The grant gives no merge authority ([`default-to-action-grants`](shared/workflow/default-to-action-grants.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
   Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
 - **Proactively suggest better alternatives to proposed approaches:** when another path reaches the requested goal more simply, cleanly, or reliably, recommend it ([`proactively-suggest-alternatives`](shared/principles/proactively-suggest-alternatives.md), [`AGENTS.cases.md`](AGENTS.cases.md)).

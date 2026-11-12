@@ -342,6 +342,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/hook-first-push.md` | ai-config#5117 took four pushes because scripts that decide each miss ran only in CI and review (2026-11-08). |  |
 | `shared/workflow/improve-your-subagents.md` | Part of an orchestrator's job is to find ways for its subagents to improve over time. Correcting each output as it arrives keeps the work moving and leaves t... |  |
 | `shared/workflow/incidents-dont-repeal-decisions.md` | When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse. Never just change the behav... |  |
+| `shared/workflow/irreversible.md` | An agent never takes an irreversible action without direct, explicit authorization from the human user (Ezra, 2026-11-11: "agents must never do anything irre... |  |
 | `shared/workflow/issue-first.md` | When starting a **new** piece of work, go **issue-first**: before branching, editing, or opening a PR, make sure a tracking issue exists. Search the tracker... |  |
 | `shared/workflow/iterative-editing.md` | Writing agents do not need to enforce all style guidelines on first draft. They should work iteratively: write a substantively-correct but stylistically loos... |  |
 | `shared/workflow/keep-agent-on-backlog.md` | Keep at least one agent working while any project repo has an open issue backlog. |  |

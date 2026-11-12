@@ -138,6 +138,8 @@ USERS = (
     ("flag-clean-claim-over-findings.py", {
         "_hrp": "no-handrolled-verdict-parse.py", "_rums": "remind-ums-on-scrutiny.py",
         "_nsp": "no-stale-pr-status.py"}),
+    ("block-merge-without-clean-checker.py", {"_SIB_WMWFC": "warn-merge-without-fully-clean.py"}),
+    ("no-ums-deferral-in-stopping-point.py", {"_PARK": "no-park-on-tracked-blocker.py"}),
 )
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "
@@ -193,7 +195,9 @@ GUARDED = {
     "flag-unattributable-reviewer-request.py", "no-push-without-self-review.py",
     "warn-merge-without-cross-harness-review.py", "no-mwc-ask-for-infra-pr.py",
     "no-announced-work-in-post-message.py", "no-interpreter-heredoc.py",
-    "require-ums-before-resolve.py",
+    "require-ums-before-resolve.py", "block-merge-without-clean-checker.py",
+    "no-ums-deferral-in-stopping-point.py", "no-underived-required-check.py",
+    "no-unshipped-commit.py",
 }
 # Deny hooks that stop gating when a sibling is missing, and must say so.
 NOT_GATING = {"block-redo-denied-write-via-other-tool.py", "no-commit-with-conflict-markers.py",
@@ -246,6 +250,12 @@ REQUIRED = (
      "no-announced-start-without-starting.py"),
     ("no-interpreter-heredoc.py", "_load_heredoc_parser", "warn-heredoc-doubled-backslash.py"),
     ("require-ums-before-resolve.py", "_load_ums_hook", "remind-ums-after-error.py"),
+    ("no-underived-required-check.py", "_load_gh_repo_flag_hook", "require-gh-repo-flag.py"),
+)
+# Hooks that load a sibling lazily, fail-open: the loader returns the module,
+# or None after naming the cause on stderr.
+LAZY = (
+    ("no-unshipped-commit.py", "_load_review_guard", "no-push-without-self-review.py"),
 )
 CALL_PROBE = ("import importlib.util as u, sys; "
               "s = u.spec_from_file_location('h', sys.argv[1]); "
@@ -278,8 +288,22 @@ def required_copy(hook_name, fn, sib, with_lib, with_sib):
         shutil.rmtree(bare, ignore_errors=True)
 
 
-check("every GUARDED hook is in USERS or REQUIRED",
-      sorted(GUARDED - {h for h, _ in USERS} - {h for h, _, _ in REQUIRED}), [])
+check("every GUARDED hook is in USERS, REQUIRED or LAZY",
+      sorted(GUARDED - {h for h, _ in USERS} - {h for h, _, _ in REQUIRED + LAZY}), [])
+for hook_name, fn, sib in LAZY:
+    proc = call_probe(HOOKS, hook_name, fn)
+    check(f"{hook_name} {fn}() loads {sib}", (proc.returncode, proc.stdout.strip()),
+          (0, "module"))
+    proc = required_copy(hook_name, fn, sib, with_lib=True, with_sib=False)
+    check(f"missing sibling: {hook_name} {fn}() returns None and names it",
+          (proc.returncode, proc.stdout.strip(), f"cannot load sibling {sib}" in proc.stderr),
+          (0, "NoneType", True))
+    proc = required_copy(hook_name, fn, sib, with_lib=False, with_sib=True)
+    check(f"broken install: {hook_name} {fn}() returns None and names the loader",
+          (proc.returncode, proc.stdout.strip(), "scripts/lib/sibling.py" in proc.stderr),
+          (0, "NoneType", True))
+    with open(os.path.join(HOOKS, hook_name), encoding="utf-8") as fh:
+        check(f"{hook_name} source guards the import", bool(GUARD_RE.search(fh.read())), True)
 for hook_name, fn, sib in REQUIRED:
     proc = call_probe(HOOKS, hook_name, fn)
     check(f"{hook_name} {fn}() loads {sib}", (proc.returncode, proc.stdout.strip()),

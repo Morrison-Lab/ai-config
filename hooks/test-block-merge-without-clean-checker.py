@@ -234,14 +234,10 @@ def main():
     _spec = _ilu.spec_from_file_location("_bm_test", HOOK)
     _mod = _ilu.module_from_spec(_spec)
     _spec.loader.exec_module(_mod)
-    _orig_here = _mod._HERE
-    _mod._HERE = "/nonexistent"
-    _fb = _mod._load_records()
-    _mod._HERE = _orig_here
     _tpath = transcript([checker()])
     try:
-        check("_load_records falls back to raw JSONL reader when sibling is missing",
-              len(list(_fb(_tpath))) == 2)
+        check("the raw JSONL fallback reader yields each record",
+              len(list(_mod._raw_records(_tpath))) == 2)
     finally:
         os.unlink(_tpath)
 

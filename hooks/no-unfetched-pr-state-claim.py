@@ -53,7 +53,6 @@ reworded. Fails OPEN on any parse trouble, including when the sibling module
 it reuses cannot load.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -68,13 +67,9 @@ if _LIB not in sys.path:
 
 try:
     from transcript_meta import is_real_user_turn as _is_user_turn  # ai-config#4983
+    from sibling import load_sibling
 
-    _spec = importlib.util.spec_from_file_location(
-        "no_offer_to_file",
-        os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-offer-to-file.py"),
-    )
-    _offer = importlib.util.module_from_spec(_spec)
-    _spec.loader.exec_module(_offer)
+    _offer = load_sibling(__file__, "no-offer-to-file.py", "no_offer_to_file", required=True)
     last_assistant_text = _offer.last_assistant_text
     sentence_around = _offer.sentence_around
     strip_code = _offer.strip_code

@@ -2,7 +2,7 @@
 
 Audit recent conversation history and assistant turns for forward-looking commitments, debt declarations, and unmonitored automation claims made without an immediate enforcement mechanism shipped in the same turn. Identify what mechanism is owed and implement or file it immediately to clear the debt.
 
-The operational counterpart to [`shared/workflow/no-empty-promises.md`](../../shared/workflow/no-empty-promises.md) and the `AGENTS.md` “No empty promises” rule.
+The operational counterpart to [`shared/workflow/no-empty-promises.md`](../../shared/workflow/no-empty-promises.md) and the “No empty promises” bullet of `AGENTS.md`’s “Leave every pause honest and resumable”.
 
 ## When this fires
 

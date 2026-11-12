@@ -13,5 +13,18 @@ Before reporting any resource as unreachable, try each of these and say which yo
 State a checkable fact only after checking it, never "as I remember".
 If every route fails, report each route and why it failed, never the first failure alone.
 
-Why this is prose and not a hook: whether another route exists cannot be decided from a transcript.
+Never say a repository isn't in a thread or session.
+Attach it instead.
+Ezra, 2026-11-12: "cai: never say a repo isn't in a thread; add it".
+An mds thread had asked the coordinator to file in ai-config because "ai-config isn't in this thread's repos", when one `add_repo` call would have attached it.
+
+- **Do:** call `mcp__claude-code-remote__add_repo`, clone the repository, do the work, and report it in the past tense.
+- **Don't:** tell the user or another session that a repository is outside this thread's repos or scope.
+
+If `add_repo` refuses or is blocked, say so in that sentence or the next and give its reason, quoted where it returned text.
+`hooks/no-repo-not-in-thread-excuse.py` denies a sentence saying a repository is not in, not attached to or outside the thread, the session or its repo list, or that the thread can't reach it.
+It passes a sentence when it or the sentence before or after it reports an attach or a refused attach, and it leaves push, write-access and edit blockers alone.
+[`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#a-repository-called-out-of-the-threads-reach) looks for the same excuse in what it reviews.
+
+The other excuses stay prose: whether another route exists cannot be decided from a transcript.
 The existing guards cover the decidable parts: `flag-blocker-without-retry.py` flags a denial handed to the user with no retry, and `flag-book-unavailable-without-library-search.py` flags a book called unavailable without a library search.

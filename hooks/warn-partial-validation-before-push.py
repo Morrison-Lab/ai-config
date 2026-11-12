@@ -287,7 +287,7 @@ def _commands(record):
 
     Handles the Claude Code shape (`message.content` blocks of `tool_use`) and
     the Antigravity shape (`tool_calls`, whose arguments may arrive as a JSON
-    string), matching `hooks/remind-ums-after-error.py`. CLAUDE.md's
+    string), matching `hooks/remind-ums-after-error.py`. AGENTS.md's
     "Generalize instructions to every AI agent by default" applies: this hook
     branches on `ANTIGRAVITY_AGENT` below, so it must be able to read that
     harness's records.

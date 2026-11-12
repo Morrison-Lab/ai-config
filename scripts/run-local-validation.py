@@ -97,6 +97,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from findbash import probe_bash  # noqa: E402
+
 _REQUIRES_CACHE = {}
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -450,6 +453,28 @@ def load_workflow(path: Path) -> Dict[str, Any]:
     return doc
 
 
+_BASH: Optional[str] = None
+
+
+def bash() -> str:
+    """The bash that runs every step: one that sees this checkout's own paths.
+
+    A bare "bash" on a Windows runner is the WSL launcher, which fails every
+    step with "Windows Subsystem for Linux has no installed distributions",
+    or, with a distribution installed, sees the checkout under /mnt/c
+    (ai-config#3724). So probe: keep the first candidate that can find this
+    script at its native path, and stop with an error when none can.
+    """
+    global _BASH
+    if _BASH is None:
+        found = probe_bash(("-c", 'test -f "$1"', "bash", Path(__file__).resolve().as_posix()))
+        if found is None:
+            sys.exit("error: no bash here can see this checkout's paths; "
+                     "set AI_SESSION_BASH to one that can (Git Bash on Windows)")
+        _BASH = found
+    return _BASH
+
+
 def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None,
              changed_listing: Optional[str] = None) -> int:
     env = dict(os.environ)
@@ -466,7 +491,7 @@ def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[
     env.update(step.env)
     cwd = root / step.cwd if step.cwd else root
     proc = subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", step.command],
+        [bash(), "-e", "-o", "pipefail", "-c", step.command],
         cwd=str(cwd), env=env, timeout=timeout,
     )
     return proc.returncode
@@ -645,7 +670,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 s.note = "availability checked at run time"
             else:
                 if s.requires not in _REQUIRES_CACHE:
-                    proc = subprocess.run(["bash", "-c", s.requires], capture_output=True, text=True)
+                    proc = subprocess.run([bash(), "-c", s.requires], capture_output=True, text=True)
                     _REQUIRES_CACHE[s.requires] = (proc.returncode == 0)
                 if not _REQUIRES_CACHE[s.requires]:
                     skipped = True

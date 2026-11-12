@@ -2357,7 +2357,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-announced-start-without-starting.py\"",
             "timeout": 10,
             "script": "no-announced-start-without-starting.py",
-            "why": "CLAUDE.md 'no empty promises' and the dont-stop-keep-working directive -- blocks a reply that ends by announcing work in the present progressive or immediate future without having begun it. Distinct from no-empty-promise.py, which asks whether a mechanism shipped; a turn that filed an issue and then closed on 'I'll start on it' satisfies that and still never starts. ai-config#5050 -- also reads the text of mcp__hearthbot__post_message, reply and update_message calls (the reply channel in Projects threads, invisible to a text-block reader) and matches 'Next I'm/I'll <verb>' and 'I'm now <verb>ing'; a later non-hearthbot tool call clears the announcement, and a named blocker or wait exempts it."
+            "why": "AGENTS.md 'No empty promises' and the dont-stop-keep-working directive -- blocks a reply that ends by announcing work in the present progressive or immediate future without having begun it. Distinct from no-empty-promise.py, which asks whether a mechanism shipped; a turn that filed an issue and then closed on 'I'll start on it' satisfies that and still never starts. ai-config#5050 -- also reads the text of mcp__hearthbot__post_message, reply and update_message calls (the reply channel in Projects threads, invisible to a text-block reader) and matches 'Next I'm/I'll <verb>' and 'I'm now <verb>ing'; a later non-hearthbot tool call clears the announcement, and a named blocker or wait exempts it."
           },
           {
             "type": "command",

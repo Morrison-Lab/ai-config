@@ -382,7 +382,7 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "_posted by codex (ai agent)": "Codex",
     "_posted by opencode (ai agent)": "OpenCode",
     # Deliberately NOT here: the Claude Code disclosure footer
-    # (`_Posted by Claude Code (AI agent) ...`).  CLAUDE.md's
+    # (`_Posted by Claude Code (AI agent) ...`).  AGENTS.md's
     # "Every comment you post to a forge says an agent posted it" mandates that
     # footer on EVERY agent-posted comment -- claims, status updates, replies,
     # and the in-chat-feedback paraphrases -- not on reviews only.  Admitting it

@@ -75,3 +75,16 @@ That session resumed with two runs at a time, then went back to four, and a seco
 A run resumes from its run id, with completed agents replayed from cache, only while its journal is still on disk.
 The second time, none was, so the four loops were relaunched from their scripts with no record of what they had verified.
 When the tool refused a persisted script path as unreadable, a copy under the scratchpad resumed with the same id.
+
+## Delegation rules for every agent
+
+These rules moved verbatim from `AGENTS.md`'s "Manage quota, including the structural kind" section (ai-config#5310), which keeps a one-sentence summary and links here.
+
+Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
+See [`restructure-for-efficiency`](restructure-for-efficiency.md) and [`merge-queue`](merge-queue.md).
+In a cloud session (no `agy` or Codex), send bulk, mechanical, and review work to OpenCode Go (`delegate-to-opencode`) while Claude quota is low.
+Claude checks every result.
+A reviewer must differ from the author in model and harness.
+Never send student or PHI data.
+Elsewhere follow `memories/delegation.md`.
+Never use a pay-per-use API anywhere (Ezra, 2026-10-17); see that file.

@@ -131,14 +131,8 @@ When a repo you touch uses copy-pasted or outdated CI actions, migrate it to the
 
 ## Manage quota, including the structural kind
 
-Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
-See [`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md) and [`merge-queue`](shared/workflow/merge-queue.md).
-In a cloud session (no `agy` or Codex), send bulk, mechanical, and review work to OpenCode Go (`delegate-to-opencode`) while Claude quota is low.
-Claude checks every result.
-A reviewer must differ from the author in model and harness.
-Never send student or PHI data.
-Elsewhere follow `memories/delegation.md`.
-Never use a pay-per-use API anywhere (Ezra, 2026-10-17); see that file.
+Follow [`manage-quota`](shared/workflow/manage-quota.md#delegation-rules-for-every-agent) for workflow shape and cost.
+It sets which work goes to cheaper models or OpenCode, who checks the results, reviewer independence, data that never leaves, and paid APIs.
 
 ## Keep ai-config and repo checkouts fresh
 
@@ -205,14 +199,8 @@ Use no robot emoji anywhere in the footer, since review parsers can misinterpret
 
 ## File formatting & links
 
-- Use GitHub-style markdown for all responses and documentation.
-- Hyperlink liberally to make it easy for readers to find more information;
-  see [`hyperlink-liberally`](shared/writing/hyperlink-liberally.md).
-- When referencing files or symbols, use relative markdown links or inline code backticks.
-- When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
-- Semantic line breaks everywhere, enforced by CI ([rule](shared/writing/semantic-line-breaks.md)).
-
-- **Don't:** link a `#NNN` a passage is displaying rather than citing, or leave referenced tools, forge items or policies unlinked.
+Follow [`file-formatting-and-links`](shared/writing/file-formatting-and-links.md) for responses and documentation.
+It sets the markdown flavour, when and how to link files, symbols, PRs and issues, and line breaks.
 
 ## Never dispatch a worker on Fable without explicit, specific permission
 

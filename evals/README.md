@@ -23,7 +23,7 @@ claude plugin eval . --ablation with-without --model sonnet --trust-plugin --no-
 - `--case <glob>` takes one glob;
   repeating the flag keeps only the last one, so use a tag or a wider glob to run several cases.
 - Runs use the subscription the CLI is signed in with.
-  Do not wire this into CI with a pay-per-use API key (`AGENTS.md`, "Manage quota").
+  Do not wire this into CI with a pay-per-use API key ([`manage-quota`](../shared/workflow/manage-quota.md#delegation-rules-for-every-agent)).
 
 Output lands in `evals/results/<timestamp>/`, which is git-ignored.
 

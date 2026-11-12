@@ -40,7 +40,8 @@ Never send email for the user; draft it ([`never-send-email`](shared/workflow/ne
 
 ## Graph and display equation defaults
 
-Follow the shared defaults for figures and display math, which include `ggplot2` for analysis figures where it is available or appropriate to add, axes titled in words, a visual wherever one helps a reader, one equation per display line by default, labelled display equations, and the shared semantic macros ([`graph-and-equation-defaults`](shared/writing/graph-and-equation-defaults.md)).
+Follow [`graph-and-equation-defaults`](shared/writing/graph-and-equation-defaults.md) for figures, visuals and display math.
+It sets the plotting library, axis titles and ticks, where to add a visual, equation layout and labels, and the macros all LaTeX math uses.
 
 ## Check external repository guidelines and PR template before filing
 

@@ -52,10 +52,13 @@ that arrives with `stop_hook_active` set exits before the sentinel, so it does
 not use up the admission's one block.
 
 A project thread usually runs the pass and THEN reports the mistake in its
-reply, so UMS work earlier in the same turn (after the last user message)
-discharges an admission too, not only work after it. A Bash redirect or `tee`
+reply, so UMS work earlier in the same turn (after the last real user turn,
+per scripts/lib/transcript_meta.py) discharges an admission too, but only one
+whose own text says it was recorded (`UMS_WORD` or `CITES_RECORD`). A second,
+different mistake admitted after the pass still owes one. A Bash redirect or `tee`
 into a memory, skill or shared path, and a GitHub MCP file write to one,
 count as UMS work, since those are how a cloud session records a learning.
+`sed -i`, `cp` and `mv` into such a path are not recognized.
 
 It stays silent when the pass already happened: a memory/skills/shared write, a
 UMS-mentioning subagent dispatch, or a `ums` invocation recorded LATER in the
@@ -99,6 +102,11 @@ try:
     from agent_notice import stop_notice
 except Exception:
     stop_notice = None
+try:
+    from transcript_meta import is_real_user_turn
+except Exception:  # broken install: no same-turn discharge
+    def is_real_user_turn(entry):  # noqa: D103
+        return False
 
 # Typographic apostrophe, spelled as an escape rather than embedding the
 # glyph, so this file stays pure ASCII per
@@ -364,23 +372,31 @@ def visible_prose(text):
 
 
 # A shell write into a memory, skill or shared path: a redirect or `tee`
-# whose target names one. A bare read (`cat memories/x.md`) is not a write.
+# whose target names one. A bare read (`cat memories/x.md`) is not a write,
+# and neither is an arrow in quoted text (`echo "a -> shared/x"`): quoted
+# strings are blanked first unless they are the redirect's own target, and a
+# `>` after `-`, `=`, `<` or `>` is not a redirect. Other writes (`sed -i`,
+# `cp`, `mv`) are not recognized.
 SHELL_UMS_WRITE = re.compile(
-    r"(?:>>?|\btee\b(?:\s+-a)?)\s*[\"']?[^\s\"'|;&<>]*"
+    r"(?:(?<![-=<>])>>?|\btee\b(?:\s+(?:-a|--append))?)\s*[\"']?[^\s\"'|;&<>]*"
     r"(?:memories?/|MEMORY\.md|CLAUDE\.md|skills/|shared/)",
     re.I,
 )
+_QUOTED_ARG = re.compile(
+    r"((?<![-=<>])>>?\s*|\btee\s+(?:(?:-a|--append)\s+)?)?(\"[^\"]*\"|'[^']*')")
+
+
+def shell_writes_ums_path(command):
+    """True when `command` redirects or tees into a memory, skill or shared path."""
+    bare = _QUOTED_ARG.sub(lambda m: m.group(0) if m.group(1) else " ", command)
+    return bool(SHELL_UMS_WRITE.search(bare))
+# An admitting reply that says where the lesson went.
+CITES_RECORD = re.compile(
+    r"\b(?:recorded|saved|wrote|added|captured)\b[^.\n]{0,80}"
+    r"(?:memor|skill|ai-config|shared/|CLAUDE\.md|AGENTS\.md|fragment)",
+    re.I,
+)
 GITHUB_FILE_WRITES = ("mcp__github__create_or_update_file", "mcp__github__push_files")
-
-
-def _is_user_text(m, blocks):
-    """True for a user record carrying typed text (not a tool result)."""
-    if m.get("type") != "user" and m.get("role") != "user":
-        return False
-    if isinstance(blocks, str):
-        return bool(blocks.strip())
-    return any(isinstance(b, dict) and b.get("type") == "text"
-               and (b.get("text") or "").strip() for b in blocks or [])
 
 
 def records(path):
@@ -400,7 +416,7 @@ def scan(path):
     mistake counts as discharged.
     """
     admit_txt, admit_at, ums_at = None, -1, -1
-    user_at, admit_turn = -1, -1
+    user_at, admit_turn, cites_pass = -1, -1, False
 
     for i, m in enumerate(records(path)):
         # A subagent's own turns are not my outgoing message.
@@ -422,7 +438,7 @@ def scan(path):
 
         is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant"
         blocks = (m.get("message") or {}).get("content") or m.get("content") or []
-        if _is_user_text(m, blocks):
+        if is_real_user_turn(m):
             user_at = i
             continue
         if isinstance(blocks, list):
@@ -468,6 +484,10 @@ def scan(path):
             if hit:
                 admit_txt, admit_at = hit.group(0).strip(), i
                 admit_turn = user_at
+                # Earlier same-turn work discharges only an admission whose
+                # own text says it was recorded, so a second, different
+                # mistake admitted after the pass still owes one.
+                cites_pass = bool(UMS_WORD.search(raw_text) or CITES_RECORD.search(raw_text))
 
         for name, inp in tool_calls:
             if not isinstance(inp, dict):
@@ -511,14 +531,14 @@ def scan(path):
                 blob = " ".join(ums_parts)
             elif name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
                 blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
-                if SHELL_UMS_WRITE.search(blob):
+                if shell_writes_ums_path(blob):
                     ums_at = i
             elif name == "Skill":
                 blob = str(inp.get("skill", ""))
             if blob and UMS_WORD.search(blob):
                 ums_at = i
 
-        if admit_at >= 0 and admit_turn < ums_at < admit_at:
+        if cites_pass and admit_at >= 0 and admit_turn < ums_at < admit_at:
             ums_at = admit_at
 
     return admit_txt, admit_at, ums_at

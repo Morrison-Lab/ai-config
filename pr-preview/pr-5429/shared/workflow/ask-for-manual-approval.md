@@ -7,7 +7,7 @@ read "auto mode" as the equivalent unattended-approval mode there.
 
 When the classifier denies an action the task needs, the user can approve it directly as soon as the session leaves auto mode.
 Leaving auto mode is available whenever the conditions under [When to switch or ask](#when-to-switch-or-ask) hold:
-switch the session yourself where the tool allows,
+switch the session yourself where that section allows it,
 or ask the user to switch.
 Do that before improvising anything else.
 
@@ -51,9 +51,13 @@ Leaving auto mode is safe without a question first only because the user then ap
 Auto mode drops broad allow rules that `default` mode honours ([permission modes](https://code.claude.com/docs/en/permission-modes)), and other routes allow a command with no prompt at all:
 a `permissions.allow` rule in any settings file that applies, a PreToolUse hook that returns an allow decision, a session "always allow" grant, and `--allowedTools`.
 This repository's [`grant-personal-permissions`](../../hooks/grant-personal-permissions.py) hook allows `gh pr merge` that way.
-So never switch modes yourself for a merge, and do not switch for any action one of those routes covers, or where you cannot tell;
-ask the user to switch out of auto mode instead, naming the refused command and its stated reason.
+So never switch modes yourself for a merge.
+Read the settings files and hooks that apply, and do not switch for an action one of them allows, or when they do not let you tell.
+In those cases ask the user to switch out of auto mode instead, naming the refused command and its stated reason.
+A session grant or `--allowedTools` cannot be read from inside the session.
+Only the user can set one, so a rerun it lets through runs on the user's own grant, and that residual risk is accepted.
 Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
+A switch to a lower mode shows no card, so that prompt is the user's only sign of the switch.
 When that tool is not available, ask the user to switch out of auto mode the same way.
 
 A first denial can be a transient misfire (see [`claude-code-hooks`](../../memories/claude-code-hooks.md) on retrying an identical command once).
@@ -64,6 +68,7 @@ A managed-settings `permissions.deny` denial applies in every mode, so report it
 
 For an action outside the hard-prohibited categories that the user has not authorized, do not switch or ask to switch modes.
 Ask the user whether to do it at all, and proceed only on a yes.
+A yes authorizes the action, so a denial after it follows the steps above.
 When no one can answer, record it as a pending decision instead (an `away` session, or a CI or `@claude` run), or report it up the dispatch chain (a dispatched subagent).
 
 ## What to say
@@ -84,7 +89,7 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
 
 ## Do and Don't
 
-- **Do:** on a classifier denial, make the one identical retry, then leave auto mode or report as [When to switch or ask](#when-to-switch-or-ask) says, in the session the classifier denied.
+- **Do:** on a classifier denial, make the one identical retry, then leave auto mode or report as [When to switch or ask](#when-to-switch-or-ask) says, in the session the classifier denied, or, in a dispatched subagent, report it up the dispatch chain.
   (2026-10-22, `apply-all.sh --apply`: two classifier denials, labelled "Modify Shared Resources" then "Auto-Mode Bypass", despite the user's typed "go".
   The user was told to "approve the prompt" when none existed, and was asked "retry?" and "disable auto?" instead of the agent switching the session itself;
   after the user answered `daytb`, the self-switch to `default` let the apply run.)

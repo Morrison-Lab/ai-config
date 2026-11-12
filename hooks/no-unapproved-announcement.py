@@ -23,9 +23,9 @@ except Exception:  # detection still runs; a detected write is then denied
 
 CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
 TOPIC = re.compile(r"discussion(_|%5f)?topic|announcement", re.I)
-ANNOUNCE = re.compile(r"is_announcement|announcement.*\.(edit|update|post|put|create\w*)\(", re.I | re.S)
-NET = re.compile(r"https?://|\b(curl|wget|http|https|requests|urllib|httpx|canvasapi|graphql|canvas\s+api)\b", re.I)
-WRITE = re.compile(r"(-X|--request)[\s=]*(?i:POST|PUT)|(^|\s)(-d|-F|-T|--data|--form|--json|--upload-file)")
+ANNOUNCE = re.compile(r"is_announcement|get_announcements.*\.(edit|update)\(", re.I | re.S)
+NET = re.compile(r"\b(curl|wget|requests|urllib|httpx|canvasapi|graphql|canvas\s+api|Invoke-\w+)\b", re.I)
+WRITE = re.compile(r"(-\w*X|--request|-Method)[\s=]*[\"']?(?i:POST|PUT)|(^|\s)(-d|-F|-T|--data|--form|--json|--upload-file)")
 SAFE_FIRST = {"git", "gh", "grep", "egrep", "rg"}
 COMPOUND = re.compile(r"[;&|`\n<>]|\$\(|\bgh\s+api\b")
 MCP_READ = re.compile(r"^(get|list|search|read|find|fetch|show|count)", re.I)
@@ -36,22 +36,22 @@ TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 
 
 def is_announcement_write(tool, inp):
-    if tool in ("Bash", "Monitor"):
+    if tool in ("Bash", "Monitor", "PowerShell"):
         cmd = inp.get("command") or ""
         first = (cmd.split() or [""])[0].rsplit("/", 1)[-1]
         if first in SAFE_FIRST and not COMPOUND.search(cmd):  # one plain command
             return False
         curl_read = first == "curl" and not WRITE.search(cmd) and not COMPOUND.search(cmd)
-        return bool(CLI.search(cmd) or ANNOUNCE.search(cmd) or (TOPIC.search(cmd) and NET.search(cmd) and not curl_read))
+        return bool(CLI.search(cmd) or ANNOUNCE.search(cmd) or (TOPIC.search(cmd) and (NET.search(cmd) or first in ("http", "https", "xh")) and not curl_read))
     name = tool.lower()
     if not name.startswith("mcp__"):
         return False
     verb = name.split("__")[-1]
-    if ("announc" in verb or "github" not in name and ("discussion" in verb or "topic" in verb)) \
-            and not MCP_READ.search(verb):
+    if ("announc" in verb or "discussion_topic" in verb or "canvas" in name and (
+            "discussion" in verb or "topic" in verb)) and not MCP_READ.search(verb):
         return True
     flat = json.dumps(inp).replace('\\"', '"')
-    return "canvas" in name and bool(TOPIC.search(flat) and re.search(r"is_announcement|\b(POST|PUT)\b", flat, re.I))
+    return bool(TOPIC.search(flat) and re.search(r"is_announcement|\b(POST|PUT)\b", flat, re.I))
 
 
 def user_words(text):
@@ -62,7 +62,8 @@ def user_words(text):
         path = [t for t, _ in stack]
         in_wake = (path[:1] == ["wake"] and path[-1:] == ["message"]
                    and set(path[1:-1]) <= {"project", "thread"})
-        if not stack or (in_wake or path == ["coordinator-relay", "relay", "cited"]) and stack[-1][1]:
+        cited = path[-2:] == ["relay", "cited"] and path[:-2] in ([], ["coordinator-relay"])
+        if not stack or (in_wake or cited) and stack[-1][1]:
             out.append(text[pos:m.start()])
         closing, tag, attrs = m.group(1), m.group(2).lower(), m.group(3)
         if closing:
@@ -84,10 +85,8 @@ def _blocks(entry):
 
 def _user_text(entry):
     att = entry.get("attachment") or {}
-    if att.get("type") == "queued_command":
+    if att.get("type") == "queued_command" and att.get("commandMode") != "task-notification":
         return str(att.get("prompt") or "")
-    if entry.get("type") == "queue-operation" and entry.get("operation") == "enqueue":
-        return str(entry.get("content") or "")
     if is_real_user_turn(entry) and entry.get("promptSource") != "sdk":
         return "\n".join(strip_injected_text(b.get("text") or "")
                          for b in _blocks(entry) if b.get("type") == "text")
@@ -107,8 +106,9 @@ def verdict(path, tool, inp):
     writes = []  # every write since the approval, failed ones included
     for entry in reversed(entries):
         text = _user_text(entry)
-        if text is not None:
-            if not APPROVAL.fullmatch((user_words(text) or [""])[-1]):
+        words = "\n".join(user_words(text)) if text is not None else ""
+        if words.strip():  # a harness note with no user words is skipped
+            if not APPROVAL.fullmatch(words):
                 return "the user's latest message is not only an approval of posting it"
             now = [w for w in writes if w[:2] == [tool, inp] and w[2] not in answered]
             if now:  # the call being judged, logged with no result yet

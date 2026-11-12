@@ -72,7 +72,7 @@ jobs:
                                and (.body // \"\" | contains(\"$marker\")))
                   | \"\(.number) \(.state) \(.state_reason) \(.closed_at)\"" | sed -n 1p)
           read -r number state reason closed <<< "$found"
-          since=$(date -u -d "$LAG_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ)
+          since=$(jq -nr --argjson days "$LAG_DAYS" 'now - $days * 86400 | todate')  # not GNU date -d
           if [ "$state" = "open" ]; then
             gh issue comment "$number" --body-file body.md
             echo "::warning::validate is still slower than the baseline; see #$number"

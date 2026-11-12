@@ -150,7 +150,7 @@ NOTE = (
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
     "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone, unredirected (exit 1); "
-    "opencode needs an attempt (its CLI or the OpenCode Go curl; an Ollama Cloud chat curl is a review too). Then the "
+    "opencode needs an attempt (its CLI or the OpenCode Go curl). An Ollama Cloud chat curl is no attempt: it is itself a qualifying review. Then the "
     "gate is waived and this hook lets the merge through "
     "(Ezra, 2026-10-16; adversarial-self-review.md "
     "'Waiver when no cross-model reviewer can run'). The waiver grants no "

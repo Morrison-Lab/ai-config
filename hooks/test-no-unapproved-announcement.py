@@ -50,7 +50,8 @@ BASH = [
     "python3 -c \"c.get_course(1).create_discussion_topic(is_announcement=True)\"",
     f"node -e \"fetch('{URL}/55', {{method: 'PUT'}})\"", f"python3 -c \"aiohttp.ClientSession().post('{URL}')\"",
     'curl -X POST -d @announcement.json "$URL"', f"Rscript -e 'httr::PUT(\"{URL}/55\")'", f"http {URL} < a.json",
-    "curl -X PUT \"$U\" -F 'm=announcement https://hooks.slack.com/x'", "curl -X POST https://l.edu/api/graphql -d @announcement.json"]
+    "curl -X PUT \"$U\" -F 'm=announcement https://hooks.slack.com/x'", "curl -X POST https://l.edu/api/graphql -d @announcement.json",
+    "python3 -c \"import http.client as h; h.HTTPSConnection('x').request('POST', '/api/v1/courses/1/discussion_topics')\""]
 WRITES = [("Bash", {"command": c}) for c in BASH] + [
     ("Monitor", POST), ("PowerShell", {"command": f"Invoke-RestMethod -Method Put -Uri {URL}/55"}),
     ("mcp__canvas__create_announcement", {"id": 1}), ("mcp__CANVAS__publish_announcement", {}),

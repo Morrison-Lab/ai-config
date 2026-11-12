@@ -1,0 +1,11 @@
+{
+  "_comment": [
+    "The CC Safety Net release hooks/run-cc-safety-net.py runs (ai-config#5317).",
+    "MIT, https://github.com/kenryu42/cc-safety-net. To move the pin, test the",
+    "new release first (see the hook's docstring), then set version and",
+    "integrity together: `npm view cc-safety-net@<version> dist.integrity`."
+  ],
+  "package": "cc-safety-net",
+  "version": "2.7.12",
+  "integrity": "sha512-oVwGaRTFewMNXJO4cRq8VbeUHxX9HZ2s6x1yna60a32/XwtoB4Q0RRNXlBrgUzp/o13wQbrBD1S1trCg/nwV6w=="
+}

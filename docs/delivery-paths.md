@@ -54,7 +54,8 @@ Status as of 2026-11-11.
 ## Leftover paths
 
 Each of these either delivered ai-config before the current path did or duplicates it, and still runs where it was installed.
-Step 3 of #5309 retires them, with a script that reports before it deletes.
+[`scripts/retire-leftover-paths.py`](../scripts/retire-leftover-paths.py) lists the ones on a machine (step 3 of #5309), and with `--retire` then moves each provable leftover into `~/.claude/ai-config-leftovers/` and removes the leftover hook entries from `~/.claude/settings.json`, keeping a copy of the old file.
+It leaves to a person a copy or link it cannot trace to ai-config, a skill that only shares a name, a copy of `shared/`, and `memories/` in any form.
 
 | Leftover | What it does now | Tracking |
 | --- | --- | --- |

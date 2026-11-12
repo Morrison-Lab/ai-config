@@ -580,6 +580,29 @@ for got, desc in mutation_2997:
     wrong += got != "REMIND"
     print(f"  {got:<7} {desc}")
 
-total = len(REMIND) + len(SILENT) + len(seq) + len(mutation) + len(mutation_2997)
+# A cp1252 console must not change the bytes the hook writes (ai-config#1288):
+# the reminder quotes a curly-quoted admission, which cp1252 wrote as 0x92.
+print("\ncp1252 console:")
+fd, cp_path = tempfile.mkstemp(suffix=".jsonl")
+# ensure_ascii=False, so the transcript holds the real character, not an escape.
+with os.fdopen(fd, "w", encoding="utf-8") as fh:
+    fh.write(json.dumps(txt("I should" + chr(0x2019) + "ve verified that first."),
+                        ensure_ascii=False) + "\n")
+cp_dir = tempfile.mkdtemp()
+try:
+    cp = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps({"transcript_path": cp_path}).encode(),
+        capture_output=True, timeout=60,
+        env=dict(os.environ, TMPDIR=cp_dir, PYTHONIOENCODING="cp1252"),
+    )
+finally:
+    os.unlink(cp_path)
+    shutil.rmtree(cp_dir, ignore_errors=True)
+cp_ok = cp.returncode == 0 and chr(0x2019).encode("utf-8") in cp.stdout
+wrong += not cp_ok
+print(f"  {'ok' if cp_ok else 'WRONG':<7} the curly quote reaches stdout as UTF-8")
+
+total = (len(REMIND) + len(SILENT) + len(seq) + len(mutation)
+         + len(mutation_2997) + 1)
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

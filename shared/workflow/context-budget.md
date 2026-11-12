@@ -12,3 +12,13 @@ Only the adversarial reviewer caught it (the `main` figure is reproducible: `wc 
 - **Do:** run `python3 scripts/check-context-closure.py` before committing an `AGENTS.md` addition.
   When it reports the file over the cap, move the detail into a `shared/` fragment and leave a one-line pointer.
 - **Don't:** append a paragraph to `AGENTS.md` without measuring the cap, least of all when the last run reported tight headroom ([ai-config#4214](https://github.com/Morrison-Lab/ai-config/issues/4214)).
+
+**Condensing a rule drops its qualifiers.**
+Measured 2026-11-12 on the [#2889](https://github.com/Morrison-Lab/ai-config/issues/2889) composition: folding six `AGENTS.md` sections into one-sentence bullets dropped eleven qualifiers, found over six review rounds.
+They were two exemptions, an alternative remedy, one of three listed mechanisms, a clock-time report, a do-not-wait clause, two of three triggers, a scope limit, a list of wait cases, and an ordering ("first").
+The removed headings also left ten citations by name in hooks, fragments, a skill and memories.
+Each change tightened or loosened a rule while the bullet still read as the same rule.
+
+- **Do:** before committing a condensed rule, list every clause of the original and point to where the condensed text keeps it, or to the fragment that carries it, and grep the repo for every removed heading's name.
+- **Do:** place a composed section after every section whose terms it uses, and lead each folded rule's bullet with its name in bold, so the SessionStart index in `hooks/inject-core-rules.py` still lists it.
+- **Don't:** condense several rules in one pass and leave the reviewers to find which conditions went missing.

@@ -1566,7 +1566,7 @@ def evaluate(cmd, pr_data):
     if verdict in ("not-clean", "stale"):
         # A standing not-clean (or stale) verdict vetoes merge even
         # alongside a human approval: disagreement among reviews is not
-        # fully clean (CLAUDE.md Strict Merge Control Policy, ai-config#2274).
+        # fully clean (shared/workflow/strict-merge-policy.md, ai-config#2274).
         pass
     elif any(v == "APPROVED" for v in human_states.values()):
         return ALLOW

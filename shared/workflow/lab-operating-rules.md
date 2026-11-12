@@ -76,6 +76,8 @@ The rest are prose because no condition in the transcript can decide them.
 
 - A denied push or tool call: retry once unchanged.
   Never route the change through another session.
+  A dispatched subagent, on a classifier denial, reports the refused command and its stated reason to its caller, and never switches permission modes itself;
+  other sessions follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
   Device consent cards are a security boundary, so use environments already approved.
   Not hookable: a denial is not visible to a hook after the fact.
 

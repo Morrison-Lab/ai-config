@@ -113,11 +113,11 @@ for tool, inp in WRITES:
 os.mkdir(os.path.join(TMP, "sub"))
 for name, code in [("sub/post.py", "import canvasapi\nc.create_discussion_topic(is_announcement=True)"), ("p.R",
                    "httr::PUT(u_topic_announcement)"), ("read.py", "print(canvasapi.get_announcements())"),
-                   ("notes.py", "# post the weekly summary\nprint('announcement')"), ("test-x.py", "is_announcement=True")]:
+                   ("notes.py", "# post the weekly summary\nprint('announcement')"), ("test-x.py", "is_announcement=True"), ("copy.py", open(SUBJECT).read())]:
     with open(os.path.join(TMP, name), "w", encoding="utf-8") as fh:
         fh.write(code)
 SCRIPTS = {"python3 sub/post.py": "deny", "cd sub && python3 post.py": "deny", "python3.12 sub/post.py": "deny",
-           "Rscript p.R": "deny", "python3 read.py": None, "python3 notes.py": None, "python3 test-x.py": None,
+           "Rscript p.R": "deny", "python3 read.py": None, "python3 notes.py": None, "python3 test-x.py": None, "python3 copy.py": None,
            "python3 gone/announcement.py": "deny", "python3 -m pytest -k announcement": None, "python3 -c 'print(1)'": None}
 for c, want in SCRIPTS.items():
     assert run("Bash", {"command": c}, user("hello"), cwd=TMP) == want, c

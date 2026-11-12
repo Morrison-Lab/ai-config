@@ -41,17 +41,20 @@ CODE_WRITE = re.compile(r"\.(post|put|edit|update)\(|\b(PUT|POST)\(|create_discu
 
 def script_writes(cmd, cwd):
     """A script file the command runs makes a network topic write, or cannot be read (#5453). test_/test- skipped."""
-    dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in re.findall(r"\bcd\s+([\w./~-]+)", cmd)]
+    cds = [os.path.expanduser(d) for d in re.findall(r"\bcd\s+([\w./~-]+)", cmd)]
+    dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in cds]
     for name in SCRIPT.findall(cmd):
         paths = [p for p in (os.path.join(d, os.path.expanduser(name)) for d in dirs) if os.path.isfile(p)]
-        if re.match(r"test[-_]", os.path.basename(name)) or paths and os.path.samefile(paths[-1], __file__):
-            continue  # a test file, or this hook itself
+        if re.match(r"test[-_]", os.path.basename(name)):
+            continue
         try:
             with open(paths[-1], encoding="utf-8", errors="ignore") as fh:
                 code = fh.read(1 << 20)
         except (IndexError, OSError):
             if TOPIC.search(cmd):
                 return True
+            continue
+        if code.startswith(__doc__[:40], code.find('"""') + 3):  # any copy of this hook
             continue
         if (ANNOUNCE.search(code) or TOPIC.search(code)) and NET.search(code) and CODE_WRITE.search(code):
             return True

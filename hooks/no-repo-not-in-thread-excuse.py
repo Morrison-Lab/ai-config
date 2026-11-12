@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 """PreToolUse: never say a repository isn't in this thread; attach it.
 
-Ezra, 2026-11-12: "cai: never say a repo isn't in a thread; add it" (see
-no-cant-from-session-excuses.md). Denies a hearthbot sentence that places a
-repository out of this thread, session or "here": the thread's repo list, or
-a repo word, owner/name or lab repo name as subject of "isn't in" and the
-like or object of "doesn't have" or "can't push to". A path or code span
-alone does not count. A report that I or we attached the one repository
-named passes, as does a reported add_repo or attach refusal or failure.
-A deny because the shape is lexical (ai-config#4741).
-`ALLOW_REPO_NOT_IN_THREAD=1` overrides. Fails open on any parse trouble.
+Ezra, 2026-11-12: "cai: never say a repo isn't in a thread; add it". The rule,
+its scope and its exemptions are in shared/workflow/no-cant-from-session-excuses.md
+and this hook's hooks.json "why". A deny because the shape is lexical
+(ai-config#4741). `ALLOW_REPO_NOT_IN_THREAD=1` overrides. Fails open on parse trouble.
 """
 import json
 import os
@@ -25,12 +20,14 @@ NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
        rf"can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
+# Every presence word must lead to a place: "lds is not available offline" passes.
+AHEAD = r"(?=\s+(?:this|the|my|our|that|current|any)\b)"
 SUBJ_NEG = re.compile(
-    rf"\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really)\s+)?"
-    r"(?:(?:in|within)(?=\s+(?:this|the|my|our|that|current|any)\b)|part\s+of|attached|among|one\s+of|"
-    r"available|accessible|reachable|checked\s+out|cloned|added)\b|\b(?:outside|unavailable|missing\s+from)\b", re.I)
+    rf"\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really)\s+)?(?:in|within|part\s+of|among|"
+    rf"(?:attached|added|checked\s+out|cloned|available|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?){AHEAD}"
+    rf"|\b(?:outside|unavailable\s+(?:in|from|to)|missing\s+from){AHEAD}", re.I)
 PLACE = rf"(?:this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
-LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b|\bhere\b", re.I)
+LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b", re.I)
 REPO_LIST = re.compile(
     rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list)\b"
     r"(?![\w'\u2019])(?!\s+(?:checkout|clone|directory|folder|tree|root|branch|files?|of)\b)"
@@ -49,11 +46,10 @@ SUBJECT = re.compile(rf"(?:{REPO_NAME.pattern})[\s`'\"\u2019]*(?:(?:is|are|was|w
 # The object must end its phrase: "I don't have the lds preview URL" passes.
 DET = r"(?:(?:the|a|an|that|this|any)\s+)?"
 TOK = r"`?([\w-]{1,39}(?:/[\w-]{1,100})?)`?"
-END = r"(?=\s*(?:[.,;:!?)]|$|(?:in|on|from|here|to|into|within|checked|cloned|attached|repo|repository)\b))"
+END = r"(?=\s*(?:[.,;:!?)](?=\s|$)|$|(?:in|on|from|here|to|into|within|checked|cloned|attached|repo|repository)\b))"
 ACCESS = r"(?:(?:write|push|read)\s+)?access\s+to\s+"
 OBJECT = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:have|has|include|includes|see)\s+(?:{ACCESS})?{DET}{TOK}{END}"
-    # Action verbs need a can't: "I did not push to lds in this session" passes.
     rf"|\b{MODAL}\s+(?:\w+\s+)?(?:reach|access|push|edit|write|commit|clone|modify|open\s+a\s+PR\s+(?:on|in|against))"
     rf"\s+(?:to\s+|into\s+)?{DET}{TOK}{END}"
     rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
@@ -61,8 +57,10 @@ OBJECT = re.compile(
     rf"|{DET}{TOK}\s+(?:checkout|clone|copy|access|repo|repository)\b)"
     rf"|\black\w*\s+{ACCESS}{DET}{TOK}",
     re.I)
+ATTACH_TOOL = re.compile(r"\b(?:ran|called|used|via)\s+add_repo\b|\badd_repo\s+(?:attached|added|cloned)\b", re.I)
+CAUSE = re.compile(r"\b(?:because|until|while|since|unless|denied|blocked|protected|flagged)\b|[:(]", re.I)
 ATTACHED = re.compile(
-    rf"\b(?:I|we)\s+(?:have\s+|{APOS}ve\s+|just\s+|then\s+)?(?:added|attached|cloned)\s+(?:(?:the|a|an)\s+)?`?([\w/-]+)", re.I)
+    rf"\b(?:I|we)(?:{APOS}ve|\s+have|\s+just|\s+then)?\s+(?:just\s+)?(?:added|attached|cloned)\s+(?:(?:the|a|an)\s+)?`?([\w/-]+)", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
     r"\b(?:add_repo|attach|attaching)\b(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,2}?"
@@ -99,14 +97,20 @@ def names_repo(sentence: str) -> bool:
     obj = OBJECT.search(sentence)
     if not obj:
         return False
+    # "I can't push to lds from this session because the branch is protected" is a blocker.
+    if obj.group(2) and CAUSE.search(sentence, obj.end()):
+        return False
     return any(g and REPO_NAME.search(g) for g in obj.groups())
 
 
 def is_excuse(sentence: str) -> bool:
+    sentence = re.sub(r"https?://[^\s)]*", "", sentence)
     if not LOC.search(sentence):
         return False
     att = ATTACHED.search(sentence)
     named = {m.group(0).lower() for m in NAMED.finditer(sentence)}
+    if ATTACH_TOOL.search(sentence) and len(named) <= 1:
+        return False
     obj = att and att.group(1).lower()
     if obj == "it" and len(named) == 1:
         obj = next(iter(named))

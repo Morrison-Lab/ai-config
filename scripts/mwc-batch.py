@@ -29,7 +29,14 @@ schedule and posts the report.
 
 The infra test is `scripts/merge-infra-pr`'s own: the infra repository list
 is read from that script and the path list from
-`hooks/no-unauthorized-merge.py`, so the two cannot drift apart.
+`hooks/no-unauthorized-merge.py`, and a renamed file's previous path counts
+too. Both are read from the checkout this script runs from, while
+merge-infra-pr reads a fresh clone of `main`, so run it from an up-to-date
+`main` checkout or the two can classify differently.
+
+The checker runs with only the flags given here. merge-infra-pr passes
+`--reviewer-out-of-quota agy`, so pass the same `--reviewer-out-of-quota`
+while agy is out of quota; without it the sweep is the stricter of the two.
 
 Exit codes: 0 report printed; 2 called wrong or a GitHub read failed.
 """
@@ -143,9 +150,10 @@ def checker_reasons(output: str) -> tuple[list[str], list[str]]:
     return reasons[:MAX_REASONS], unread
 
 
-def run_checker(repo: str, number: int, annotations_read: str) -> tuple[bool, list[str], list[str]]:
+def run_checker(repo: str, number: int, annotations_read: str,
+        extra_args: list[str]) -> tuple[bool, list[str], list[str]]:
     """(clean, reasons, unread annotation run ids) for one PR."""
-    command = [sys.executable, str(CHECKER), str(number), "-R", repo]
+    command = [sys.executable, str(CHECKER), str(number), "-R", repo, *extra_args]
     if annotations_read:
         command += ["--annotations-read", annotations_read]
     proc = subprocess.run(command, capture_output=True, text=True, check=False)
@@ -171,7 +179,18 @@ def parse_annotations_read(values: list[str]) -> dict[str, str]:
     return parsed
 
 
-def sweep_repo(repo: str, repos: set[str], patterns, annotations_read: dict[str, str]) -> tuple[list[dict], int]:
+def pr_paths(repo: str, number: int) -> list[str]:
+    """Every path a PR changes, plus each renamed file's previous path."""
+    paths = []
+    for f in gh_list(f"repos/{repo}/pulls/{number}/files?per_page=100"):
+        paths.append(f["filename"])
+        if f.get("previous_filename"):
+            paths.append(f["previous_filename"])
+    return paths
+
+
+def sweep_repo(repo: str, repos: set[str], patterns, annotations_read: dict[str, str],
+        extra_args: list[str]) -> tuple[list[dict], int]:
     """(one result per open non-draft PR, number of drafts skipped)."""
     owner_repo = repo.split("/")
     if len(owner_repo) != 2 or not all(owner_repo):
@@ -194,7 +213,8 @@ def sweep_repo(repo: str, repos: set[str], patterns, annotations_read: dict[str,
         if state != "green":
             results.append({**row, "status": "waiting", "reasons": [f"CI {state}"]})
             continue
-        clean, reasons, unread = run_checker(repo, number, annotations_read.get(f"{name}#{number}", ""))
+        clean, reasons, unread = run_checker(
+            repo, number, annotations_read.get(f"{name}#{number}", ""), extra_args)
         if unread:
             reasons.append(
                 f"{len(unread)} check run(s) with unread annotations: read them with "
@@ -203,7 +223,7 @@ def sweep_repo(repo: str, repos: set[str], patterns, annotations_read: dict[str,
         if not clean:
             results.append({**row, "status": "not clean", "reasons": reasons})
             continue
-        files = [f["filename"] for f in gh_list(f"repos/{repo}/pulls/{number}/files?per_page=100")]
+        files = pr_paths(repo, number)
         results.append({**row, "status": scope(name, files, repos, patterns), "reasons": []})
     return results, drafts
 
@@ -239,13 +259,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Repeatable. Passed to the checker for that PR as --annotations-read "
              "IDS, only after those runs' annotations were read and fixed or "
              "explained (IDS is ID[,ID...] or all).")
+    parser.add_argument(
+        "--reviewer-out-of-quota", action="append", default=[], metavar="NAME",
+        help="Repeatable. Passed to the checker for every PR, as merge-infra-pr "
+             "passes `agy`.")
     args = parser.parse_args(argv)
     annotations_read = parse_annotations_read(args.annotations_read)
+    extra_args = [arg for name in args.reviewer_out_of_quota
+                  for arg in ("--reviewer-out-of-quota", name)]
     repos = infra_repos(MERGE_INFRA_PR.read_text(encoding="utf-8"))
     patterns = infra_patterns()
     results, drafts = [], 0
     for repo in args.repos:
-        repo_results, repo_drafts = sweep_repo(repo, repos, patterns, annotations_read)
+        repo_results, repo_drafts = sweep_repo(repo, repos, patterns, annotations_read, extra_args)
         results.extend(repo_results)
         drafts += repo_drafts
     print(render(results, args.repos, drafts))

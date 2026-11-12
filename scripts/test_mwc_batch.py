@@ -74,6 +74,16 @@ def test_scope_no_files_is_content(patterns):
     assert mwc_batch.scope("lds", [], {"gha"}, patterns) == "content"
 
 
+def test_pr_paths_include_rename_source(monkeypatch, patterns):
+    # A content file renamed into an infra-looking path stays content, as in
+    # merge-infra-pr, which checks previous_filename too.
+    monkeypatch.setattr(mwc_batch, "gh_list", lambda path: [
+        {"filename": ".github/x.yml", "previous_filename": "chapters/x.qmd"}])
+    paths = mwc_batch.pr_paths("Morrison-Lab/lds", 1)
+    assert paths == [".github/x.yml", "chapters/x.qmd"]
+    assert mwc_batch.scope("lds", paths, {"gha"}, patterns) == "content"
+
+
 CHECKER_OUTPUT = """\
 Some heading
   - Check run 'page-banners' passed but carries 1 annotation(s) not yet read: run `gh api repos/Morrison-Lab/sds/check-runs/131542553930/annotations` (for many runs, ...)

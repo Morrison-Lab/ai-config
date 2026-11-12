@@ -33,20 +33,23 @@ def transcript(steps):
     """One assistant tool_use record + one user tool_result record per step."""
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
-        for i, s in enumerate(steps):
-            tid = f"toolu_{i}"
+        for i, entry in enumerate(steps):
+            # A list is parallel tool calls: one assistant record holds them all.
+            group = entry if isinstance(entry, list) else [entry]
+            tids = [f"toolu_{i}_{j}" for j in range(len(group))]
             fh.write(json.dumps({
-                "type": "assistant", "isSidechain": s["sidechain"],
-                "message": {"content": [{"type": "tool_use", "id": tid,
-                                         "name": s["tool"],
-                                         "input": s["input"]}]},
+                "type": "assistant", "isSidechain": group[0]["sidechain"],
+                "message": {"content": [
+                    {"type": "tool_use", "id": tid, "name": s["tool"],
+                     "input": s["input"]} for tid, s in zip(tids, group)]},
             }) + "\n")
             fh.write(json.dumps({
-                "type": "user", **s.get("rec", {}),
+                "type": "user", **group[0].get("rec", {}),
                 "message": {"content": [{
                     "type": "tool_result", "tool_use_id": tid,
                     "is_error": s["is_error"],
-                    "content": [{"type": "text", "text": s["out"]}]}]},
+                    "content": [{"type": "text", "text": s["out"]}]}
+                    for tid, s in zip(tids, group)]},
             }) + "\n")
     return path
 
@@ -102,6 +105,16 @@ def main():
           run(MERGE, [AGENT])[0])
     check("warns when the cross-harness run predates the last push",
           run(MERGE, [CODEX, PUSH])[0])
+    # ai-config#5382: parallel calls in one record run in no known order.
+    check("warns when the review ran in parallel with a Bash push",
+          run(MERGE, [[CODEX, PUSH]])[0] and run(MERGE, [[PUSH, CODEX]])[0])
+    check("warns when the review ran in parallel with an MCP push",
+          run(MERGE, [[CODEX, step("", tool="mcp__github__push_files",
+                                   tool_input={})]])[0])
+    check("silent when a later review follows a parallel push and review",
+          not run(MERGE, [[CODEX, PUSH], CODEX])[0])
+    check("silent when the review runs in parallel with an unrelated call",
+          not run(MERGE, [PUSH, [CODEX, step("git status")]])[0])
     check("warns when the last push was an MCP push tool",
           run(MERGE, [CODEX, step("", tool="mcp__github__push_files",
                                   tool_input={})])[0])

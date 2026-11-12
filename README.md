@@ -157,14 +157,14 @@ generic CLI fallback). The sync script above renders the full reference at
 instead of duplicating its table.
 Edit the `.yml`, then rerun the script — CI fails if either output is stale.
 
-A handful of the highest-traffic skills (`ard`, `ardi`, `claim-pr`,
-`pr-status`) go a step further and name the operation token inline next to the
-concrete command (e.g. `` gh pr comment <N> ... # COMMENT_PR ``), so a
-non-Claude wrapper can resolve by token instead of pattern-matching the `gh`
-command. This is a pilot (ai-config#195) — the rest of the corpus still names
-only concrete commands. `scripts/validate-skills.py` lints every such token
-against the registry, so a typo'd token fails CI instead of silently not
-resolving for other models.
+Many skills go a step further and name the operation token inline next to the concrete command
+(e.g. `` gh pr comment <N> ... # COMMENT_PR ``),
+so a non-Claude wrapper can resolve by token instead of pattern-matching the `gh` command.
+This started as a pilot in four skills (`ard`, `ardi`, `claim-pr`, `pr-status`; ai-config#195)
+and is being extended to the rest of the corpus (ai-config#416);
+skills not yet converted name only concrete commands.
+`scripts/validate-skills.py` lints every such token against the registry,
+so a typo'd token fails CI instead of silently not resolving for other models.
 
 ## Claude Code on the web
 

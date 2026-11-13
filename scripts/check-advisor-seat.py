@@ -29,7 +29,7 @@ import sys
 REFUSED_ENGINE_WORD = "codex"
 
 # Effort values that name no level, so passing one is inheriting.
-INHERITED_EFFORTS = {"default", "inherit", "inherited", "auto", "none"}
+INHERITED_EFFORTS = {"default", "inherit", "inherited", "auto", "unset", "-"}
 
 # Model-name prefixes mapped to the family that trained the model. A prefix
 # matches the start of a name segment (split on `/`, `:` and `.`) and must be
@@ -75,16 +75,25 @@ def _matches(segment: str, prefix: str) -> bool:
 def family(model: str, prefixes=None) -> str:
     """Return the family of a model name, or raise Refusal if it is unknown.
 
-    Segments are tried from the last one back, so `bedrock/us.anthropic.
-    claude-opus` resolves on `claude-opus`. An unknown name fails closed:
-    guessing its family could seat a same-family model as independent.
+    Every segment is classified, so `bedrock/us.anthropic.claude-opus`
+    resolves on `claude-opus`. Segments naming two families make the name
+    ambiguous, and an unknown name fails closed: guessing either could seat a
+    same-family model as independent.
     """
     table = FAMILY_PREFIXES if prefixes is None else prefixes
     segments = re.split(r"[/:.]", model.strip().lower())
-    for segment in reversed(segments):
-        for prefix, fam in table.items():
-            if _matches(segment, prefix):
-                return fam
+    found = {
+        fam
+        for segment in segments
+        for prefix, fam in table.items()
+        if _matches(segment, prefix)
+    }
+    if len(found) > 1:
+        raise Refusal(
+            f"{model!r} names more than one family ({', '.join(sorted(found))})"
+        )
+    if found:
+        return found.pop()
     raise Refusal(
         f"unknown model family for {model!r}; pass --family PREFIX=FAMILY "
         "or add the prefix to FAMILY_PREFIXES in scripts/check-advisor-seat.py"
@@ -92,7 +101,8 @@ def family(model: str, prefixes=None) -> str:
 
 
 def _bare(model: str) -> str:
-    return re.split(r"[/:]", model.strip().lower())[-1]
+    """Drop a `provider/` path and a `:tag` suffix such as `:free`."""
+    return model.strip().lower().rsplit("/", 1)[-1].split(":", 1)[0]
 
 
 def same_model(requested: str, reported: str) -> bool:

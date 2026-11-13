@@ -49,6 +49,11 @@ class FamilyTest(unittest.TestCase):
         with self.assertRaises(seat.Refusal):
             seat.family("o3x")
 
+    def test_two_families_in_one_name_refused(self):
+        for name in ("kimi-k3.claude-haiku", "gpt-5.claude"):
+            with self.assertRaises(seat.Refusal):
+                seat.family(name)
+
     def test_unknown_family_fails_closed(self):
         with self.assertRaises(seat.Refusal):
             seat.family("mystery-model-1")
@@ -58,6 +63,7 @@ class SameModelTest(unittest.TestCase):
     def test_dated_snapshot_matches(self):
         self.assertTrue(seat.same_model("gpt-5", "gpt-5-2025-08-07"))
         self.assertTrue(seat.same_model("kimi-k3", "opencode/Kimi-K3"))
+        self.assertTrue(seat.same_model("kimi-k3", "kimi-k3:free"))
 
     def test_sibling_model_does_not_match(self):
         self.assertFalse(seat.same_model("gpt-5", "gpt-5-mini"))
@@ -89,6 +95,18 @@ class MainTest(unittest.TestCase):
             code, _, err = run(argv(engine=engine))
             self.assertEqual(code, 2, engine)
             self.assertIn("never an advisor seat", err)
+        for engine in ("opencode", "agy"):
+            self.assertEqual(run(argv(engine=engine))[0], 0, engine)
+
+    def test_reported_snapshot_passes_through_main(self):
+        args = argv("claude-opus-5-5", "opencode", "gpt-5", "high",
+                    "--reported-model", "gpt-5-2025-08-07")
+        self.assertEqual(run(args), (0, "independent", ""))
+
+    def test_family_option_overrides_a_builtin(self):
+        args = argv("claude-opus-5-5", "opencode", "kimi-k3", "high",
+                    "--family", "kimi=anthropic")
+        self.assertEqual(run(args)[0], 2)
 
     def test_inherited_effort_refused(self):
         for effort in (" ", "default", "Inherit", "auto"):

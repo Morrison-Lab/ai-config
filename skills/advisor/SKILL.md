@@ -81,7 +81,7 @@ Run it before the call, and again after with `--reported-model` set to the model
 python3 scripts/check-advisor-seat.py --caller-model <caller> --engine <engine> --model <model> --effort <effort>
 ```
 
-It exits 2 on a same-family seat, an engine whose name contains `codex`, an effort that names no level (blank, `default`, `inherit`, `auto`), an unknown model family, or a reply from a model other than the one requested or its dated snapshot.
+It exits 2 on a same-family seat, an engine whose name contains `codex`, an effort that names no level (blank, or one of `INHERITED_EFFORTS` such as `default`), a model name that is unknown or names two families, or a reply from a model other than the one requested or its dated snapshot.
 `--allow-same-family` accepts a same-family seat and prints it as weaker, and `--family PREFIX=FAMILY` classifies a model the built-in table does not know.
 
 ### 5. Treat the answer as evidence

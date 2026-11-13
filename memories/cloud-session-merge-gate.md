@@ -139,7 +139,7 @@ Learned on [ai-config#5023](https://github.com/Morrison-Lab/ai-config/pull/5023)
 - Start a Remote Control session on the Mac (`start_remote_control`, read-only brief) to run `agy` on `gh pr diff N -R O/R`.
   Ask for it in parallel with the fully-clean checker, not after, because Ezra must approve the card.
 - Run `check-pr-fully-clean.py` as its own Bash call, with no `&&` and no pipe.
-  Pass `--annotations-read=all` after `-R` only once you have read every listed annotation and posted an "Annotations reviewed" comment.
+  Pass `--annotations-read=all` after `-R` only once you have read every listed annotation and posted a comment beginning `Annotation dispositions for head <sha7>:`, which the checker requires (ai-config#4893).
   The merge hook does not credit a compound or piped run.
 - `validate` runs twice on one head (pull_request and push events), and the checker blocks until both finish.
 

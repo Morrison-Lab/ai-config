@@ -1012,7 +1012,8 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
             # A passing conclusion hides warning and notice annotations
             # (ai-config#4892). Reading them is part of "clean": fix each, or
             # say in the PR why it is a false positive, then pass the run id
-            # to --annotations-read.
+            # to --annotations-read. The PR comment is enforced below
+            # (ai-config#4893).
             issues.append(
                 f"Check run '{name}'{where} passed but carries "
                 f"{cr['annotations_count']} annotation(s) not yet read: run "
@@ -1043,7 +1044,61 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     unread = sum("annotation(s) not yet read" in i for i in issues)
     if unread > UNREAD_RUNS_BUDGET_THRESHOLD:
         issues.append(_core_budget_note(unread, repo, sha))
+    marked_read = [
+        cr for cr in check_runs
+        if cr.get("status") == "completed"
+        and cr.get("conclusion") in ("success", "neutral", "skipped")
+        and cr.get("annotations_count")
+        and ("all" in _ANNOTATIONS_READ or cr.get("id") in _ANNOTATIONS_READ)]
+    if marked_read and not _has_disposition_comment(pr):
+        issues.append(_missing_disposition_issue(len(marked_read), sha))
     return all(i.startswith("NOTE: ") for i in issues), issues
+
+
+# The marker a disposition comment opens with (ai-config#4893).
+DISPOSITION_MARKER = "Annotation dispositions for head"
+
+
+def _has_disposition_comment(pr) -> bool:
+    """True when a PR comment records the head's annotation dispositions.
+
+    `--annotations-read` alone is the agent's word that it read the
+    annotations; nothing showed what it concluded. On Morrison-Lab/mds#770 a
+    `check-restated-results` warning was judged a false positive and merged
+    with the reason written nowhere (ai-config#4893). The comment must name
+    this head (its first 7 characters) after the marker, and must be newer
+    than the head commit, so a disposition of an earlier head never counts.
+    """
+    sha7 = (pr.head_sha or "")[:7].lower()
+    head_date = pr.commit_date or ""
+    # Fail closed: without the head's date, no comment can be shown newer.
+    if not sha7 or not head_date:
+        return False
+    opening = f"{DISPOSITION_MARKER} {sha7}"
+    for comment in pr.get_comments():
+        # The comment must BEGIN with the marker and this head: a quote of it
+        # inside some other comment (a review, this checker's own message) is
+        # no record. Leading blank lines are allowed.
+        body = (comment.body or "").lstrip()
+        if not body.lower().startswith(opening.lower()):
+            continue
+        # ISO 8601 UTC timestamps from one API compare correctly as strings;
+        # "newer" is strict, so a comment stamped with the head's own second
+        # does not count.
+        if (comment.created_at or "") <= head_date:
+            continue
+        return True
+    return False
+
+
+def _missing_disposition_issue(count: int, sha: str) -> str:
+    return (
+        f"{count} passing run(s) with annotations were marked read by "
+        "--annotations-read, but no PR comment newer than the head commit "
+        "records what was done about them: post a comment beginning "
+        f"`{DISPOSITION_MARKER} {sha[:7]}:` that names each warning or "
+        "failure annotation as fixed or as a false positive, with the reason, "
+        "and may group routine notices, then rerun (ai-config#4893)")
 
 
 # Above this many unread annotation runs, name the shared core budget (ai-config#5045).

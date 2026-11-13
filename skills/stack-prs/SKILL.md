@@ -86,9 +86,10 @@ When both branches already exist, decide overlap mechanically: merge the depende
 git merge-tree --write-tree --merge-base=origin/<base-branch> origin/main origin/<dependent-branch>
 ```
 
-Exit 0 means overlap does not justify the stack;
-check Test A's code half, then branch from `main` (or re-point an existing stack there).
-In the [mds#728](https://github.com/Morrison-Lab/mds/issues/728) exercise stack (2026-11-12) a 6-PR chain stacked on an unrelated 4-PR chain passed this test, and the stack held all 6 behind the 4 ([ai-config#5605](https://github.com/Morrison-Lab/ai-config/issues/5605)).
+Exit 0 means overlap does not justify the stack.
+Unless Test A shows a dependency, branch from `main` (or re-point an existing stack there).
+In the [mds#728](https://github.com/Morrison-Lab/mds/issues/728) exercise stack (2026-11-12), a 6-PR chain was stacked on an unrelated 4-PR chain although this command exited 0 for it.
+The stack held all 6 behind the 4 for no reason ([ai-config#5605](https://github.com/Morrison-Lab/ai-config/issues/5605)).
 
 ### Neither test passes → branch from `main`
 

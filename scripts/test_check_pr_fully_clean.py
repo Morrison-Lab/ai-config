@@ -10584,6 +10584,12 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         same_ok, _ = checker.check_ci_runs(
             "sha1234abc", TEST_REPO, comments=same, commit_date=head_date)
         check("a disposition comment stamped with the head's own time does not count", not same_ok)
+        undated_ok, _ = checker.check_ci_runs("sha1234abc", TEST_REPO, comments=dispo)
+        check("with no head commit date, no disposition comment counts (fail closed)", not undated_ok)
+        glued = [dict(dispo[0], body="Annotation dispositions for headsha1234: ok")]
+        glued_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=glued, commit_date=head_date)
+        check("the sha must follow the marker after one space", not glued_ok)
         checker._ANNOTATIONS_READ.discard(77)
         checker._ANNOTATIONS_READ.add("all")
         all_ok, _ = checker.check_ci_runs(

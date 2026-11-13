@@ -1070,21 +1070,22 @@ def _has_disposition_comment(pr) -> bool:
     than the head commit, so a disposition of an earlier head never counts.
     """
     sha7 = (pr.head_sha or "")[:7].lower()
-    if not sha7:
-        return False
     head_date = pr.commit_date or ""
+    # Fail closed: without the head's date, no comment can be shown newer.
+    if not sha7 or not head_date:
+        return False
+    opening = f"{DISPOSITION_MARKER} {sha7}"
     for comment in pr.get_comments():
-        # The comment must BEGIN with the marker: a quote of it inside some
-        # other comment (a review, this checker's own message) is no record.
+        # The comment must BEGIN with the marker and this head: a quote of it
+        # inside some other comment (a review, this checker's own message) is
+        # no record. Leading blank lines are allowed.
         body = (comment.body or "").lstrip()
-        if not body.startswith(DISPOSITION_MARKER):
-            continue
-        if not body[len(DISPOSITION_MARKER):].lstrip().lower().startswith(sha7):
+        if not body.lower().startswith(opening.lower()):
             continue
         # ISO 8601 UTC timestamps from one API compare correctly as strings;
         # "newer" is strict, so a comment stamped with the head's own second
         # does not count.
-        if head_date and (comment.created_at or "") <= head_date:
+        if (comment.created_at or "") <= head_date:
             continue
         return True
     return False

@@ -52,6 +52,8 @@ CASES = [
     ("isn't done", [say("**Stopping Point**: Not clean; UMS isn't done.")], True),
     ("won't run", [say("**Stopping Point**: Clean; won't run UMS.")], True),
     ("executed passes", [say("**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending")], False),
+    ("pending CI before a comma", [say("**Stopping Point**: Not clean. CI and review are still pending, UMS has run, and nothing new needs filing.")], False),
+    ("UMS ran, CI pending after a comma", [say("**Stopping Point**: Not clean; UMS ran, CI pending")], False),
     ("ran UMS passes", [say("**Stopping Point**: Not clean; ran UMS, gha#1 awaits CI")], False),
     ("no stopping point line", [say("UMS not yet run, but this is a status reply.")], False),
     ("in fence", [say("```\n**Stopping Point**: Not clean; UMS not yet run\n```")], False),

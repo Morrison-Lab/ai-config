@@ -585,6 +585,11 @@ When MWC is enabled for a session:
 3. If an active `.mwc` marker exists for the current session, `no-unauthorized-merge.py` allows merge tool executions.
 4. `ai-session.sh disable-mwc` removes the `.mwc` marker file, restoring the strict prohibition immediately.
 
+**A grant the user types in plain English needs no command (ai-config#5612).**
+`no-unauthorized-merge.py` reads the transcript: the user's latest merge word (as `remind-plain-english-merge-word.py` defines it, never a coordinator's note) grants, and a later revocation withdraws it.
+So merge with the GitHub MCP tool right after the word and run no `ai-session.sh` step (Ezra, 2026-11-13: "stop asking for manual approvals");
+the marker below remains for a relayed grant.
+
 **The session id has to match on both sides, and that is the part that breaks.**
 The guard resolves which session it is running under from the hook payload's own
 `session_id` field, then the transcript filename stem, then `AI_SESSION_ID` /

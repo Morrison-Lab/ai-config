@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-b0bacdaee50ff9abb97ae013f25660d1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-73697afd21240edc0e3998da1c8d687b.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-b0bacdaee50ff9abb97ae013f25660d1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-3191446cf01d07254cce00ea98dcb138.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-01ff0db6beb894ce1e8b5cbee5b9b6d6.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-3191446cf01d07254cce00ea98dcb138.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -513,6 +513,7 @@ cookieconsent.run({
 <section id="b.-port-existing-content-by-script" class="level3">
 <h3 class="anchored" data-anchor-id="b.-port-existing-content-by-script">2b. Port existing content by script</h3>
 <p>If the content already exists in another notes repository, do not retype it. Follow <a href="../../shared/workflow/port-by-script.md"><code>port-by-script</code></a>: copy the source files with a script, keep ids, wording and citations, and edit only what the target’s style rules require. Step 3 applies only to content with nothing to port.</p>
+<p>Before porting an ai-config fragment’s rule to <code>psw</code>, check that psw does not already state it: run <code>python3 scripts/find-psw-rule-overlap.py &lt;fragment&gt; --psw &lt;psw checkout&gt;</code> from ai-config, which lists the psw files that quote the fragment’s example words, and read the files it lists first (<a href="../../shared/workflow/grep-is-not-coverage.md#psw-is-part-of-the-corpus-for-prose-and-presentation-rules"><code>grep-is-not-coverage</code></a>).</p>
 </section>
 <section id="draft-content-in-target-conventions" class="level3">
 <h3 class="anchored" data-anchor-id="draft-content-in-target-conventions">3. Draft Content in Target Conventions</h3>

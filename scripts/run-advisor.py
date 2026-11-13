@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""Run one advisor consult read-only, between two seat checks.
+"""Run one advisor consult read-only, with the seat checked around it.
 
-Step 3 of skills/advisor/SKILL.md runs the call read-only with `model` and
-`effort` pinned. For `opencode` this sends one streamed chat completion with
-no `tools` key, so the advisor can only answer, through curl (the cloud proxy
-refuses Python's urllib, skills/delegate-to-opencode/SKILL.md), with the
-effort as `reasoning_effort`. For `agy` it runs `agy --mode plan --print=...`
-(memories/antigravity.md). scripts/check-advisor-seat.py runs before the call
-and, for `opencode`, again on the model the reply names. `agy --print` names
-no model, so that seat is reported unverified rather than checked.
+For `opencode`: one streamed chat completion with no `tools` key, so the
+advisor can only answer, via curl (the cloud proxy refuses urllib and injects
+the key), effort as `reasoning_effort` (honoured by the endpoint? unmeasured).
+For `agy`: `agy --mode plan --print=...` (memories/antigravity.md). The seat
+check runs before the call and, for `opencode`, on the model the reply names;
+`agy --print` names none, so that seat is reported unverified.
 
 Answer on stdout, seat label on stderr. Exit 2: refused seat or bad argument;
 exit 1: engine failure. `--dry-run` calls nothing. See ai-config#884.
@@ -138,7 +136,11 @@ def main(argv=None, run=subprocess.run):
                     help="add or override a model-name prefix (repeatable)")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
-    briefing = args.briefing.read_text(encoding="utf-8")
+    try:
+        briefing = args.briefing.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        briefing = ""
+        print(f"cannot read the briefing: {exc}", file=sys.stderr)
     if not briefing.strip():
         print("refused: the briefing is empty", file=sys.stderr)
         return 2

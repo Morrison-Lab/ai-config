@@ -66,15 +66,15 @@ Do not send restricted data (FERPA records, PHI): the briefing leaves the machin
 
 Run the advisor in the engine's read-only or plan mode, with no session persistence where the engine supports it.
 Pass `model` and `effort` explicitly.
-`scripts/run-advisor.py` makes the call and runs step 4's seat check before and after it:
+`scripts/run-advisor.py` makes the call and runs step 4's seat check before it, and after it where the engine names the model that answered:
 
 ```bash
 python3 scripts/run-advisor.py --caller-model <caller> --engine opencode --model <model> --effort <effort> --briefing <briefing_path>
 ```
 
 For `opencode`, it sends one streamed request with no tools to the OpenCode Go endpoint, so the advisor can only answer, and it checks the model the reply names.
-For `agy`, it runs `agy --mode plan --print=<briefing>`.
-`agy --print` names no model, so the wrapper labels that seat unverified rather than checked.
+It relies on the cloud proxy for the API key, and whether the endpoint honours its `reasoning_effort` field is unmeasured.
+For `agy`, it runs `agy --mode plan --print=<briefing>`, which names no model, so the wrapper labels that seat unverified.
 Engine invocation details are in the delegate skills' memories (`memories/delegation.md`, `memories/antigravity.md`).
 
 ### 4. Never fall back to the caller's family

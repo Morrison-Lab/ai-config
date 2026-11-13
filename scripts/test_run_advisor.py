@@ -38,7 +38,7 @@ class RunAdvisorTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.briefing = Path(tmp.name) / "briefing.md"
-        self.briefing.write_text("Does line 40 contradict line 12?\n")
+        self.briefing.write_text("Does line 40 contradict line 12?\n", encoding="utf-8")
 
     def go(self, fake, engine="opencode", model="kimi-k3", effort="high", *extra):
         argv = ["--caller-model", "claude-opus-5-5", "--engine", engine,
@@ -92,10 +92,10 @@ class RunAdvisorTest(unittest.TestCase):
         with self.assertRaises(SystemExit) as ctx:  # codex is not a choice
             self.go(FakeRun(), "codex", "gpt-5")
         self.assertEqual(ctx.exception.code, 2)
-        self.briefing.write_text("  \n")
-        code, _, err = self.go(FakeRun())
-        self.assertEqual(code, 2)
-        self.assertIn("briefing is empty", err)
+        self.briefing.write_text("  \n", encoding="utf-8")
+        self.assertIn("briefing is empty", self.go(FakeRun())[2])
+        self.briefing.unlink()
+        self.assertEqual(self.go(FakeRun())[0], 2)
 
     def test_agy_plan_mode_and_unverified_label(self):
         fake = FakeRun("They agree.\n")

@@ -57,6 +57,9 @@ jobs:
       - name: Run check-advisor-seat tests
         # ai-config#884: the advisor skill's no-same-family-fallback guard.
         run: python3 scripts/test_check_advisor_seat.py
+      - name: Run run-advisor tests
+        # ai-config#884: the advisor skill's read-only call, between two seat checks.
+        run: python3 scripts/test_run_advisor.py
       - name: Run check-dynamic-note-expiry tests
         # ai-config#5018: a memory note stating a changing condition carries `expires YYYY-MM-DD`.
         run: python3 scripts/test_check_dynamic_note_expiry.py

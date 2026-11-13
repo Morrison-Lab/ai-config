@@ -29,7 +29,9 @@ decidable signature; the rest (below) stay rules in run-ums-proactively.md.
                      produces an error?". Inject-only, because a deny would
                      block the retry that fixes the error. EXPECTED_ERRORS
                      lists results that are not mistakes (a grep with no
-                     match, a false test, a diff, a call marked expect-fail).
+                     match, a false test, a diff), EXPECT_FAIL a call marked
+                     expect-fail, and USER_REJECTED a call the user declined.
+                     Every error among parallel results counts.
 
 Inject-only: every path prints context and exits 0. Fails OPEN and SILENT.
 Each reminder fires once per distinct trigger text (sentinel in the temp dir).
@@ -55,18 +57,30 @@ REVERT = re.compile(r"\bgit\s+(?:revert|reset\s+--hard|restore\s+--source)\b")
 # and its error text, the tool-error reminder is skipped. Ezra said "daytb" on
 # which expected non-zero results to exempt (2026-11-13, ai-config#5630); edit
 # this list to change the answer.
+#
+# Each command regex is matched against the LAST stage of the command (after
+# the final &&, ||, ;, | or newline), because that stage sets the exit code:
+# "cd r && grep x f" fails exactly when its grep finds nothing. The split
+# ignores quoting, which can only make a quoted ";" look like a stage break.
+# The EXPECT_FAIL pair is matched against the whole command instead, anchored
+# to its start or its end, so the words inside a commit message do not count.
 _EXIT_1_ONLY = r"\A\s*Exit code 1\s*\Z"
+# grep -c prints a count of 0 (per file, "f:0") before exiting 1.
+_EXIT_1_NO_MATCH = r"\A\s*Exit code 1(?:\s*\n\s*(?:\S+:)?0)*\s*\Z"
 EXPECTED_ERRORS = (
     # A search that finds nothing: grep, rg or git grep, exit 1, no output.
-    (r"\A\s*(?:git\s+grep|grep|egrep|fgrep|rg)\b", _EXIT_1_ONLY),
+    (r"\A\s*(?:git(?:\s+-C\s+\S+)?\s+grep|grep|egrep|fgrep|rg)\b", _EXIT_1_NO_MATCH),
     # A test whose answer is "no": test, [ or [[, exit 1.
     (r"\A\s*(?:test|\[\[?)\s", r"\A\s*Exit code 1\b"),
     # diff, cmp or git diff --exit-code reporting a difference: exit 1.
     (r"\A\s*(?:diff|cmp)\b|\bgit\s+diff\b.*--(?:exit-code|quiet)\b", r"\A\s*Exit code 1\b"),
-    # A command the agent marked as expected to fail: an EXPECT_FAIL=1 prefix
-    # or an "# expect-fail" comment.
-    (r"\bEXPECT_FAIL=1\b|#\s*expect(?:ed)?[- ]fail", r""),
 )
+# A command the agent marked as expected to fail: an EXPECT_FAIL=1 prefix or
+# a trailing "# expect-fail" comment.
+EXPECT_FAIL = re.compile(r"\A\s*EXPECT_FAIL=1\s|#\s*expect(?:ed)?[- ]fail\s*\Z")
+# The user declined the call: a decision, not a malformed command.
+USER_REJECTED = re.compile(r"doesn't want to proceed|user rejected", re.I)
+STAGE_BREAK = re.compile(r"&&|\|\||[;|\n]")
 
 # Read only the end of a long transcript: the newest tool result is all we need.
 TAIL_BYTES = 400_000
@@ -138,14 +152,23 @@ def _text(content):
     return ""
 
 
-def last_tool_error(transcript_path):
-    """(tool_use_id, tool name, input, error text) when the newest tool result is an error."""
+def last_tool_errors(transcript_path):
+    """[(tool_use_id, tool name, input, error text)] for each error in the newest batch of results.
+
+    Parallel calls return several results, so the newest batch is every result
+    whose call belongs to the last group of calls that has any result yet. A
+    call still pending (the one this hook is running for) starts a group with
+    no results and is skipped.
+    """
     with open(transcript_path, "rb") as fh:
         fh.seek(0, os.SEEK_END)
         fh.seek(max(0, fh.tell() - TAIL_BYTES))
         lines = fh.read().decode("utf-8", errors="replace").splitlines()
     uses = {}
-    last = None
+    group_of = {}
+    group = 0
+    seen_result = False
+    results = []
     for line in lines:
         try:
             entry = json.loads(line)
@@ -158,34 +181,52 @@ def last_tool_error(transcript_path):
             if not isinstance(block, dict):
                 continue
             if block.get("type") == "tool_use":
+                if seen_result:
+                    group += 1
+                    seen_result = False
                 uses[block.get("id")] = (block.get("name"), block.get("input"))
+                group_of[block.get("id")] = group
             elif block.get("type") == "tool_result":
-                last = block
-    if not last or not last.get("is_error"):
-        return None
-    use_id = last.get("tool_use_id")
-    name, inp = uses.get(use_id, ("a tool", None))
-    return use_id, name, inp, _text(last.get("content"))
+                seen_result = True
+                results.append(block)
+    if not results:
+        return []
+    newest = max(group_of.get(r.get("tool_use_id"), group) for r in results)
+    errors = []
+    for res in results:
+        use_id = res.get("tool_use_id")
+        if group_of.get(use_id, group) != newest or not res.get("is_error"):
+            continue
+        name, inp = uses.get(use_id, ("a tool", None))
+        errors.append((use_id, name, inp, _text(res.get("content"))))
+    return errors
+
+
+def is_expected(inp, error):
+    """True when an error result is not a mistake (EXPECTED_ERRORS, EXPECT_FAIL, a user rejection)."""
+    if USER_REJECTED.search(error):
+        return True
+    command = str(inp.get("command") or "") if isinstance(inp, dict) else json.dumps(inp or "")
+    if EXPECT_FAIL.search(command):
+        return True
+    stage = STAGE_BREAK.split(command.rstrip())[-1]
+    return any(re.search(cmd_re, stage) and re.search(err_re, error) for cmd_re, err_re in EXPECTED_ERRORS)
 
 
 def tool_error_reminder(payload):
     path = payload.get("transcript_path")
     if not isinstance(path, str) or not os.path.isfile(path):
         return None
-    found = last_tool_error(path)
-    if not found:
-        return None
-    use_id, name, inp, error = found
-    command = str(inp.get("command") or "") if isinstance(inp, dict) else json.dumps(inp or "")
-    if any(re.search(cmd_re, command) and re.search(err_re, error) for cmd_re, err_re in EXPECTED_ERRORS):
-        return None
-    if not first_time("tool-error", f"{path}:{use_id}"):
-        return None
-    # "Exit code N" alone says nothing about the cause, so quote the next line too.
-    shown = [ln.strip() for ln in error.splitlines() if ln.strip()][:2] or ["error"]
-    if not shown[0].startswith("Exit code"):
-        shown = shown[:1]
-    return MESSAGES["tool-error"].format(tool=name, error=": ".join(shown)[:200])
+    notes = []
+    for use_id, name, inp, error in last_tool_errors(path):
+        if is_expected(inp, error) or not first_time("tool-error", f"{path}:{use_id}"):
+            continue
+        # "Exit code N" alone says nothing about the cause, so quote the next line too.
+        shown = [ln.strip() for ln in error.splitlines() if ln.strip()][:2] or ["error"]
+        if not shown[0].startswith("Exit code"):
+            shown = shown[:1]
+        notes.append(MESSAGES["tool-error"].format(tool=name, error=": ".join(shown)[:200]))
+    return "\n\n".join(notes) or None
 
 
 def coordinator_note(prompt):

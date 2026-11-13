@@ -17,8 +17,9 @@ They now read reply-tool text, and `hooks/remind-ums-after-error.py` also blocks
 A malformed command, a wrong flag, a refused form or a rejected query is fixed by the retry and then forgotten, so the next session writes it wrong again.
 Once the revised call works, record what caused the error and the form that works.
 (Ezra, 2026-11-13, [ai-config#5630](https://github.com/Morrison-Lab/ai-config/issues/5630): "any time you format a command incorrectly and need to revise it, run ums?", then "in other words, any time a command produces an error?".)
-`hooks/remind-ums-on-trigger-events.py` injects the reminder on the call after any error result, once per error.
-Expected results that are not mistakes (a grep with no match, a false `test`, a `diff` that finds differences, a call marked `EXPECT_FAIL=1` or `# expect-fail`) are exempt through its `EXPECTED_ERRORS` list.
+`hooks/remind-ums-on-trigger-events.py` injects the reminder on the call after any error result, once per error, and counts every error in a batch of parallel calls.
+Expected results that are not mistakes (a grep with no match, a false `test`, a `diff` that finds differences) are exempt through its `EXPECTED_ERRORS` list, which it matches against the command's last stage, so `cd r && grep x f` is exempt too.
+A call marked with an `EXPECT_FAIL=1` prefix or a trailing `# expect-fail` comment is exempt, and so is a call the user declined.
 
 - **Do:** after a failed call, retry it, then record the cause and the working form.
 - **Don't:** treat a retry that works as the end of the matter.

@@ -19,6 +19,7 @@ whether the running copy is the installed snapshot or a stale one:
  11. A legacy {"decision": "block"} output counts as a deny.
  12. The sibling cannot be imported: a merge is still gated (fail closed).
  13. The budget runs out: a later gate is reported as not reached, and denied.
+ 14. The repo hooks.json registers the hook for Bash and mcp__github__.*.
 """
 import json
 import os
@@ -195,6 +196,14 @@ try:
     check("13 budget exhausted: later gate not reached, deny",
           d == "deny" and "gate-s.py: timed out" in reason
           and "gate-a.py: not reached" in reason, f"{out}")
+
+    # 14. The repo's own hooks.json registers this hook for both merge
+    # surfaces, with the script field matching_hooks uses to skip itself.
+    spec = json.loads((HOOK.parent / "hooks.json").read_text(encoding="utf-8"))
+    groups = [g.get("matcher") for g in spec["hooks"]["PreToolUse"]
+              if any(h.get("script") == HOOK.name for h in g.get("hooks", []))]
+    check("14 registered for Bash and mcp__github__.*",
+          "Bash" in groups and "mcp__github__.*" in groups, f"{groups}")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

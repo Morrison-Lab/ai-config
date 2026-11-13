@@ -63,6 +63,8 @@ If the content already exists in another notes repository, do not retype it.
 Follow [`port-by-script`](../../shared/workflow/port-by-script.md): copy the source files with a script, keep ids, wording and citations, and edit only what the target's style rules require.
 Step 3 applies only to content with nothing to port.
 
+Before porting an ai-config fragment's rule to `psw`, check that psw does not already state it: run `python3 scripts/find-psw-rule-overlap.py <fragment> --psw <psw checkout>` from ai-config, which lists the psw files that quote the fragment's example words, and read the files it lists first ([`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md#psw-is-part-of-the-corpus-for-prose-and-presentation-rules)).
+
 ### 3. Draft Content in Target Conventions
 
 Follow the shared Morrison-Lab writing and technical standards:

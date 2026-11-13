@@ -7,15 +7,22 @@ listed `/mwc`, the bare word `mwc`, "merge when confident", "merge at will"
 and "maw", and a model reading that list does not generalize it. This hook
 makes the recognition mechanical: when the user's message is a merge
 instruction in plain English, it injects the instruction to treat it as a bare
-`mwc` (`mwc all`) and run `enable-mwc`, with the same gates `mwc` has.
+`mwc` (`mwc all`), with the same gates `mwc` has.
 
-It only ADDS context and never grants anything itself: the merge guards
-(no-unauthorized-merge.py, enforce-mwc-review-gate.py) still decide. Text the
-user did not type (code, quotes, system reminders, pasted content) is ignored,
-and a question ("should I merge?") is not a grant.
+It only ADDS context. The grant itself is read by no-unauthorized-merge.py,
+which loads `merge_word()` and `revokes()` from this file and scans the
+session transcript for them. That is what lets a cloud session merge with the
+GitHub MCP tool after a plain-English grant: the `ai-session.sh enable-mwc`
+step this hook used to require is a Bash call, which prompted for approval in
+a cloud session again and again, and its marker still did not reach the guard
+there (Ezra, 2026-11-13: "stop asking for manual approvals"). Text the user
+did not type (code, quotes, system reminders, pasted content, a
+coordinator's note) is ignored, and a question ("should I merge?") is not a
+grant.
 
 Fails OPEN and SILENT on any parse trouble.
 """
+import html
 import json
 import re
 import sys
@@ -33,6 +40,12 @@ INLINE = re.compile(
     r"\b(?:merge\s+when\s+(?:ready|clean|green)|merge\s+them\s+all|mwc\s+(?:them\s+)?all)\b",
     re.I,
 )
+# Withdrawing a grant: `/mwc revoke`, `disable-mwc`, "stop merging", "don't merge".
+REVOKE = re.compile(
+    r"(?:^|\W)(?:/?mwc\s+revoke|disable-mwc|stop\s+merging"
+    r"|(?:do\s+not|don't|dont|no\s+more)\s+merg(?:e|ing)\b)",
+    re.I,
+)
 QUESTION = re.compile(r"\?\s*$")
 QUESTION_SENTENCE = re.compile(r"[^.!?\n]*\?")
 
@@ -43,12 +56,27 @@ NOT_TYPED = [
     re.compile(r'`[^`\n]*`|"[^"\n]*"'),
 ]
 
+# A cloud project thread wraps the user's words in harness XML: a `<wake>`
+# whose human message carries trust="principal", and a coordinator relay whose
+# user messages are `<cited author="user">` entries. Everything else in those
+# wrappers (the coordinator's own note, a peer's message) is not the user's
+# grant, so only those two kinds of body are read.
+HARNESS_WRAPPER = re.compile(r"<(?:wake|coordinator-relay)\b")
+PRINCIPAL_MESSAGE = re.compile(
+    r'<message\b(?=[^>]*\bfrom="human")(?=[^>]*\btrust="principal")[^>]*>(.*?)</message>',
+    re.S,
+)
+CITED_USER = re.compile(r'<cited\b(?=[^>]*\bauthor="user")[^>]*>(.*?)</cited>', re.S)
+NOTE = re.compile(r"<note\b[^>]*>.*?</note>", re.S)
+
 REMINDER = (
     "[hook: remind-plain-english-merge-word] The user's message (\"{quote}\") is a merge word "
-    "in plain English. Treat it as a bare `mwc` (`mwc all`): run `ai-session.sh enable-mwc` "
-    "and `check-mwc` per skills/mwc/SKILL.md, then merge every in-scope PR that is fully "
-    "clean. Do not ask them to retype `mwc` or to name PR numbers. The gates still run on each "
-    "PR (fully-clean, current head, stale base); a PR that fails them waits, and you say which. "
+    "in plain English. Treat it as a bare `mwc` (`mwc all`). The merge guard reads this "
+    "message from the transcript, so run no `ai-session.sh` step and no other Bash for the "
+    "grant; merge with the GitHub MCP merge tool where one is available, and merge every "
+    "in-scope PR that is fully clean. Do not ask them to retype `mwc` or to name PR numbers. "
+    "The gates still run on each PR (fully-clean, current head, stale base); a PR that fails "
+    "them waits, and you say which. "
     "If the words were not a merge instruction (a question, quoted text), ignore this."
 )
 
@@ -58,6 +86,36 @@ def typed(text: str) -> str:
     for pattern in NOT_TYPED:
         text = pattern.sub(" ", text)
     return text.strip()
+
+
+def user_bodies(prompt: str) -> list:
+    """The parts of a prompt the user wrote, harness wrappers removed."""
+    if not HARNESS_WRAPPER.search(prompt):
+        return [prompt]
+    prompt = NOTE.sub(" ", prompt)
+    bodies = PRINCIPAL_MESSAGE.findall(prompt) + CITED_USER.findall(prompt)
+    return [html.unescape(body) for body in bodies]
+
+
+def merge_word(prompt: str):
+    """The merge word the user typed in `prompt`, or None."""
+    for body in user_bodies(prompt):
+        text = typed(body)
+        if not text or QUESTION.search(text):
+            continue
+        match = WHOLE.match(text) or INLINE.search(text)
+        if not match:
+            continue
+        # An inline match inside a sentence that ends in a question mark is not an instruction.
+        if QUESTION_SENTENCE.match(text, match.end()):
+            continue
+        return " ".join(match.group(0).split())
+    return None
+
+
+def revokes(prompt: str) -> bool:
+    """Whether the user's own words in `prompt` withdraw a merge grant."""
+    return any(REVOKE.search(typed(body)) for body in user_bodies(prompt))
 
 
 def main() -> int:
@@ -75,16 +133,10 @@ def main() -> int:
     prompt = payload.get("prompt") if isinstance(payload, dict) else None
     if not isinstance(prompt, str):
         return 0
-    text = typed(prompt)
-    if not text or QUESTION.search(text):
+    word = merge_word(prompt)
+    if word is None:
         return 0
-    match = WHOLE.match(text) or INLINE.search(text)
-    if not match:
-        return 0
-    # An inline match inside a sentence that ends in a question mark is not an instruction.
-    if QUESTION_SENTENCE.match(text, match.end()):
-        return 0
-    print(REMINDER.format(quote=" ".join(match.group(0).split())[:60]))
+    print(REMINDER.format(quote=word[:60]))
     return 0
 
 

@@ -308,3 +308,11 @@ A same-family answer passes only when the report calls it weaker.
 Read the transcript and the reply yourself;
 do not report the output of [`check-advisor-seat.py`](../../scripts/check-advisor-seat.py) as your finding.
 See [`advisor`](../../skills/advisor/SKILL.md#4-never-fall-back-to-the-callers-family).
+
+## Figures with a cut value axis
+
+On a diff that draws a figure in any tool or format (a Quarto chunk, matplotlib or plotly for a slide or Word file, a native PowerPoint chart, a Shiny app), check that a bar chart's value axis starts at zero, and that a dot or line plot of a count, rate or proportion that readers compare also starts at zero unless the quantity has no meaningful zero.
+Flag a caption or speaker note that warns about a cut axis instead of fixing it.
+Read the plotting code yourself, including limits computed at run time;
+do not report the output of `hooks/no-truncated-bar-axis.py` as your finding.
+See [`visuals-everywhere`](../../shared/writing/visuals-everywhere.md#axis-at-zero-in-every-format).

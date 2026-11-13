@@ -4,6 +4,7 @@ Defaults for analysis figures, visuals and display math: `ggplot2`, worded axes 
 
 When authoring analysis figures, prefer `ggplot2` over base graphics wherever the dependency is available or appropriate to add.
 Title axes in words, not symbols; print ticks as plain numbers ([details](axis-tick-labels.md)).
+Start a bar chart's value axis at zero, and any axis readers judge size against, in every tool and output format, slides and Word included ([details](visuals-everywhere.md#axis-at-zero-in-every-format)).
 One equation per display line unless a reason favors more;
 one `=` per math line ([details](math-derivation-steps.md)).
 Include a visual wherever one helps a reader, in new work and in existing content you touch, as plotly where feasible with a static fallback.

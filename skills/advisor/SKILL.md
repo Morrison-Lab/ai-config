@@ -83,6 +83,10 @@ python3 scripts/check-advisor-seat.py --caller-model <caller> --engine <engine> 
 
 It exits 2 on a same-family seat, an engine whose name contains `codex`, an effort that names no level (blank, or a word such as `default` or `inherit`), a model name that is unknown or names two families, or a reply from a model other than the one requested or its dated snapshot.
 `--allow-same-family` accepts a same-family seat and prints it as weaker, and `--family PREFIX=FAMILY` classifies a model the built-in table does not know.
+The `adversarial-reviewer` agent's "Advisor consults from the caller's own family" item is the reviewer's layer for this rule.
+
+- **Do:** run the script before and after the call, and stop on exit 2.
+- **Don't:** take an answer from whatever model the engine fell back to, since a substitute from your own family is not the independent read you asked for.
 
 ### 5. Treat the answer as evidence
 

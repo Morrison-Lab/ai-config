@@ -54,7 +54,7 @@ GRANT = re.compile(
 REVERT = re.compile(r"\bgit\s+(?:revert|reset\s+--hard|restore\s+--source)\b")
 
 # Errors that are not mistakes: (command regex, error-text regex) pairs. When
-# both search-match the failed call's command (its input, for a non-Bash tool)
+# both search-match the failed call's "command" input (empty for other tools)
 # and its error text, the tool-error reminder is skipped. Ezra said "daytb" on
 # which expected non-zero results to exempt (2026-11-13, ai-config#5630); edit
 # this list to change the answer.
@@ -75,7 +75,7 @@ EXPECTED_ERRORS = (
     # A test whose answer is "no": test, [ or [[, exit 1.
     (r"\A\s*(?:test|\[\[?)\s", r"\A\s*Exit code 1\b"),
     # diff, cmp or git diff --exit-code reporting a difference: exit 1.
-    (r"\A\s*(?:diff|cmp)\b|\bgit\s+diff\b.*--(?:exit-code|quiet)\b", r"\A\s*Exit code 1\b"),
+    (r"\A\s*(?:diff|cmp)\b|\A\s*git(?:\s+-C\s+\S+)?\s+diff\b.*--(?:exit-code|quiet)\b", r"\A\s*Exit code 1\b"),
 )
 # A command the agent marked as expected to fail: an EXPECT_FAIL=1 prefix or
 # a trailing "# expect-fail" comment.
@@ -210,8 +210,7 @@ def last_tool_errors(transcript_path):
 def last_stage(command):
     """The last non-empty stage of a shell command, split on unquoted operators (2>&1 lexes as ">&", no break).
 
-    Unbalanced quotes make shlex raise; the whole command is then the stage,
-    which matches an exemption only if the command starts with the exempt tool.
+    On unbalanced quotes shlex raises, and the whole command is the stage.
     """
     lexer = shlex.shlex(command, posix=True, punctuation_chars=OPERATOR_CHARS + "<>")
     lexer.whitespace = " \t\r"

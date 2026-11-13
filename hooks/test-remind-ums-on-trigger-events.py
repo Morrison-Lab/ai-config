@@ -104,13 +104,14 @@ check("grep exit 1 with stderr still reminds",
       "unmatched" in pre(transcript("grep '(' f", "Exit code 1\ngrep: unmatched (")))
 for cmd, res in (("cd r && grep foo f", "Exit code 1"), ("ls; grep foo f", "Exit code 1"),
                  ("git -C r grep foo", "Exit code 1"), ("grep -c foo f", "Exit code 1\n0"),
-                 ("cat f | rg foo", "Exit code 1")):
+                 ("cat f | rg foo", "Exit code 1"), ("git -C repo diff --exit-code", "Exit code 1")):
     check(f"expected error in a compound {cmd!r} is silent", pre(transcript(cmd, res)) == "")
 # shlex keeps a quoted operator inside its stage, and skips an empty last stage.
 for cmd in ('rg "foo|bar" file', 'grep -E "a|b" f', "grep foo f;", "grep 'x && y' f", "cd r && grep foo f ;", "grep foo f 2>&1"):
     check(f"a quoted or trailing operator in {cmd!r} is still an expected no-match",
           pre(transcript(cmd, "Exit code 1")) == "")
-for cmd in ('echo "x" | grep "a;b" f && make', "python3 - <<EOF\ngrep x\nEOF", "echo \"unbalanced; grep x"):
+for cmd in ('echo "x" | grep "a;b" f && make', "python3 - <<EOF\ngrep x\nEOF", "echo \"unbalanced; grep x",
+            "python runner.py git diff --quiet"):
     check(f"{cmd!r}, whose last stage is not a search, still reminds",
           "UMS" in pre(transcript(cmd, "Exit code 1")))
 check("an expect-fail phrase inside a commit message still reminds",

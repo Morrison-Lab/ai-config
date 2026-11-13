@@ -19,10 +19,31 @@ A visual follows these figure rules:
 
 - figures that show estimates carry confidence intervals (error bars or ribbons);
 - axis ticks are in the variable's original measurement scale and print plain numbers, not scientific notation ([details](axis-tick-labels.md));
-- an axis is extended to show important reference values such as zero when they matter;
+- the value axis includes zero whenever readers judge size from a bar's length or from the distance between marks, as for counts, rates and proportions ([below](#axis-at-zero-in-every-format));
 - every figure has alt text ([`alt-text`](../../skills/alt-text/SKILL.md)) and a numbered caption;
 - the code chunk comments what it does and why;
 - colors are colorblind-safe.
+
+## Axis at zero in every format
+
+The figure rules apply to every figure in every output format: a Quarto chunk, a matplotlib or plotly figure saved for a `.pptx` or Word file, a native PowerPoint chart, a Shiny app.
+A rule written while drafting notes still binds a slide built from a Python script (ai-config#5614: a slide session read this page as covering Quarto and R chunks only).
+
+Zero matters whenever a reader judges size from a bar's length or from the distance between marks.
+That covers counts, rates and proportions.
+A bar chart's value axis always starts at zero, because the bar's length is the value it shows.
+A dot or line plot of a rate or proportion that readers compare across groups also starts at zero, unless the quantity has no meaningful zero (a temperature in Celsius, a calendar year, an index).
+To show a small difference clearly, plot the difference itself, or use dots with intervals, rather than cutting the axis.
+
+A distortion you notice gets fixed, never captioned.
+A speaker note or caption warning that the axis does not start at zero leaves the misleading picture in place for every reader who skips the note.
+
+`hooks/no-truncated-bar-axis.py` denies the decidable case: a bar chart (matplotlib, ggplot2, plotly, python-pptx) whose value axis gets a literal lower limit above zero.
+A comment `axis-zero: allow <reason>` exempts the rare bar chart of a quantity with no meaningful zero.
+The dot and line cases stay prose, because whether zero matters there depends on what the quantity means, which no pattern in the code can decide.
+
+- **Do:** start the value axis at zero, and if the difference then looks small, show the difference directly.
+- **Don't:** keep a cut axis and add a caution in a caption or speaker note.
 
 Every example gets one (Ezra, 2026-10-23, [psw rule](https://morrison-lab.github.io/psw/chapters/teaching.html)):
 give each `#exm-` div a figure of its data, model or results in the same PR that writes or edits it, without being asked.

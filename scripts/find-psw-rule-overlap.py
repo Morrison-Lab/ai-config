@@ -10,9 +10,11 @@ exposed it.
 
 A rule's example words are often the only words two statements of the same
 rule share, so this script searches for them deterministically: it extracts
-the short double-quoted phrases a fragment uses (one to three words, letters
-only) and greps every .qmd and .md file under a psw checkout for each, as a
-whole word and ignoring case.
+the short double-quoted phrases a fragment uses (one to three words of
+letters, apostrophes and hyphens, at least two characters) and greps every
+.qmd and .md file under a psw checkout for each, as a whole word (a hyphen
+does not count as a boundary) and ignoring case. Curly apostrophes in psw are
+read as straight ones.
 
 It does not decide whether a hit is the same rule; read the hits. It exits 0
 whether or not anything matched, 2 on a missing path or when the fragment
@@ -30,7 +32,7 @@ import re
 import sys
 from pathlib import Path
 
-QUOTED = re.compile(r'"([A-Za-z][A-Za-z\' -]{0,40})"')
+QUOTED = re.compile(r'"([A-Za-z][A-Za-z\' -]{1,40})"')
 MAX_WORDS = 3
 SKIP_DIRS = {"_site", "_freeze", ".quarto", "_extensions", "node_modules", ".git"}
 
@@ -66,12 +68,13 @@ def hits(phrase, files, root):
     the word does ("Do not write "now""); those hits sort first, since common
     example words ("now", "still") also appear in ordinary prose.
     """
-    word = r"\b" + re.escape(phrase) + r"\b"
+    word = r"(?<![\w-])" + re.escape(phrase) + r"(?![\w-])"
     pattern = re.compile(word, re.IGNORECASE)
     quoted_pattern = re.compile(r"[\"*`]" + word + r"[\"*`]", re.IGNORECASE)
     found = []
     for path in files:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        text = path.read_text(encoding="utf-8", errors="replace").replace("’", "'")
+        lines = text.splitlines()
         for number, line in enumerate(lines, start=1):
             if pattern.search(line):
                 quoted = bool(quoted_pattern.search(line))

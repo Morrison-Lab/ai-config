@@ -1,0 +1,76 @@
+# advisor — one bounded consult from an independent model
+
+An advisor consult sends one decision point to a model from a different family and brings back an opinion. The advisor reads and answers. It does not edit files, implement, or take over the task. Claude stays the orchestrator and decides what to do with the answer.
+
+The pattern comes from the `advisor` skill in `scdenney/open-science-skills`. It is CC BY-NC 4.0, so this skill takes the pattern only and copies nothing.
+
+## When this fires
+
+- “advisor”, “ask an advisor”, “get a second opinion on this decision”.
+- Before an approach crystallizes, when a wrong choice would be costly to undo.
+- Before declaring done, when the claim being made is one you cannot check against a primary source.
+
+Do not use it for a diff review. Use [`adv`](../../skills/adv/SKILL.llms.md) for that. Do not use it for fan-out reading or drafting. Use [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.llms.md) or [`delegate-to-agy`](../../skills/delegate-to-agy/SKILL.llms.md) for that.
+
+## Parameters
+
+Each value below is a parameter with today’s default, so a caller can change it without editing this file ([`configurable-parameters`](../../shared/coding/configurable-parameters.md)).
+
+| Parameter | Default | Meaning |
+|----|----|----|
+| `engine` | `opencode` | The CLI or endpoint that reaches the advisor. `agy` is the other seat. Codex is never a seat, because the lab allows it only in UCDH projects (`bcs`, `hac`) and this skill is for the rest. |
+| `model` | the strongest model `engine` offers outside the caller’s family | Look it up at call time; do not hard-code a model name in a brief. |
+| `effort` | the highest the engine offers | Pinned, not inherited: a cheap consult on a hard question wastes the reason for asking. |
+| `briefing_path` | a file in the scratchpad directory | Where the briefing is written before the call. |
+
+## Procedure
+
+### 1. Make the deliverable durable first
+
+A consult takes real time, and a session can end during it. Write down the work product (commit it, or save the draft) before the call, so the answer has something to attach to.
+
+### 2. Write a self-contained briefing
+
+Nothing carries over from this session except the working directory. The briefing file states:
+
+- the task and why it matters;
+- what has been done so far;
+- the current approach, or the exact claim to be checked;
+- the precise question, with file paths and line numbers.
+
+“Does this look right?” is not a question. “Does `shared/workflow/x.md` line 40 contradict the rule at line 12?” is one. Do not send restricted data (FERPA records, PHI): the briefing leaves the machine.
+
+### 3. Call the advisor read-only
+
+Run the advisor in the engine’s read-only or plan mode, with no session persistence where the engine supports it. Pass `model` and `effort` explicitly. `scripts/run-advisor.py` makes the call and runs step 4’s seat check before it, and after it where the engine names the model that answered:
+
+``` bash
+python3 scripts/run-advisor.py --caller-model <caller> --engine opencode --model <model> --effort <effort> --briefing <briefing_path>
+```
+
+For `opencode`, it sends one streamed request with no tools to the OpenCode Go endpoint, so the advisor can only answer, and it checks the model the reply names. It relies on the cloud proxy for the API key, and whether the endpoint honours its `reasoning_effort` field is unmeasured. For `agy`, it runs `agy --mode plan --print=<briefing>`, which names no model, so the wrapper labels that seat unverified. Engine invocation details are in the delegate skills’ memories (`memories/delegation.md`, `memories/antigravity.md`).
+
+### 4. Never fall back to the caller’s family
+
+If the chosen model is unavailable, report that and stop, or pick another engine outside the caller’s family. A same-family substitute is not independent, so it defeats the point of asking. A different model in the caller’s own family is a weaker and cheaper option: name it as weaker in the result, and do not call it equivalent.
+
+`scripts/check-advisor-seat.py` checks this rule and step 3’s explicit `model` and `effort`. `run-advisor.py` runs it for you. For a call the wrapper does not make, run it before the call, and again after with `--reported-model` set to the model the reply names:
+
+``` bash
+python3 scripts/check-advisor-seat.py --caller-model <caller> --engine <engine> --model <model> --effort <effort>
+```
+
+It exits 2 on a same-family seat, an engine whose name contains `codex`, an effort that names no level (blank, or a word such as `default` or `inherit`), a model name that is unknown or names two families, or a reply from a model other than the one requested or its dated snapshot. `--allow-same-family` accepts a same-family seat and prints it as weaker, and `--family PREFIX=FAMILY` classifies a model the built-in table does not know. The `adversarial-reviewer` agent’s “Advisor consults from the caller’s own family” item is the reviewer’s layer for this rule.
+
+- **Do:** run the script before and after the call, and stop on exit 2.
+- **Don’t:** take an answer from whatever model the engine fell back to, since a substitute from your own family is not the independent read you asked for.
+
+### 5. Treat the answer as evidence
+
+The advisor’s answer is a lead, not a verdict. A primary source or an observed failure outranks it. Check each claim against the file or command output before acting on it, and label anything unchecked as an unverified lead (see [`adv`](../../skills/adv/SKILL.llms.md#verify-cross-model-findings-before-presenting-them)). When the advisor and the evidence conflict, state the conflict plainly in one more consult. Do not settle it by coin flip.
+
+## Not covered yet
+
+[ai-config#884](https://github.com/Morrison-Lab/ai-config/issues/884) tracks the last open question: whether `context: fork` can replace a separate process (it isolates conversation history but stays on an agent type in this session, so it is not a cross-family consult).
+
+Back to top

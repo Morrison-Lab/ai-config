@@ -239,6 +239,10 @@ A cloud Bash call can prompt for approval, and an MCP call does not.
 `hooks/prefer-mcp-over-bash-in-cloud.py` denies `gh pr|issue|run|workflow|release`, `gh api` and `curl` to api.github.com there, except search, which has no MCP tool.
 [`tool-mappings.md`](tool-mappings.md) maps each command.
 Beyond GitHub no hook can tell which Bash steps an MCP tool covers, so check the tool list before reaching for Bash.
+The reviewer's checklist item is in [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md#bash-where-a-cloud-mcp-tool-exists).
+
+- **Do:** merge, comment and read PRs with the GitHub MCP tools in a cloud session.
+- **Don't:** run `gh pr` or `gh api` in Bash there when an MCP tool does the same step.
 
 ## Draft communications in Ezra's voice
 

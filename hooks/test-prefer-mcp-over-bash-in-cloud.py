@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "prefer-mcp-over-bash-in-cloud.py")
+    os.path.dirname(os.path.realpath(__file__)), "prefer-mcp-over-bash-in-cloud.py")
 
 # (command, denied in a cloud session)
 CASES = [
@@ -35,7 +35,19 @@ CASES = [
     ('echo "gh pr view 3"', False),
     ("grep -n 'gh pr view' file.md", False),
     ("cat <<'EOF'\ngh pr view 3\nEOF", False),
-    ("ALLOW_BASH_OVER_MCP=1 gh api repos/a/b/check-runs/1/annotations", False),
+    ("ALLOW_BASH_OVER_MCP=1 gh api repos/a/b/commits/abc", False),
+    ("gh api repos/a/b/check-runs/1/annotations", False),
+    ("gh api graphql -f query=x", False),
+    ("gh pr checkout 12", False),
+    ("gh run watch 99", False),
+    ("gh release create v1.0.0", False),
+    ("gh --repo=a/b pr view 3", True),
+    ("gh -Ra/b issue list", True),
+    ('bash -c "gh pr view 3"', True),
+    ("gh api search/../repos/a/b/pulls", True),
+    ("curl https://api.github.com/search/../repos/a/b", True),
+    ("gh pr view 3 # ALLOW_BASH_OVER_MCP=1", True),
+    ("echo ALLOW_BASH_OVER_MCP=1; gh pr view 3", True),
 ]
 
 

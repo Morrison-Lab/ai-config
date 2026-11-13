@@ -13,6 +13,18 @@
 
 Read the nearest sibling hook before writing the new one, since the reviewer will compare them.
 
+Four more misses sent [#5615](https://github.com/Morrison-Lab/ai-config/pull/5615) through [#5618](https://github.com/Morrison-Lab/ai-config/pull/5618) to a second push (2026-11-13):
+
+- **Do:** count the diff before pushing (`git diff --shortstat origin/main`), and keep the hook, its test, its README row and its rule section within 10 files and 300 lines.
+  Split first when over, since `hooks/no-oversized-pr-push.py` refuses the push.
+- **Don't:** push a new hook, test, README row and rule section together without counting them.
+- **Do:** add the `README.md` hook-catalog row in the same commit as the hook (`check-hook-catalog.py`).
+- **Don't:** leave the row for the review round.
+- **Do:** give every algorithmic check both a writer rule and a reviewer instruction, then run `python3 scripts/check-check-has-instructions.py`.
+- **Don't:** ship the writer rule alone.
+- **Do:** run `python3 scripts/check_regex_patterns.py` on a new regex and flatten any nested quantifier (a repeat inside a repeat).
+- **Don't:** leave a nested quantifier for CI to find.
+
 For a guard against a destructive command ([`destructive-actions-catalog`](destructive-actions-catalog.md)):
 
 - **Do:** test it by feeding the hook a payload, or inside a throwaway repository made for that test.

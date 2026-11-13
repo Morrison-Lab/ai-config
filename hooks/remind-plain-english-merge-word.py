@@ -7,15 +7,16 @@ listed `/mwc`, the bare word `mwc`, "merge when confident", "merge at will"
 and "maw", and a model reading that list does not generalize it. This hook
 makes the recognition mechanical: when the user's message is a merge
 instruction in plain English, it injects the instruction to treat it as a bare
-`mwc` (`mwc all`) and run `enable-mwc`, with the same gates `mwc` has.
+`mwc` (`mwc all`), with the same gates `mwc` has.
 
-It only ADDS context and never grants anything itself: the merge guards
-(no-unauthorized-merge.py, enforce-mwc-review-gate.py) still decide. Text the
-user did not type (code, quotes, system reminders, pasted content) is ignored,
-and a question ("should I merge?") is not a grant.
+It only ADDS context; no-unauthorized-merge.py loads `merge_word()` and
+`revokes()` from here and reads the grant from the transcript, so no Bash
+step is needed (ai-config#5612). Text the user did not type and questions
+are not grants.
 
 Fails OPEN and SILENT on any parse trouble.
 """
+import html
 import json
 import re
 import sys
@@ -33,6 +34,26 @@ INLINE = re.compile(
     r"\b(?:merge\s+when\s+(?:ready|clean|green)|merge\s+them\s+all|mwc\s+(?:them\s+)?all)\b",
     re.I,
 )
+# A grant opens a clause: "ok, merge them all" grants, "I can merge when ready" does not.
+CLAUSE_START = re.compile(
+    r"(?:^|[.!;:\n,])(?:\W|\b(?:ok(?:ay)?|yes|yep|great|thanks|good|sure|then|and|so|please|now)\b)*$",
+    re.I,
+)
+SLASH_COMMAND = re.compile(
+    r"<command-name>\s*/?(?:ai-config:)?(mwc|maw|merge-when-confident|merge-at-will)\s*</command-name>"
+    r"(?:.*?<command-args>(.*?)</command-args>)?",
+    re.S | re.I,
+)
+# Withdrawing a grant: `/mwc revoke`, `disable-mwc`, "stop merging", "don't merge".
+# A bare "stop", "wait" or "no" withdraws too, but only as a whole clause or
+# before a merge word, so "stop asking for approvals" is not a revocation.
+REVOKE = re.compile(
+    r"(?:^|\W)(?:/?mwc\s+revoke|revoke\s+(?:the\s+)?mwc|disable-mwc|stop\s+merging"
+    r"|hold\s+off|not\s+yet"
+    r"|(?:do\s+not|don't|dont|no\s+more|never)\s+merg(?:e|ing)\b)"
+    r"|(?:^|[.!;])\s*(?:stop|wait|no)\b[^\w\n]*(?:$|merg)",
+    re.I | re.M,
+)
 QUESTION = re.compile(r"\?\s*$")
 QUESTION_SENTENCE = re.compile(r"[^.!?\n]*\?")
 
@@ -43,12 +64,28 @@ NOT_TYPED = [
     re.compile(r'`[^`\n]*`|"[^"\n]*"'),
 ]
 
+# In a cloud thread, only the principal's wake message and a relay's
+# `<cited author="user">` entries are the user's words.
+HARNESS_WRAPPER = re.compile(r"<(?:wake|coordinator-relay)\b")
+PRINCIPAL_MESSAGE = re.compile(
+    r'<message\b(?=[^>]*\bfrom="human")(?=[^>]*\btrust="principal")'
+    r'(?=[^>]*\btrigger="true")[^>]*>(.*?)</message>',
+    re.S,
+)
+CITED_USER = re.compile(r'<cited\b(?=[^>]*\bauthor="user")[^>]*>(.*?)</cited>', re.S)
+NOTE = re.compile(r"<note\b[^>]*>.*?</note>", re.S)
+# A harness-written prompt (task notification, command output) opens with a tag.
+REMINDER_BLOCK = re.compile(r"<system-reminder\b[^>]*>.*?</system-reminder>", re.S)
+HARNESS_TAGGED = re.compile(r"^\s*<[A-Za-z][\w-]*\b")
+
 REMINDER = (
     "[hook: remind-plain-english-merge-word] The user's message (\"{quote}\") is a merge word "
-    "in plain English. Treat it as a bare `mwc` (`mwc all`): run `ai-session.sh enable-mwc` "
-    "and `check-mwc` per skills/mwc/SKILL.md, then merge every in-scope PR that is fully "
-    "clean. Do not ask them to retype `mwc` or to name PR numbers. The gates still run on each "
-    "PR (fully-clean, current head, stale base); a PR that fails them waits, and you say which. "
+    "in plain English. Treat it as a bare `mwc` (`mwc all`). The merge guard reads this "
+    "message from the transcript, so run no `ai-session.sh` step and no other Bash for the "
+    "grant; merge with the GitHub MCP merge tool where one is available, and merge every "
+    "in-scope PR that is fully clean. Do not ask them to retype `mwc` or to name PR numbers. "
+    "The gates still run on each PR (fully-clean, current head, stale base); a PR that fails "
+    "them waits, and you say which. "
     "If the words were not a merge instruction (a question, quoted text), ignore this."
 )
 
@@ -58,6 +95,54 @@ def typed(text: str) -> str:
     for pattern in NOT_TYPED:
         text = pattern.sub(" ", text)
     return text.strip()
+
+
+def user_bodies(prompt: str) -> list:
+    """The parts of a prompt the user wrote, harness wrappers removed."""
+    if not HARNESS_WRAPPER.search(prompt):
+        if HARNESS_TAGGED.match(REMINDER_BLOCK.sub("", prompt)):
+            return []
+        return [prompt]
+    prompt = NOTE.sub(" ", prompt)
+    bodies = PRINCIPAL_MESSAGE.findall(prompt) + CITED_USER.findall(prompt)
+    return [html.unescape(body) for body in bodies]
+
+
+def slash_grant(prompt: str):
+    """The `/mwc` slash command recorded in `prompt`, unless it revokes, or None."""
+    match = SLASH_COMMAND.search(prompt)
+    if not match or REVOKE.search("/mwc " + (match.group(2) or "")):
+        return None
+    return "/" + match.group(1).lower()
+
+
+def merge_word(prompt: str, strict: bool = False):
+    """The merge word typed in `prompt`, or None; `strict` (the guard) needs it to open a clause."""
+    slash = slash_grant(prompt)
+    if slash:
+        return slash
+    for body in user_bodies(prompt):
+        text = typed(body)
+        if not text or QUESTION.search(text):
+            continue
+        match = WHOLE.match(text) or INLINE.search(text)
+        if not match:
+            continue
+        if strict and match.start() > 0 and not CLAUSE_START.search(text[: match.start()]):
+            continue
+        # An inline match inside a sentence that ends in a question mark is not an instruction.
+        if QUESTION_SENTENCE.match(text, match.end()):
+            continue
+        return " ".join(match.group(0).split())
+    return None
+
+
+def revokes(prompt: str) -> bool:
+    """Whether the user's own words in `prompt` withdraw a merge grant."""
+    match = SLASH_COMMAND.search(prompt)
+    if match and REVOKE.search("/mwc " + (match.group(2) or "")):
+        return True
+    return any(REVOKE.search(typed(body)) for body in user_bodies(prompt))
 
 
 def main() -> int:
@@ -75,16 +160,10 @@ def main() -> int:
     prompt = payload.get("prompt") if isinstance(payload, dict) else None
     if not isinstance(prompt, str):
         return 0
-    text = typed(prompt)
-    if not text or QUESTION.search(text):
+    word = merge_word(prompt)
+    if word is None:
         return 0
-    match = WHOLE.match(text) or INLINE.search(text)
-    if not match:
-        return 0
-    # An inline match inside a sentence that ends in a question mark is not an instruction.
-    if QUESTION_SENTENCE.match(text, match.end()):
-        return 0
-    print(REMINDER.format(quote=" ".join(match.group(0).split())[:60]))
+    print(REMINDER.format(quote=word[:60]))
     return 0
 
 

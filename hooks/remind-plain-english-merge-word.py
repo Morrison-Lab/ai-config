@@ -9,16 +9,10 @@ makes the recognition mechanical: when the user's message is a merge
 instruction in plain English, it injects the instruction to treat it as a bare
 `mwc` (`mwc all`), with the same gates `mwc` has.
 
-It only ADDS context. The grant itself is read by no-unauthorized-merge.py,
-which loads `merge_word()` and `revokes()` from this file and scans the
-session transcript for them. That is what lets a cloud session merge with the
-GitHub MCP tool after a plain-English grant: the `ai-session.sh enable-mwc`
-step this hook used to require is a Bash call, which prompted for approval in
-a cloud session again and again, and its marker still did not reach the guard
-there (Ezra, 2026-11-13: "stop asking for manual approvals"). Text the user
-did not type (code, quotes, system reminders, pasted content, a
-coordinator's note) is ignored, and a question ("should I merge?") is not a
-grant.
+It only ADDS context; no-unauthorized-merge.py loads `merge_word()` and
+`revokes()` from here and reads the grant from the transcript, so no Bash
+step is needed (ai-config#5612). Text the user did not type and questions
+are not grants.
 
 Fails OPEN and SILENT on any parse trouble.
 """
@@ -40,14 +34,11 @@ INLINE = re.compile(
     r"\b(?:merge\s+when\s+(?:ready|clean|green)|merge\s+them\s+all|mwc\s+(?:them\s+)?all)\b",
     re.I,
 )
-# For a grant, an inline merge word must open a sentence or clause, as an
-# imperative does: "ok, merge them all" grants; "I can merge when ready, per
-# the plan" describes and does not (ai-config#5615 review).
+# A grant opens a clause: "ok, merge them all" grants, "I can merge when ready" does not.
 CLAUSE_START = re.compile(
     r"(?:^|[.!;:\n,])(?:\W|\b(?:ok(?:ay)?|yes|yep|great|thanks|good|sure|then|and|so|please|now)\b)*$",
     re.I,
 )
-# A slash command as the transcript records it.
 SLASH_COMMAND = re.compile(
     r"<command-name>\s*/?(?:ai-config:)?(mwc|maw|merge-when-confident|merge-at-will)\s*</command-name>"
     r"(?:.*?<command-args>(.*?)</command-args>)?",
@@ -73,11 +64,8 @@ NOT_TYPED = [
     re.compile(r'`[^`\n]*`|"[^"\n]*"'),
 ]
 
-# A cloud project thread wraps the user's words in harness XML: a `<wake>`
-# whose human message carries trust="principal", and a coordinator relay whose
-# user messages are `<cited author="user">` entries. Everything else in those
-# wrappers (the coordinator's own note, a peer's message) is not the user's
-# grant, so only those two kinds of body are read.
+# In a cloud thread, only the principal's wake message and a relay's
+# `<cited author="user">` entries are the user's words.
 HARNESS_WRAPPER = re.compile(r"<(?:wake|coordinator-relay)\b")
 PRINCIPAL_MESSAGE = re.compile(
     r'<message\b(?=[^>]*\bfrom="human")(?=[^>]*\btrust="principal")'
@@ -86,8 +74,7 @@ PRINCIPAL_MESSAGE = re.compile(
 )
 CITED_USER = re.compile(r'<cited\b(?=[^>]*\bauthor="user")[^>]*>(.*?)</cited>', re.S)
 NOTE = re.compile(r"<note\b[^>]*>.*?</note>", re.S)
-# A prompt the harness wrote rather than the user (a task notification, a
-# teammate's message, local command output) opens with its own tag.
+# A harness-written prompt (task notification, command output) opens with a tag.
 REMINDER_BLOCK = re.compile(r"<system-reminder\b[^>]*>.*?</system-reminder>", re.S)
 HARNESS_TAGGED = re.compile(r"^\s*<[A-Za-z][\w-]*\b")
 
@@ -130,12 +117,7 @@ def slash_grant(prompt: str):
 
 
 def merge_word(prompt: str, strict: bool = False):
-    """The merge word the user typed in `prompt`, or None.
-
-    `strict` is the merge guard's reading: an inline match counts only where it
-    opens a sentence or clause, since the guard turns a match into authority
-    rather than a reminder.
-    """
+    """The merge word typed in `prompt`, or None; `strict` (the guard) needs it to open a clause."""
     slash = slash_grant(prompt)
     if slash:
         return slash

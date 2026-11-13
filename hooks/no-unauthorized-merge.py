@@ -2247,13 +2247,7 @@ def resolve_session_id(payload: dict | None = None) -> str | None:
 
 
 def _load_merge_word_detector():
-    """remind-plain-english-merge-word.py, loaded by path, or None.
-
-    That hook owns what counts as the user's merge word and what withdraws
-    one, so the guard reuses it rather than keeping a second copy that could
-    drift. When it cannot be loaded the transcript grant is simply not found,
-    which fails CLOSED: the marker path below still works.
-    """
+    """The merge-word hook, loaded by path (one copy of the rule), or None (fails closed)."""
     import importlib.util
     path = Path(__file__).resolve().parent / "remind-plain-english-merge-word.py"
     try:
@@ -2266,12 +2260,7 @@ def _load_merge_word_detector():
 
 
 def _user_prompts(transcript_path: str):
-    """The text of each prompt the user submitted, oldest first.
-
-    Tool results, meta records, compaction summaries and subagent (sidechain)
-    records are also stored as `user` records and are skipped: none of them
-    is the user's own words.
-    """
+    """Each prompt the user typed, oldest first; tool results, meta and sidechain records skipped."""
     with open(transcript_path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -2298,15 +2287,9 @@ def _user_prompts(transcript_path: str):
 
 
 def transcript_merge_grant(payload: dict | None = None) -> bool:
-    """Whether the user granted merging in plain English in this session.
+    """Whether this session's latest merge word or revocation is a grant (ai-config#5612).
 
-    Reads the session transcript for the latest user prompt that is a merge
-    word (`mwc`, "merge them all", "merge when ready", ...) or withdraws one;
-    the later of the two wins. This is the grant path that needs no Bash call:
-    a cloud session merging with the GitHub MCP tool could not see the
-    `ai-session.sh enable-mwc` marker, and running that script prompted for
-    approval each time (ai-config#5612). The transcript is per session, so
-    the grant ends with the session, as the marker's does.
+    Needs no Bash call, so a cloud session can merge with the MCP tool.
     """
     path = (payload or {}).get("transcript_path") or (payload or {}).get("transcriptPath")
     if not isinstance(path, str) or not path.strip() or not os.path.isfile(path.strip()):

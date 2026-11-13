@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the transcript merge grant in hooks/no-unauthorized-merge.py (ai-config#5612).
-
-A plain-English merge word the user typed in this session lets an MCP merge
-through with no `ai-session.sh` step; a later revocation, a question, a
-coordinator's note, a tool result or a subagent record does not count.
-
-Run: python3 hooks/test-no-unauthorized-merge-transcript-grant.py [hooks/no-unauthorized-merge.py]
-"""
+"""Tests for the transcript merge grant in hooks/no-unauthorized-merge.py (ai-config#5612)."""
 import json
 import os
 import subprocess
@@ -38,7 +31,6 @@ RELAY = ('<coordinator-relay><relay from="coordinator">'
          '<cited id="m2" author="user" name="Ezra">{}</cited>'
          '<note>{}</note></relay></coordinator-relay>')
 
-# (description, transcript records, expected verdict)
 CASES = [
     ("no transcript records", [], "BLOCK"),
     ("plain 'merge them all'", [user("merge them all")], "allow"),

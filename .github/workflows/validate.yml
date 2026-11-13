@@ -69,6 +69,9 @@ jobs:
       - name: Run check-owed-mechanism tests
         # ai-config#5049: a memory note that says a check or hook is owed links its issue.
         run: python3 scripts/test_check_owed_mechanism.py
+      - name: Run find-psw-rule-overlap tests
+        # ai-config#5628: before porting a fragment to psw, find psw lines that quote its example words.
+        run: python3 scripts/test_find_psw_rule_overlap.py
       - name: Run check-stop-hook-shapes tests
         # ai-config#5055: a Stop hook that reads the final message names its transcript shapes.
         run: python3 scripts/test_check_stop_hook_shapes.py

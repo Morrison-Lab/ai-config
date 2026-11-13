@@ -43,7 +43,7 @@ def example_phrases(text):
     seen = []
     for match in QUOTED.finditer(text):
         phrase = match.group(1).strip().lower()
-        if not phrase or len(phrase.split()) > MAX_WORDS:
+        if len(phrase) < 2 or len(phrase.split()) > MAX_WORDS:
             continue
         if phrase not in seen:
             seen.append(phrase)
@@ -124,6 +124,8 @@ def main(argv=None):
         for quoted, rel, number, line in found[:args.max_lines]:
             mark = "Q" if quoted else " "
             print(f"  {mark} {rel}:{number}: {line[:120]}")
+        # The summary counts every quoting hit, not only the lines shown.
+        for quoted, rel, _number, _line in found:
             if quoted:
                 quoting.setdefault(rel, set()).add(phrase)
     print(f"{matched} of {len(phrases)} phrase(s) found across {len(files)} psw file(s).")

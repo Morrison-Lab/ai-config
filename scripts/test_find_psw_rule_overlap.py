@@ -42,6 +42,9 @@ check("a phrase over three words is skipped",
 check("a one-letter phrase is skipped; apostrophes and hyphens are kept",
       fpro.example_phrases('"A" and "don\'t" and "state-of-the-art"'),
       ["don't", "state-of-the-art"])
+check("a phrase that is one letter after stripping is skipped",
+      fpro.example_phrases('say "A " and "ok" here'),
+      ["ok"])
 check("a quoted code-like token is skipped",
       fpro.example_phrases('"tool_calls" and ", "'),
       [])
@@ -82,6 +85,14 @@ with tempfile.TemporaryDirectory() as tmp:
     code, out = run([str(fragment), "--psw", str(psw), "--max-lines", "1"])
     check("--max-lines caps the lines shown per phrase", out.count("\n    chapters/"), 0)
     check("--max-lines keeps the first (quoting) line", out.count("Q chapters/"), 1)
+
+    many = root / "many"
+    (many / "chapters").mkdir(parents=True)
+    for i in range(1, 8):
+        (many / "chapters" / f"f{i}.md").write_text('Avoid "now".\n', encoding="utf-8")
+    code, out = run([str(fragment), "--psw", str(many), "--max-lines", "2"])
+    check("the quoting summary counts hits beyond --max-lines",
+          all(f"chapters/f{i}.md: now" in out for i in range(1, 8)), True)
 
     nomatch = root / "nomatch.md"
     nomatch.write_text('Avoid "zebra".\n', encoding="utf-8")

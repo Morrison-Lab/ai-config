@@ -17,6 +17,8 @@ whether the running copy is the installed snapshot or a stale one:
   9. A project-scope entry for another project only: silent.
  10. An installed hook whose matcher does not match the tool is not run.
  11. A legacy {"decision": "block"} output counts as a deny.
+ 12. The sibling cannot be imported: a merge is still gated (fail closed).
+ 13. The budget runs out: a later gate is reported as not reached, and denied.
 """
 import json
 import os
@@ -44,6 +46,7 @@ DENY = ('import json;print(json.dumps({"hookSpecificOutput":{"hookEventName":'
 PASS = 'import sys;sys.stdin.read()'
 FAIL = 'import sys;sys.exit(1)'
 BLOCK = 'import json;print(json.dumps({"decision":"block","reason":"legacy no"}))'
+SLOW = 'import time;time.sleep(5)'
 
 
 def snapshot(base, groups):
@@ -162,6 +165,36 @@ try:
     rc, out = run(base, stale, dict(MCP_MERGE, cwd=str(tmp)))
     d, reason, _ = decision(out)
     check("11 legacy decision:block is a deny", d == "deny" and "legacy no" in reason, f"{out}")
+
+    # 12. The hook copied alone, so its sibling cannot be imported: the
+    # coarse merge test still runs the installed gates (fail closed).
+    lone = tmp / "lone"
+    lone.mkdir()
+    shutil.copy(HOOK, lone / HOOK.name)
+    base, root = case("c12", [("mcp__github__.*", [("gate-b.py", DENY)])], MCP_MERGE)
+    env = dict(os.environ, AI_CONFIG_PLUGINS_DIR=str(base), AI_CONFIG_SELF_ROOT=str(stale))
+    proc = subprocess.run([sys.executable, str(lone / HOOK.name)],
+                          input=json.dumps(dict(MCP_MERGE, cwd=str(tmp))),
+                          capture_output=True, text=True, env=env, timeout=120)
+    out = json.loads(proc.stdout) if proc.stdout.strip() else None
+    d, reason, _ = decision(out)
+    check("12 sibling unavailable: merge still gated", d == "deny" and "gate-b.py" in reason,
+          f"{proc.returncode} {out} {proc.stderr[-300:]}")
+
+    # 13. A slow first gate uses the whole budget: the second is reported as
+    # not reached, and the merge is refused.
+    base, root = case("c13", [("mcp__github__.*", [("gate-s.py", SLOW), ("gate-a.py", PASS)])],
+                      MCP_MERGE)
+    env = dict(os.environ, AI_CONFIG_PLUGINS_DIR=str(base), AI_CONFIG_SELF_ROOT=str(stale),
+               AI_CONFIG_STALE_GATE_BUDGET="1")
+    proc = subprocess.run([sys.executable, str(HOOK)],
+                          input=json.dumps(dict(MCP_MERGE, cwd=str(tmp))),
+                          capture_output=True, text=True, env=env, timeout=120)
+    out = json.loads(proc.stdout) if proc.stdout.strip() else None
+    d, reason, _ = decision(out)
+    check("13 budget exhausted: later gate not reached, deny",
+          d == "deny" and "gate-s.py: timed out" in reason
+          and "gate-a.py: not reached" in reason, f"{out}")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

@@ -55,7 +55,7 @@ from pathlib import Path
 
 PLUGIN = "ai-config"
 SELF = os.path.basename(__file__)
-BUDGET = 50.0  # seconds for all installed hooks together; registered timeout is 60
+BUDGET = float(os.environ.get("AI_CONFIG_STALE_GATE_BUDGET", "50"))  # seconds for all installed hooks; registered timeout is 60
 
 _LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
                     "scripts", "lib")
@@ -119,20 +119,53 @@ def installed_paths(here: Path) -> list[Path]:
     return out
 
 
+MERGE_TOOLS = ("merge_pull_request", "enable_pr_auto_merge")
+MERGE_WORDS = ("gh pr merge", "/merge")
+
+
+def looks_like_merge(payload: dict) -> bool:
+    """A coarse merge test, used only when the precise one cannot run.
+
+    Erring toward True is the safe direction here: a false positive costs
+    one run of the installed gates, while a false negative lets a merge
+    past a stale session's weaker hooks unchecked.
+    """
+    tool = payload.get("tool_name") or payload.get("toolName") or ""
+    if tool.endswith(MERGE_TOOLS):
+        return True
+    tool_input = payload.get("tool_input") or payload.get("toolInput") or {}
+    command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
+    return tool == "Bash" and isinstance(command, str) and any(
+        word in command for word in MERGE_WORDS)
+
+
 def is_merge(payload: dict) -> bool:
-    """True when the call merges or arms auto-merge, per the cross-harness hook."""
+    """True when the call merges or arms auto-merge, per the cross-harness hook.
+
+    Falls back to looks_like_merge when the sibling cannot be loaded or
+    raises, so a broken import fails closed rather than open.
+    """
     if load_sibling is None:
-        return False
-    xh = load_sibling(__file__, "warn-merge-without-cross-harness-review.py",
-                      "_sib_wmwchr")
+        return looks_like_merge(payload)
+    try:
+        xh = load_sibling(__file__, "warn-merge-without-cross-harness-review.py",
+                          "_sib_wmwchr")
+    except Exception:
+        return looks_like_merge(payload)
     if xh is None:
-        return False
-    sib = xh._sibling()
+        return looks_like_merge(payload)
+    try:
+        sib = xh._sibling()
+    except Exception:
+        return looks_like_merge(payload)
     tool = payload.get("tool_name") or payload.get("toolName") or ""
     tool_input = payload.get("tool_input") or payload.get("toolInput")
     if not isinstance(tool_input, dict):
         return False
-    return bool(xh._targets(sib, tool, tool_input))
+    try:
+        return bool(xh._targets(sib, tool, tool_input))
+    except Exception:
+        return looks_like_merge(payload)
 
 
 def matching_hooks(root: Path, tool: str) -> list[dict]:
@@ -159,7 +192,8 @@ def run_installed(root: Path, tool: str, raw: str) -> tuple[list[str], list[str]
         name = hook.get("script") or hook["command"]
         left = deadline - time.monotonic()
         if left <= 0:
-            failures.append(f"{name}: out of time")
+            failures.append(f"{name}: not reached, because earlier hooks "
+                            f"used the whole {BUDGET:.0f} s budget")
             continue
         command = hook["command"].replace("${CLAUDE_PLUGIN_ROOT}", str(root))
         try:
@@ -209,9 +243,10 @@ def main() -> int:
     if not isinstance(payload, dict):
         return 0
     try:
-        if not is_merge(payload):
-            return 0
+        merge = is_merge(payload)
     except Exception:
+        merge = looks_like_merge(payload)
+    if not merge:
         return 0
     paths = installed_paths(session_dir(payload))
     mine = self_root()

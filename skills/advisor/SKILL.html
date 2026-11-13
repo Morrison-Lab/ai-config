@@ -27,6 +27,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -51,9 +86,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-3191446cf01d07254cce00ea98dcb138.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-01ff0db6beb894ce1e8b5cbee5b9b6d6.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-3191446cf01d07254cce00ea98dcb138.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-b0bacdaee50ff9abb97ae013f25660d1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-73697afd21240edc0e3998da1c8d687b.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-b0bacdaee50ff9abb97ae013f25660d1.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -450,6 +485,13 @@ cookieconsent.run({
 <section id="never-fall-back-to-the-callers-family" class="level3">
 <h3 class="anchored" data-anchor-id="never-fall-back-to-the-callers-family">4. Never fall back to the caller’s family</h3>
 <p>If the chosen model is unavailable, report that and stop, or pick another engine outside the caller’s family. A same-family substitute is not independent, so it defeats the point of asking. A different model in the caller’s own family is a weaker and cheaper option: name it as weaker in the result, and do not call it equivalent.</p>
+<p><code>scripts/check-advisor-seat.py</code> checks this rule and step 3’s explicit <code>model</code> and <code>effort</code>. Run it before the call, and again after with <code>--reported-model</code> set to the model the reply names:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> scripts/check-advisor-seat.py <span class="at">--caller-model</span> <span class="op">&lt;</span>caller<span class="op">&gt;</span> --engine <span class="op">&lt;</span>engine<span class="op">&gt;</span> --model <span class="op">&lt;</span>model<span class="op">&gt;</span> --effort <span class="op">&lt;</span>effort<span class="op">&gt;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>It exits 2 on a same-family seat, an engine whose name contains <code>codex</code>, an effort that names no level (blank, or a word such as <code>default</code> or <code>inherit</code>), a model name that is unknown or names two families, or a reply from a model other than the one requested or its dated snapshot. <code>--allow-same-family</code> accepts a same-family seat and prints it as weaker, and <code>--family PREFIX=FAMILY</code> classifies a model the built-in table does not know. The <code>adversarial-reviewer</code> agent’s “Advisor consults from the caller’s own family” item is the reviewer’s layer for this rule.</p>
+<ul>
+<li><strong>Do:</strong> run the script before and after the call, and stop on exit 2.</li>
+<li><strong>Don’t:</strong> take an answer from whatever model the engine fell back to, since a substitute from your own family is not the independent read you asked for.</li>
+</ul>
 </section>
 <section id="treat-the-answer-as-evidence" class="level3">
 <h3 class="anchored" data-anchor-id="treat-the-answer-as-evidence">5. Treat the answer as evidence</h3>
@@ -458,7 +500,7 @@ cookieconsent.run({
 </section>
 <section id="not-covered-yet" class="level2">
 <h2 class="anchored" data-anchor-id="not-covered-yet">Not covered yet</h2>
-<p><a href="https://github.com/Morrison-Lab/ai-config/issues/884">ai-config#884</a> tracks the later slices: a script that enforces steps 3 and 4 mechanically, and whether <code>context: fork</code> can replace a separate process (it isolates conversation history but stays on an agent type in this session, so it is not a cross-family consult).</p>
+<p><a href="https://github.com/Morrison-Lab/ai-config/issues/884">ai-config#884</a> tracks the later slices: a wrapper that runs step 3’s call in the engine’s read-only mode, and whether <code>context: fork</code> can replace a separate process (it isolates conversation history but stays on an agent type in this session, so it is not a cross-family consult).</p>
 
 
 </section>

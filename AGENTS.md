@@ -154,7 +154,7 @@ At three open PRs per repo, open no fourth ([`wip-cap`](shared/workflow/wip-cap.
 ## A freeze stops new work, not issue filing
 
 "a freeze shouldn't prevent you from filing issues" (Ezra, 2026-11-12).
-A scope freeze, the WIP cap, `finish-wave` or any other freeze stops grabbing and working issues, never filing them: file in the same turn and leave the issue unclaimed ([`freezes-allow-filing`](shared/workflow/freezes-allow-filing.md)).
+A scope freeze, the WIP cap, `finish-wave` or any other freeze stops grabbing and working issues, never filing them: file in the same turn and leave the issue unclaimed, unless it is urgent and you filed it yourself, which you may work ([`freezes-allow-filing`](shared/workflow/freezes-allow-filing.md)).
 
 ## Canonical sources vs generated output
 

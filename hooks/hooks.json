@@ -322,6 +322,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/prefer-mcp-over-bash-in-cloud.py\"",
+            "timeout": 10,
+            "script": "prefer-mcp-over-bash-in-cloud.py",
+            "why": "ai-config#5613. Ezra, 2026-11-13: \"remember that cloud sessions should use mcp tools rather than bash commands wherever possible\". In a cloud session (CLAUDE_CODE_REMOTE=true) DENIES a Bash command whose program, at a command position, is gh pr|issue|run|workflow|release, gh api on a non-search path, or curl/wget to api.github.com on a non-search path, and names the GitHub MCP tool that does the job. Search passes, since the cloud harness has no MCP search tool. git, gh auth/search/secret/label and quoted or heredoc mentions are not touched. A deny rather than a warning because a warning is read past (ai-config#4741) and the Bash call it would allow is the approval prompt Ezra asked to stop. ALLOW_BASH_OVER_MCP=1 covers an endpoint no MCP tool has. Silent outside cloud sessions; fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-gh-repo-flag.py\"",
             "timeout": 10,
             "script": "require-gh-repo-flag.py",

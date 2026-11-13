@@ -31,10 +31,8 @@ Changing an existing hook's event or matcher in `hooks/hooks.json` needs the sam
 - **Do:** after any edit to `hooks/hooks.json`, run `python3 scripts/gen-hooks-plugin.py`, update the hook's `README.md` catalog row, and then run `python3 scripts/check-hook-catalog.py`.
 - **Don't:** treat a matcher change as a one-line edit to `hooks/hooks.json`.
 
-The same PR's regex stage split broke on `rg "a|b" f` and on `grep x f;`, which the runner's cross-harness review reproduced (2026-11-13):
-
 - **Do:** split a shell command into stages with `shlex` (`punctuation_chars=";&|\n"`), as [`least-flexible-tool`](../coding/least-flexible-tool.md) says, and test a quoted operator, a trailing operator and an unbalanced quote.
-- **Don't:** split on `&&`, `|` or `;` with a regex that cannot see quoting.
+- **Don't:** split on `&&`, `|` or `;` with a regex that cannot see quoting, as #5631 first did and broke on `rg "a|b" f` and `grep x f;`.
 
 For a guard against a destructive command ([`destructive-actions-catalog`](destructive-actions-catalog.md)):
 

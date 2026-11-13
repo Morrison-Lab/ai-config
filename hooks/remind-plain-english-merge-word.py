@@ -44,7 +44,7 @@ INLINE = re.compile(
 # imperative does: "ok, merge them all" grants; "I can merge when ready, per
 # the plan" describes and does not (ai-config#5615 review).
 CLAUSE_START = re.compile(
-    r"(?:^|[.!;:\n]|,)\s*(?:(?:ok(?:ay)?|yes|yep|great|thanks|good|sure|then|and|so|please|now)\W+)*$",
+    r"(?:^|[.!;:\n,])(?:\W|\b(?:ok(?:ay)?|yes|yep|great|thanks|good|sure|then|and|so|please|now)\b)*$",
     re.I,
 )
 # A slash command as the transcript records it.

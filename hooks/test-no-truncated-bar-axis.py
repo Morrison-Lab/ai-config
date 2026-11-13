@@ -13,7 +13,7 @@ import sys
 import tempfile
 
 HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "no-truncated-bar-axis.py")
+    os.path.dirname(os.path.realpath(__file__)), "no-truncated-bar-axis.py")
 
 MPL_BAR = "ax.bar(groups, coverage)\n"
 # (description, code, denied)
@@ -45,6 +45,34 @@ CODE = [
      "chart = shapes.add_chart(XL_CHART_TYPE.LINE, x, y, cx, cy, data).chart\n"
      "chart.value_axis.minimum_scale = 70\n", False),
     ("allow comment", MPL_BAR + "ax.set_ylim(70, 80)  # axis-zero: allow index has no zero\n", False),
+    ("matplotlib bar, set_ylim(.5, 1)", MPL_BAR + "ax.set_ylim(.5, 1)\n", True),
+    ("bars on ax1, limit on a twinx line axes",
+     "ax1.bar(g, v)\nax2 = ax1.twinx()\nax2.plot(g, r)\nax2.set_ylim(70, 80)\n", False),
+    ("bars on ax1, limit on a separate line axes",
+     "fig, (ax1, ax2) = plt.subplots(1, 2)\nax1.bar(g, v)\nax2.plot(x, y)\nax2.set_ylim(70, 80)\n", False),
+    ("bars and a line chart in separate figures",
+     "plt.figure()\nplt.bar(g, v)\nplt.figure()\nplt.plot(x, y)\nplt.ylim(70, 80)\n", False),
+    ("matplotlib bar, ax.set(ylim=(70, 80))", MPL_BAR + "ax.set(ylim=(70, 80))\n", True),
+    ("seaborn barplot, plt.ylim(70, 80)", "sns.barplot(data=d, x='g', y='v')\nplt.ylim(70, 80)\n", True),
+    ("seaborn barplot on ax, ax.set_ylim(70, 80)",
+     "sns.barplot(data=d, x='g', y='v', ax=ax)\nax.set_ylim(70, 80)\n", True),
+    ("pandas kind='bar', ylim=(70, 80)", "df.plot(kind='bar', ylim=(70, 80))\n", True),
+    ("pandas .plot.bar(), then ax.set_ylim(70, 80)",
+     "ax = df.plot.bar(x='g', y='v')\nax.set_ylim(70, 80)\n", True),
+    ("pandas kind='line', ylim=(70, 80)", "df.plot(kind='line', ylim=(70, 80))\n", False),
+    ("base R barplot(ylim = c(70, 80))", "barplot(v, names.arg = g, ylim = c(70, 80))\n", True),
+    ("base R barplot(ylim = c(0, 100))", "barplot(v, ylim = c(0, 100))\n", False),
+    ("plotly horizontal bars, update_xaxes(range=[85, 95])",
+     "fig = go.Figure(go.Bar(x=v, y=g, orientation='h'))\nfig.update_xaxes(range=[85, 95])\n", True),
+    ("plotly bars, secondary y-axis range",
+     "fig = make_subplots(specs=[[{'secondary_y': True}]])\nfig.add_trace(go.Bar(x=g, y=v))\n"
+     "fig.update_yaxes(range=[85, 95], secondary_y=True)\n", False),
+    ("altair mark_bar, scale zero=False",
+     "alt.Chart(d).mark_bar().encode(x='g', y=alt.Y('v', scale=alt.Scale(zero=False)))\n", True),
+    ("altair mark_bar, domain=[70, 80]",
+     "alt.Chart(d).mark_bar().encode(x='g', y=alt.Y('v', scale=alt.Scale(domain=[70, 80])))\n", True),
+    ("altair mark_line, zero=False",
+     "alt.Chart(d).mark_line().encode(x='t', y=alt.Y('v', scale=alt.Scale(zero=False)))\n", False),
 ]
 
 

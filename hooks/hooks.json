@@ -2056,14 +2056,14 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": ".*",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ums-on-trigger-events.py\"",
             "timeout": 10,
             "script": "remind-ums-on-trigger-events.py",
-            "why": "A git revert or hard reset means work was undone or redone: ask what would have prevented the first attempt and record it (ai-config#4480)."
+            "why": "A git revert or hard reset means work was undone or redone: ask what would have prevented the first attempt and record it (ai-config#4480). On every tool: when the newest tool result is an error, the next call (usually its revision) gets a UMS reminder, once per error, except for EXPECTED_ERRORS such as a grep with no match (Ezra, 2026-11-13, ai-config#5630)."
           }
         ]
       },

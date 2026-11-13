@@ -20,6 +20,18 @@ decidable signature; the rest (below) stay rules in run-ums-proactively.md.
                      the compacted context may be summarized away.
   revert             PreToolUse Bash running `git revert`, `git reset --hard`
                      or `git restore --source`: work was undone or redone.
+  tool-error         PreToolUse, any tool (ai-config#5630): the transcript's
+                     most recent tool result is an error (a non-zero exit, a
+                     hook denial, an InputValidationError, an MCP error), so
+                     this call is usually its revision. Ezra, 2026-11-13: "any
+                     time you format a command incorrectly and need to revise
+                     it, run ums?", then "in other words, any time a command
+                     produces an error?". Inject-only, because a deny would
+                     block the retry that fixes the error. EXPECTED_ERRORS
+                     lists results that are not mistakes (a grep with no
+                     match, a false test, a diff), EXPECT_FAIL a call marked
+                     expect-fail, and USER_REJECTED a call the user declined.
+                     Every error among parallel results counts.
 
 Inject-only: every path prints context and exits 0. Fails OPEN and SILENT.
 Each reminder fires once per distinct trigger text (sentinel in the temp dir).
@@ -28,6 +40,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import sys
 import tempfile
 
@@ -39,6 +52,40 @@ GRANT = re.compile(
     re.I,
 )
 REVERT = re.compile(r"\bgit\s+(?:revert|reset\s+--hard|restore\s+--source)\b")
+
+# Errors that are not mistakes: (command regex, error-text regex) pairs. When
+# both search-match the failed call's "command" input (empty for other tools)
+# and its error text, the tool-error reminder is skipped. Ezra said "daytb" on
+# which expected non-zero results to exempt (2026-11-13, ai-config#5630); edit
+# this list to change the answer.
+#
+# Each command regex is matched against the LAST non-empty stage of the
+# command (after the final unquoted &&, ||, ;, |, & or newline), because that
+# stage sets the exit code: "cd r && grep x f" fails exactly when its grep
+# finds nothing. last_stage() splits with shlex, so a quoted operator, as in
+# rg "a|b" f, stays inside its stage. A heredoc body or a compound command
+# ending in "done" or "fi" has no exempt last stage, so it is never exempted.
+# EXPECT_FAIL is matched against the whole command instead, anchored to its
+# start or its end, so the words inside a commit message do not count.
+# grep -c prints a count of 0 (per file, "f:0") before exiting 1.
+_EXIT_1_NO_MATCH = r"\A\s*Exit code 1(?:\s*\n\s*(?:\S+:)?0)*\s*\Z"
+EXPECTED_ERRORS = (
+    # A search that finds nothing: grep, rg or git grep, exit 1, no output.
+    (r"\A\s*(?:git(?:\s+-C\s+\S+)?\s+grep|grep|egrep|fgrep|rg)\b", _EXIT_1_NO_MATCH),
+    # A test whose answer is "no": test, [ or [[, exit 1.
+    (r"\A\s*(?:test|\[\[?)\s", r"\A\s*Exit code 1\b"),
+    # diff, cmp or git diff --exit-code reporting a difference: exit 1.
+    (r"\A\s*(?:diff|cmp)\b|\A\s*git(?:\s+-C\s+\S+)?\s+diff\b.*--(?:exit-code|quiet)\b", r"\A\s*Exit code 1\b"),
+)
+# A command the agent marked as expected to fail: an EXPECT_FAIL=1 prefix or
+# a trailing "# expect-fail" comment.
+EXPECT_FAIL = re.compile(r"\A\s*EXPECT_FAIL=1\s|#\s*expect(?:ed)?[- ]fail\s*\Z")
+# The user declined the call: a decision, not a malformed command.
+USER_REJECTED = re.compile(r"doesn't want to proceed|user rejected", re.I)
+OPERATOR_CHARS = ";&|\n"
+
+# Read only the end of a long transcript: the newest tool result is all we need.
+TAIL_BYTES = 400_000
 
 COMMON = (
     "Record the general rule in its global home in this turn (ai-config for agent rules, "
@@ -72,6 +119,12 @@ MESSAGES = {
         "what the summary still shows (corrections, workarounds, convention failures) before "
         "continuing."
     ),
+    "tool-error": (
+        "[hook: remind-ums-on-trigger-events] The previous {tool} call returned an error "
+        "({error!r}). Ezra, 2026-11-13: any command that produces an error owes a UMS pass. "
+        "Once the revised call works, record what caused the error and the form that works, "
+        "so the next session writes it right the first time. " + COMMON
+    ),
     "revert": (
         "[hook: remind-ums-on-trigger-events] This command reverts or redoes work. Once it runs, "
         "ask what decision or check would have prevented the first attempt, and record that. "
@@ -91,6 +144,116 @@ def first_time(kind, text):
     except OSError:
         pass
     return True
+
+
+def _text(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(str(b.get("text", "")) for b in content if isinstance(b, dict))
+    return ""
+
+
+def last_tool_errors(transcript_path):
+    """[(tool_use_id, tool name, input, error text)] for each error in the newest batch of results.
+
+    Parallel calls return several results, so the newest batch is every result
+    whose call belongs to the last group of calls that has any result yet. A
+    call still pending (the one this hook is running for) starts a group with
+    no results and is skipped.
+    """
+    with open(transcript_path, "rb") as fh:
+        fh.seek(0, os.SEEK_END)
+        fh.seek(max(0, fh.tell() - TAIL_BYTES))
+        lines = fh.read().decode("utf-8", errors="replace").splitlines()
+    uses = {}
+    group_of = {}
+    group = 0
+    seen_result = False
+    results = []
+    for line in lines:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        content = (entry.get("message") or {}).get("content") if isinstance(entry, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_use":
+                if seen_result:
+                    group += 1
+                    seen_result = False
+                uses[block.get("id")] = (block.get("name"), block.get("input"))
+                group_of[block.get("id")] = group
+            elif block.get("type") == "tool_result":
+                seen_result = True
+                results.append(block)
+    # A result whose call fell before the tail has no group, so it cannot be
+    # placed in time; leave it out rather than count an old error as new.
+    results = [r for r in results if r.get("tool_use_id") in group_of]
+    if not results:
+        return []
+    newest = max(group_of[r.get("tool_use_id")] for r in results)
+    errors = []
+    for res in results:
+        use_id = res.get("tool_use_id")
+        if group_of[use_id] != newest or not res.get("is_error"):
+            continue
+        name, inp = uses.get(use_id, ("a tool", None))
+        errors.append((use_id, name, inp, _text(res.get("content"))))
+    return errors
+
+
+def last_stage(command):
+    """The last non-empty stage of a shell command, split on unquoted operators (2>&1 lexes as ">&", no break).
+
+    On unbalanced quotes shlex raises, and the whole command is the stage.
+    """
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=OPERATOR_CHARS + "<>")
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    try:
+        tokens = list(lexer)
+    except ValueError:
+        return command.strip()
+    stages = [[]]
+    for tok in tokens:
+        if set(tok) <= set(OPERATOR_CHARS):
+            stages.append([])
+        else:
+            stages[-1].append(tok)
+    nonempty = [stage for stage in stages if stage]
+    return " ".join(nonempty[-1]) if nonempty else ""
+
+
+def is_expected(inp, error):
+    """True when an error result is not a mistake (EXPECTED_ERRORS, EXPECT_FAIL, a user rejection)."""
+    if USER_REJECTED.search(error):
+        return True
+    command = str(inp.get("command") or "") if isinstance(inp, dict) else json.dumps(inp or "")
+    if EXPECT_FAIL.search(command):
+        return True
+    stage = last_stage(command)
+    return any(re.search(cmd_re, stage) and re.search(err_re, error) for cmd_re, err_re in EXPECTED_ERRORS)
+
+
+def tool_error_reminder(payload):
+    path = payload.get("transcript_path")
+    if not isinstance(path, str) or not os.path.isfile(path):
+        return None
+    notes = []
+    for use_id, name, inp, error in last_tool_errors(path):
+        if is_expected(inp, error) or not first_time("tool-error", f"{path}:{use_id}"):
+            continue
+        # "Exit code N" alone says nothing about the cause, so quote the next line too.
+        shown = [ln.strip() for ln in error.splitlines() if ln.strip()][:2] or ["error"]
+        if not shown[0].startswith("Exit code"):
+            shown = shown[:1]
+        notes.append(MESSAGES["tool-error"].format(tool=name, error=": ".join(shown)[:200]))
+    return "\n\n".join(notes) or None
 
 
 def coordinator_note(prompt):
@@ -123,10 +286,16 @@ def main() -> int:
         if event == "PreToolUse":
             inp = payload.get("tool_input")
             cmd = str(inp.get("command") or "") if isinstance(inp, dict) else ""
+            notes = []
             if REVERT.search(cmd) and first_time("revert", cmd):
+                notes.append(MESSAGES["revert"])
+            error_note = tool_error_reminder(payload)
+            if error_note:
+                notes.append(error_note)
+            if notes:
                 print(json.dumps({"hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
-                    "additionalContext": MESSAGES["revert"],
+                    "additionalContext": "\n\n".join(notes),
                 }}))
             return 0
         prompt = payload.get("prompt")

@@ -25,6 +25,15 @@ Four more misses sent [#5615](https://github.com/Morrison-Lab/ai-config/pull/561
 - **Do:** run `python3 scripts/check_regex_patterns.py` on a new regex and flatten any nested quantifier (a repeat inside a repeat).
 - **Don't:** leave a nested quantifier for CI to find.
 
+Changing an existing hook's event or matcher in `hooks/hooks.json` needs the same two follow-ups as a new hook.
+[#5631](https://github.com/Morrison-Lab/ai-config/pull/5631) widened a matcher from `Bash` to `.*` and failed `validate` twice, once for each follow-up (2026-11-13):
+
+- **Do:** after any edit to `hooks/hooks.json`, run `python3 scripts/gen-hooks-plugin.py`, update the hook's `README.md` catalog row, and then run `python3 scripts/check-hook-catalog.py`.
+- **Don't:** treat a matcher change as a one-line edit to `hooks/hooks.json`.
+
+- **Do:** split a shell command into stages with `shlex` (`punctuation_chars=";&|\n"`), as [`least-flexible-tool`](../coding/least-flexible-tool.md) says, and test a quoted operator, a trailing operator and an unbalanced quote.
+- **Don't:** split on `&&`, `|` or `;` with a regex that cannot see quoting, as #5631 first did and broke on `rg "a|b" f` and `grep x f;`.
+
 For a guard against a destructive command ([`destructive-actions-catalog`](destructive-actions-catalog.md)):
 
 - **Do:** test it by feeding the hook a payload, or inside a throwaway repository made for that test.

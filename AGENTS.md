@@ -232,6 +232,18 @@ Use a browser only if none can (or could be set up), or the task is visual.
 Never use Chrome or Claude in Chrome (Ezra, 2026-10-22).
 See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
 
+## Cloud sessions use MCP tools, not Bash, wherever one exists
+
+In a cloud session, do GitHub work and any other step an MCP tool covers with that tool, not with a Bash command (Ezra, 2026-11-13: "cloud sessions should use mcp tools rather than bash commands wherever possible").
+A cloud Bash call can prompt for approval, and an MCP call does not.
+`hooks/prefer-mcp-over-bash-in-cloud.py` denies `gh pr|issue|run|workflow|release`, `gh api` and `curl` to api.github.com there, except search, which has no MCP tool.
+[`tool-mappings.md`](tool-mappings.md) maps each command.
+Beyond GitHub no hook can tell which Bash steps an MCP tool covers, so check the tool list before reaching for Bash.
+The reviewer's checklist item is in [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md#bash-where-a-cloud-mcp-tool-exists).
+
+- **Do:** merge, comment and read PRs with the GitHub MCP tools in a cloud session.
+- **Don't:** run `gh pr` or `gh api` in Bash there when an MCP tool does the same step.
+
 ## Draft communications in Ezra's voice
 
 Imitate Ezra's writing style in any draft that goes out as him ([`draft-in-ezras-voice`](skills/draft-in-ezras-voice/SKILL.md)).

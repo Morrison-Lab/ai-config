@@ -309,6 +309,13 @@ Read the transcript and the reply yourself;
 do not report the output of [`check-advisor-seat.py`](../../scripts/check-advisor-seat.py) as your finding.
 See [`advisor`](../../skills/advisor/SKILL.md#4-never-fall-back-to-the-callers-family).
 
+## Bash where a cloud MCP tool exists
+
+On a transcript, skill or brief for a cloud session, check that GitHub steps (PRs, issues, merges, comments, runs, releases, file contents) go through a GitHub MCP tool rather than `gh` or `curl` in Bash, and flag a Bash step an MCP tool covers.
+Search through `gh api search/...` is fine, since the cloud harness has no MCP search tool.
+Read the commands yourself; do not report the output of `hooks/prefer-mcp-over-bash-in-cloud.py` as your finding.
+See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever-one-exists).
+
 ## Figures with a cut value axis
 
 On a diff that draws a figure in any tool or format (a Quarto chunk, matplotlib or plotly for a slide or Word file, a native PowerPoint chart, a Shiny app), check that a bar chart's value axis starts at zero, and that a dot or line plot of a count, rate or proportion that readers compare also starts at zero unless the quantity has no meaningful zero.

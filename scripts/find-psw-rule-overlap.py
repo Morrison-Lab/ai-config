@@ -34,6 +34,7 @@ from pathlib import Path
 
 QUOTED = re.compile(r'"([A-Za-z][A-Za-z\' -]{1,40})"')
 MAX_WORDS = 3
+CURLY_APOSTROPHE = chr(0x2019)
 SKIP_DIRS = {"_site", "_freeze", ".quarto", "_extensions", "node_modules", ".git"}
 
 
@@ -73,7 +74,7 @@ def hits(phrase, files, root):
     quoted_pattern = re.compile(r"[\"*`]" + word + r"[\"*`]", re.IGNORECASE)
     found = []
     for path in files:
-        text = path.read_text(encoding="utf-8", errors="replace").replace("’", "'")
+        text = path.read_text(encoding="utf-8", errors="replace").replace(CURLY_APOSTROPHE, "'")
         lines = text.splitlines()
         for number, line in enumerate(lines, start=1):
             if pattern.search(line):

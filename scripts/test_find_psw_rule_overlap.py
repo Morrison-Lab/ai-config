@@ -71,7 +71,7 @@ with tempfile.TemporaryDirectory() as tmp:
           out.index("Q chapters/word-choice.qmd") < out.index("chapters/prose.qmd"), True)
 
     (psw / "chapters" / "case.qmd").write_text(
-        "NOW is upper case.\nA now-ish word.\nWe don’t.\n", encoding="utf-8")
+        "NOW is upper case.\nA now-ish word.\nWe don" + chr(0x2019) + "t.\n", encoding="utf-8")
     code, out = run([str(fragment), "--psw", str(psw), "--max-lines", "9"])
     check("matching ignores case", "chapters/case.qmd:1:" in out, True)
     check("a hyphenated word is not a whole-word hit", "chapters/case.qmd:2:" in out, False)

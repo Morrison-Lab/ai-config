@@ -40,11 +40,28 @@ INLINE = re.compile(
     r"\b(?:merge\s+when\s+(?:ready|clean|green)|merge\s+them\s+all|mwc\s+(?:them\s+)?all)\b",
     re.I,
 )
-# Withdrawing a grant: `/mwc revoke`, `disable-mwc`, "stop merging", "don't merge".
-REVOKE = re.compile(
-    r"(?:^|\W)(?:/?mwc\s+revoke|disable-mwc|stop\s+merging"
-    r"|(?:do\s+not|don't|dont|no\s+more)\s+merg(?:e|ing)\b)",
+# For a grant, an inline merge word must open a sentence or clause, as an
+# imperative does: "ok, merge them all" grants; "I can merge when ready, per
+# the plan" describes and does not (ai-config#5615 review).
+CLAUSE_START = re.compile(
+    r"(?:^|[.!;:\n]|,)\s*(?:(?:ok(?:ay)?|yes|yep|great|thanks|good|sure|then|and|so|please|now)\W+)*$",
     re.I,
+)
+# A slash command as the transcript records it.
+SLASH_COMMAND = re.compile(
+    r"<command-name>\s*/?(?:ai-config:)?(mwc|maw|merge-when-confident|merge-at-will)\s*</command-name>"
+    r"(?:.*?<command-args>(.*?)</command-args>)?",
+    re.S | re.I,
+)
+# Withdrawing a grant: `/mwc revoke`, `disable-mwc`, "stop merging", "don't merge".
+# A bare "stop", "wait" or "no" withdraws too, but only as a whole clause or
+# before a merge word, so "stop asking for approvals" is not a revocation.
+REVOKE = re.compile(
+    r"(?:^|\W)(?:/?mwc\s+revoke|revoke\s+(?:the\s+)?mwc|disable-mwc|stop\s+merging"
+    r"|hold\s+off|not\s+yet"
+    r"|(?:do\s+not|don't|dont|no\s+more|never)\s+merg(?:e|ing)\b)"
+    r"|(?:^|[.!;])\s*(?:stop|wait|no)\b[^\w\n]*(?:$|merg)",
+    re.I | re.M,
 )
 QUESTION = re.compile(r"\?\s*$")
 QUESTION_SENTENCE = re.compile(r"[^.!?\n]*\?")
@@ -63,11 +80,16 @@ NOT_TYPED = [
 # grant, so only those two kinds of body are read.
 HARNESS_WRAPPER = re.compile(r"<(?:wake|coordinator-relay)\b")
 PRINCIPAL_MESSAGE = re.compile(
-    r'<message\b(?=[^>]*\bfrom="human")(?=[^>]*\btrust="principal")[^>]*>(.*?)</message>',
+    r'<message\b(?=[^>]*\bfrom="human")(?=[^>]*\btrust="principal")'
+    r'(?=[^>]*\btrigger="true")[^>]*>(.*?)</message>',
     re.S,
 )
 CITED_USER = re.compile(r'<cited\b(?=[^>]*\bauthor="user")[^>]*>(.*?)</cited>', re.S)
 NOTE = re.compile(r"<note\b[^>]*>.*?</note>", re.S)
+# A prompt the harness wrote rather than the user (a task notification, a
+# teammate's message, local command output) opens with its own tag.
+REMINDER_BLOCK = re.compile(r"<system-reminder\b[^>]*>.*?</system-reminder>", re.S)
+HARNESS_TAGGED = re.compile(r"^\s*<[A-Za-z][\w-]*\b")
 
 REMINDER = (
     "[hook: remind-plain-english-merge-word] The user's message (\"{quote}\") is a merge word "
@@ -91,20 +113,40 @@ def typed(text: str) -> str:
 def user_bodies(prompt: str) -> list:
     """The parts of a prompt the user wrote, harness wrappers removed."""
     if not HARNESS_WRAPPER.search(prompt):
+        if HARNESS_TAGGED.match(REMINDER_BLOCK.sub("", prompt)):
+            return []
         return [prompt]
     prompt = NOTE.sub(" ", prompt)
     bodies = PRINCIPAL_MESSAGE.findall(prompt) + CITED_USER.findall(prompt)
     return [html.unescape(body) for body in bodies]
 
 
-def merge_word(prompt: str):
-    """The merge word the user typed in `prompt`, or None."""
+def slash_grant(prompt: str):
+    """The `/mwc` slash command recorded in `prompt`, unless it revokes, or None."""
+    match = SLASH_COMMAND.search(prompt)
+    if not match or REVOKE.search("/mwc " + (match.group(2) or "")):
+        return None
+    return "/" + match.group(1).lower()
+
+
+def merge_word(prompt: str, strict: bool = False):
+    """The merge word the user typed in `prompt`, or None.
+
+    `strict` is the merge guard's reading: an inline match counts only where it
+    opens a sentence or clause, since the guard turns a match into authority
+    rather than a reminder.
+    """
+    slash = slash_grant(prompt)
+    if slash:
+        return slash
     for body in user_bodies(prompt):
         text = typed(body)
         if not text or QUESTION.search(text):
             continue
         match = WHOLE.match(text) or INLINE.search(text)
         if not match:
+            continue
+        if strict and match.start() > 0 and not CLAUSE_START.search(text[: match.start()]):
             continue
         # An inline match inside a sentence that ends in a question mark is not an instruction.
         if QUESTION_SENTENCE.match(text, match.end()):
@@ -115,6 +157,9 @@ def merge_word(prompt: str):
 
 def revokes(prompt: str) -> bool:
     """Whether the user's own words in `prompt` withdraw a merge grant."""
+    match = SLASH_COMMAND.search(prompt)
+    if match and REVOKE.search("/mwc " + (match.group(2) or "")):
+        return True
     return any(REVOKE.search(typed(body)) for body in user_bodies(prompt))
 
 

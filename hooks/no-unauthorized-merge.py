@@ -2319,7 +2319,7 @@ def transcript_merge_grant(payload: dict | None = None) -> bool:
         for prompt in _user_prompts(path.strip()):
             if detector.revokes(prompt):
                 granted = False
-            elif detector.merge_word(prompt):
+            elif detector.merge_word(prompt, strict=True):
                 granted = True
     except Exception:
         return False

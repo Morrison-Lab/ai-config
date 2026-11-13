@@ -224,6 +224,13 @@ def say(text):
         {"type": "text", "text": text}]}}
 
 
+def hearth_reply(text, tid="tp1"):
+    """A Projects-thread reply: the text rides in a post_message tool call."""
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": tid, "name": "mcp__hearthbot__post_message",
+         "input": {"text": text}}]}}
+
+
 def bash(command):
     return {"type": "assistant", "message": {"content": [
         {"type": "tool_use", "name": "Bash", "input": {"command": command}}]}}
@@ -252,6 +259,20 @@ CASES = [
      True, "'I'll no longer' blocks"),
     ([say("I promise to run the sweep first.")],
      True, "a bare performative blocks"),
+
+    # Projects threads reply through post_message, never a text block
+    # (ai-config#5050, #5075): the promise is in the tool call's `text`.
+    ([hearth_reply("From here on I'll run UMS before every pause.")],
+     True, "a 'from here on' promise in post_message blocks"),
+    ([hearth_reply("Going forward I'll run the checker."), WROTE_FRAGMENT],
+     False, "a post_message promise is discharged by a fragment write"),
+    ([hearth_reply("Opened the PR and the checks are green.")],
+     False, "a post_message reply with no promise passes"),
+    ([hearth_reply("I'll start with the equivalence-negation chapter.")],
+     True, "announced unstarted work in post_message with nothing after it blocks"),
+    ([hearth_reply("I'll start with the equivalence-negation chapter."),
+      bash("git status")],
+     False, "announced work in post_message followed by a work call passes"),
 
     # Discharged by shipping something durable.
     ([say("Going forward I'll run the checker."), WROTE_FRAGMENT,

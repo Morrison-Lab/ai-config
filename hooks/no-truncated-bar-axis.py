@@ -22,7 +22,7 @@ bar chart and sets that chart's value axis to start above zero:
   on the same axes as the bars; a `twinx()` axes is never paired;
 * ggplot2: `geom_col(` / `geom_bar(` with `ylim(N`, `ylim = c(N` or
   `limits = c(N` in `scale_y_continuous`;
-* base R: `barplot(` with `ylim = c(N` or `xlim = c(N`;
+* base R: `barplot(` with `ylim = c(N`, or `xlim = c(N` when `horiz = TRUE`;
 * plotly: `go.Bar(` / `px.bar(` / `type='bar'` with a value-axis `range=[N`
   (the x axis when `orientation='h'`), skipping `secondary_y=True`;
 * altair: `mark_bar(` with `alt.Scale(domain=[N` or `zero=False`;
@@ -137,9 +137,6 @@ RULES = [
      re.compile(r"\bgeom_(?:col|bar)\s*\("),
      re.compile(r"\bylim\s*\(\s*" + N + r"|\bylim\s*=\s*c\(\s*" + N
                 + r"|scale_y_continuous\s*\([^)]*?\blimits\s*=\s*c\(\s*" + N, re.S)),
-    ("base R barplot",
-     re.compile(r"(?<![.\w])barplot\s*\("),
-     re.compile(r"\b[xy]lim\s*=\s*c\(\s*" + N)),
     ("altair bars",
      re.compile(r"\bmark_bar\s*\("),
      re.compile(r"alt\.Scale\s*\([^)]*?(?:\bdomain\s*=\s*[\[(]\s*" + N + r"|\bzero\s*=\s*False)")),
@@ -164,6 +161,21 @@ def _plotly(seg):
     return None
 
 
+BASE_R_BAR = re.compile(r"(?<![.\w])barplot\s*\(")
+BASE_R_HORIZ = re.compile(r"\bhoriz\s*=\s*(?:TRUE|T)\b")
+
+
+def _base_r(seg):
+    """Base R `barplot`: the value axis is y, or x when `horiz = TRUE`."""
+    if not BASE_R_BAR.search(seg):
+        return None
+    axis = "x" if BASE_R_HORIZ.search(seg) else "y"
+    m = re.search(r"\b" + axis + r"lim\s*=\s*c\(\s*" + N, seg)
+    if m and _cut(m.group(1)):
+        return "base R barplot", " ".join(m.group(0).split())[:80]
+    return None
+
+
 def _rules(seg):
     for name, bar, limit in RULES:
         if not bar.search(seg):
@@ -180,7 +192,7 @@ def truncated(text):
     if ALLOW.search(text):
         return None
     for seg in SEGMENT.split(text):
-        hit = _mpl(seg) or _plotly(seg) or _rules(seg)
+        hit = _mpl(seg) or _plotly(seg) or _base_r(seg) or _rules(seg)
         if hit:
             return hit
     return None

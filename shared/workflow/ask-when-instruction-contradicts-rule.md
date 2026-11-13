@@ -26,6 +26,7 @@ The trigger was a request on 2026-11-13 to put the table numbers back on the lds
 ## How to ask
 
 - Ask once, as a single question with the readings as options, and recommend one (the "Always give recommendations with questions" bullet of [Act on the whole request, and decide rather than ask](../../AGENTS.md#act-on-the-whole-request-and-decide-rather-than-ask)).
+  The sweep question is a second question, asked only after the answer is a revision.
 - Keep working on the instruction while you wait when the step is reversible, since a direct instruction outranks a general default ([`specific-beats-general`](../principles/specific-beats-general.md)).
   Wait for the answer first when the step cannot be undone, or when it would cross a hard safety gate.
 - Asking which reading is meant is not asking the maintainer to justify the instruction.

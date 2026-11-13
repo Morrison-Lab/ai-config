@@ -58,7 +58,7 @@ To show a small difference clearly, plot the difference itself, or use dots with
 A distortion you notice gets fixed, never captioned.
 A speaker note or caption warning that the axis does not start at zero leaves the misleading picture in place for every reader who skips the note.
 
-`hooks/no-truncated-bar-axis.py` denies the decidable case: a bar chart (matplotlib, ggplot2, plotly, python-pptx) whose value axis gets a literal lower limit above zero.
+`hooks/no-truncated-bar-axis.py` denies the decidable case: a bar chart (matplotlib, seaborn, pandas, ggplot2, base R, plotly, altair, python-pptx) whose value axis gets a literal lower limit above zero.
 A comment `axis-zero: allow <reason>` exempts the rare bar chart of a quantity with no meaningful zero.
 The dot and line cases stay prose, because whether zero matters there depends on what the quantity means, which no pattern in the code can decide.
 The reviewer's checklist item is in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#figures-with-a-cut-value-axis).

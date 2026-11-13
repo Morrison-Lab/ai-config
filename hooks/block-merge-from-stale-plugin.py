@@ -161,7 +161,7 @@ def is_merge(payload: dict) -> bool:
     tool = payload.get("tool_name") or payload.get("toolName") or ""
     tool_input = payload.get("tool_input") or payload.get("toolInput")
     if not isinstance(tool_input, dict):
-        return False
+        return looks_like_merge(payload)
     try:
         return bool(xh._targets(sib, tool, tool_input))
     except Exception:

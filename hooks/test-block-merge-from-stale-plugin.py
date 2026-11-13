@@ -20,6 +20,7 @@ whether the running copy is the installed snapshot or a stale one:
  12. The sibling cannot be imported: a merge is still gated (fail closed).
  13. The budget runs out: a later gate is reported as not reached, and denied.
  14. The repo hooks.json registers the hook for Bash and mcp__github__.*.
+ 15. A merge tool call with no tool_input is still gated.
 """
 import json
 import os
@@ -196,6 +197,12 @@ try:
     check("13 budget exhausted: later gate not reached, deny",
           d == "deny" and "gate-s.py: timed out" in reason
           and "gate-a.py: not reached" in reason, f"{out}")
+
+    # 15. A merge tool call with no tool_input is still gated.
+    base, root = case("c15", [("mcp__github__.*", [("gate-b.py", DENY)])], MCP_MERGE)
+    rc, out = run(base, stale, {"tool_name": MCP_MERGE["tool_name"], "cwd": str(tmp)})
+    d, reason, _ = decision(out)
+    check("15 merge tool without tool_input: gated", d == "deny" and "gate-b.py" in reason, f"{out}")
 
     # 14. The repo's own hooks.json registers this hook for both merge
     # surfaces, with the script field matching_hooks uses to skip itself.

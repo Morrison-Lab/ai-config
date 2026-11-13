@@ -40,6 +40,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import sys
 import tempfile
 
@@ -58,13 +59,14 @@ REVERT = re.compile(r"\bgit\s+(?:revert|reset\s+--hard|restore\s+--source)\b")
 # which expected non-zero results to exempt (2026-11-13, ai-config#5630); edit
 # this list to change the answer.
 #
-# Each command regex is matched against the LAST stage of the command (after
-# the final &&, ||, ;, | or newline), because that stage sets the exit code:
-# "cd r && grep x f" fails exactly when its grep finds nothing. The split
-# ignores quoting, which can only make a quoted ";" look like a stage break.
-# The EXPECT_FAIL pair is matched against the whole command instead, anchored
-# to its start or its end, so the words inside a commit message do not count.
-_EXIT_1_ONLY = r"\A\s*Exit code 1\s*\Z"
+# Each command regex is matched against the LAST non-empty stage of the
+# command (after the final unquoted &&, ||, ;, |, & or newline), because that
+# stage sets the exit code: "cd r && grep x f" fails exactly when its grep
+# finds nothing. last_stage() splits with shlex, so a quoted operator, as in
+# rg "a|b" f, stays inside its stage. A heredoc body or a compound command
+# ending in "done" or "fi" has no exempt last stage, so it is never exempted.
+# EXPECT_FAIL is matched against the whole command instead, anchored to its
+# start or its end, so the words inside a commit message do not count.
 # grep -c prints a count of 0 (per file, "f:0") before exiting 1.
 _EXIT_1_NO_MATCH = r"\A\s*Exit code 1(?:\s*\n\s*(?:\S+:)?0)*\s*\Z"
 EXPECTED_ERRORS = (
@@ -80,7 +82,7 @@ EXPECTED_ERRORS = (
 EXPECT_FAIL = re.compile(r"\A\s*EXPECT_FAIL=1\s|#\s*expect(?:ed)?[- ]fail\s*\Z")
 # The user declined the call: a decision, not a malformed command.
 USER_REJECTED = re.compile(r"doesn't want to proceed|user rejected", re.I)
-STAGE_BREAK = re.compile(r"&&|\|\||[;|\n]")
+OPERATOR_CHARS = ";&|\n"
 
 # Read only the end of a long transcript: the newest tool result is all we need.
 TAIL_BYTES = 400_000
@@ -189,17 +191,43 @@ def last_tool_errors(transcript_path):
             elif block.get("type") == "tool_result":
                 seen_result = True
                 results.append(block)
+    # A result whose call fell before the tail has no group, so it cannot be
+    # placed in time; leave it out rather than count an old error as new.
+    results = [r for r in results if r.get("tool_use_id") in group_of]
     if not results:
         return []
-    newest = max(group_of.get(r.get("tool_use_id"), group) for r in results)
+    newest = max(group_of[r.get("tool_use_id")] for r in results)
     errors = []
     for res in results:
         use_id = res.get("tool_use_id")
-        if group_of.get(use_id, group) != newest or not res.get("is_error"):
+        if group_of[use_id] != newest or not res.get("is_error"):
             continue
         name, inp = uses.get(use_id, ("a tool", None))
         errors.append((use_id, name, inp, _text(res.get("content"))))
     return errors
+
+
+def last_stage(command):
+    """The last non-empty stage of a shell command, split on unquoted operators.
+
+    Unbalanced quotes make shlex raise; the whole command is then the stage,
+    which matches an exemption only if the command starts with the exempt tool.
+    """
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=OPERATOR_CHARS)
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    try:
+        tokens = list(lexer)
+    except ValueError:
+        return command.strip()
+    stages = [[]]
+    for tok in tokens:
+        if set(tok) <= set(OPERATOR_CHARS):
+            stages.append([])
+        else:
+            stages[-1].append(tok)
+    nonempty = [stage for stage in stages if stage]
+    return " ".join(nonempty[-1]) if nonempty else ""
 
 
 def is_expected(inp, error):
@@ -209,7 +237,7 @@ def is_expected(inp, error):
     command = str(inp.get("command") or "") if isinstance(inp, dict) else json.dumps(inp or "")
     if EXPECT_FAIL.search(command):
         return True
-    stage = STAGE_BREAK.split(command.rstrip())[-1]
+    stage = last_stage(command)
     return any(re.search(cmd_re, stage) and re.search(err_re, error) for cmd_re, err_re in EXPECTED_ERRORS)
 
 

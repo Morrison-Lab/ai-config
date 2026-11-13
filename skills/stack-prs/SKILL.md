@@ -80,14 +80,16 @@ section the base PR's hunks change — or append at the same insertion point
 `sync-with-main` documents). Branch from `main` when the shared file's edits
 land in different regions.
 
-When both branches already exist, decide overlap mechanically: merge the dependent branch's own changes onto `main` without its base.
+When both branches already exist, test overlap mechanically first: merge the dependent branch's own changes onto `main` without its base.
 
 ```bash
 git merge-tree --write-tree --merge-base=origin/<base-branch> origin/main origin/<dependent-branch>
 ```
 
-Exit 0 means overlap does not justify the stack.
-Unless Test A shows a dependency, branch from `main` (or re-point an existing stack there).
+Exit 1 (a conflict) is evidence for Test B.
+Exit 0 is evidence against it, but not proof: a file with `merge=union`, or two appends git can order, merges silently.
+So after exit 0, read the shared files' hunks for the same-insertion-point case above.
+If they land in different regions and Test A shows no dependency, branch from `main` (or re-point an existing stack there).
 In the [mds#728](https://github.com/Morrison-Lab/mds/issues/728) exercise stack (2026-11-12), a 6-PR chain was stacked on an unrelated 4-PR chain although this command exited 0 for it.
 The stack held all 6 behind the 4 for no reason ([ai-config#5605](https://github.com/Morrison-Lab/ai-config/issues/5605)).
 

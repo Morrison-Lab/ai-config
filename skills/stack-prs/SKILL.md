@@ -80,12 +80,34 @@ section the base PR's hunks change — or append at the same insertion point
 `sync-with-main` documents). Branch from `main` when the shared file's edits
 land in different regions.
 
+When both branches already exist, test overlap mechanically first: merge the dependent branch's own changes onto `main` without its base.
+
+```bash
+git merge-tree --write-tree --merge-base=origin/<base-branch> origin/main origin/<dependent-branch>
+```
+
+Exit 1 (a conflict) is evidence for Test B.
+Exit 0 is evidence against it, but not proof: a file with `merge=union`, or two appends git can order, merges silently.
+So after exit 0, read the shared files' hunks for the same-insertion-point case above.
+If they land in different regions and Test A shows no dependency, branch from `main` (or re-point an existing stack there).
+In the [mds#728](https://github.com/Morrison-Lab/mds/issues/728) exercise stack (2026-11-12), a 6-PR chain was stacked on an unrelated 4-PR chain although this command exited 0 for it.
+The stack held all 6 behind the 4 for no reason ([ai-config#5605](https://github.com/Morrison-Lab/ai-config/issues/5605)).
+
 ### Neither test passes → branch from `main`
 
 Merely concurrent PRs stay independent; stacking should not be reached for
 out of caution. See
 [`stack-dont-pause`](../../shared/workflow/stack-dont-pause.md) for the same
 decision made inline inside a sweep loop.
+
+A PR split off another to meet a size cap is no exception: base each split on `main` unless it passes Test A or Test B against its parent ([ai-config#5606](https://github.com/Morrison-Lab/ai-config/issues/5606)).
+
+- **Do:** run the gate for every split and every chain, and name the test that passed in the stacked PR's `> [!IMPORTANT]` alert.
+- **Don't:** stack because the base is still in flight, or because the split came out of it.
+
+Count the cost of a stack too.
+A check whose `pull_request` trigger is filtered to `main` never runs on a stacked PR, and re-pointing a PR fires no CI, so each stacked PR needs a fresh push and a full rerun after its base merges.
+Drop such a filter where the check does not depend on the base, as [mds#809](https://github.com/Morrison-Lab/mds/pull/809) does.
 
 ## Procedure
 

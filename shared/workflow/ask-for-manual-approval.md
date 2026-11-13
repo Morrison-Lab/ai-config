@@ -36,7 +36,7 @@ The grant covers cancelling only: re-running, deleting runs or logs, and dispatc
 A cloud session reads no user settings, so there it needs an entry in managed settings.
 
 - **Do:** cancel a superseded or stale run directly, and if the classifier still refuses it, check that `python3 scripts/wire-user-config.py --check` reports `ok` for "Run cancel" on that machine.
-- **Don't:** ask the user to type an approval line for a run cancel on a machine where the rule is installed (2026-11-13, the merge runner on cf463-02 was refused `gh run cancel` on superseded `mlg` runs and Ezra had to type one).
+- **Don't:** ask the user to type an approval line for a run cancel on a machine where the rule is installed (2026-11-13, the merge runner was refused `gh run cancel` on superseded `mlg` runs and Ezra had to type one).
 
 ## When to switch or ask
 

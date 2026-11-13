@@ -19,14 +19,13 @@ he approved adding the clarification, no-real-conflict and sweep questions the s
 
 An instruction that crosses a rule leaves two records that disagree.
 Followed silently, the rule stays written down and the next session enforces it against the maintainer's own wish.
-Refused, the agent overrides the maintainer with a default.
 Only the maintainer knows which record should win, and the answer changes what gets edited: nothing for an exception or a mistake, the rule's home for a revision or a clarification.
 
-The trigger was a request on 2026-11-13 for table numbers on the lds note-sheet PDFs, which reversed an earlier deliberate choice ([Morrison-Lab/lds#2442](https://github.com/Morrison-Lab/lds/pull/2442)).
+The trigger was a request on 2026-11-13 to put the table numbers back on the lds note sheets ([Morrison-Lab/lds#2442](https://github.com/Morrison-Lab/lds/pull/2442)), which reverted the removal of those numbers in [Morrison-Lab/lds#2438](https://github.com/Morrison-Lab/lds/pull/2438) earlier that day.
 
 ## How to ask
 
-- Ask once, as a single question with the readings as options, and recommend one ([Always give recommendations with questions](../../AGENTS.md#act-on-the-whole-request-and-decide-rather-than-ask)).
+- Ask once, as a single question with the readings as options, and recommend one (the "Always give recommendations with questions" bullet of [Act on the whole request, and decide rather than ask](../../AGENTS.md#act-on-the-whole-request-and-decide-rather-than-ask)).
 - Keep working on the instruction while you wait when the step is reversible, since a direct instruction outranks a general default ([`specific-beats-general`](../principles/specific-beats-general.md)).
   Wait for the answer first when the step cannot be undone, or when it would cross a hard safety gate.
 - Asking which reading is meant is not asking the maintainer to justify the instruction.
@@ -36,7 +35,7 @@ The trigger was a request on 2026-11-13 for table numbers on the lds note-sheet 
 ## Why this is prose and not a hook
 
 No deny hook can detect the case.
-Telling that an instruction conflicts with a rule needs knowing which recorded rules it touches, which is a judgment about meaning that no lexical match on the prompt can make.
+Telling that an instruction conflicts with a rule needs knowing which recorded rules it touches, which is a judgment about meaning that no lexical match on the prompt can reliably make.
 The mechanism is the rule's bullet in `AGENTS.md`, which `hooks/inject-core-rules.py` puts in the SessionStart index of every session.
 
 - **Do:** quote the rule, link its home, and ask which reading the instruction is, with a recommendation.

@@ -42,13 +42,19 @@ Nothing carries over from this session except the working directory. The briefin
 
 ### 3. Call the advisor read-only
 
-Run the advisor in the engine’s read-only or plan mode, with no session persistence where the engine supports it. Pass `model` and `effort` explicitly. Engine invocation details are in the delegate skills’ memories (`memories/delegation.md`, `memories/antigravity.md`).
+Run the advisor in the engine’s read-only or plan mode, with no session persistence where the engine supports it. Pass `model` and `effort` explicitly. `scripts/run-advisor.py` makes the call and runs step 4’s seat check before it, and after it where the engine names the model that answered:
+
+``` bash
+python3 scripts/run-advisor.py --caller-model <caller> --engine opencode --model <model> --effort <effort> --briefing <briefing_path>
+```
+
+For `opencode`, it sends one streamed request with no tools to the OpenCode Go endpoint, so the advisor can only answer, and it checks the model the reply names. It relies on the cloud proxy for the API key, and whether the endpoint honours its `reasoning_effort` field is unmeasured. For `agy`, it runs `agy --mode plan --print=<briefing>`, which names no model, so the wrapper labels that seat unverified. Engine invocation details are in the delegate skills’ memories (`memories/delegation.md`, `memories/antigravity.md`).
 
 ### 4. Never fall back to the caller’s family
 
 If the chosen model is unavailable, report that and stop, or pick another engine outside the caller’s family. A same-family substitute is not independent, so it defeats the point of asking. A different model in the caller’s own family is a weaker and cheaper option: name it as weaker in the result, and do not call it equivalent.
 
-`scripts/check-advisor-seat.py` checks this rule and step 3’s explicit `model` and `effort`. Run it before the call, and again after with `--reported-model` set to the model the reply names:
+`scripts/check-advisor-seat.py` checks this rule and step 3’s explicit `model` and `effort`. `run-advisor.py` runs it for you. For a call the wrapper does not make, run it before the call, and again after with `--reported-model` set to the model the reply names:
 
 ``` bash
 python3 scripts/check-advisor-seat.py --caller-model <caller> --engine <engine> --model <model> --effort <effort>
@@ -65,6 +71,6 @@ The advisor’s answer is a lead, not a verdict. A primary source or an observed
 
 ## Not covered yet
 
-[ai-config#884](https://github.com/Morrison-Lab/ai-config/issues/884) tracks the later slices: a wrapper that runs step 3’s call in the engine’s read-only mode, and whether `context: fork` can replace a separate process (it isolates conversation history but stays on an agent type in this session, so it is not a cross-family consult).
+[ai-config#884](https://github.com/Morrison-Lab/ai-config/issues/884) tracks the last open question: whether `context: fork` can replace a separate process (it isolates conversation history but stays on an agent type in this session, so it is not a cross-family consult).
 
 Back to top

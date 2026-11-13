@@ -21,6 +21,9 @@ whether the running copy is the installed snapshot or a stale one:
  13. The budget runs out: a later gate is reported as not reached, and denied.
  14. The repo hooks.json registers the hook for Bash and mcp__github__.*.
  15. A merge tool call with no tool_input is still gated.
+ 16. Two applicable entries, one the running snapshot: the other is still run.
+ 17. enable_pr_auto_merge is gated.
+ 18. A REST merge through gh api is gated.
 """
 import json
 import os
@@ -203,6 +206,31 @@ try:
     rc, out = run(base, stale, {"tool_name": MCP_MERGE["tool_name"], "cwd": str(tmp)})
     d, reason, _ = decision(out)
     check("15 merge tool without tool_input: gated", d == "deny" and "gate-b.py" in reason, f"{out}")
+
+    # 16. Two applicable entries, one of them the running snapshot: the other
+    # one's gates still run.
+    base, root = case("c16", [("mcp__github__.*", [("gate-b.py", DENY)])], MCP_MERGE)
+    (base / "installed_plugins.json").write_text(json.dumps({"plugins": {
+        "ai-config@Morrison-Lab": [
+            {"scope": "user", "installPath": str(stale)},
+            {"scope": "project", "projectPath": str(tmp), "installPath": str(root)}]}}),
+        encoding="utf-8")
+    rc, out = run(base, stale, dict(MCP_MERGE, cwd=str(tmp)))
+    d, reason, _ = decision(out)
+    check("16 running snapshot matches one entry, another is newer: gated",
+          d == "deny" and "gate-b.py" in reason, f"{out}")
+
+    # 17 and 18. Auto-merge over MCP and a REST merge through gh api are gated.
+    base, root = case("c17", [("mcp__github__.*", [("gate-b.py", DENY)])], MCP_MERGE)
+    auto = {"tool_name": "mcp__github__enable_pr_auto_merge",
+            "tool_input": dict(MCP_MERGE["tool_input"]), "cwd": str(tmp)}
+    rc, out = run(base, stale, auto)
+    check("17 enable_pr_auto_merge: gated", decision(out)[0] == "deny", f"{out}")
+    base, root = case("c18", [("Bash", [("gate-b.py", DENY)])], GH_MERGE)
+    api = {"tool_name": "Bash", "cwd": str(tmp), "tool_input": {
+        "command": "gh api -X PUT repos/Morrison-Lab/mds/pulls/748/merge"}}
+    rc, out = run(base, stale, api)
+    check("18 gh api PUT .../merge: gated", decision(out)[0] == "deny", f"{out}")
 
     # 14. The repo's own hooks.json registers this hook for both merge
     # surfaces, with the script field matching_hooks uses to skip itself.

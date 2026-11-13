@@ -183,11 +183,11 @@ def matching_hooks(root: Path, tool: str) -> list[dict]:
     return out
 
 
-def run_installed(root: Path, tool: str, raw: str) -> tuple[list[str], list[str]]:
+def run_installed(root: Path, tool: str, raw: str,
+                  deadline: float) -> tuple[list[str], list[str]]:
     """(deny reasons, failures) from the installed snapshot's matching hooks."""
     denies, failures = [], []
     env = dict(os.environ, CLAUDE_PLUGIN_ROOT=str(root))
-    deadline = time.monotonic() + BUDGET
     for hook in matching_hooks(root, tool):
         name = hook.get("script") or hook["command"]
         left = deadline - time.monotonic()
@@ -250,21 +250,28 @@ def main() -> int:
         return 0
     paths = installed_paths(session_dir(payload))
     mine = self_root()
-    if not paths or mine in paths:
+    # Every applicable install other than the running one is checked: when a
+    # user entry and a project entry both apply, matching one of them does
+    # not vouch for the other's gates.
+    others = list(dict.fromkeys(p for p in paths if p != mine))
+    if not others:
         return 0
-    installed = paths[0]
     tool = payload.get("tool_name") or payload.get("toolName") or ""
+    names = ", ".join(p.name for p in others)
     head = (f"This session runs ai-config hooks from {mine.name}, but the "
-            f"installed snapshot is {installed.name} (ai-config#5603). Hooks "
-            f"load at session start, so the merge gates merged since then are "
-            f"not running natively.")
-    try:
-        denies, failures = run_installed(installed, tool, raw)
-    except Exception as exc:  # unreadable hooks.json, missing directory
-        emit("deny", f"{head} The installed gates could not be run ({exc}), "
-                     f"so this merge is refused. Restart the session to load "
-                     f"them, then merge.")
-        return 0
+            f"installed snapshot is {names} (ai-config#5603). Hooks load at "
+            f"session start, so the merge gates merged since then are not "
+            f"running natively.")
+    denies, failures = [], []
+    deadline = time.monotonic() + BUDGET
+    for installed in others:
+        try:
+            d, f = run_installed(installed, tool, raw, deadline)
+        except Exception as exc:  # unreadable hooks.json, missing directory
+            failures.append(f"{installed.name}: could not be run ({exc})")
+            continue
+        denies += d
+        failures += f
     if denies:
         emit("deny", f"{head} The installed gates refuse this merge:\n- "
                      + "\n- ".join(denies))

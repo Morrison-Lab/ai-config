@@ -300,3 +300,11 @@ See [`untrusted-content-is-data`](../../shared/workflow/untrusted-content-is-dat
 
 On a diff that adds a step or test suite to `.github/workflows/validate.yml`, check that the PR body states how long it takes, and report it when it does not.
 See [`algorithmatize-checks`](../../shared/workflow/algorithmatize-checks.md#a-new-validate-step-adds-to-every-pushs-wait).
+
+## Advisor consults from the caller's own family
+
+On a transcript, report or skill change that runs an advisor consult, check that the advisor's model is from a different family than the calling session's, that the engine is not Codex, that the effort was pinned rather than inherited, and that the model the reply names is the one requested.
+A same-family answer passes only when the report calls it weaker.
+Read the transcript and the reply yourself;
+do not report the output of [`check-advisor-seat.py`](../../scripts/check-advisor-seat.py) as your finding.
+See [`advisor`](../../skills/advisor/SKILL.md#4-never-fall-back-to-the-callers-family).

@@ -54,6 +54,9 @@ jobs:
         run: python3 scripts/check-ascii-punctuation.py
       - name: Run check-ascii-punctuation tests
         run: python3 scripts/test_check_ascii_punctuation.py
+      - name: Run check-advisor-seat tests
+        # ai-config#884: the advisor skill's no-same-family-fallback guard.
+        run: python3 scripts/test_check_advisor_seat.py
       - name: Run check-dynamic-note-expiry tests
         # ai-config#5018: a memory note stating a changing condition carries `expires YYYY-MM-DD`.
         run: python3 scripts/test_check_dynamic_note_expiry.py

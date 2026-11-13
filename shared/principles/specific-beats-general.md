@@ -55,6 +55,8 @@ When a user gives an explicit command that departs from a general preference:
 - **Do not require the user to re-justify a clear choice**:
   Once the user specifies a concrete requirement or preference for a task,
   treat the preference as settled for that task.
+- **Ask whether the override is one-off or a rule change**: Follow the directive, and ask the maintainer whether it is an exception, a revision of the rule, a clarification or a mistake, so the recorded rule does not go stale against the maintainer's wish ([`ask-when-instruction-contradicts-rule`](../workflow/ask-when-instruction-contradicts-rule.md)).
+  Asking which reading is meant is not asking for a justification.
 - **Distinguish genuine hazards from policy preferences**:
   Challenge an instruction only when it would cause data loss,
   violate an external safety boundary,
@@ -121,7 +123,7 @@ and error handling:
 - **Do:** handle specific error classes and edge cases explicitly in code.
 - **Do:** limit the effect of a specific user override to the exact scope and task requested.
 - **Don't:** cite a general repository convention to refuse or debate an explicit user instruction.
-- **Don't:** treat a one-off user override as a mandate to change repository-wide defaults for all sessions.
+- **Don't:** treat a user override as either one-off or a mandate to change defaults without asking which it is.
 - **Don't:** allow a general instruction to override a hard safety gate without explicit, verified authorization.
 - **Don't:** use generic catch-all handlers or stringly-typed structures where specific types and conditions exist.
 

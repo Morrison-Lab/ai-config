@@ -262,6 +262,9 @@ Read a request for everything it plainly asks, do every safe step it covers, and
   Never act [irreversibly](shared/workflow/irreversible.md) without the user's direct, explicit word.
   The grant gives no merge authority ([`default-to-action-grants`](shared/workflow/default-to-action-grants.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
   Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
+- **Ask what an instruction that contradicts a rule is meant to be:** when the maintainer's instruction seems to contradict a recorded rule, quote the rule and ask whether the instruction is an exception, a revision, a clarification or a mistake, or whether there is no real conflict, with a recommendation.
+  For a revision, also ask whether to sweep existing material.
+  Keep working on a reversible instruction while you wait ([`ask-when-instruction-contradicts-rule`](shared/workflow/ask-when-instruction-contradicts-rule.md)).
 - **Proactively suggest better alternatives to proposed approaches:** when another path reaches the requested goal more simply, cleanly, or reliably, recommend it ([`proactively-suggest-alternatives`](shared/principles/proactively-suggest-alternatives.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
 - **Always give recommendations with questions:** every question or set of options you put to the user for a genuine decision carries a specific recommendation, and authorized work is done, not offered ([`rec`](skills/rec/SKILL.md), [`no-cop-out-offers`](shared/workflow/no-cop-out-offers.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
 

@@ -69,8 +69,8 @@ _NOT = (
     r"pending|owed|outstanding|skipped|deferred|postponed|next|later|queued|todo)"
 )
 RX_DEFER = re.compile(
-    r"\b" + _UMS + r"\b[^;.\n]{0,40}?\b" + _NOT + r"\b"          # UMS not yet run
-    r"|\b" + _NOT + r"\b[^;.\n]{0,25}?\b" + _UMS + r"\b"          # not run UMS / pending UMS
+    r"\b" + _UMS + r"\b[^;.,\n]{0,40}?\b" + _NOT + r"\b"          # UMS not yet run
+    r"|\b" + _NOT + r"\b[^;.,\n]{0,25}?\b" + _UMS + r"\b"          # not run UMS / pending UMS
     r"|\b(?:will|to|going to|should)\s+(?:be\s+)?(?:run|ran|do|done)\b[^;.\n]{0,20}\b" + _UMS + r"\b"
     r"|\bno\s+" + _UMS + r"\b",
     re.I,

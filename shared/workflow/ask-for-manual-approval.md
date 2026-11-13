@@ -26,6 +26,18 @@ The user's words: "I took you out of auto mode so I can approve things;
 remember you can always ask me to do that if helpful."
 Related: [ai-config#4286](https://github.com/Morrison-Lab/ai-config/issues/4286), [ai-config#4033](https://github.com/Morrison-Lab/ai-config/issues/4033).
 
+## Actions pre-allowed through settings
+
+Cancelling a GitHub Actions run is always allowed (Ezra, 2026-11-13: "let's make a rule that cancelling runs is always ok?
+that the auto classifier can see?", [ai-config#5623](https://github.com/Morrison-Lab/ai-config/issues/5623)).
+`scripts/wire-user-config.py`, which `bootstrap.sh` runs, writes the rule where the classifier reads it: a `Bash(gh run cancel *)` permission rule, which skips the classifier, and an `autoMode.allow` entry for the `gh api .../actions/runs/<id>/cancel` and MCP forms.
+Rerun `bootstrap.sh` (or `python3 scripts/wire-user-config.py`) on a machine to pick it up.
+The grant covers cancelling only: re-running, deleting runs or logs, and dispatching workflows still go through the classifier.
+A cloud session reads no user settings, so there it needs an entry in managed settings.
+
+- **Do:** cancel a superseded or stale run directly, and if the classifier still refuses it, check that `python3 scripts/wire-user-config.py --check` reports `ok` for "Run cancel" on that machine.
+- **Don't:** ask the user to type an approval line for a run cancel on a machine where the rule is installed (2026-11-13, the merge runner on cf463-02 was refused `gh run cancel` on superseded `mlg` runs and Ezra had to type one).
+
 ## When to switch or ask
 
 Approval never makes a hard-prohibited category acceptable.

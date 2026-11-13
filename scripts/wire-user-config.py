@@ -11,7 +11,14 @@ own wiring:
                 the desktop app and Remote Control sessions load the plugin
                 (skills, hooks, and through hooks/inject-core-rules.py the
                 AGENTS.md rules) in every project.
-  Codex         $CODEX_HOME/AGENTS.md (default ~/.codex) -- Codex's
+  Run cancel    ~/.claude/settings.json -- lets every session cancel a GitHub
+                Actions run without the auto-mode classifier refusing it
+                (ai-config#5623): a `Bash(gh run cancel *)` permission rule,
+                which skips the classifier, and an `autoMode.allow` prose rule
+                for the API and MCP forms. The classifier reads `autoMode` only
+                from user or managed settings, never from a repository, so no
+                repo file can carry it; cloud sessions read neither file.
+  Codex        $CODEX_HOME/AGENTS.md (default ~/.codex) -- Codex's
                 user-global instruction file, linked to this checkout's
                 AGENTS.md.
   Gemini CLI    ~/.gemini/GEMINI.md -- a marked block importing
@@ -184,6 +191,56 @@ def wire_claude(check: bool) -> tuple[str, bool]:
     return f"write {path}: registered {MARKETPLACE}, enabled {PLUGIN}", True
 
 
+CANCEL_PERMISSION = "Bash(gh run cancel *)"
+CANCEL_AUTO_MODE_RULE = (
+    "Cancelling GitHub Actions workflow runs is always allowed (Ezra, 2026-11-13, "
+    "Morrison-Lab/ai-config#5623): `gh run cancel <id>`, "
+    "`gh api -X POST repos/<owner>/<repo>/actions/runs/<id>/cancel` or "
+    "`.../force-cancel`, and the equivalent GitHub MCP call, in any repository "
+    "the user can push to, singly or in a loop over superseded or stale runs. "
+    "This rule covers cancelling only: re-running, deleting runs or logs, and "
+    "dispatching workflows are not covered by it.")
+
+
+def wire_claude_run_cancel(check: bool) -> tuple[str, bool]:
+    """Pre-allow run cancellation, keeping every entry already present."""
+    if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
+        return ("ok    remote container: cloud sessions read no user settings, "
+                "so only managed settings can carry this rule"), True
+    claude_home = Path(os.environ.get("CLAUDE_HOME", home() / ".claude"))
+    path = claude_home / "settings.json"
+    settings = load_json(path)
+    if settings is None:
+        return f"skip  {path} is not a JSON object; fix it by hand", False
+    for key in ("permissions", "autoMode"):
+        if key in settings and not isinstance(settings[key], dict):
+            return f"skip  {path}: `{key}` is not a JSON object; fix it by hand", False
+    perms = settings.get("permissions", {})
+    auto = settings.get("autoMode", {})
+    for name, owner in (("permissions", perms), ("autoMode", auto)):
+        if "allow" in owner and not isinstance(owner["allow"], list):
+            return (f"skip  {path}: `{name}.allow` is not a JSON array; "
+                    "fix it by hand"), False
+    need_perm = CANCEL_PERMISSION not in perms.get("allow", [])
+    need_rule = CANCEL_AUTO_MODE_RULE not in auto.get("allow", [])
+    if not (need_perm or need_rule):
+        return f"ok    {path} allows run cancellation", True
+    if check:
+        return f"todo  {path}: allow run cancellation", False
+    if need_perm:
+        settings.setdefault("permissions", {}).setdefault("allow", []).append(
+            CANCEL_PERMISSION)
+    if need_rule:
+        # An autoMode array without "$defaults" replaces the classifier's
+        # built-in rules (settings reference, `autoMode`), so a new array
+        # keeps them. An existing array without it is the user's choice to
+        # replace them, and is left that way.
+        rules = settings.setdefault("autoMode", {}).setdefault("allow", ["$defaults"])
+        rules.append(CANCEL_AUTO_MODE_RULE)
+    write_json(path, settings)
+    return f"write {path}: run cancellation allowed", True
+
+
 def replaceable_link(path: Path, target: Path) -> bool:
     """A link we may repoint: dangling, or into another ai-config checkout."""
     if not path.is_symlink():
@@ -277,6 +334,7 @@ def wire_opencode(check: bool) -> tuple[str, bool]:
 
 STEPS = (
     ("Claude Code", wire_claude),
+    ("Run cancel", wire_claude_run_cancel),
     ("Codex", wire_codex),
     ("Gemini CLI", wire_gemini),
     ("opencode", wire_opencode),

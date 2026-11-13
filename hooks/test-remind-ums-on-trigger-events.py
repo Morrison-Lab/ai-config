@@ -107,7 +107,7 @@ for cmd, res in (("cd r && grep foo f", "Exit code 1"), ("ls; grep foo f", "Exit
                  ("cat f | rg foo", "Exit code 1")):
     check(f"expected error in a compound {cmd!r} is silent", pre(transcript(cmd, res)) == "")
 # shlex keeps a quoted operator inside its stage, and skips an empty last stage.
-for cmd in ('rg "foo|bar" file', 'grep -E "a|b" f', "grep foo f;", "grep 'x && y' f", "cd r && grep foo f ;"):
+for cmd in ('rg "foo|bar" file', 'grep -E "a|b" f', "grep foo f;", "grep 'x && y' f", "cd r && grep foo f ;", "grep foo f 2>&1"):
     check(f"a quoted or trailing operator in {cmd!r} is still an expected no-match",
           pre(transcript(cmd, "Exit code 1")) == "")
 for cmd in ('echo "x" | grep "a;b" f && make', "python3 - <<EOF\ngrep x\nEOF", "echo \"unbalanced; grep x"):

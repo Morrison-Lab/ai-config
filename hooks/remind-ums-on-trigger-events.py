@@ -208,12 +208,12 @@ def last_tool_errors(transcript_path):
 
 
 def last_stage(command):
-    """The last non-empty stage of a shell command, split on unquoted operators.
+    """The last non-empty stage of a shell command, split on unquoted operators (2>&1 lexes as ">&", no break).
 
     Unbalanced quotes make shlex raise; the whole command is then the stage,
     which matches an exemption only if the command starts with the exempt tool.
     """
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=OPERATOR_CHARS)
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=OPERATOR_CHARS + "<>")
     lexer.whitespace = " \t\r"
     lexer.whitespace_split = True
     try:

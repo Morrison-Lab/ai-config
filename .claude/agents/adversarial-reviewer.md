@@ -305,5 +305,6 @@ See [`algorithmatize-checks`](../../shared/workflow/algorithmatize-checks.md#a-n
 
 On a transcript, report or skill change that runs an advisor consult, check that the advisor's model is from a different family than the calling session's, that the engine is not Codex, that the effort was pinned rather than inherited, and that the model the reply names is the one requested.
 A same-family answer passes only when the report calls it weaker.
-Read the transcript and the reply yourself; do not report the output of [`check-advisor-seat.py`](../../scripts/check-advisor-seat.py) as your finding.
+Read the transcript and the reply yourself;
+do not report the output of [`check-advisor-seat.py`](../../scripts/check-advisor-seat.py) as your finding.
 See [`advisor`](../../skills/advisor/SKILL.md#4-never-fall-back-to-the-callers-family).

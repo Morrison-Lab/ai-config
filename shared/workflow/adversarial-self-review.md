@@ -81,6 +81,14 @@ What is added: a merge additionally requires
 the author-dispatched cross-model, cross-harness reviewer's
 100% all-clear adversarial verdict at the shipping head.
 
+The gate is this rule, not the hook that enforces it.
+A session's hooks load at its start, and a cloud session's SessionStart refresh can then install a newer plugin snapshot, so until a restart the running merge hooks may be older and weaker than the installed ones.
+On 2026-11-13 the running `warn-merge-without-cross-harness-review.py` only warned while the installed copy denied, and Morrison-Lab/mds#748 merged with no non-Claude read ([ai-config#5603](https://github.com/Morrison-Lab/ai-config/issues/5603)).
+`hooks/block-merge-from-stale-plugin.py` now runs the installed snapshot's merge hooks when the running one is stale, but a snapshot that predates it cannot.
+
+- **Do:** run the cross-harness read on the shipping head before every merge, whether the hook denies, warns, or stays silent.
+- **Don't:** read a merge-gate warning, or a merge call the hooks let through, as evidence the gate is met.
+
 In a cloud session (e.g. claude.ai) where no external CLI tools are installed,
 OpenCode Go over HTTP serves as the cross-harness reviewer (see [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)).
 When Go and its free ids are exhausted, that skill's "Ollama Cloud when Go is exhausted" route (`curl` to `api.ollama.com`) comes after them, and after `agy` on a device when the session can reach one.

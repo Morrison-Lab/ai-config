@@ -1046,6 +1046,18 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-merge-from-stale-plugin.py\"",
+            "timeout": 60,
+            "script": "block-merge-from-stale-plugin.py",
+            "why": "ai-config#5603: hooks load at session start, and a cloud session's SessionStart refresh then installs a newer snapshot, so until a restart every merge gate merged since the old snapshot is absent. On 2026-11-13 Morrison-Lab/mds#748 merged with no non-Claude review because the running snapshot's cross-harness hook only warned while the installed one denied. On a merge or auto-merge call (recognized by warn-merge-without-cross-harness-review.py's _targets), when this file's plugin root is not the installPath of an applicable ai-config entry in installed_plugins.json, it runs the installed snapshot's matching PreToolUse hooks on the same payload and denies if any denies or cannot run (fail closed). Silent when there is no record or the snapshot is current. A stale snapshot that predates this hook cannot run it."
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {
@@ -1312,6 +1324,18 @@
             "timeout": 10,
             "script": "warn-sweep-pr-without-ask.py",
             "why": "The MCP half of the Bash entry (ai-config#4829): a remote session has no `gh`, so mcp__github__create_pull_request with \"sweep\" in the title is how it opens a sweep PR. Same script, same warn-only behaviour."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__github__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-merge-from-stale-plugin.py\"",
+            "timeout": 60,
+            "script": "block-merge-from-stale-plugin.py",
+            "why": "ai-config#5603: hooks load at session start, and a cloud session's SessionStart refresh then installs a newer snapshot, so until a restart every merge gate merged since the old snapshot is absent. On 2026-11-13 Morrison-Lab/mds#748 merged with no non-Claude review because the running snapshot's cross-harness hook only warned while the installed one denied. On a merge or auto-merge call (recognized by warn-merge-without-cross-harness-review.py's _targets), when this file's plugin root is not the installPath of an applicable ai-config entry in installed_plugins.json, it runs the installed snapshot's matching PreToolUse hooks on the same payload and denies if any denies or cannot run (fail closed). Silent when there is no record or the snapshot is current. A stale snapshot that predates this hook cannot run it."
           }
         ]
       },

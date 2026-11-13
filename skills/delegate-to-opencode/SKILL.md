@@ -221,6 +221,10 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   On [ai-config#4572](https://github.com/Morrison-Lab/ai-config/pull/4572), `longcat-2.5-preview-free` found three real defects in the first push and then returned no text on the fix commit in two attempts, while `cat-jam-free` returned a clean verdict on both heads.
   Run both, treat an empty answer as no verdict rather than clean, and address, rebut or defer every defect in a list as for any review.
   The user accepted a clean verdict from one of these free models as the non-Claude gate while Go is exhausted (relayed by the coordinator session, 2026-10-16), with the other model's empty answer counted as no verdict.
+- **The free ids change, so read them from `/models` each time** rather than reusing the names above.
+  On 2026-11-13, with Go at its weekly limit, `/models` listed `beam-free`, `iceman-contributor-free` and `longcat-2.5-free`, and `cat-jam-free` and `longcat-2.5-preview-free` returned `Upstream request failed: Model is unavailable`.
+  All three listed ids answered the same streamed review request.
+  `longcat-2.5-free` returned no text, so it gives no verdict ([ai-config#5603](https://github.com/Morrison-Lab/ai-config/issues/5603)).
 - **In a cloud session on 2026-10-16 these other routes did not work, so use the streamed Go-endpoint recipe above instead.**
   The free ids on the pay-as-you-go path `https://opencode.ai/zen/v1` (not the Go path) return `FreeTierError` with the message that the free tier can only be used from within OpenCode, whereas the paid ids on that path return the 402 above.
   With the CLI installed by `npm i -g opencode-ai` and the opencode API-key environment variable set to any non-empty value (the proxy supplies the real key), `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout.

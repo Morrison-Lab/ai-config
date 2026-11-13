@@ -259,6 +259,12 @@ Compare the result against both parents' changes since the merge base;
 do not report the warning hook's output as your finding.
 See [`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md#anti-patterns).
 
+## Merges without a non-Claude read
+
+On a transcript or report that merged a PR, check that a non-Claude read of the merged head is cited before the merge call.
+A merge the hooks let through, or a hook that only warned, does not meet the gate: a session can run an older plugin snapshot whose merge hook is weaker than the installed one (ai-config#5603).
+See [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
+
 ## Renamed headings
 
 On a diff that renames, rewords, removes or moves a Markdown heading to another file, search for links to the old anchor (`#old-slug` and `file.md#old-slug`, in every file) and report any the diff leaves pointing at nothing.

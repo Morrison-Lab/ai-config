@@ -176,8 +176,34 @@ check("the ci-failure reminder is context, not a deny", "additionalContext" in o
 for c in ("timed_out", "startup_failure"):
     check(f"conclusion {c!r} reminds", "failed CI check" in pre(transcript("", runs(c), is_error=False)))
 check("a workflow run (actions_get shape) reminds",
-      "validate" in pre(transcript("", json.dumps({"id": 9, "name": "validate", "conclusion": "failure"}),
-                                   is_error=False)))
+      "validate" in pre(transcript("", json.dumps({"id": 9, "name": "validate", "status": "completed",
+                                                   "conclusion": "failure"}), is_error=False)))
+
+
+def wf_run(name, conclusion, created, **extra):
+    return dict({"name": name, "status": "completed", "conclusion": conclusion, "created_at": created}, **extra)
+
+
+history = json.dumps({"workflow_runs": [wf_run("validate", "success", "2026-11-14T08:00:00Z"),
+                                        wf_run("validate", "failure", "2026-11-13T08:00:00Z")]})
+check("an old failure followed by a newer pass in a run history is silent",
+      pre(transcript("", history, is_error=False)) == "")
+history = json.dumps([wf_run("lint", "failure", "2026-11-14T08:00:00Z"), wf_run("lint", "success", "2026-11-13T08:00:00Z")])
+check("a newest failure in a run history reminds", "lint" in pre(transcript("", history, is_error=False)))
+job = json.dumps({"jobs": [wf_run("build", "failure", "2026-11-14T08:00:00Z", steps=[
+    {"name": "Run tests", "status": "completed", "conclusion": "failure", "number": 3}])]})
+out = pre(transcript("", job, is_error=False))
+check("a failed job names the job, not its steps", "build" in out and "Run tests" not in out)
+check("a nameless failed object is silent",
+      pre(transcript("", json.dumps({"id": 77, "status": "completed", "conclusion": "failure"}), is_error=False)) == "")
+for label, text in (("JSON followed by stderr", runs("success", "failure") + "\nwarning: something on stderr"),
+                    ("a line before the JSON", "Fetching checks...\n" + runs("success", "failure")),
+                    ("one value per line", "\n".join(json.dumps(wf_run(f"job{i}", c, "t")) for i, c in
+                                                     enumerate(("success", "failure")))),
+                    ("pages printed back to back", runs("success") + runs("success", "failure"))):
+    check(f"{label} reminds", "job1" in pre(transcript("", text, is_error=False)))
+check("a failed check inside an error result is left to the tool-error reminder",
+      "failed CI check" not in pre(transcript("", runs("failure"), is_error=True)))
 for c in ("success", "skipped", "cancelled", "neutral", None):
     check(f"conclusion {c!r} is silent", pre(transcript("", runs(c), is_error=False)) == "")
 check("prose mentioning a failure conclusion is silent",

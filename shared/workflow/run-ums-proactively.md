@@ -21,15 +21,19 @@ Once the revised call works, record what caused the error and the form that work
 Expected results that are not mistakes (a grep with no match, a false `test`, a `diff` that finds differences) are exempt through its `EXPECTED_ERRORS` list, which it matches against the command's last stage, so `cd r && grep x f` is exempt too.
 A call marked with an `EXPECT_FAIL=1` prefix or a trailing `# expect-fail` comment is exempt, and so is a call the user declined.
 
+- **Do:** after a failed call, retry it, then record the cause and the working form.
+- **Don't:** treat a retry that works as the end of the matter.
+
 **A failed CI check triggers the pass too.**
 The goal is that every CI workflow passes, or skips where appropriate, on the first push.
 So when a check fails, record why the first push missed it and what local check would have caught it.
-(Ezra, [ai-config#1100](https://github.com/Morrison-Lab/ai-config/issues/1100): "our goal is that all CI workflows pass (or skip, if appropriate) on the first push;
-no failures".)
-The same hook injects the reminder on the call after a result whose JSON holds a check run or workflow run with conclusion `failure`, `timed_out` or `startup_failure`, once per set of failed check names.
+Ezra wrote the goal in [ai-config#1100](https://github.com/Morrison-Lab/ai-config/issues/1100): "our goal is that all CI workflows pass (or skip, if appropriate) on the first push;
+no failures".
+The same hook injects the reminder on the call after a result whose JSON shows a check run, job or workflow run whose newest run of that name ended `failure`, `timed_out` or `startup_failure`.
+It fires once per set of failed check names.
 
-- **Do:** after a failed call, retry it, then record the cause and the working form.
-- **Don't:** treat a retry that works as the end of the matter.
+- **Do:** when a check fails, find its cause, then record what local check would have caught it before the push.
+- **Don't:** fix the failure and push again with no note of why the first push missed it.
 
 Still run UMS before `/clear` too, as a final catch-all for anything accumulated since the last proactive pass --- but treat that as a backstop, not the trigger to wait for.
 

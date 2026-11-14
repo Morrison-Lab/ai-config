@@ -31,7 +31,7 @@ The prime directive: **only purge what you can prove is fake.** A reference you
   checkable facts (file names, function names, versions, links, citations) —
   especially memory and instruction files, which compound errors over time.
 
-## Step 1 — Detect (forked)
+## Step 1 --- Detect (forked)
 
 Run the `detect-hallucinations` skill on the target the user named.
 It runs forked as the read-only `hallucination-detector` agent: it resolves
@@ -44,7 +44,7 @@ in that skill's file, not here.
 When in doubt, it's ❓ not ❌. False deletions are worse than a flagged
 maybe.
 
-## Step 2 — Propose a fix for each fabrication (interactive)
+## Step 2 --- Propose a fix for each fabrication (interactive)
 
 Default action is **propose, then apply on confirmation** — never bulk-edit
 silently. For each ❌, present: the reference, where it is, the evidence it's
@@ -64,7 +64,7 @@ together if the user prefers). Re-verify after editing. If the target is a
 memory or instruction file, the global *"verify before recommending"* rule is
 the reason this matters — a fabricated memory poisons every future session.
 
-## Step 3 — Report
+## Step 3 --- Report
 
 Summarize: N references checked → ✅ resolved, ❌ fixed (list before→after),
 ❓ unverifiable (list, with why each couldn't be checked). The ❓ list is a
@@ -83,7 +83,7 @@ session.
 
 ## Relationship to other skills
 
-- **`detect-hallucinations`** — this skill's forked, read-only detect
+- **`detect-hallucinations`** --- this skill's forked, read-only detect
   phase (Step 1); run it alone for a report with no fixes.
 - **`record-learnings`, `ums`, `memorize` / `remember`** — these *write* the
   memory/skill/instruction corpus; `purge-hallucinations` *audits* it. A

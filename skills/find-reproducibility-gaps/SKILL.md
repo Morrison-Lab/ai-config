@@ -135,11 +135,11 @@ This whole skill runs isolated as the `reproducibility-auditor` custom agent (`c
 Every step above needs only that agent's tools (`Bash`, `Read`, `Grep`, `Glob`, `WebFetch`), so nothing is lost by forking the whole procedure.
 The harness gives the fork no Edit or Write tool;
 the agent keeps `Bash` for its checks, so avoiding a write-capable shell command is still instruction-level.
-`background: false` returns the report before the caller continues, because the caller acts on it.
+`background: false` returns the report before the caller continues, because `reproducibility-audit` acts on it.
 
 ## Relationship to other skills
 
-- **`reproducibility-audit`** --- the act half: files the tracking issue, fixes on a branch and drives the PR with `ardi`.
+- **`reproducibility-audit`** --- the act half: runs this skill, then files the tracking issue, fixes on a branch and drives the PR with `ardi`.
 - **`reprexes`** --- isolates a **single bug** into a minimal runnable snippet;
   this skill audits whether the **whole project** reproduces.
 - **`check-dependency-updates` (`cdu`)** --- asks whether a pin is current;

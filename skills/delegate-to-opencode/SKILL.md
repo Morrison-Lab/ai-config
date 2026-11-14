@@ -383,6 +383,8 @@ Each fact below was measured in a claude.ai cloud session on the date given, so 
   `/api/tags` lists `gemma4:31b`, but the id that answered was `gemma4:31b-cloud`.
   No review from `gemma4:31b-cloud` is recorded here, so the quality of its reviews has not been measured.
   `kimi-k3`, `glm-5.3` and `deepseek-v4-pro:0813` were refused as "not included in your free usage" (2026-11-09).
+  On 2026-11-14 every model tried, `gpt-oss:120b` and `gemma4:31b-cloud` included, was refused with "Add usage credits or subscribe", so the free allowance can run out too ([gha#2004](https://github.com/Morrison-Lab/gha/pull/2004)).
+  Try both free-plan ids before recording Ollama as unavailable in a waiver.
 - Send `"stream": false` and read `message.content`.
   A non-streaming request with a diff of about 30 KB returned a full review on 2026-11-05.
   The Go gateway's 30-second cutoff above did not apply.

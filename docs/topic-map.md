@@ -102,6 +102,7 @@ its description does not use (ai-config#949).
 | `skills/find-ai-tells/SKILL.md` | Spot AI prose tells. |  |
 | `skills/find-duplicates/SKILL.md` | -> find-overlap. |  |
 | `skills/find-overlap/SKILL.md` | Find overlapping skills or memory. |  |
+| `skills/find-reproducibility-gaps/SKILL.md` | Find reproducibility gaps, read-only. |  |
 | `skills/finish-wave/SKILL.md` | Finish the current wave; start no new one. |  |
 | `skills/first/SKILL.md` | Jump to head of task queue. |  |
 | `skills/fix-forward-references/SKILL.md` | Fix forward references in text. |  |

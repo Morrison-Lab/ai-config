@@ -15,9 +15,10 @@ background: false
 
 # check-prose-claims --- read-only check of claims, reasoning and values in prose
 
-The *check* half of `fact-check-prose`, factored out so it runs forked ([ai-config#914](https://github.com/Morrison-Lab/ai-config/issues/914)).
+Steps 1-6 of `fact-check-prose`, as a skill that runs forked ([ai-config#914](https://github.com/Morrison-Lab/ai-config/issues/914)).
 It checks whether prose is true and its logic holds, per [`shared/writing/fact-check-prose.md`](../../shared/writing/fact-check-prose.md), and returns a verdict table.
-It changes nothing: `fact-check-prose` applies corrections in the main session on request, and you can run this skill on its own for a report with no edits.
+It changes nothing, so run it on its own for a report with no edits;
+`fact-check-prose`'s step 7 is where corrections are applied, in the main session and on request.
 
 ## Step 1 --- Resolve the target and extract checkable units
 
@@ -52,7 +53,8 @@ Return **`Pre-flight: NOT READY`** instead of a report, with remediation instruc
 
 Check each factual claim against domain knowledge first.
 Where it is checkable against an external source (a package's own docs, a spec, a paper, a dataset's documentation), fetch that source **from the local `sources/` corpus**.
-Do **not** fall back to the open web (`WebFetch`) if the local source is missing.
+Do **not** fall back to the open web (`WebFetch`) for a cited source missing from the local corpus;
+`WebFetch` is for rendered previews (step 5), not for cited works.
 If a local source turns out to be incomplete (a missing chapter, for example), abort and return **`Pre-flight: NOT READY`**.
 Confirm or refute the claim against the local source, not against a secondhand summary.
 Don't wave a plausible-sounding claim through unchecked;
@@ -117,7 +119,7 @@ the per-claim `prose-fact-checker` fan-out stays a main-session option.
 
 ## Relationship to other skills
 
-- **`fact-check-prose`** --- the act half: applies the corrections this report names, on the user's request.
+- **`fact-check-prose`** --- holds the on-request correction step (its step 7), which applies fixes like the ones this report names.
 - **`prose-fact-checker` agent** --- checks one unit handed to it;
   this skill's agent covers a whole target in one pass.
 - **`check-info-quality` (`ciq`)** --- its check C catches a claim that passes here yet still misleads.

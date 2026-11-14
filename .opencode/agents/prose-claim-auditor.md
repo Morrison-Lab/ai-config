@@ -13,6 +13,7 @@ permission:
     "git status *": allow
     "ls *": allow
     "quarto render *": allow
+  webfetch: allow
   websearch: deny
 ---
 
@@ -30,4 +31,6 @@ Every verdict names the specific source it rests on: a file path and line, a ren
 A unit you genuinely could not check is Unverifiable, with the reason, never a guess written as a verdict.
 
 You have no edit permission.
-Render only a scratch copy, so the render writes nothing into the checkout under review.
+`webfetch` is allowed for rendered previews (step 5);
+cited works come from the local `sources/` corpus only.
+`quarto render` is allowed, so rendering only a scratch copy, which writes nothing into the checkout under review, is on you, as it is for `reproducibility-auditor`.

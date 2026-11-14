@@ -17,6 +17,18 @@ of each chapter in `REQUIRED`:
   * conciseness.qmd
   * relative-pronouns.qmd (grammar/)
 
+An exercise or solution also needs `EXERCISE_REQUIRED`, the chapter that holds
+the exercise rules (one ask per exercise, a solution per exercise):
+
+  * teaching.qmd
+
+The edit counts as an exercise or solution when the file's name has an `exr`
+or `sol` part (`_boolean_exr.qmd`, `_exr-boolean.qmd`) or the written text opens
+an `#exr-` or `#sol-` div. Such a file is gated wherever it lives, so the
+question banks outside `chapters/` (mcsg `exercises/`) are covered too
+(ai-config#5632: a session that passed the three-chapter gate wrote twelve
+multi-part exercises on mcs#168).
+
 DISCHARGE
 ---------
 A read-shaped call naming the chapter under a `psw` directory,
@@ -43,11 +55,16 @@ REQUIRED = {
     "conciseness.qmd": "chapters/conciseness.qmd",
     "relative-pronouns.qmd": "chapters/grammar/relative-pronouns.qmd",
 }
+EXERCISE_REQUIRED = {
+    "teaching.qmd": "chapters/teaching.qmd",
+}
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit"}
 READ_TOOLS = {"Read", "WebFetch", "mcp__github__get_file_contents"}
 READ_CMD_RE = re.compile(
     r"(?:^|[;&|(\s])(?:cat|bat|head|tail|less|more|sed|awk|grep|rg|nl|view|curl|wget)\s")
 PAGE_RE = re.compile(r"(?:^|/)(?:chapters|_subfiles)/(?:[^/]+/)*[^/]+\.qmd$")
+EXERCISE_NAME_RE = re.compile(r"(?:^|/)_?(?:[^/]*[_-])?(?:exr|sol)(?:[_-][^/]*)?\.qmd$")
+EXERCISE_DIV_RE = re.compile(r"\{\s*#(?:exr|sol)-")
 EXEMPT_RE = re.compile(r"(?:^|/)(?:hooks|memories|shared|outtakes)/")
 SOURCE_RE = re.compile(r"(?:morrison-lab\.github\.io/psw|Morrison-Lab/psw|(?:^|/)psw/)", re.I)
 
@@ -94,39 +111,54 @@ def chapters_read(transcript_path):
             continue
         if not SOURCE_RE.search(text):
             continue
-        for name in REQUIRED:
+        for name in {**REQUIRED, **EXERCISE_REQUIRED}:
             stem = name[:-4]
             if re.search(r"(?<![\w-])" + re.escape(stem) + r"(?:\.qmd|\.html)?(?![\w-])", text):
                 seen.add(name)
     return seen
 
 
+def written_text(inp):
+    parts = [inp.get("content"), inp.get("new_string")]
+    for edit in inp.get("edits") or []:
+        if isinstance(edit, dict):
+            parts.append(edit.get("new_string"))
+    return "\n".join(str(x) for x in parts if x)
+
+
 def edited_page(payload):
+    """Return (path, required chapters) for a gated edit, else None."""
     if payload.get("tool_name") not in EDIT_TOOLS:
         return None
     inp = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
     path = str(inp.get("file_path") or inp.get("path") or "").replace("\\", "/")
-    if PAGE_RE.search(path) and not EXEMPT_RE.search(path):
-        return path
+    if not path.endswith(".qmd") or EXEMPT_RE.search(path):
+        return None
+    exercise = bool(EXERCISE_NAME_RE.search(path) or EXERCISE_DIV_RE.search(written_text(inp)))
+    if exercise:
+        return path, {**REQUIRED, **EXERCISE_REQUIRED}
+    if PAGE_RE.search(path):
+        return path, REQUIRED
     return None
 
 
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-        page = edited_page(payload) if isinstance(payload, dict) else None
-        if not page:
+        gated = edited_page(payload) if isinstance(payload, dict) else None
+        if not gated:
             return 0
+        page, required = gated
         transcript = payload.get("transcript_path")
         if not isinstance(transcript, str) or not os.path.isfile(transcript):
             return 0
-        missing = [n for n in REQUIRED if n not in chapters_read(transcript)]
+        missing = [n for n in required if n not in chapters_read(transcript)]
         if not missing:
             return 0
     except Exception:
         return 0
     sources = "\n".join(
-        f"- psw/{REQUIRED[n]} (https://morrison-lab.github.io/psw/{REQUIRED[n][:-4]}.html)"
+        f"- psw/{required[n]} (https://morrison-lab.github.io/psw/{required[n][:-4]}.html)"
         for n in missing)
     reason = REASON.format(
         page=os.path.basename(page), missing=", ".join(missing), sources=sources)

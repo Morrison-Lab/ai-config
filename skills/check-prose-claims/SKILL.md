@@ -79,7 +79,8 @@ Walk each reasoning chain step by step:
 
 ## Step 5 --- Cross-check computed values and figures against the rendered output
 
-Don't trust the prose's own description of a computed value; verify it against what was actually produced:
+Don't trust the prose's own description of a computed value.
+Verify it against what was actually produced:
 
 1. Check whether the project has a **PR-preview deploy**: a sticky preview-link comment on the PR, or a preview workflow named in the project's `CLAUDE.md` or `.github/workflows/` (such as `preview.yml` + `preview-deploy.yml` built on `rossjrw/pr-preview-action`, which deploy to a `gh-pages` branch under `pr-preview/pr-<N>/<path>`).
 2. If a live preview exists, fetch the rendered page (`WebFetch`) and read the actual value or figure off it.

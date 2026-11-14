@@ -24,6 +24,17 @@ A call marked with an `EXPECT_FAIL=1` prefix or a trailing `# expect-fail` comme
 - **Do:** after a failed call, retry it, then record the cause and the working form.
 - **Don't:** treat a retry that works as the end of the matter.
 
+**A failed CI check triggers the pass too.**
+The goal is that every CI workflow passes, or skips where appropriate, on the first push.
+So when a check fails, record why the first push missed it and what local check would have caught it.
+Ezra wrote the goal in [ai-config#1100](https://github.com/Morrison-Lab/ai-config/issues/1100): "our goal is that all CI workflows pass (or skip, if appropriate) on the first push;
+no failures".
+The same hook injects the reminder on the call after a result whose JSON shows a check run, job or workflow run whose newest run of that name ended `failure`, `timed_out` or `startup_failure`.
+It fires once per set of failed check names.
+
+- **Do:** when a check fails, find its cause, then record what local check would have caught it before the push.
+- **Don't:** fix the failure and push again with no note of why the first push missed it.
+
 Still run UMS before `/clear` too, as a final catch-all for anything accumulated since the last proactive pass --- but treat that as a backstop, not the trigger to wait for.
 
 **In a multi-PR/multi-issue session (GII-style), treat each PR merge as a concrete proactive-UMS checkpoint, not just "whenever a learning happens to surface."**

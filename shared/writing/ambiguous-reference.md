@@ -217,6 +217,26 @@ The block's own worked example settles it in the same direction:
 refresh, leaving the third entry's figures where they were.
 Fixed to "record the SHA the new figures were derived at alongside them".)
 
+## An inserted sentence moves the next sentence's referent
+
+Inserting a sentence into the middle of a paragraph changes what comes
+before every sentence after it.
+A definite noun phrase in the next sentence ("the check", "the run") then
+reads as referring to the inserted case, even when it still means the case
+before the insertion.
+
+- **Do:** after inserting a sentence, reread the sentence that now follows
+  it and confirm it still describes what it described before.
+- **Do:** put a new case in its own bullet or paragraph when the sentences
+  after the insertion point describe only the old case.
+- **Don't:** check only the inserted lines; the defect is in the unchanged
+  line below them.
+
+(`Morrison-Lab/ai-config#5650`, 2026-11-14, cross-harness review on
+`83d1b71`: an inserted `opened`-event case ended "the next human-actor push
+heals it", and the unchanged next sentence, "The check stays red with no new
+run at all", then read as contradicting it.)
+
 ## Relationship to neighbouring rules
 
 - [`challenge-ambiguous-terminology`](../workflow/challenge-ambiguous-terminology.md)

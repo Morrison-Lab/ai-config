@@ -32,6 +32,12 @@ decidable signature; the rest (below) stay rules in run-ums-proactively.md.
                      match, a false test, a diff), EXPECT_FAIL a call marked
                      expect-fail, and USER_REJECTED a call the user declined.
                      Every error among parallel results counts.
+  ci-failure         PreToolUse, any tool (ai-config#1100): the newest batch of
+                     tool results holds a JSON check run or workflow run whose
+                     conclusion is failure, timed_out or startup_failure. Ezra:
+                     "our goal is that all CI workflows pass (or skip, if
+                     appropriate) on the first push; no failures". Inject-only,
+                     once per transcript and set of failed check names.
 
 Inject-only: every path prints context and exits 0. Fails OPEN and SILENT.
 Each reminder fires once per distinct trigger text (sentinel in the temp dir).
@@ -84,6 +90,9 @@ EXPECT_FAIL = re.compile(r"\A\s*EXPECT_FAIL=1\s|#\s*expect(?:ed)?[- ]fail\s*\Z")
 USER_REJECTED = re.compile(r"doesn't want to proceed|user rejected", re.I)
 OPERATOR_CHARS = ";&|\n"
 
+# Check-run and workflow-run conclusions that mean the check failed.
+FAILED_CONCLUSIONS = {"failure", "timed_out", "startup_failure"}
+
 # Read only the end of a long transcript: the newest tool result is all we need.
 TAIL_BYTES = 400_000
 
@@ -125,6 +134,12 @@ MESSAGES = {
         "Once the revised call works, record what caused the error and the form that works, "
         "so the next session writes it right the first time. " + COMMON
     ),
+    "ci-failure": (
+        "[hook: remind-ums-on-trigger-events] The previous result shows a failed CI check ({checks}). "
+        "The goal is that every CI workflow passes, or skips where appropriate, on the first push "
+        "(ai-config#1100). Once you know the cause, record why the first push missed it and what "
+        "local check would have caught it. " + COMMON
+    ),
     "revert": (
         "[hook: remind-ums-on-trigger-events] This command reverts or redoes work. Once it runs, "
         "ask what decision or check would have prevented the first attempt, and record that. "
@@ -154,8 +169,8 @@ def _text(content):
     return ""
 
 
-def last_tool_errors(transcript_path):
-    """[(tool_use_id, tool name, input, error text)] for each error in the newest batch of results.
+def newest_batch(transcript_path):
+    """[(tool_use_id, tool name, input, result text, is_error)] for the newest batch of results.
 
     Parallel calls return several results, so the newest batch is every result
     whose call belongs to the last group of calls that has any result yet. A
@@ -197,14 +212,44 @@ def last_tool_errors(transcript_path):
     if not results:
         return []
     newest = max(group_of[r.get("tool_use_id")] for r in results)
-    errors = []
+    batch = []
     for res in results:
         use_id = res.get("tool_use_id")
-        if group_of[use_id] != newest or not res.get("is_error"):
+        if group_of[use_id] != newest:
             continue
         name, inp = uses.get(use_id, ("a tool", None))
-        errors.append((use_id, name, inp, _text(res.get("content"))))
-    return errors
+        batch.append((use_id, name, inp, _text(res.get("content")), bool(res.get("is_error"))))
+    return batch
+
+
+def last_tool_errors(transcript_path):
+    """[(tool_use_id, tool name, input, error text)] for each error in the newest batch of results."""
+    return [(u, n, i, t) for u, n, i, t, err in newest_batch(transcript_path) if err]
+
+
+def failed_checks(text):
+    """Names of the failed check runs or workflow runs in a JSON tool result.
+
+    The shape is the one pull_request_read get_check_runs, actions_get and
+    gh api return: an object carrying "conclusion" (checked on ai-config#5631).
+    Text that is not JSON yields nothing, so prose quoting the word "failure"
+    never fires.
+    """
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return []
+    found = []
+    stack = [data]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            if node.get("conclusion") in FAILED_CONCLUSIONS:
+                found.append(str(node.get("name") or node.get("html_url") or node.get("id") or "a check"))
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+    return found
 
 
 def last_stage(command):
@@ -238,6 +283,21 @@ def is_expected(inp, error):
         return True
     stage = last_stage(command)
     return any(re.search(cmd_re, stage) and re.search(err_re, error) for cmd_re, err_re in EXPECTED_ERRORS)
+
+
+def ci_failure_reminder(payload):
+    path = payload.get("transcript_path")
+    if not isinstance(path, str) or not os.path.isfile(path):
+        return None
+    names = []
+    for use_id, _name, _inp, text, is_error in newest_batch(path):
+        if is_error:
+            continue
+        names.extend(failed_checks(text))
+    names = sorted(set(names))
+    if not names or not first_time("ci-failure", f"{path}:{names}"):
+        return None
+    return MESSAGES["ci-failure"].format(checks=", ".join(names)[:200])
 
 
 def tool_error_reminder(payload):
@@ -292,6 +352,9 @@ def main() -> int:
             error_note = tool_error_reminder(payload)
             if error_note:
                 notes.append(error_note)
+            ci_note = ci_failure_reminder(payload)
+            if ci_note:
+                notes.append(ci_note)
             if notes:
                 print(json.dumps({"hookSpecificOutput": {
                     "hookEventName": "PreToolUse",

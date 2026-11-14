@@ -162,5 +162,28 @@ with open(orphan, "w", encoding="utf-8") as fh:
         {"type": "tool_result", "tool_use_id": "r", "is_error": False, "content": "a"}]}}) + "\n")
 check("an error whose call fell before the tail is silent", pre(orphan) == "")
 check("a missing transcript is silent", pre("/nonexistent/t.jsonl") == "")
+
+
+# ci-failure (ai-config#1100): the newest result shows a failed check run.
+def runs(*conclusions):
+    return json.dumps({"total_count": len(conclusions), "check_runs": [
+        {"id": i, "name": f"job{i}", "status": "completed", "conclusion": c} for i, c in enumerate(conclusions)]})
+
+
+out = pre(transcript("", runs("success", "failure"), is_error=False, name="mcp__github__pull_request_read"))
+check("a failed check run reminds and names it", "failed CI check" in out and "job1" in out and "job0" not in out)
+check("the ci-failure reminder is context, not a deny", "additionalContext" in out and '"deny"' not in out)
+for c in ("timed_out", "startup_failure"):
+    check(f"conclusion {c!r} reminds", "failed CI check" in pre(transcript("", runs(c), is_error=False)))
+check("a workflow run (actions_get shape) reminds",
+      "validate" in pre(transcript("", json.dumps({"id": 9, "name": "validate", "conclusion": "failure"}),
+                                   is_error=False)))
+for c in ("success", "skipped", "cancelled", "neutral", None):
+    check(f"conclusion {c!r} is silent", pre(transcript("", runs(c), is_error=False)) == "")
+check("prose mentioning a failure conclusion is silent",
+      pre(transcript("", 'the run had "conclusion": "failure" earlier', is_error=False)) == "")
+same_ci = transcript("", runs("failure"), is_error=False)
+tmp = tempfile.mkdtemp()
+check("fires once per set of failed checks", pre(same_ci, tmp) != "" and pre(same_ci, tmp) == "")
 print(f"\n{'FAILED' if failures else 'all passed'}: {failures} wrong")
 sys.exit(1 if failures else 0)

@@ -77,6 +77,7 @@ its description does not use (ai-config#949).
 | `skills/delegate-to-databricks/SKILL.md` | Dispatch sidecar work to Databricks-hosted LLMs. |  |
 | `skills/delegate-to-opencode/SKILL.md` | Delegate sidecar work to OpenCode or OpenRouter models. |  |
 | `skills/dependabot/SKILL.md` | -> chores. |  |
+| `skills/detect-hallucinations/SKILL.md` | Find fake references, read-only. |  |
 | `skills/detect-hypothetical-examples/SKILL.md` | Flag invented examples when real data exists. |  |
 | `skills/detect-informal-definitions/SKILL.md` | Detect informal definitions. |  |
 | `skills/di/SKILL.md` | -> defer-issue. |  |

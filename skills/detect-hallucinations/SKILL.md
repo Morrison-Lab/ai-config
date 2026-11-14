@@ -23,9 +23,9 @@ It changes nothing: `purge-hallucinations` proposes and applies the fixes in
 the main session afterward, and you can run this skill on its own to ask
 "what here is made up?".
 
-The prime directive: **only call fake what you can prove is fake.** A reference
-you *can't* verify (network down, ambiguous symbol, private resource) is
-**unverifiable**, not a hallucination.
+The prime directive: **only call fake what you can prove is fake.**
+A reference you *can't* verify (network down, ambiguous symbol, private
+resource) is **unverifiable**, not a hallucination.
 
 ## Step 1 — Resolve the target
 
@@ -101,8 +101,8 @@ Sort every reference into exactly one bucket:
 | ❌ **Fabricated** | proven absent (404, no definition, no such tag/file) | `purge-hallucinations` proposes a fix |
 | ❓ **Unverifiable** | can't be checked here (network, private, ambiguous) | **report, do not edit** |
 
-When in doubt, it's ❓ not ❌. False deletions are worse than a flagged
-maybe.
+When in doubt, it's ❓ not ❌.
+False deletions are worse than a flagged maybe.
 
 ## Step 4 — Return the report
 

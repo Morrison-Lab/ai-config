@@ -15,10 +15,9 @@ background: false
 
 # check-prose-claims --- read-only check of claims, reasoning and values in prose
 
-Steps 1-6 of `fact-check-prose`, as a skill that runs forked ([ai-config#914](https://github.com/Morrison-Lab/ai-config/issues/914)).
+The *check* half of `fact-check-prose`, factored out so it runs forked ([ai-config#914](https://github.com/Morrison-Lab/ai-config/issues/914)).
 It checks whether prose is true and its logic holds, per [`shared/writing/fact-check-prose.md`](../../shared/writing/fact-check-prose.md), and returns a verdict table.
-It changes nothing, so run it on its own for a report with no edits;
-`fact-check-prose`'s step 7 is where corrections are applied, in the main session and on request.
+It changes nothing: `fact-check-prose` runs it, then applies corrections in the main session on request, and you can run this skill on its own for a report with no edits.
 
 ## Step 1 --- Resolve the target and extract checkable units
 
@@ -42,7 +41,7 @@ If the target cites no external works, skip this gate.
 Otherwise, before evaluating any claim against an external source, check whether the repository's local source corpus (`sources/` or equivalent) actually contains the needed sources:
 
 1. **Are required sources missing from the local corpus?**
-2. **Is a required source present but unconverted?**
+2. **Is the required source present but unconverted?**
    For example, a `.pdf`, `.docx`, or `.epub` file without a corresponding Markdown conversion.
 
 If either holds, **refuse to run**:
@@ -119,7 +118,7 @@ the per-claim `prose-fact-checker` fan-out stays a main-session option.
 
 ## Relationship to other skills
 
-- **`fact-check-prose`** --- holds the on-request correction step (its step 7), which applies fixes like the ones this report names.
+- **`fact-check-prose`** --- the act half: runs this skill, then applies the corrections this report names, on the user's request.
 - **`prose-fact-checker` agent** --- checks one unit handed to it;
   this skill's agent covers a whole target in one pass.
 - **`check-info-quality` (`ciq`)** --- its check C catches a claim that passes here yet still misleads.

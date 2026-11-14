@@ -188,11 +188,11 @@ becomes the forked subagent's task, so there is no way to fork only a
 sub-step.
 A skill whose procedure mixes a read-only detect phase with a
 **main-session-only** write/PR/interactive-confirmation follow-through
-(`fact-check-prose` and `check-info-quality`
-both do this --- see #914) cannot use mechanism 2
+(`check-info-quality` does this --- see #914) cannot use mechanism 2
 without restructuring into two skills first, as `purge-hallucinations`
 did by moving its detect phase into the forked `detect-hallucinations`
-(and `reproducibility-audit` into `find-reproducibility-gaps`):
+(and `reproducibility-audit` into `find-reproducibility-gaps`,
+and `fact-check-prose` into `check-prose-claims`):
 forking the whole thing to a
 read-only custom agent would strip the write access the follow-through
 needs, not replace it declaratively.

@@ -22,7 +22,7 @@ job is to find reproducibility gaps, not to fix them.
 
 Detect the project's type first (an R package has a `DESCRIPTION`; a Quarto
 book/site has a `_quarto.yml`; anything else is a general script repo) and run
-the matching checklist section from the skill, plus every all-project-types
+the matching checklist section from `find-reproducibility-gaps`, plus every all-project-types
 section:
 
 1. **R package** --- `renv.lock` completeness against actual `library()`/`::`

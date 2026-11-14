@@ -42,6 +42,7 @@ its description does not use (ai-config#949).
 | `skills/check-dependency-updates/SKILL.md` | Audit dependency updates. |  |
 | `skills/check-history/SKILL.md` | Check closed PR history for issue. |  |
 | `skills/check-info-quality/SKILL.md` | Flag stale or misleading content. |  |
+| `skills/check-prose-claims/SKILL.md` | Check prose claims, read-only. |  |
 | `skills/check-rendered-refs/SKILL.md` | Find broken refs in render. |  |
 | `skills/checkpoint/SKILL.md` | Save mid-task snapshot. |  |
 | `skills/chores/SKILL.md` | Handle chore and bump PRs. |  |

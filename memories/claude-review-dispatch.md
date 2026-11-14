@@ -122,12 +122,18 @@ the bot-sender and allowed-bots short-circuit gates), see
   dispatched `/review` came back clean.)
   - **The empty retrigger commit must be pushed by a HUMAN actor --- a
     bot-pushed one is silently skipped.**
-    `claude-code-review.yml` (and the
-    review-triggering workflows generally) gate on a bot-actor `if:` filter
-    (e.g. `github.actor != 'github-actions[bot]'` / not a `[bot]` login), so a
-    `synchronize` event fired by a bot-authored push --- e.g. the `@claude`
+    gha `v3`'s `claude-code-review.yml` gates its jobs on the sender's
+    account type, `github.event.sender.type != 'Bot'`, which skips every
+    Bot account, not only `github-actions[bot]`; it has no `github.actor`
+    test, so a grep for `github.actor` finds nothing (checked 2026-11-14,
+    ai-config#1503).
+    So a `synchronize` event fired by a bot-authored push --- e.g. the `@claude`
     agent itself doing `git commit --allow-empty` on the PR --- is *filtered
     out* and never starts the gating `claude-review` run.
+    The same gate skips the `opened` event of a PR created through the raw
+    GitHub API, which `claude[bot]` authors (Lacaedemon/sparta#1278: all
+    three jobs skipped on `opened`, then ran on the next `synchronize` from
+    a User push); the next human-actor push heals it.
     The check stays red
     with no new run at all (not even a stub), which reads like nothing
     happened.

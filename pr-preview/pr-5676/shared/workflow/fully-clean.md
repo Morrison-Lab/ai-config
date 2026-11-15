@@ -1691,12 +1691,20 @@ So merge once, on the current head, when all three hold:
 - GitHub reports the PR mergeable, with no conflict (`mergeable` true, `mergeable_state` neither `dirty` nor `behind`);
 - the latest review names that head.
 
+This is the GitHub direct-merge rule.
+The GitLab form below keeps its `--is-ancestor` currency check.
+On a base whose protection or ruleset requires an up-to-date branch, GitHub reports every drifting PR `behind` and will not merge it, so the rule gives no relief there:
+read the ruleset's `strict_required_status_checks_policy` rather than assuming either way.
+
 Update the branch only when one of those fails for a reason an update fixes: a real conflict, the checker's base-drift failure (the base gained a workflow gate the head never ran, or the comparison hit the 300-file cap), or a base whose protection requires an up-to-date branch (`mergeable_state` `behind`).
 The residual risk is accepted rather than closed: a gate the base gained through a script or a reusable workflow is invisible to the path diff, and the post-merge CI run on the base is what catches it, under the red-main rule ([`red-main`](red-main.md)).
-`hooks/no-update-branch-on-clean-pr.py` is the instrument: it denies the update, by the MCP tool or by `gh pr update-branch` or `gh api .../update-branch`, on a PR the transcript shows as fully clean, until the checker reports base drift for it.
+`hooks/no-update-branch-on-clean-pr.py` is the instrument:
+it denies the MCP `update_pull_request_branch` call on a PR the transcript shows as fully clean, until the checker reports base drift for it.
+Its extension to the `gh pr update-branch` and `gh api .../update-branch` forms, and to a later conflict or `behind` report, is the follow-up half of [#5675](https://github.com/Morrison-Lab/ai-config/issues/5675).
 
 - **Do:** merge a PR that is behind only by content, on its current head, once the three conditions hold.
 - **Don't:** merge `main` into a fully clean PR at merge time because `behind_by` is non-zero.
+
 Under a merge queue where every clean-gate check both executes for `merge_group` and is required (or aggregated behind a required check),
 the queue's speculative merge test will cover this once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) defines the queue form of the gate,
 and [`merge-queue`](merge-queue.md) forbids the manual update loop there.
@@ -1743,12 +1751,13 @@ Merge synchronously, right after the check, with the merge command pinned.
   The merge-base need not be that tip: a base that moved only by content is merged as it stands, per the content-only rule above.
   A retarget to another branch at the same tip during the gate would otherwise pass both the ancestry check and the head pin with a verdict produced for the old target.
   A concurrent push after the gate can already contain the base tip, so an ancestry check alone would admit a head no verdict covers.
-  Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py`, which [`mwc`](../../skills/mwc/SKILL.md) already runs, both [`mwc`](../../skills/mwc/SKILL.md) and [`merge-it`](../../skills/merge-it/SKILL.md) name it as a manual step after their readiness check and before the merge command: `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && [ "$b" = "<pinned-base>" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$head" = "<pinned-sha>" ] && echo "$tip"`, where `<pinned-sha>` and `<pinned-base>` are the `headRefOid` and `baseRefName` recorded before the gate ran.
+  Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py`, which [`mwc`](../../skills/mwc/SKILL.md) already runs, both [`mwc`](../../skills/mwc/SKILL.md) and [`merge-it`](../../skills/merge-it/SKILL.md) name it as a manual step after their readiness check and before the merge command:
+  `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && [ "$b" = "<pinned-base>" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$head" = "<pinned-sha>" ] && echo "$tip"`,
+  where `<pinned-sha>` and `<pinned-base>` are the `headRefOid` and `baseRefName` recorded before the gate ran.
   The trailing `echo` prints the tested base tip: record it as `<pinned-tip>` before the gate reruns, since a shell variable does not survive into the later tool call that makes the pre-merge comparison.
   The live base name is compared to the pin rather than trusted, so a retarget fails the check instead of steering the fetch.
-  `git merge-base` needs both tips' history: in a shallow clone the two can appear disjoint ([`claude-code-consumer-wiring`](../../memories/claude-code-consumer-wiring.md) records the bogus merge-base), so run `git fetch --unshallow` (or `--deepen=<n>` with a depth that reaches the common ancestor) first, or use the compare endpoint, which is unaffected.
   Both fetches name the repository the `-R` reads came from, not the checkout's `origin`, which in a fork or another checkout can be a different repository whose same-numbered PR would let the gate compare unrelated commits.
-  Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
+  Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing an empty head with the pin.
   Reading `FETCH_HEAD` after each fetch uses the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/<branch>` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
   The base comes from the PR, not from the repository's default branch: a stacked or release PR targets another branch, and [`merge-it`](../../skills/merge-it/SKILL.md) already warns not to assume `main` for those.
 - **Do:** for a direct merge from a remote session without `git`, re-read the PR's `headRefOid` and `baseRefName` and require both to equal the recorded pins, then read the compare endpoint instead of `git merge-base`, `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"`, with the base name encoded as one path segment (`jq -rn --arg b "<base>" '$b|@uri'`, so `release/1.x` does not split the path).

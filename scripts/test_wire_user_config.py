@@ -156,9 +156,11 @@ class WireUserConfig(unittest.TestCase):
         s = self.settings()
         self.assertEqual(s["permissions"]["allow"], [wire.CANCEL_PERMISSION])
         self.assertEqual(s["autoMode"]["allow"],
-                         ["$defaults", wire.CANCEL_AUTO_MODE_RULE])
+                         ["$defaults", wire.CANCEL_AUTO_MODE_RULE,
+                          wire.BRANCH_PUSH_AUTO_MODE_RULE])
         _, out = self.run_main("--check")
         self.assertIn("ok    ", line(out, "Run cancel"))
+        self.assertIn("ok    ", line(out, "Branch push"))
         self.run_main()
         self.assertEqual(self.settings(), s)
 
@@ -170,8 +172,28 @@ class WireUserConfig(unittest.TestCase):
         s = self.settings()
         self.assertEqual(s["permissions"]["allow"], ["Bash(ls)", wire.CANCEL_PERMISSION])
         # An array without "$defaults" is the user's choice; it gains no "$defaults".
-        self.assertEqual(s["autoMode"]["allow"], ["mine", wire.CANCEL_AUTO_MODE_RULE])
+        self.assertEqual(s["autoMode"]["allow"], ["mine", wire.CANCEL_AUTO_MODE_RULE,
+                                                  wire.BRANCH_PUSH_AUTO_MODE_RULE])
         self.assertEqual(s["autoMode"]["environment"], ["env"])
+
+    def test_branch_push_check_reports_todo_and_writes_nothing(self):
+        self.write_settings({"autoMode": {"allow": ["$defaults"]}})
+        _, out = self.run_main("--check")
+        self.assertIn("todo  ", line(out, "Branch push"))
+        self.assertEqual(self.settings()["autoMode"]["allow"], ["$defaults"])
+
+    def test_branch_push_rule_excludes_force_default_branch_and_large_prs(self):
+        rule = wire.BRANCH_PUSH_AUTO_MODE_RULE
+        self.assertIn("`claude/`", rule)
+        for excluded in ("--force", "--force-with-lease", "`main`",
+                         "deleting branches", "pushing tags", "ALLOW_LARGE_PR=1"):
+            self.assertIn(excluded, rule.split("does not cover", 1)[1])
+
+    def test_branch_push_malformed_allow_is_reported(self):
+        self.write_settings({"autoMode": {"allow": "x"}})
+        _, out = self.run_main()
+        self.assertIn("is not a JSON array", line(out, "Branch push"))
+        self.assertEqual(self.settings()["autoMode"], {"allow": "x"})
 
     def test_run_cancel_rule_covers_cancelling_only(self):
         rule = wire.CANCEL_AUTO_MODE_RULE

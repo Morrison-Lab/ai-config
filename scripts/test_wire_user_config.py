@@ -185,9 +185,27 @@ class WireUserConfig(unittest.TestCase):
     def test_branch_push_rule_excludes_force_default_branch_and_large_prs(self):
         rule = wire.BRANCH_PUSH_AUTO_MODE_RULE
         self.assertIn("`claude/`", rule)
-        for excluded in ("--force", "--force-with-lease", "`main`",
-                         "deleting branches", "pushing tags", "ALLOW_LARGE_PR=1"):
+        self.assertIn("every destination ref starts with `claude/`", rule)
+        for excluded in ("--force", "--force-with-lease", "`main`", "`gh-pages`",
+                         "`--all`", "`--mirror`", "`--prune`", "`--delete`",
+                         "empty-source refspec", "deleting branches",
+                         "pushing tags", "ALLOW_LARGE_PR=1"):
             self.assertIn(excluded, rule.split("does not cover", 1)[1])
+
+    def test_branch_push_is_left_to_managed_settings_in_a_remote_container(self):
+        os.environ["CLAUDE_CODE_REMOTE"] = "true"
+        try:
+            _, out = self.run_main()
+        finally:
+            del os.environ["CLAUDE_CODE_REMOTE"]
+        self.assertIn("ok    remote container", line(out, "Branch push"))
+        self.assertFalse((self.home / ".claude/settings.json").exists())
+
+    def test_branch_push_non_object_automode_is_reported(self):
+        self.write_settings({"autoMode": ["x"]})
+        _, out = self.run_main()
+        self.assertIn("`autoMode` is not a JSON object", line(out, "Branch push"))
+        self.assertEqual(self.settings()["autoMode"], ["x"])
 
     def test_branch_push_malformed_allow_is_reported(self):
         self.write_settings({"autoMode": {"allow": "x"}})

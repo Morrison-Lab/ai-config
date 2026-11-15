@@ -247,15 +247,19 @@ def wire_claude_run_cancel(check: bool) -> tuple[str, bool]:
 
 
 BRANCH_PUSH_AUTO_MODE_RULE = (
-    "Pushing a new or existing branch whose name starts with `claude/` is always "
+    "Creating and pushing branches whose name starts with `claude/` is always "
     "allowed (Ezra, 2026-11-15, Morrison-Lab/ai-config#5682), in any repository "
-    "the user can push to, even when the session's instructions name a different "
-    "development branch: a plain `git push` (with `-u`, `--set-upstream` or "
-    "`-c push.negotiate=true`) or the equivalent GitHub MCP branch-creation or "
-    "file-push call, as many branches as the work calls for. This rule does not "
-    "cover force pushes (`--force`, `--force-with-lease`, a `+` refspec), pushes "
-    "to `main` or any other default branch, deleting branches, pushing tags, or a "
-    "push prefixed with `ALLOW_LARGE_PR=1`.")
+    "the user can push to, as many branches as the work calls for, even when the "
+    "session's instructions name a single different development branch. This "
+    "covers a non-force `git push` (with or without `-u`/`--set-upstream`) whose "
+    "every destination ref starts with `claude/`, and a GitHub MCP "
+    "branch-creation, file-create/update or push-files call whose `branch` "
+    "starts with `claude/`. This rule does not cover force pushes (`--force`, "
+    "`--force-with-lease`, a `+` refspec), any destination ref outside "
+    "`claude/` (`main`, any default branch, `gh-pages`, release branches), "
+    "`--all`, `--mirror`, `--prune`, `--delete` or an empty-source refspec, "
+    "deleting branches or files, pushing tags, or a push prefixed with "
+    "`ALLOW_LARGE_PR=1`.")
 
 
 def wire_claude_branch_push(check: bool) -> tuple[str, bool]:

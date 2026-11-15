@@ -474,6 +474,9 @@ The shipped version shares one 6-second budget across both calls, returns "no de
 When authoring a new hook:
 1. Place the implementation script in `hooks/<name>.py` (or `.sh`).
 2. Add comprehensive unit tests in `hooks/test-<name>.py`.
+   A hook that parses Bash commands imports `scripts/lib/shellcmd.py` (`shell_c_expansions`, `simple_commands`) and matches whole argv tokens, never a command-position regex of its own.
+   [ai-config#5678](https://github.com/Morrison-Lab/ai-config/pull/5678) spent four review rounds on a hand-written one before switching to the splitter.
+   [`shell.md`](shell.md#a-hook-that-parses-bash-commands-reuses-scriptslibshellcmdpy) has the case.
 3. Register the hook in [`hooks/hooks.json`](../hooks/hooks.json) under the correct event and matcher.
 4. Add a row to the README hooks table in [`README.md`](../README.md#enforcement-hooks-hooks).
    The row's matcher list must equal the `hooks.json` groups for that script joined by `, `, in file order:

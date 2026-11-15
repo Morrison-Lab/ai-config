@@ -65,7 +65,8 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import (COMMAND_WRAPPERS, ENV_ASSIGNMENT, SHELL_KEYWORDS,
-                          WRAPPER_ARG_WINDOW, shell_c_expansions, simple_commands)
+                          WRAPPER_ARG_WINDOW, shell_c_expansions,
+                          simple_commands_with_scope)
 except Exception as _exc:  # broken install: degrade, never block
     print(f"no-update-branch-on-clean-pr: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); no Bash command will be checked", file=sys.stderr)
@@ -160,8 +161,12 @@ def targets_of(tool, tool_input, cwd=None):
     for depth, line in enumerate(shell_c_expansions(tool_input["command"])):
         # A nested `bash -c` shell starts in a directory the text cannot show,
         # and a `cd` moves the rest of the line, so neither resolves origin.
-        where, repo_env = (cwd if depth == 0 else None), None
-        for argv in simple_commands(line) or []:
+        # A `( ... )` subshell inherits its parent's state, but its own `cd`
+        # and `export` end with it, so the state is kept per subshell scope.
+        state = {(0,): ((cwd if depth == 0 else None), None)}
+        for scope, argv in simple_commands_with_scope(line) or []:
+            where, repo_env = next(state[scope[:i]] for i in range(len(scope), 0, -1)
+                                   if scope[:i] in state)
             # `{ cd x; }`, `then cd x`, `builtin cd x` and `command cd x` all
             # run the builtin, so skip the keywords and those two prefixes.
             words = list(dropwhile(lambda w: w in SHELL_KEYWORDS or w in BUILTIN_PREFIXES, argv))
@@ -169,6 +174,7 @@ def targets_of(tool, tool_input, cwd=None):
                 where = None
             if words[:1] == ["export"]:
                 repo_env = gh_repo(words[1:]) or repo_env
+            state[scope] = (where, repo_env)
             args = gh_args(argv)
             if args and args[0] == "api":
                 found += [m.groups() for m in map(API_PATH.match, args[1:]) if m]

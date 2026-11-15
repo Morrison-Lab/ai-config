@@ -64,7 +64,7 @@ BARE_LINE = re.compile(r"\b" + VERB + r"\s+[`\"]?(?P<w>mwc|retry\s+#\d+)\b", re.
 # only as the direct object of an asking verb, so "reply if you want me to
 # merge 95" is not read as one.
 MERGE_LINE = r"merge\s+(?:[a-z][\w.-]*\s+)?#?\d+(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+|\s*&\s*)#?\d+)*"
-QUOTED_MERGE = re.compile(r"[`\"“](?P<m>" + MERGE_LINE + r")[.,]?[`\"”]", re.I)
+QUOTED_MERGE = re.compile(r"[`\"\u201c](?P<m>" + MERGE_LINE + r")[.,]?[`\"\u201d]", re.I)
 PLAIN_MERGE = re.compile(r"\b" + VERB + r"\s+(?:with\s+)?(?P<m>" + MERGE_LINE + r")\b", re.I)
 # A sentence reporting a line already typed is not an ask for it.
 REPORTED = re.compile(r"\b(?:typed|said|sent|gave|wrote|answered|replied|merged)\b", re.I)

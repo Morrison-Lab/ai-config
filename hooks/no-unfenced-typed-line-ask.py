@@ -51,7 +51,7 @@ KNOWN_LINE = re.compile(
     r"|retry\s+[\w.-]+#\d+"
     r"|merge\s+anyway\s+#?[\w.-]*\d+)",
     re.I)
-INLINE = re.compile(r"`([^`\n]+)`|\"([^\"\n]{2,})\"|“([^”\n]{2,})”")
+INLINE = re.compile(r"`([^`\n]+)`|\"([^\"\n]{2,})\"|\u201c([^\u201d\n]{2,})\u201d")
 # A sentence reporting a line already typed is not an ask for it.
 REPORTED = re.compile(r"\b(?:typed|said|sent|gave|wrote|answered|replied)\b", re.I)
 SENT = re.compile(r"(?<=[.!?])\s+|\n+")

@@ -1991,14 +1991,14 @@
         ]
       },
       {
-        "matcher": "mcp__github__update_pull_request_branch",
+        "matcher": "mcp__github__update_pull_request_branch|Bash",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-update-branch-on-clean-pr.py\"",
             "timeout": 10,
             "script": "no-update-branch-on-clean-pr.py",
-            "why": "ai-config#5093. ids#47 lost its Clean verdict at head 98ed862a on 2026-11-07 when main was merged into it. Denies update_pull_request_branch on a PR the transcript shows as FULLY CLEAN on its head, unless check-pr-fully-clean.py later reported base drift (the base gained a CI gate the head never ran). A PR with no clean line in the transcript is untouched. Fails open on any parse trouble."
+            "why": "ai-config#5093, #5675. ids#47 lost its Clean verdict at head 98ed862a on 2026-11-07 when main was merged into it, and Ezra decided on 2026-11-14 that a PR behind only by other PRs' content merges on its current head. Denies update_pull_request_branch and gh api .../pulls/<N>/update-branch on a PR the transcript shows as FULLY CLEAN on its head, unless check-pr-fully-clean.py later reported that the branch needs the base (base drift adding a CI gate, a conflict, or a required up-to-date branch). A PR with no clean line in the transcript is untouched. Fails open on any parse trouble."
           }
         ]
       },

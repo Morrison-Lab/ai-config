@@ -577,3 +577,22 @@ It is a memory entry only.
 (2026-10-07, two Springer books downloaded in a browser;
 reported missing after a title/author search, found under their ISBN and DOI-suffix names.
 [ai-config#4358](https://github.com/Morrison-Lab/ai-config/issues/4358).)
+
+## `run-local-validation.py` leaves temporary hook files while it runs
+
+Its mutation and fixture suites write `hooks/tmp_mut_*.py` and `hooks/tmp*.py` into the checkout and delete them at the end.
+A `git add -A` while a run was still going in the background committed a 298-line temporary file on [ai-config#5676](https://github.com/Morrison-Lab/ai-config/pull/5676)'s branch.
+It was dropped before the push (2026-11-14).
+
+- **Do:** let the run finish, or stop it, before staging, and stage named paths.
+- **Don't:** run `git add -A` in a checkout where `run-local-validation.py` is still running.
+
+## A hook that parses Bash commands reuses `scripts/lib/shellcmd.py`
+
+[ai-config#5678](https://github.com/Morrison-Lab/ai-config/pull/5678) first matched `gh api .../update-branch` with a hand-written command-position regex and quote scanner.
+Three review rounds later, the cross-model review still found a path inside another command's quoted body, a `#` comment, and a backslash-newline continuation handled wrong (2026-11-15).
+Porting the hook to `shellcmd.py`'s `shell_c_expansions` and `simple_commands`, and matching whole argv tokens, fixed all three, also covered `bash -c` and `sudo -u x`, and shrank the diff.
+This adds to the [hook checklist](hooks.md#5-adding--modifying-hooks-checklist).
+
+- **Do:** `ls scripts/lib/` before writing any shell parsing in a hook, and import `shellcmd.py` to tell an executed command from quoted text.
+- **Don't:** write a new command-position regex or quote and comment span scanner for a hook.

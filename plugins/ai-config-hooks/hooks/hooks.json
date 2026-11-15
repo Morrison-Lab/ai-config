@@ -322,6 +322,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-chained-edit-and-commit-in-cloud.py\"'",
+            "timeout": 10,
+            "script": "no-chained-edit-and-commit-in-cloud.py",
+            "why": "ai-config#5688, from #5687. Ezra, 2026-11-15: \"avoid asking for approvals when there's another idiomatic path forward\". In a cloud session (CLAUDE_CODE_REMOTE=true) DENIES a Bash command that chains an in-place edit (sed or perl -i, or a >/>> redirect into a file outside /dev, /tmp and a scratchpad directory) with git commit, also inside bash -c, and points to the Edit tool for the edit and a separate Bash call for the commit. Either half alone passes, as do quoted mentions. A deny rather than a warning because a warning is read past (ai-config#4741) and the chain is what raised the approval prompts. ALLOW_CHAINED_EDIT_COMMIT=1 covers a chain that is needed. Silent outside cloud sessions; fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-gh-repo-flag.py\"'",
             "timeout": 10,
             "script": "require-gh-repo-flag.py",

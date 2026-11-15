@@ -6,23 +6,12 @@ him to type an approval line: "always give me the line with a copy button".
 The Claude app shows a copy button on a fenced code block, not on inline code
 or quoted text.
 
-Denies a user-visible reply tool call (mcp__hearthbot__reply, post_message,
-update_message, edit_message) when, outside fenced code blocks,
-
-  * a known typed line (`mwc <repo> ...`, `approve push of ...`,
-    `approve editing ...`, `retry <repo>#<n>`, `merge anyway <pr>`) appears
-    in a sentence that asks the user to type, say, reply, paste or enter it
-    (the verb as an imperative or request, so "the return type of" is not one),
-    or alone on its own line in a message that asks; or
-  * a sentence asks the user to type, and the verb's own object ("type `X`",
-    "reply with `X`", "type this line: `X`") sits in inline backticks or
-    double quotes,
-
-and that same line is not also given in a fenced code block in the message.
-A negated ask ("no need to type anything") is left alone. Plain single-word
-merge words in prose ("a bare `mwc`") are left alone unless a sentence asks
-the user to type them. ALLOW_UNFENCED_TYPED_LINE=1 overrides. Fails open on
-parse trouble. shared/workflow/lab-operating-rules.md.
+Denies a user-visible reply tool call that asks the user to type a known line
+(mwc, approve push of, approve editing, retry, merge anyway) or an inline-quoted
+line that is the object of an imperative type/paste/say/reply/respond/send,
+unless the same line is also in a fenced code block. Negated asks and reports
+of a line already typed are left alone. ALLOW_UNFENCED_TYPED_LINE=1 overrides.
+Fails open on parse trouble. shared/workflow/lab-operating-rules.md.
 """
 import json
 import os
@@ -35,10 +24,12 @@ FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.S | 
 
 # Asking the user to type a line: the verb only as an imperative or request,
 # so "the return type of" or "the docs say" is not an ask.
-VERB = r"(?:type|paste|enter|say|reply|respond|send)"
+VERB = r"(?:type|paste|say|reply|respond|send)"
 ASK = re.compile(
-    r"(?:^|[:;,]\s*|\b(?:please|just|then|to|can\s+you|you\s+(?:can|should|need\s+to|must))\s+)"
-    + VERB + r"\b",
+    r"(?:[:;,]\s*|\b(?:please|just|then|can\s+you|you\s+(?:can|should|need\s+to|must))\s+)" + VERB + r"\b"
+    # A sentence-initial verb is an imperative ("Type `X` in the thread"),
+    # unless its object is the subject of a verb ("Type `int` is expected").
+    r"|^\s*" + VERB + r"\b(?!\s+\S+\s+(?:is|are|was|were|has|have|will|can|must|should|does)\b)",
     re.I)
 # An inline line counts only as the verb's own object: "type `X`",
 # "reply with `X`", "type this line: `X`". "paste the log from `debug.log`" does not.
@@ -57,10 +48,11 @@ KNOWN_LINE = re.compile(
     r"|approve\s+push\s+of\s+[^\n`\"]+"
     r"|approve\s+editing\s+[^\n`\"]+"
     r"|retry\s+[\w.-]+#\d+"
-    r"|merge\s+anyway\s+#?[\w.-]*\d+)",
+    r"|merge\s+anyway\s+(?:[\w.-]+(?:#|\s+))?#?\d+)",
     re.I)
 # A bare merge word or retry is a typed line only inside an asking sentence,
 # and never covers a longer fenced line.
+BARE_WORD = re.compile(r"mwc|retry\s+#\d+", re.I)
 BARE_LINE = re.compile(r"\b" + VERB + r"\s+[`\"]?(?P<w>mwc|retry\s+#\d+)\b", re.I)
 # A sentence reporting a line already typed is not an ask for it.
 REPORTED = re.compile(r"\b(?:typed|said|sent|gave|wrote|answered|replied)\b", re.I)
@@ -87,6 +79,9 @@ def split_fences(text):
 def covered(line, fenced, plain=False):
     n = norm(line)
     if n in fenced:
+        return True
+    # A bare merge word or retry ("type `mwc`") is covered by a fenced full line that starts with it.
+    if BARE_WORD.fullmatch(n) and any(f.startswith(n + " ") for f in fenced):
         return True
     # A plain-text match runs to the end of its line, so a whole fenced typed
     # line that starts it ("approve push of X" in "approve push of X in this

@@ -1932,7 +1932,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unfenced-typed-line-ask.py\"'",
             "timeout": 10,
             "script": "no-unfenced-typed-line-ask.py",
-            "why": "ai-config#5667. Ezra, 2026-11-15, in a thread that had asked him to type an approval line: \"always give me the line with a copy button\". The Claude app shows a copy button only on a fenced code block. Blocks (deny) a user-visible reply (reply, post_message, update_message, edit_message) that asks the user to type a line (mwc <repo> <pr> <sha>, approve push of ..., approve editing ..., retry <repo>#<n>, merge anyway <pr>, or an inline-quoted line that is the object of an imperative type, paste, say, reply or enter) when that line is not also in a fenced code block. A negated ask and a report of a line already typed are left alone. ALLOW_UNFENCED_TYPED_LINE=1 overrides. Fails open on parse trouble."
+            "why": "ai-config#5667. Ezra, 2026-11-15, in a thread that had asked him to type an approval line: \"always give me the line with a copy button\". The Claude app shows a copy button only on a fenced code block. Blocks (deny) a user-visible reply (reply, post_message, update_message, edit_message) that asks the user to type a line (mwc <repo> <pr> <sha>, approve push of ..., approve editing ..., retry <repo>#<n>, merge anyway <pr>, or an inline-quoted line that is the object of an imperative type, paste, say, reply, respond or send) when that line is not also in a fenced code block. A negated ask and a report of a line already typed are left alone. ALLOW_UNFENCED_TYPED_LINE=1 overrides. Fails open on parse trouble."
           },
           {
             "type": "command",

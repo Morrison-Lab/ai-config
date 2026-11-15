@@ -57,6 +57,7 @@ import os
 import re
 import subprocess
 import sys
+from itertools import dropwhile
 
 try:
     _LIB = os.path.join(os.path.dirname(os.path.dirname(
@@ -71,6 +72,8 @@ except Exception as _exc:  # broken install: degrade, never block
     shell_c_expansions = None
 
 TOOL = "mcp__github__update_pull_request_branch"
+# Prefixes that still run the shell builtin after them (`builtin cd`, `command cd`).
+BUILTIN_PREFIXES = ("builtin", "command")
 # Only a line carrying the "[stale-base rule]" marker counts: a checker older
 # than ai-config#5144 prints the same line without it and also lacks the
 # stale-base rule, so trusting it refused a main merge on a stale head (lds#2208).
@@ -159,10 +162,13 @@ def targets_of(tool, tool_input, cwd=None):
         # and a `cd` moves the rest of the line, so neither resolves origin.
         where, repo_env = (cwd if depth == 0 else None), None
         for argv in simple_commands(line) or []:
-            if argv[0] in ("cd", "pushd", "popd"):
+            # `{ cd x; }`, `then cd x`, `builtin cd x` and `command cd x` all
+            # run the builtin, so skip the keywords and those two prefixes.
+            words = list(dropwhile(lambda w: w in SHELL_KEYWORDS or w in BUILTIN_PREFIXES, argv))
+            if words[:1] and words[0] in ("cd", "pushd", "popd"):
                 where = None
-            if argv[0] == "export":
-                repo_env = gh_repo(argv[1:]) or repo_env
+            if words[:1] == ["export"]:
+                repo_env = gh_repo(words[1:]) or repo_env
             args = gh_args(argv)
             if args and args[0] == "api":
                 found += [m.groups() for m in map(API_PATH.match, args[1:]) if m]

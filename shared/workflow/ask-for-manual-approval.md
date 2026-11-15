@@ -101,6 +101,8 @@ When you switched the session yourself, say so and say that a prompt is coming;
 when the switch conditions hold and you could not switch, ask the user to switch out of auto mode for that stretch.
 When an allow route covers the action, such as a merge, tell the user that switching lets it run with no further prompt.
 Name `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
+When the user has to type a line to clear the block, such as a message that names the exact action and its target, give that line alone in a fenced code block, so the app shows a copy button (Ezra, 2026-11-15: "always give me the line with a copy button", ai-config#5667;
+enforced by `hooks/no-unfenced-typed-line-ask.py`).
 When you asked the user to switch, then until the session leaves auto mode, continue with any work the denial does not block, and arm a wake to resume the denied step.
 If the user is away (an `away` session, or a CI or `@claude` run), nobody can answer a prompt: do not switch or ask, record the denied action as a pending decision, do not poll for a switch, and continue other work.
 

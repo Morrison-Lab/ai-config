@@ -8,8 +8,9 @@ when main was merged into it. Merging main into a PR branch is always allowed
 checker pass stop applying and the PR needs a new review round.
 
 Denies `mcp__github__update_pull_request_branch`, and a Bash command running
-`gh api` on `repos/<o>/<r>/pulls/<N>/update-branch`, when the transcript holds
-the checker's line `<owner>/<repo>#<N> is FULLY CLEAN on HEAD <sha8>! [stale-base rule]` for that
+`gh api` on `repos/<o>/<r>/pulls/<N>/update-branch` or `gh pr update-branch`,
+when the transcript holds the checker's line
+`<owner>/<repo>#<N> is FULLY CLEAN on HEAD <sha8>! [stale-base rule]` for that
 PR and no later checker report that the branch needs the base. Those reports
 are the cases where updating is required: base drift that added a CI gate the
 head never ran ("<base> gained N commit(s) since this head's merge base",
@@ -24,10 +25,13 @@ splitter the other command-parsing hooks share: it keeps each quoted string
 as one argument, blanks heredoc bodies and `#` comments, and joins
 backslash-continued lines, and `shell_c_expansions` follows a `bash -c`
 string. A simple command counts when its program is `gh`, after `VAR=value`
-prefixes, shell keywords and wrappers (`env`, `sudo -u x`, `timeout 5`), its
-first argument is `api`, and one whole argument is the path. So a commit
-message, a comment, or a body passed to another command that quotes the form
-is not denied.
+prefixes, shell keywords and wrappers (`env`, `sudo -u x`, `timeout 5`), and
+either its first argument is `api` and one whole argument is the path, or
+its first two are `pr update-branch` and it names the PR. A PR URL names
+repository and number; a number takes the repository from `-R`/`--repo`, a
+`GH_REPO=` prefix or earlier `export`, or else the origin remote of the
+working directory. So a commit message, a comment, or a body passed to
+another command that quotes either form is not denied.
 
 Not covered, so these fail open and the prose rule in
 shared/workflow/fully-clean.md carries them:
@@ -35,8 +39,9 @@ shared/workflow/fully-clean.md carries them:
   number to match against a clean line;
 - a `gh api` path built from shell variables (`repos/$REPO/pulls/$N/...`),
   whose values the hook cannot read;
-- `gh pr update-branch`, whose repository comes from the working directory;
-  its form is the second half of ai-config#5677;
+- a `gh pr update-branch` given a branch name or no PR, or given a bare
+  number after a `cd` or inside a `bash -c` string, since the PR or the
+  directory its repository comes from is then unknown;
 - the holes shellcmd.py's own docstring lists, such as `xargs`, `eval`, and
   a wrapper chain longer than its look-ahead window;
 - a script a shell reads from a heredoc (`bash <<'EOF'`), since heredoc
@@ -50,6 +55,7 @@ Fails open on any parse trouble, including an unreadable transcript.
 import json
 import os
 import re
+import subprocess
 import sys
 
 try:
@@ -80,6 +86,11 @@ DRIFT = re.compile(
 HEADER = re.compile(r"fully-clean status for ([\w.-]+/[\w.-]+)#(\d+)")
 # A wrapper's numeric argument, such as `timeout 5` or `nice -n 10`.
 NUMBER = re.compile(r"\A\d+(?:\.\d+)?[smhd]?\Z")
+# The PR argument of `gh pr update-branch`: a URL, or a number.
+PR_URL = re.compile(r"\Ahttps?://github\.com/([\w.-]+)/([\w.-]+)/pull/(\d+)(?:[/?#].*)?\Z")
+PR_NUMBER = re.compile(r"\A#?(\d+)\Z")
+# github.com remotes, and the cloud proxy form (http://...@127.0.0.1:N/git/<o>/<r>).
+REMOTE = re.compile(r"(?:github\.com[:/]|/git/)([\w.-]+/[\w.-]+?)(?:\.git)?/?$")
 # One whole argument of `gh api`; `?...` query parameters are allowed.
 API_PATH = re.compile(r"/?repos/([\w.-]+)/([\w.-]+)/pulls/(\d+)/update-branch(?:\?.*)?\Z")
 
@@ -124,11 +135,12 @@ def drift_after(text, repo, num, after):
     return False
 
 
-def targets_of(tool, tool_input):
+def targets_of(tool, tool_input, cwd=None):
     """Every (owner, name, number) the update call names; empty when none.
 
     The MCP tool names all three. A Bash command counts when it runs `gh api`
-    on `repos/<owner>/<name>/pulls/<N>/update-branch`.
+    on `repos/<owner>/<name>/pulls/<N>/update-branch`, or
+    `gh pr update-branch` on a PR it names (see `pr_update_target`).
     A compound command is checked for every update it runs, not only the first.
     """
     if tool == TOOL:
@@ -142,12 +154,74 @@ def targets_of(tool, tool_input):
     if shell_c_expansions is None:
         return []
     found = []
-    for line in shell_c_expansions(tool_input["command"]):
+    for depth, line in enumerate(shell_c_expansions(tool_input["command"])):
+        # A nested `bash -c` shell starts in a directory the text cannot show,
+        # and a `cd` moves the rest of the line, so neither resolves origin.
+        where, repo_env = (cwd if depth == 0 else None), None
         for argv in simple_commands(line) or []:
+            if argv[0] in ("cd", "pushd", "popd"):
+                where = None
+            if argv[0] == "export":
+                repo_env = gh_repo(argv[1:]) or repo_env
             args = gh_args(argv)
             if args and args[0] == "api":
                 found += [m.groups() for m in map(API_PATH.match, args[1:]) if m]
+            elif args and args[:2] == ["pr", "update-branch"]:
+                prefix = argv[:len(argv) - len(args)]
+                target = pr_update_target(args[2:], gh_repo(prefix) or repo_env, where)
+                found += [target] if target else []
     return found
+
+
+def gh_repo(tokens):
+    """The value of the last `GH_REPO=` assignment among *tokens*, or None."""
+    values = [t.split("=", 1)[1] for t in tokens if t.startswith("GH_REPO=")]
+    return values[-1] if values else None
+
+
+def pr_update_target(rest, repo, cwd):
+    """(owner, name, number) for `gh pr update-branch <rest>`, or None.
+
+    The PR is the first positional argument: a URL names repository and
+    number, and a number (`47`, `#47`) takes its repository from `-R`/`--repo`,
+    else *repo* (a `GH_REPO` prefix or an earlier `export`), else the origin
+    remote of *cwd*. A branch name or no argument names no PR the text can
+    match, so it is left alone (fails open), as is a number whose repository
+    is unknown.
+    """
+    pr = None
+    for i, tok in enumerate(rest):
+        if tok in ("-R", "--repo"):
+            repo = rest[i + 1] if i + 1 < len(rest) else None
+        elif tok.startswith("--repo="):
+            repo = tok.split("=", 1)[1]
+        elif tok.startswith("-R"):
+            repo = tok[2:].lstrip("=")
+        elif pr is None and not tok.startswith("-") and rest[i - 1:i] not in (["-R"], ["--repo"]):
+            pr = tok
+    url = PR_URL.match(pr or "")
+    if url:
+        return url.groups()
+    num = PR_NUMBER.match(pr or "")
+    if not num:
+        return None
+    parts = (repo or origin_repo(cwd) or "").split("/")[-2:]
+    if len(parts) != 2 or not all(parts):
+        return None
+    return parts[0], parts[1], num.group(1)
+
+
+def origin_repo(cwd):
+    """owner/name of the origin remote of *cwd*, or None."""
+    if not isinstance(cwd, str):
+        return None
+    try:
+        url = subprocess.run(["git", "-C", cwd, "remote", "get-url", "origin"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = REMOTE.search(url)
+    return m.group(1) if m else None
 
 
 def gh_args(argv):
@@ -193,7 +267,7 @@ def main() -> int:
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return 0
-    targets = targets_of(payload.get("tool_name"), tool_input)
+    targets = targets_of(payload.get("tool_name"), tool_input, payload.get("cwd"))
     if not targets:
         return 0
     try:

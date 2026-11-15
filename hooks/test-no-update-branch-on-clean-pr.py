@@ -53,6 +53,7 @@ CASES = [
 ]
 
 # (name, Bash command, transcript text, should_deny).
+CLEAN_OTHER47 = "Morrison-Lab/other#47 is FULLY CLEAN on HEAD 98ed862a! [stale-base rule]"
 API47 = "gh api -X PUT repos/Morrison-Lab/ids/pulls/47/update-branch"
 BASH_CASES = [
     ("gh api update-branch path is denied", API47 + " -f expected_head_sha=abc", CLEAN47, True),
@@ -64,8 +65,34 @@ BASH_CASES = [
      'gh api -X PUT "repos/$REPO/pulls/$N/update-branch"', CLEAN47, False),
     ("a quoted literal path still counts",
      'gh api -X PUT "repos/Morrison-Lab/ids/pulls/47/update-branch"', CLEAN47, True),
-    ("gh pr update-branch is not covered yet", "gh pr update-branch 47 -R Morrison-Lab/ids",
-     CLEAN47, False),
+    ("gh pr update-branch with -R is denied", "gh pr update-branch 47 -R Morrison-Lab/ids",
+     CLEAN47, True),
+    ("gh pr update-branch with --repo= is denied",
+     "gh pr update-branch --repo=Morrison-Lab/ids 47", CLEAN47, True),
+    ("an attached -R names the repo", "gh pr update-branch 47 -RMorrison-Lab/other", CLEAN47, False),
+    ("-R with a host names the repo", "gh pr update-branch 47 -R github.com/Morrison-Lab/ids",
+     CLEAN47, True),
+    ("gh pr update-branch with a PR URL is denied",
+     "gh pr update-branch https://github.com/Morrison-Lab/ids/pull/47", CLEAN47, True),
+    ("#47 is a PR number", "gh pr update-branch '#47' --rebase", CLEAN47, True),
+    ("a bare number resolves to the origin remote's repo", "gh pr update-branch 47", CLEAN47, True),
+    ("a bare number does not match another repo's clean line",
+     "gh pr update-branch 47", CLEAN_OTHER47, False),
+    ("-R overrides the origin remote", "gh pr update-branch 47 -R Morrison-Lab/other",
+     CLEAN_OTHER47, True),
+    ("a GH_REPO prefix names the repo", "GH_REPO=Morrison-Lab/other gh pr update-branch 47",
+     CLEAN_OTHER47, True),
+    ("an earlier export of GH_REPO names the repo",
+     "export GH_REPO=Morrison-Lab/other; gh pr update-branch 47", CLEAN_OTHER47, True),
+    ("a bare number after a cd fails open", "cd ../x && gh pr update-branch 47", CLEAN47, False),
+    ("a bare number inside bash -c fails open", 'bash -c "gh pr update-branch 47"', CLEAN47, False),
+    ("bash -c with -R still counts", 'bash -c "gh pr update-branch 47 -R Morrison-Lab/ids"',
+     CLEAN47, True),
+    ("a branch name fails open", "gh pr update-branch my-branch", CLEAN47, False),
+    ("no PR argument fails open", "gh pr update-branch --rebase", CLEAN47, False),
+    ("a quoted gh pr mention is not denied",
+     'gh issue comment 5 --body "never run gh pr update-branch 47"', CLEAN47, False),
+    ("unrelated gh pr command untouched", "gh pr view 47", CLEAN47, False),
     ("after && it still counts", "git fetch && " + API47, CLEAN47, True),
     ("the second update in a compound command is checked",
      "gh api -X PUT repos/Morrison-Lab/ids/pulls/48/update-branch; " + API47, CLEAN47, True),
@@ -112,10 +139,30 @@ BASH_CASES = [
 ]
 
 
-def run(tool, owner, repo, num, path, command=None):
+# The checker's own wording of each report that lifts the denial. The hook
+# matches these by text, so a rewording in the checker must fail here first.
+CHECKER = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                       "scripts", "check-pr-fully-clean.py")
+CHECKER_WORDING = [
+    "gained {behind} commit(s) since this head's merge base",
+    "GitHub holds this PR as {state!r}",
+    "GitHub reports mergeable_state {state!r}",
+]
+
+
+def scratch_repo(origin):
+    """A temporary git repository whose origin remote is *origin*."""
+    path = tempfile.mkdtemp()
+    subprocess.run(["git", "init", "-q", "-b", "main", path], check=True)
+    subprocess.run(["git", "-C", path, "remote", "add", "origin", origin], check=True)
+    return path
+
+
+def run(tool, owner, repo, num, path, command=None, cwd=None):
     tool_input = ({"command": command} if command is not None
                   else {"owner": owner, "repo": repo, "pullNumber": num})
-    payload = {"tool_name": tool, "tool_input": tool_input, "transcript_path": path}
+    payload = {"tool_name": tool, "tool_input": tool_input, "transcript_path": path,
+               "cwd": cwd}
     r = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
@@ -124,6 +171,8 @@ def run(tool, owner, repo, num, path, command=None):
 
 def main() -> int:
     bad = 0
+    ids = scratch_repo("https://github.com/Morrison-Lab/ids.git")
+    proxy = scratch_repo("http://local_proxy@127.0.0.1:8080/git/Morrison-Lab/ids")
     for name, tool, owner, repo, num, text, want in CASES:
         if text is None:
             path = "/nonexistent/transcript.jsonl"
@@ -142,11 +191,21 @@ def main() -> int:
         f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
         f.write(text)
         f.close()
-        got = run("Bash", None, None, None, f.name, command=command)
+        got = run("Bash", None, None, None, f.name, command=command, cwd=ids)
         ok = got == want
         bad += not ok
         print(("ok   " if ok else "FAIL ") + name)
+        if name.startswith("a bare number resolves"):
+            got = run("Bash", None, None, None, f.name, command=command, cwd=proxy)
+            bad += not got
+            print(("ok   " if got else "FAIL ") + "a cloud proxy origin resolves to its repo")
         os.unlink(f.name)
+    with open(CHECKER, encoding="utf-8") as f:
+        checker = f.read()
+    for phrase in CHECKER_WORDING:
+        ok = phrase in checker
+        bad += not ok
+        print(("ok   " if ok else "FAIL ") + "the checker still prints: " + phrase)
     return 1 if bad else 0
 
 

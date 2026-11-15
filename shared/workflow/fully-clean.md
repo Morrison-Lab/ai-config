@@ -1699,10 +1699,9 @@ read the ruleset's `strict_required_status_checks_policy` rather than assuming e
 Update the branch only when one of those fails for a reason an update fixes: a real conflict, the checker's base-drift failure (the base gained a workflow gate the head never ran, or the comparison hit the 300-file cap), or a base whose protection requires an up-to-date branch (`mergeable_state` `behind`).
 The residual risk is accepted rather than closed: a gate the base gained through a script or a reusable workflow is invisible to the path diff, and the post-merge CI run on the base is what catches it, under the red-main rule ([`red-main`](red-main.md)).
 `hooks/no-update-branch-on-clean-pr.py` is the instrument:
-it denies the update, by the MCP `update_pull_request_branch` call or `gh api .../update-branch`, on a PR the transcript shows as fully clean,
+it denies the update, by the MCP `update_pull_request_branch` call, `gh api .../update-branch` or `gh pr update-branch`, on a PR the transcript shows as fully clean,
 until the checker reports that the branch needs the base (base drift, a conflict, or a required up-to-date branch).
 A `gh api` path built from shell variables and a `git merge` then `git push` name no PR it can match, so this prose carries those.
-Its extension to `gh pr update-branch` is the follow-up half of [#5675](https://github.com/Morrison-Lab/ai-config/issues/5675).
 
 - **Do:** merge a PR that is behind only by content, on its current head, once the three conditions hold.
 - **Don't:** merge `main` into a fully clean PR at merge time because `behind_by` is non-zero.

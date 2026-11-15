@@ -241,8 +241,16 @@ A cloud Bash call can prompt for approval, and an MCP call does not.
 Beyond GitHub no hook can tell which Bash steps an MCP tool covers, so check the tool list before reaching for Bash.
 The reviewer's checklist item is in [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md#bash-where-a-cloud-mcp-tool-exists).
 
+The same holds beyond MCP and beyond cloud sessions: before a step that would ask the user for approval, take any idiomatic path that reaches the same result without a prompt (Ezra, 2026-11-15: "avoid asking for approvals when there's another idiomatic path forward", [#5687](https://github.com/Morrison-Lab/ai-config/issues/5687)).
+Edit a file with the Edit or Write tool rather than `sed -i` or a heredoc, and run each step as its own short command rather than chaining edits, commits and checks into one long command.
+Make this choice before the first attempt.
+After a classifier denial, [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md) and [`difm`](skills/do-it-for-me/SKILL.md) still govern: retry the identical command, never a rephrasing that gets around the denial.
+A deny hook for the chained edit-and-commit case is [#5688](https://github.com/Morrison-Lab/ai-config/issues/5688).
+
 - **Do:** merge, comment and read PRs with the GitHub MCP tools in a cloud session.
+- **Do:** edit with the Edit tool, then commit and run checks as separate commands.
 - **Don't:** run `gh pr` or `gh api` in Bash there when an MCP tool does the same step.
+- **Don't:** chain `sed -i` edits, `git commit` and check scripts into one Bash command that raises a prompt the separate steps would not.
 
 ## Draft communications in Ezra's voice
 

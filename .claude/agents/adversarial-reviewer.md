@@ -323,3 +323,11 @@ Flag a caption or speaker note that warns about a cut axis instead of fixing it.
 Read the plotting code yourself, including limits computed at run time;
 do not report the output of `hooks/no-truncated-bar-axis.py` as your finding.
 See [`visuals-everywhere`](../../shared/writing/visuals-everywhere.md#axis-at-zero-in-every-format).
+
+## Typed lines without a copy button
+
+On a transcript, skill, brief or reply that asks the user to type a line verbatim (a merge word with its repository, PR and SHA, an `approve push of ...` or `approve editing ...` line, a `retry` line, or any other exact text), check that the line itself is given alone in a fenced code block, not only in inline code, quotes or a sentence.
+The Claude app shows a copy button only on a fenced block.
+Read the message yourself;
+do not report the output of `hooks/no-unfenced-typed-line-ask.py` as your finding.
+See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).

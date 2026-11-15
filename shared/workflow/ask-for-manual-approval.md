@@ -135,3 +135,6 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
 - **Don't:** tell the user to approve a prompt after a classifier denial;
   the denial shows none.
   Say "no prompt was shown".
+- **Do:** when the user must type a line to clear a block, put that line alone in a fenced code block, so the app gives it a copy button.
+  `hooks/no-unfenced-typed-line-ask.py` denies a reply that gives it only inline, and [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#typed-lines-without-a-copy-button) checks for it (ai-config#5667).
+- **Don't:** write "type `approve push of claude/x to Morrison-Lab/lds`" with the line only in inline code or quotes.

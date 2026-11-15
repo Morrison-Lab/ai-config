@@ -30,7 +30,7 @@ The rest are prose because no condition in the transcript can decide them.
   Enforced by `hooks/no-bundled-approval-ask.py`.
 - Give every line Ezra must type in a fenced code block of its own, never only in inline code, quotes or plain text: merge words (`mwc <repo> <pr> <sha>`), classifier-clearing lines (`approve push of ...`, `approve editing ...`), `retry <repo>#<n>` and `merge anyway <pr>`.
   The Claude app shows a copy button only on a fenced block (Ezra, 2026-11-15: "always give me the line with a copy button", ai-config#5667).
-  Enforced by `hooks/no-unfenced-typed-line-ask.py`.
+  Enforced by `hooks/no-unfenced-typed-line-ask.py`, and checked by [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#typed-lines-without-a-copy-button).
 - Routine pushed scripts (Canvas upload and replace, CI_RUNNER and variable scripts) are allow-listed in the user-level settings on the Mac and cf463-02, so the classifier does not demand typed phrases.
   Merge commands are never allow-listed.
   Ezra, 2026-10-25: "stop making me give so many manual orders".

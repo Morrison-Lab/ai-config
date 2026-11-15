@@ -19,14 +19,15 @@ PRs' content is not one of them: Ezra decided on 2026-11-14 that such a PR
 merges on its current head (ai-config#5675). A PR with no clean line in the
 transcript is untouched, so syncing a not-yet-clean PR stays free.
 
-The `gh api` form counts only at command position, outside any quoted string
-or `#` comment: the start of the command, after `;`, `&&`, `||`, `|`, a
-newline, `(`, `{` or `$(`, or after a `then`, `do` or `else` keyword, with
-optional `VAR=value` prefixes and `env`, `sudo`, `command`, `exec`, `nohup`,
-`nice`, `time` or `timeout N` wrappers. Its path may be quoted only as a whole
-argument. So a commit message, a comment, or a body passed to another command
-that quotes the form is not denied. A backslash-newline continues the command
-onto the next line.
+A Bash command is split into simple commands by scripts/lib/shellcmd.py, the
+splitter the other command-parsing hooks share: it keeps each quoted string
+as one argument, blanks heredoc bodies and `#` comments, and joins
+backslash-continued lines, and `shell_c_expansions` follows a `bash -c`
+string. A simple command counts when its program is `gh`, after `VAR=value`
+prefixes, shell keywords and wrappers (`env`, `sudo -u x`, `timeout 5`), its
+first argument is `api`, and one whole argument is the path. So a commit
+message, a comment, or a body passed to another command that quotes the form
+is not denied.
 
 Not covered, so these fail open and the prose rule in
 shared/workflow/fully-clean.md carries them:
@@ -35,12 +36,9 @@ shared/workflow/fully-clean.md carries them:
 - a `gh api` path built from shell variables (`repos/$REPO/pulls/$N/...`),
   whose values the hook cannot read;
 - `gh pr update-branch`, whose repository comes from the working directory;
-  its form is the second half of ai-config#5675;
-- a command inside a string another program runs (`bash -c "..."`, `xargs`),
-  including a `"$(gh ...)"` substitution inside double quotes;
-- a wrapper given flags (`sudo -u x`, `nice -n 5`).
-A heredoc body is not treated as quoted, so a body line that starts with the
-form is denied (one message, the safe direction).
+  its form is the second half of ai-config#5677;
+- the holes shellcmd.py's own docstring lists, such as `xargs`, `eval`, and
+  a wrapper chain longer than its look-ahead window.
 
 The clean line is searched in the whole transcript text, not only in trusted
 tool results (block-merge-without-clean-checker.py does that stricter parse for
@@ -48,8 +46,21 @@ merges): a deny here costs one message, so the broader match errs the safe way.
 Fails open on any parse trouble, including an unreadable transcript.
 """
 import json
+import os
 import re
 import sys
+
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import (COMMAND_WRAPPERS, ENV_ASSIGNMENT, SHELL_KEYWORDS,
+                          WRAPPER_ARG_WINDOW, shell_c_expansions, simple_commands)
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"no-update-branch-on-clean-pr: cannot load scripts/lib/shellcmd.py "
+          f"({_exc}); no Bash command will be checked", file=sys.stderr)
+    shell_c_expansions = None
 
 TOOL = "mcp__github__update_pull_request_branch"
 # Only a line carrying the "[stale-base rule]" marker counts: a checker older
@@ -65,18 +76,8 @@ DRIFT = re.compile(
     r"|mergeable_state '(?:behind|dirty)'"
     r"|holds this PR as 'behind'")
 HEADER = re.compile(r"fully-clean status for ([\w.-]+/[\w.-]+)#(\d+)")
-# Command position: start, a separator, `$(` or `(`, `{`, or a `then`/`do`/
-# `else` keyword standing as its own word (so not the `do` of `to-do`); then
-# optional VAR=value prefixes and flagless wrappers (captured, so `live`
-# can find where `gh` starts).
-# A value cannot hold `$(`, so `x=$(gh ...)` still anchors at the `$(`.
-# A match inside a quoted string or a `#` comment is dropped in `live`.
-START = (r"(?:^|[;&|\n({]|\$\(|(?<![\w-])(?:then|do|else)(?=\s))\s*"
-         r"((?:(?:env|sudo|command|exec|nohup|nice|time|timeout\s+\S+)\s+"
-         r"|\w+=(?:'[^']*'|\"[^\"]*\"|[^\s;&|()$'\"]*)\s+)*)")
-CONTINUATION = re.compile(r"\\\n")
-API_PATH = re.compile(
-    START + r"gh\s+api\b[^;&|\n]*?repos/([\w.-]+)/([\w.-]+)/pulls/(\d+)/update-branch\b")
+# One whole argument of `gh api`; `?...` query parameters are allowed.
+API_PATH = re.compile(r"/?repos/([\w.-]+)/([\w.-]+)/pulls/(\d+)/update-branch(?:\?.*)?\Z")
 
 REASON = """\
 [hook: no-update-branch-on-clean-pr] {repo}#{num} is already fully clean on \
@@ -134,63 +135,35 @@ def targets_of(tool, tool_input):
         return []
     if tool != "Bash" or not isinstance(tool_input.get("command"), str):
         return []
-    # A backslash-newline joins two lines into one command; two spaces keep
-    # every later position where it was.
-    cmd = CONTINUATION.sub("  ", tool_input["command"])
-    inert = inert_spans(cmd)
-    return [(m.group(2), m.group(3), m.group(4))
-            for m in API_PATH.finditer(cmd) if live(m, inert)]
+    if shell_c_expansions is None:
+        return []
+    found = []
+    for line in shell_c_expansions(tool_input["command"]):
+        for argv in simple_commands(line) or []:
+            args = gh_args(argv)
+            if args and args[0] == "api":
+                found += [m.groups() for m in map(API_PATH.match, args[1:]) if m]
+    return found
 
 
-def inert_spans(cmd):
-    """(start, end, kind) of each quoted region and `#` comment of *cmd*.
+def gh_args(argv):
+    """The arguments after `gh` when `gh` is the program of *argv*, else None.
 
-    kind is the quote character, or "#" for a comment, which runs to the end
-    of its line and starts only at the start of a word outside quotes. A
-    backslash escapes the next character outside single quotes. An
-    unterminated quote runs to the end of the command.
+    Assignments, shell keywords and wrappers before it are skipped, and a
+    wrapper's own arguments (`sudo -u x`, `timeout 5`) within shellcmd's
+    look-ahead window.
     """
-    spans, quote, start, i = [], None, 0, 0
-    while i < len(cmd):
-        c = cmd[i]
-        if c == "\\" and quote != "'":
-            i += 2
-            continue
-        if quote is None and c == "#" and (i == 0 or cmd[i - 1].isspace()):
-            end = cmd.find("\n", i)
-            end = len(cmd) if end < 0 else end
-            spans.append((i, end, "#"))
-            i = end
-            continue
-        if quote is None and c in "'\"":
-            quote, start = c, i
-        elif c == quote:
-            spans.append((start, i, quote))
-            quote = None
-        i += 1
-    if quote is not None:
-        spans.append((start, len(cmd), quote))
-    return spans
-
-
-def live(m, spans):
-    """True when match *m* is an update call, not text inside another command.
-
-    Its `gh` (where START's group 1 ends) must sit outside every quote and
-    comment. Its `repos/...` path may be quoted only as a whole argument: a
-    quote that opens right before it (or before a leading `/`) is fine, and a
-    path inside a longer quoted value such as `-f body="..."` is not.
-    """
-    gh = m.end(1)
-    path = m.start(2) - len("repos/")
-    if path > 0 and m.string[path - 1] == "/":
-        path -= 1
-    for s, e, kind in spans:
-        if s < gh <= e:
-            return False
-        if s < path <= e and not (kind != "#" and s == path - 1):
-            return False
-    return True
+    after_wrapper = False
+    for i, tok in enumerate(argv):
+        if os.path.basename(tok) == "gh":
+            return argv[i + 1:]
+        if ENV_ASSIGNMENT.match(tok) or tok in SHELL_KEYWORDS:
+            after_wrapper = False
+        elif os.path.basename(tok) in COMMAND_WRAPPERS:
+            after_wrapper = True
+        elif not after_wrapper or i > WRAPPER_ARG_WINDOW:
+            return None
+    return None
 
 
 def main() -> int:

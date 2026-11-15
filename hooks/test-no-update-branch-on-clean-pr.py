@@ -99,6 +99,11 @@ BASH_CASES = [
     ("a mention inside a # comment is not denied",
      "git status # then " + API47, CLEAN47, False),
     ("a # inside a word is not a comment", "x=a#b; " + API47, CLEAN47, True),
+    ("a bash -c string is followed", 'bash -c "' + API47 + '"', CLEAN47, True),
+    ("a wrapper with flags still counts", "sudo -u me " + API47, CLEAN47, True),
+    ("a query string on the path still counts", API47 + "?x=1", CLEAN47, True),
+    ("a heredoc body is not denied",
+     "cat > notes.md <<'EOF'\n" + API47 + "\nEOF", CLEAN47, False),
 ]
 
 

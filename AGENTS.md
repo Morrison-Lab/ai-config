@@ -245,7 +245,7 @@ The same holds beyond MCP and beyond cloud sessions: before a step that would as
 Edit a file with the Edit or Write tool rather than `sed -i` or a heredoc, and run each step as its own short command rather than chaining edits, commits and checks into one long command.
 Make this choice before the first attempt.
 After a classifier denial, [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md) and [`difm`](skills/do-it-for-me/SKILL.md) still govern: retry the identical command, never a rephrasing that gets around the denial.
-A deny hook for the chained edit-and-commit case is [#5688](https://github.com/Morrison-Lab/ai-config/issues/5688).
+In a cloud session `hooks/no-chained-edit-and-commit-in-cloud.py` denies a command that chains an in-place edit (`sed -i`, `perl -i`, or a redirect into a file outside `/tmp/` and a scratchpad) with `git commit` ([#5688](https://github.com/Morrison-Lab/ai-config/issues/5688)).
 
 - **Do:** merge, comment and read PRs with the GitHub MCP tools in a cloud session.
 - **Do:** edit with the Edit tool, then commit and run checks as separate commands.

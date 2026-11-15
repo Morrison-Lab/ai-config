@@ -313,7 +313,8 @@ See [`advisor`](../../skills/advisor/SKILL.md#4-never-fall-back-to-the-callers-f
 
 On a transcript, skill or brief for a cloud session, check that GitHub steps (PRs, issues, merges, comments, runs, releases, file contents) go through a GitHub MCP tool rather than `gh` or `curl` in Bash, and flag a Bash step an MCP tool covers.
 Search through `gh api search/...` is fine, since the cloud harness has no MCP search tool.
-Read the commands yourself; do not report the output of `hooks/prefer-mcp-over-bash-in-cloud.py` as your finding.
+Also flag a cloud Bash command that chains an in-place edit (`sed -i`, `perl -i`, a redirect into a tracked file) with `git commit`, since the Edit tool and a separate commit avoid the prompt.
+Read the commands yourself; do not report the output of `hooks/prefer-mcp-over-bash-in-cloud.py` or `hooks/no-chained-edit-and-commit-in-cloud.py` as your finding.
 See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever-one-exists).
 
 ## Figures with a cut value axis

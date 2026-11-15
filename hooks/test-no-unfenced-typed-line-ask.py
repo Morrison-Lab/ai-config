@@ -53,7 +53,7 @@ CASES = [
     ("imperative reply without with", POST, {"text": "Reply `approve editing hooks/hooks.json` here."}, True),
     ("curly-quoted line", POST, {"text": "Type \u201cgo ahead with the upload\u201d here."}, True),
     ("docs say is not an ask", POST, {"text": "The docs say `retry` is safe."}, False),
-    # Runner review of daba5f9 (ai-config#5668): ordinary replies that ask for nothing to be typed.
+    # Runner reviews of daba5f9, 60d72bf and c1ddb9e (ai-config#5668): ordinary replies that ask for nothing to be typed.
     ("noun type with inline code", POST, {"text": "The return type of `getUser()` is `User`."}, False),
     ("reply with thoughts", POST, {"text": "Please reply with your thoughts on `module_a`."}, False),
     ("paste a log", POST, {"text": "Please paste the error log from `debug.log`."}, False),
@@ -68,8 +68,9 @@ CASES = [
     ("bare retry ask", POST, {"text": "Please type retry #5668."}, True),
     ("noun type after and, mwc in prose", POST,
      {"text": "The mwc grant covers it, and type hints in `a.py` are fine."}, False),
-    # Runner review of 60d72bf (ai-config#5668).
     ("sentence-initial noun Type", POST, {"text": "Type `int` is expected by the validator."}, False),
+    ("sentence-initial noun Type, other verb", POST, {"text": "Type `factor` encodes categories in R."}, False),
+    ("could you type", POST, {"text": "Could you type `mwc lds 2508 abc1234` in the runner thread?"}, True),
     ("infinitive to send", POST, {"text": "We use a webhook to send `push` events to Slack."}, False),
     ("infinitive to reply with", POST, {"text": "Configured to reply with `pong` on ping."}, False),
     ("then enter a directory", POST, {"text": "Then enter `chapters/` and run the checker."}, False),

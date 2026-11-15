@@ -89,6 +89,16 @@ BASH_CASES = [
     ("a quoted multi-line body is not denied",
      'gh issue comment 5 --body "line one\n' + API47 + '"', CLEAN47, False),
     ("the do of to-do is not a keyword", "to-do " + API47, CLEAN47, False),
+    ("a path inside another gh api call's quoted body is not denied",
+     'gh api repos/Morrison-Lab/ids/issues/5/comments -f body="do not run ' + API47 + '"',
+     CLEAN47, False),
+    ("a quoted path with a leading slash still counts",
+     'gh api -X PUT "/repos/Morrison-Lab/ids/pulls/47/update-branch"', CLEAN47, True),
+    ("a backslash-newline continuation still counts",
+     "gh api -X PUT \\\n  repos/Morrison-Lab/ids/pulls/47/update-branch", CLEAN47, True),
+    ("a mention inside a # comment is not denied",
+     "git status # then " + API47, CLEAN47, False),
+    ("a # inside a word is not a comment", "x=a#b; " + API47, CLEAN47, True),
 ]
 
 

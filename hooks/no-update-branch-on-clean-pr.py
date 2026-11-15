@@ -19,12 +19,14 @@ PRs' content is not one of them: Ezra decided on 2026-11-14 that such a PR
 merges on its current head (ai-config#5675). A PR with no clean line in the
 transcript is untouched, so syncing a not-yet-clean PR stays free.
 
-The `gh api` form counts only at command position, outside any quoted string:
-the start of the command, after `;`, `&&`, `||`, `|`, a newline, `(`, `{` or
-`$(`, or after a `then`, `do` or `else` keyword, with optional `VAR=value`
-prefixes and `env`, `sudo`, `command`, `exec`, `nohup`, `nice`, `time` or
-`timeout N` wrappers. So a commit message or comment body that quotes it
-is not denied.
+The `gh api` form counts only at command position, outside any quoted string
+or `#` comment: the start of the command, after `;`, `&&`, `||`, `|`, a
+newline, `(`, `{` or `$(`, or after a `then`, `do` or `else` keyword, with
+optional `VAR=value` prefixes and `env`, `sudo`, `command`, `exec`, `nohup`,
+`nice`, `time` or `timeout N` wrappers. Its path may be quoted only as a whole
+argument. So a commit message, a comment, or a body passed to another command
+that quotes the form is not denied. A backslash-newline continues the command
+onto the next line.
 
 Not covered, so these fail open and the prose rule in
 shared/workflow/fully-clean.md carries them:
@@ -65,13 +67,14 @@ DRIFT = re.compile(
 HEADER = re.compile(r"fully-clean status for ([\w.-]+/[\w.-]+)#(\d+)")
 # Command position: start, a separator, `$(` or `(`, `{`, or a `then`/`do`/
 # `else` keyword standing as its own word (so not the `do` of `to-do`); then
-# optional VAR=value prefixes and flagless wrappers (captured, so `unquoted`
+# optional VAR=value prefixes and flagless wrappers (captured, so `live`
 # can find where `gh` starts).
 # A value cannot hold `$(`, so `x=$(gh ...)` still anchors at the `$(`.
-# A match whose `gh` sits inside a quoted string is dropped in `unquoted`.
+# A match inside a quoted string or a `#` comment is dropped in `live`.
 START = (r"(?:^|[;&|\n({]|\$\(|(?<![\w-])(?:then|do|else)(?=\s))\s*"
          r"((?:(?:env|sudo|command|exec|nohup|nice|time|timeout\s+\S+)\s+"
          r"|\w+=(?:'[^']*'|\"[^\"]*\"|[^\s;&|()$'\"]*)\s+)*)")
+CONTINUATION = re.compile(r"\\\n")
 API_PATH = re.compile(
     START + r"gh\s+api\b[^;&|\n]*?repos/([\w.-]+)/([\w.-]+)/pulls/(\d+)/update-branch\b")
 
@@ -131,16 +134,20 @@ def targets_of(tool, tool_input):
         return []
     if tool != "Bash" or not isinstance(tool_input.get("command"), str):
         return []
-    cmd = tool_input["command"]
-    quoted = quoted_spans(cmd)
+    # A backslash-newline joins two lines into one command; two spaces keep
+    # every later position where it was.
+    cmd = CONTINUATION.sub("  ", tool_input["command"])
+    inert = inert_spans(cmd)
     return [(m.group(2), m.group(3), m.group(4))
-            for m in API_PATH.finditer(cmd) if unquoted(m, quoted)]
+            for m in API_PATH.finditer(cmd) if live(m, inert)]
 
 
-def quoted_spans(cmd):
-    """(start, end) of each single- or double-quoted region of *cmd*.
+def inert_spans(cmd):
+    """(start, end, kind) of each quoted region and `#` comment of *cmd*.
 
-    A backslash escapes the next character outside single quotes. An
+    kind is the quote character, or "#" for a comment, which runs to the end
+    of its line and starts only at the start of a word outside quotes. A
+    backslash escapes the next character outside single quotes. An
     unterminated quote runs to the end of the command.
     """
     spans, quote, start, i = [], None, 0, 0
@@ -149,24 +156,41 @@ def quoted_spans(cmd):
         if c == "\\" and quote != "'":
             i += 2
             continue
+        if quote is None and c == "#" and (i == 0 or cmd[i - 1].isspace()):
+            end = cmd.find("\n", i)
+            end = len(cmd) if end < 0 else end
+            spans.append((i, end, "#"))
+            i = end
+            continue
         if quote is None and c in "'\"":
             quote, start = c, i
         elif c == quote:
-            spans.append((start, i))
+            spans.append((start, i, quote))
             quote = None
         i += 1
     if quote is not None:
-        spans.append((start, len(cmd)))
+        spans.append((start, len(cmd), quote))
     return spans
 
 
-def unquoted(m, spans):
-    """True when the `gh` of match *m* is outside every quoted region.
+def live(m, spans):
+    """True when match *m* is an update call, not text inside another command.
 
-    START's group 1 ends where `gh` begins, so its end is the command's start.
+    Its `gh` (where START's group 1 ends) must sit outside every quote and
+    comment. Its `repos/...` path may be quoted only as a whole argument: a
+    quote that opens right before it (or before a leading `/`) is fine, and a
+    path inside a longer quoted value such as `-f body="..."` is not.
     """
-    pos = m.end(1)
-    return not any(s < pos <= e for s, e in spans)
+    gh = m.end(1)
+    path = m.start(2) - len("repos/")
+    if path > 0 and m.string[path - 1] == "/":
+        path -= 1
+    for s, e, kind in spans:
+        if s < gh <= e:
+            return False
+        if s < path <= e and not (kind != "#" and s == path - 1):
+            return False
+    return True
 
 
 def main() -> int:

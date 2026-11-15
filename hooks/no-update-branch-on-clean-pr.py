@@ -38,7 +38,9 @@ shared/workflow/fully-clean.md carries them:
 - `gh pr update-branch`, whose repository comes from the working directory;
   its form is the second half of ai-config#5677;
 - the holes shellcmd.py's own docstring lists, such as `xargs`, `eval`, and
-  a wrapper chain longer than its look-ahead window.
+  a wrapper chain longer than its look-ahead window;
+- a script a shell reads from a heredoc (`bash <<'EOF'`), since heredoc
+  bodies are blanked so that a quoted commit message or note is not denied.
 
 The clean line is searched in the whole transcript text, not only in trusted
 tool results (block-merge-without-clean-checker.py does that stricter parse for

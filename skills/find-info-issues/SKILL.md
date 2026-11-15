@@ -15,10 +15,9 @@ background: false
 
 # find-info-issues --- read-only check for stale, irrelevant and misleading content
 
-The detect steps of `check-info-quality`, as a skill that runs forked ([ai-config#914](https://github.com/Morrison-Lab/ai-config/issues/914)).
+The *detect* half of `check-info-quality`, factored out so it runs forked ([ai-config#914](https://github.com/Morrison-Lab/ai-config/issues/914)).
 It runs the three relational checks below and returns a findings table with a proposed fix per row.
-It changes nothing, so run it on its own for a report with no edits;
-fixes are applied in the main session, only on the user's confirmation.
+It changes nothing: `check-info-quality` runs it, then proposes fixes and applies them in the main session only on the user's confirmation, and you can run this skill on its own for a report with no edits.
 
 1. **Out-of-date** --- the claim was true, but the world moved.
    Needs comparing the claim to its **current** state.
@@ -131,7 +130,7 @@ the agent keeps `Bash` for its checks, so avoiding a write-capable shell command
 
 ## Relationship to other skills
 
-- **`check-info-quality` (`ciq`)** --- holds the same checks today, with the step that proposes fixes and applies them on confirmation.
+- **`check-info-quality` (`ciq`)** --- the act half: runs this skill, then proposes the fixes this report names and applies them on confirmation.
 - **`purge-hallucinations`** --- checks whether a reference **exists**;
   check C here checks whether an existing, real reference **actually supports** the claim it's attached to.
 - **`check-prose-claims`** --- the truth-side sibling: it verdicts a claim accurate or inaccurate, while check C here catches a true claim that still misleads.

@@ -60,14 +60,21 @@ KNOWN_LINE = re.compile(
 BARE_WORD = re.compile(r"mwc|retry\s+#\d+", re.I)
 BARE_LINE = re.compile(r"\b" + VERB + r"\s+[`\"]?(?P<w>mwc|retry\s+#\d+)\b", re.I)
 # A plain-English merge word, "merge 95 and 96" or "merge lds 94, 95 and 96"
-# (ai-config#5685). Quoted, it is a line to type wherever it appears; plain,
-# only as the direct object of an asking verb, so "reply if you want me to
-# merge 95" is not read as one.
-MERGE_LINE = r"merge\s+(?:[a-z][\w.-]*\s+)?#?\d+(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+|\s*&\s*)#?\d+)*"
+# (ai-config#5685). Quoted, it counts in an asking sentence or after a colon
+# ("Both are clean: `merge 95`"); plain, only right after an asking verb or a
+# merge-word cue ("reply: merge 95", "your merge word: merge 95"), so "reply
+# if you want me to merge 95" and "treating your `merge 95` as approval" pass.
+MERGE_LINE = (r"merge\s+(?:(?:them\s+)?all\b|(?:[a-z][\w.-]*\s+)?#?\d+"
+              r"(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+|\s*&\s*)#?\d+)*)")
+MERGE_CUE = r"(?:type|paste|say|reply|respond|(?:merge|approval)\s+(?:word|line)s?|approve(?:\s+\w+)?\s+with)"
 QUOTED_MERGE = re.compile(r"[`\"\u201c](?P<m>" + MERGE_LINE + r")[.,]?[`\"\u201d]", re.I)
-PLAIN_MERGE = re.compile(r"\b" + VERB + r"\s+(?:with\s+)?(?P<m>" + MERGE_LINE + r")\b", re.I)
+PLAIN_MERGE = re.compile(r"\b" + MERGE_CUE + r"(?:\s*:\s*|\s+)(?:with\s+)?(?P<m>" + MERGE_LINE + r")\b", re.I)
+COLON_BEFORE = re.compile(r":\s*$")
 # A sentence reporting a line already typed is not an ask for it.
-REPORTED = re.compile(r"\b(?:typed|said|sent|gave|wrote|answered|replied|merged)\b", re.I)
+REPORTED = re.compile(r"\b(?:typed|said|sent|gave|wrote|answered|replied)\b", re.I)
+# For a merge word, only a report before the line counts ("you typed `merge 95`,
+# so I merged it"), so "reply `merge 95` once 94 is merged" is still an ask.
+MERGE_REPORTED = re.compile(r"\b(?:typed|said|sent|gave|wrote|answered|replied|merged|treating|took)\b", re.I)
 SENT = re.compile(r"(?<=[.!?])\s+|\n+")
 
 REASON = (
@@ -112,10 +119,12 @@ def offending_line(text):
     prose, fenced = split_fences(text)
     sentences = [s for s in SENT.split(prose) if s.strip()]
     for s in sentences:
-        if REPORTED.search(s) or NEGATED.search(s):
+        if NEGATED.search(s):
             continue
-        for m in list(QUOTED_MERGE.finditer(s)) + list(PLAIN_MERGE.finditer(s)):
-            if not covered(m.group("m"), fenced):
+        quoted = [m for m in QUOTED_MERGE.finditer(s)
+                  if ASK.search(s) or COLON_BEFORE.search(s[:m.start()])]
+        for m in quoted + list(PLAIN_MERGE.finditer(s)):
+            if not MERGE_REPORTED.search(s[:m.start()]) and not covered(m.group("m"), fenced):
                 return m.group("m").strip()
     asking = [s for s in sentences if ASK.search(s) and not NEGATED.search(s)]
     if not asking:

@@ -11,10 +11,12 @@ update_message, edit_message) when, outside fenced code blocks,
 
   * a known typed line (`mwc <repo> ...`, `approve push of ...`,
     `approve editing ...`, `retry <repo>#<n>`, `merge anyway <pr>`) appears
-    in a sentence that asks the user to type, say, reply, paste or enter it,
+    in a sentence that asks the user to type, say, reply, paste or enter it
+    (the verb as an imperative or request, so "the return type of" is not one),
     or alone on its own line in a message that asks; or
-  * a sentence asks the user to type, and the line it gives sits in inline
-    backticks or double quotes,
+  * a sentence asks the user to type, and the verb's own object ("type `X`",
+    "reply with `X`", "type this line: `X`") sits in inline backticks or
+    double quotes,
 
 and that same line is not also given in a fenced code block in the message.
 A negated ask ("no need to type anything") is left alone. Plain single-word
@@ -29,14 +31,20 @@ import sys
 
 REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
 
-FENCE = re.compile(r"^[ \t]*(```|~~~)[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.S | re.M)
+FENCE = re.compile(r"^[ \t]*(`{3,}|~{3,})[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.S | re.M)
 
-# Asking the user to type, paste or send a line.
+# Asking the user to type a line: the verb only as an imperative or request,
+# so "the return type of" or "the docs say" is not an ask.
+VERB = r"(?:type|paste|enter|say|reply|respond|send)"
 ASK = re.compile(
-    r"\b(?:type|typing|paste|reply\s+with|respond\s+with|answer\s+with|send\s+(?:me\s+)?(?:the\s+)?(?:line|word)|"
-    r"(?:say|write)\s+(?:the\s+line|this\s+line|exactly))\b"
-    # "Say ...", "Reply ...", "Enter ..." only as an imperative, so "the docs say" is not an ask.
-    r"|(?:^|[:;]\s*|\b(?:please|just|then)\s+)(?:say|reply|enter)\b",
+    r"(?:^|[:;,]\s*|\b(?:please|just|then|to|can\s+you|you\s+(?:can|should|need\s+to|must))\s+)"
+    + VERB + r"\b",
+    re.I)
+# An inline line counts only as the verb's own object: "type `X`",
+# "reply with `X`", "type this line: `X`". "paste the log from `debug.log`" does not.
+OBJECT = re.compile(
+    r"\b" + VERB + r"\s+(?:with\s+|exactly\s+|(?:this|the\s+following|the)(?:\s+line|\s+command)?\s*:?\s*)?"
+    r"(?:`(?P<a>[^`\n]+)`|\"(?P<b>[^\"\n]{2,})\"|\u201c(?P<c>[^\u201d\n]{2,})\u201d)",
     re.I)
 NEGATED = re.compile(
     r"\b(?:don'?t|do\s+not|no\s+need\s+to|needn'?t|never|without|not\s+need\s+to|nothing\s+to)\b"
@@ -51,7 +59,9 @@ KNOWN_LINE = re.compile(
     r"|retry\s+[\w.-]+#\d+"
     r"|merge\s+anyway\s+#?[\w.-]*\d+)",
     re.I)
-INLINE = re.compile(r"`([^`\n]+)`|\"([^\"\n]{2,})\"|\u201c([^\u201d\n]{2,})\u201d")
+# A bare merge word or retry is a typed line only inside an asking sentence,
+# and never covers a longer fenced line.
+BARE_LINE = re.compile(r"\b" + VERB + r"\s+[`\"]?(?P<w>mwc|retry\s+#\d+)\b", re.I)
 # A sentence reporting a line already typed is not an ask for it.
 REPORTED = re.compile(r"\b(?:typed|said|sent|gave|wrote|answered|replied)\b", re.I)
 SENT = re.compile(r"(?<=[.!?])\s+|\n+")
@@ -81,7 +91,14 @@ def covered(line, fenced, plain=False):
     # A plain-text match runs to the end of its line, so a whole fenced typed
     # line that starts it ("approve push of X" in "approve push of X in this
     # thread") covers it. A fragment such as a fenced "mwc" covers nothing.
-    return plain and any(n.startswith(f + " ") and KNOWN_LINE.fullmatch(f) for f in fenced)
+    return plain and any(n.startswith(f) and KNOWN_LINE.fullmatch(f) and WORD_END.match(n[len(f):])
+                         for f in fenced)
+
+
+# What may follow a covering fenced line in a plain-text match: end, space or
+# punctuation, but not more of a path or name ("approve push of x," is covered
+# by a fenced "approve push of x"; "mwc lds 25" does not cover "mwc lds 2508").
+WORD_END = re.compile(r"$|[^\w./#-]")
 
 
 def offending_line(text):
@@ -99,8 +116,14 @@ def offending_line(text):
             if not covered(m.group(0), fenced, plain=True):
                 return m.group(0).strip()
     for s in asking:
-        for m in INLINE.finditer(s):
-            line = next(g for g in m.groups() if g)
+        for m in BARE_LINE.finditer(s):
+            # A fenced full line that starts with the bare word covers it.
+            word = norm(m.group("w"))
+            if not any(f == word or f.startswith(word + " ") for f in fenced):
+                return m.group("w").strip()
+    for s in asking:
+        for m in OBJECT.finditer(s):
+            line = m.group("a") or m.group("b") or m.group("c")
             if not covered(line, fenced):
                 return line.strip()
     return None

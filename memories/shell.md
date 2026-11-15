@@ -596,3 +596,11 @@ This adds to the [hook checklist](hooks.md#5-adding--modifying-hooks-checklist).
 
 - **Do:** `ls scripts/lib/` before writing any shell parsing in a hook, and import `shellcmd.py` to tell an executed command from quoted text.
 - **Don't:** write a new command-position regex or quote and comment span scanner for a hook.
+
+A hook that tracks shell state across commands (a `cd`, an `export`) needs two more things from the same library.
+[ai-config#5679](https://github.com/Morrison-Lab/ai-config/pull/5679) read `argv[0]` for `cd` and `export` from flat `simple_commands`, and two cross-model review rounds found both gaps (2026-11-15).
+First, a `cd` after `{`, `then`, `builtin` or `command` was missed.
+Second, a `cd` inside `( ... )` leaked into the parent shell.
+
+- **Do:** skip leading `SHELL_KEYWORDS` and the `builtin`/`command` prefixes before reading the command word, and keep the state per scope from `simple_commands_with_scope`.
+- **Don't:** model `cd` or `export` from `argv[0]` of flat `simple_commands`.

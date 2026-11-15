@@ -78,6 +78,8 @@ DRIFT = re.compile(
     r"|mergeable_state '(?:behind|dirty)'"
     r"|holds this PR as 'behind'")
 HEADER = re.compile(r"fully-clean status for ([\w.-]+/[\w.-]+)#(\d+)")
+# A wrapper's numeric argument, such as `timeout 5` or `nice -n 10`.
+NUMBER = re.compile(r"\A\d+(?:\.\d+)?[smhd]?\Z")
 # One whole argument of `gh api`; `?...` query parameters are allowed.
 API_PATH = re.compile(r"/?repos/([\w.-]+)/([\w.-]+)/pulls/(\d+)/update-branch(?:\?.*)?\Z")
 
@@ -151,19 +153,32 @@ def targets_of(tool, tool_input):
 def gh_args(argv):
     """The arguments after `gh` when `gh` is the program of *argv*, else None.
 
-    Assignments, shell keywords and wrappers before it are skipped, and a
-    wrapper's own arguments (`sudo -u x`, `timeout 5`) within shellcmd's
-    look-ahead window.
+    Assignments and shell keywords before it are skipped, and so is a
+    wrapper's own arguments within shellcmd's look-ahead window, counted from
+    the wrapper: an option, the value after an option (`sudo -u x`), an
+    assignment (`env A=1`) or a number (`timeout 5`). Any other word after a
+    wrapper is the program it runs (`time echo gh ...` runs `echo`), so the
+    command is not a `gh` call. A value-less option before such a program
+    (`sudo -E echo gh ...`) is read as taking that word as its value, which
+    errs toward a denial.
     """
-    after_wrapper = False
+    wrapper_at, after_option = None, False
     for i, tok in enumerate(argv):
-        if os.path.basename(tok) == "gh":
+        name = os.path.basename(tok)
+        if name == "gh":
             return argv[i + 1:]
-        if ENV_ASSIGNMENT.match(tok) or tok in SHELL_KEYWORDS:
-            after_wrapper = False
-        elif os.path.basename(tok) in COMMAND_WRAPPERS:
-            after_wrapper = True
-        elif not after_wrapper or i > WRAPPER_ARG_WINDOW:
+        if name in COMMAND_WRAPPERS:
+            wrapper_at, after_option = i, False
+        elif wrapper_at is None:
+            if not (ENV_ASSIGNMENT.match(tok) or tok in SHELL_KEYWORDS):
+                return None
+        elif i - wrapper_at > WRAPPER_ARG_WINDOW:
+            return None
+        elif tok.startswith("-"):
+            after_option = "=" not in tok
+        elif after_option or ENV_ASSIGNMENT.match(tok) or NUMBER.match(tok):
+            after_option = False
+        else:
             return None
     return None
 

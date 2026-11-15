@@ -102,7 +102,8 @@ A reviewer that ran and returned not-clean is not unavailable.
   On a base that requires a merge queue, stop and report: the queue form of this gate is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) and is out of scope until it lands.
   It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py` for GitHub;
   the GitLab path is instrumented by `check-mr-fully-clean.py`,
-  and on a repository that does not require an up-to-date branch GitHub would otherwise permit the stale merge, which is why the manual check stays required there.
+  The manual step pins the head, the base name and the base tip, so the merge is tied to the tip the checker's base-drift check read;
+  that drift check, not a zero `behind_by`, decides whether the branch needs the base.
   Update the branch, pinned to the recorded head, only on a conflict, a base-drift failure from the checker, or a base that requires an up-to-date branch (`mergeable_state` `behind`).
   Locally: `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`.
   Remotely: `update_pull_request_branch` with `expectedHeadSha`.

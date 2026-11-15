@@ -370,10 +370,15 @@
 - When several in-flight PRs touch the SAME files, merging any one moves `main` and re-conflicts the rest --- so serialize the merges: merge one, wait for the others to recompute (CONFLICTING/DIRTY, or briefly UNKNOWN --- re-poll after a few seconds), and merge the next only once it's re-resynced clean.
   Merge the most-isolated PR (disjoint files) FIRST --- it rides through without a re-resync; sequence foundational/big same-file PRs LAST so lighter PRs rebase onto simpler `main`.
   An agent watching a PR must POLL its own `mergeable`/`mergeStateStatus` on EVERY watch tick (a newly-appearing conflict from someone else's merge is NOT a CI event, so a CI-completion monitor never fires on it), and on catching one immediately `git fetch origin main && git merge origin/main`, resolve, re-run checks, push --- staying in the watch loop until the PR is merged or closed (clean regresses to CONFLICTING when main moves).
-  The coordinator's nudge is only a backstop for a genuinely-dead agent. (Learned on sparta 2026-07-01 merging the movement cluster.)
+  The coordinator's nudge is only a backstop for a genuinely-dead agent.
+  (Learned on sparta 2026-07-01 merging the movement cluster.)
   Beyond same-file collisions: after ANY merge that advances the base (`main`), proactively re-sync EVERY trailing open PR branch that passes `memories/reviewing-prs.md`'s scope test and resolve conflicts (an out-of-scope branch is reported to the user and left untouched) --- don't wait for a branch to show DIRTY or for the next review trigger.
+  **Except a PR that is already fully clean and about to merge** (Ezra, 2026-11-14, [#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)): content-only drift does not re-sync it;
+  merge it on its current head per `shared/workflow/fully-clean.md`'s content-only rule, and re-sync only on a conflict, a base-drift failure, or a base that requires an up-to-date branch.
   In R packages the recurring conflicts are DESCRIPTION `Version:` (bump above main) and NEWS.md (union-merge, keeping both sides' bullets and one subsection per heading); the `@claude` bot auto-syncs non-conflicting branches but does NOT resolve these real DESCRIPTION/NEWS conflicts.
-  Sequential merges cascade version-check reds and NEWS/DESCRIPTION conflicts down the whole stack of trailing PRs, so keeping them all synced after each merge keeps the queue mergeable; parallelize with worktree-isolated workers, capped at ~3 concurrent to respect shared CI runners. (Learned on ucdavis/bcs.)
+  Sequential merges cascade version-check reds and NEWS/DESCRIPTION conflicts down the whole stack of trailing PRs, so keeping them all synced after each merge keeps the queue mergeable;
+  parallelize with worktree-isolated workers, capped at ~3 concurrent to respect shared CI runners.
+  (Learned on ucdavis/bcs.)
   **The DESCRIPTION half of this cascade is obsolete once a repo adopts `Morrison-Lab/gha`'s new `bump-dev-version`/`version-check` capabilities (gha#390, tracking gha#388)** --- PRs stop touching `Version:` at all, so there's no version-bump conflict left to cascade down the stack.
   The NEWS.md union-merge half is unaffected until a separate `news.d`-fragment capability ships (deferred, see gha#388).
   Check whether the repo you're stacking PRs in has migrated before applying the DESCRIPTION-bump advice above.

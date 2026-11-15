@@ -374,7 +374,7 @@
   (Learned on sparta 2026-07-01 merging the movement cluster.)
   Beyond same-file collisions: after ANY merge that advances the base (`main`), proactively re-sync EVERY trailing open PR branch that passes `memories/reviewing-prs.md`'s scope test and resolve conflicts (an out-of-scope branch is reported to the user and left untouched) --- don't wait for a branch to show DIRTY or for the next review trigger.
   **Except a PR that is already fully clean and about to merge** (Ezra, 2026-11-14, [#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)): content-only drift does not re-sync it;
-  merge it on its current head per `shared/workflow/fully-clean.md`'s content-only rule, and re-sync only on a conflict or a base-drift failure.
+  merge it on its current head per `shared/workflow/fully-clean.md`'s content-only rule, and re-sync only on a conflict, a base-drift failure, or a base that requires an up-to-date branch.
   In R packages the recurring conflicts are DESCRIPTION `Version:` (bump above main) and NEWS.md (union-merge, keeping both sides' bullets and one subsection per heading); the `@claude` bot auto-syncs non-conflicting branches but does NOT resolve these real DESCRIPTION/NEWS conflicts.
   Sequential merges cascade version-check reds and NEWS/DESCRIPTION conflicts down the whole stack of trailing PRs, so keeping them all synced after each merge keeps the queue mergeable;
   parallelize with worktree-isolated workers, capped at ~3 concurrent to respect shared CI runners.

@@ -28,7 +28,7 @@ VERB = r"(?:type|paste|say|reply|respond|send)"
 ASK = re.compile(
     r"(?:[:;,]\s*|\b(?:please|just|then|(?:can|could|would)\s+you|you\s+(?:can|should|need\s+to|must))\s+)" + VERB + r"\b"
     # A sentence-initial verb is an imperative unless its object is a verb's subject ("Type `int` encodes").
-    r"|^\s*" + VERB + r"\b(?!\s+(?:`[^`\n]*`|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d|(?![`\"\u201c]|mwc\b|approve\b|retry\b|merge\b)\S+)\s+(?:(?!this\b|thus\b|plus\b)[a-z]{3,}s|is|has|does|are|was|were|have|will|can|must|should)\b)",
+    r"|^\s*" + VERB + r"\b(?!\s+(?:`(?!mwc\b|approve\b|retry\b|merge\b)[^`\n]*`|\"(?!mwc\b|approve\b|retry\b|merge\b)[^\"\n]*\"|\u201c(?!mwc\b|approve\b|retry\b|merge\b)[^\u201d\n]*\u201d|(?![`\"\u201c]|mwc\b|approve\b|retry\b|merge\b)\S+)\s+(?:(?!this\b|thus\b|plus\b)[a-z]{3,}s|is|has|does|are|was|were|have|will|can|must|should)\b)",
     re.I)
 # An inline line counts only as the verb's own object: "type `X`",
 # "reply with `X`", "type this line: `X`". "paste the log from `debug.log`" does not.

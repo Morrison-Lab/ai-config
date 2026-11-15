@@ -26,7 +26,7 @@ CASES = [
     ("merge anyway inline", POST, {"text": "If you want it regardless, reply with `merge anyway 2508`."}, True),
     ("generic typed line inline", POST,
      {"text": "Please type `go ahead with the Canvas upload` so the classifier sees it."}, True),
-    ("mwc with bare PR number", POST, {"text": "Type `mwc 548` when you are ready."}, True),
+    ("mwc with bare PR number", POST, {"text": "Type `mwc 548` unless you disagree."}, True),
     ("fenced mwc line", POST,
      {"text": "lds#2508 is clean. Type this in the runner thread:\n\n" + FENCE + "\nmwc lds 2508 abc1234\n" + FENCE + "\n"}, False),
     ("fenced plus inline echo of the same line", POST,

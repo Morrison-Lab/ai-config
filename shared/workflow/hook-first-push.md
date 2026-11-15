@@ -4,6 +4,11 @@
 
 - **Do:** run `python3 scripts/check-text-encoding.py` (every `open()` takes `encoding="utf-8"`), `python3 scripts/check-hook-output-shape.py` (a Stop hook's test parses the output and asserts `decision` and `reason`), and `python3 scripts/check-hook-catalog.py` before pushing.
 - **Do:** block a Stop through `stop_notice` in `scripts/lib/agent_notice.py`, which blocks once per turn, keeps the temp sentinel out of the project, and shows the user the message.
+- **Do:** run `python3 scripts/check-ascii-punctuation.py <hook>` too.
+  Write a curly quote in a regex as the escape `\u201c`, which `re` reads inside a raw string.
+  [#5686](https://github.com/Morrison-Lab/ai-config/pull/5686) went red on its first push because the glyph itself landed in the file (2026-11-15).
+- **Don't:** trust that an escape typed in an edit reached the file as an escape.
+  A Write or Edit call can turn it into the glyph, so print the line back with `cat -A`.
 - **Do:** run each checker on its own and read its exit status before any `| tail`.
   `check-hook-catalog.py` prints a clean-looking summary line on failure too (ai-config#5125).
 - **Do:** write an alternation matcher in a README hook row with `\|` and no `[...]` character class, which the catalog checker's row regex cannot parse.

@@ -577,3 +577,12 @@ It is a memory entry only.
 (2026-10-07, two Springer books downloaded in a browser;
 reported missing after a title/author search, found under their ISBN and DOI-suffix names.
 [ai-config#4358](https://github.com/Morrison-Lab/ai-config/issues/4358).)
+
+## `run-local-validation.py` leaves temporary hook files while it runs
+
+Its mutation and fixture suites write `hooks/tmp_mut_*.py` and `hooks/tmp*.py` into the checkout and delete them at the end.
+A `git add -A` while a run was still going in the background committed a 298-line temporary file on [ai-config#5676](https://github.com/Morrison-Lab/ai-config/pull/5676)'s branch.
+It was dropped before the push (2026-11-14).
+
+- **Do:** let the run finish, or stop it, before staging, and stage named paths.
+- **Don't:** run `git add -A` in a checkout where `run-local-validation.py` is still running.

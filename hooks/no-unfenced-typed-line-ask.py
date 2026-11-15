@@ -11,7 +11,8 @@ update_message, edit_message) when, outside fenced code blocks,
 
   * a known typed line (`mwc <repo> ...`, `approve push of ...`,
     `approve editing ...`, `retry <repo>#<n>`, `merge anyway <pr>`) appears
-    in a message that asks the user to type something; or
+    in a sentence that asks the user to type, say, reply, paste or enter it,
+    or alone on its own line in a message that asks; or
   * a sentence asks the user to type, and the line it gives sits in inline
     backticks or double quotes,
 
@@ -33,7 +34,9 @@ FENCE = re.compile(r"^[ \t]*(```|~~~)[^\n]*\n(.*?)^[ \t]*\1[ \t]*$", re.S | re.M
 # Asking the user to type, paste or send a line.
 ASK = re.compile(
     r"\b(?:type|typing|paste|reply\s+with|respond\s+with|answer\s+with|send\s+(?:me\s+)?(?:the\s+)?(?:line|word)|"
-    r"(?:say|write)\s+(?:the\s+line|this\s+line|exactly))\b",
+    r"(?:say|write)\s+(?:the\s+line|this\s+line|exactly))\b"
+    # "Say ...", "Reply ...", "Enter ..." only as an imperative, so "the docs say" is not an ask.
+    r"|(?:^|[:;]\s*|\b(?:please|just|then)\s+)(?:say|reply|enter)\b",
     re.I)
 NEGATED = re.compile(
     r"\b(?:don'?t|do\s+not|no\s+need\s+to|needn'?t|never|without|not\s+need\s+to|nothing\s+to)\b"
@@ -71,11 +74,14 @@ def split_fences(text):
     return FENCE.sub("\n", text), fenced
 
 
-def covered(line, fenced):
+def covered(line, fenced, plain=False):
     n = norm(line)
-    # A plain-text match runs to the end of its line, so a fenced line that
-    # starts it ("approve push of X" in "approve push of X in this thread") covers it.
-    return any(n == f or n in f or n.startswith(f) for f in fenced)
+    if n in fenced:
+        return True
+    # A plain-text match runs to the end of its line, so a whole fenced typed
+    # line that starts it ("approve push of X" in "approve push of X in this
+    # thread") covers it. A fragment such as a fenced "mwc" covers nothing.
+    return plain and any(n.startswith(f + " ") and KNOWN_LINE.fullmatch(f) for f in fenced)
 
 
 def offending_line(text):
@@ -84,11 +90,13 @@ def offending_line(text):
     asking = [s for s in sentences if ASK.search(s) and not NEGATED.search(s)]
     if not asking:
         return None
-    for s in sentences:
-        if REPORTED.search(s) and not ASK.search(s):
-            continue
+    # A known typed line counts when its own sentence asks for it, or when it
+    # stands alone on a line ("Type this:" then the line), not when a status
+    # sentence elsewhere in the message mentions it.
+    alone = [s for s in sentences if KNOWN_LINE.fullmatch(norm(s)) and not REPORTED.search(s)]
+    for s in asking + alone:
         for m in KNOWN_LINE.finditer(s):
-            if not covered(m.group(0), fenced):
+            if not covered(m.group(0), fenced, plain=True):
                 return m.group(0).strip()
     for s in asking:
         for m in INLINE.finditer(s):

@@ -60,6 +60,22 @@ The user chatting from their Mac also does not mean Remote Control is serving th
   on 2026-10-01 there was no visible way to remove a Library context folder, and a guessed path would have sent the user looking for a control that did not exist.
 - **Don't:** infer a thread's state from a notice that names no session.
 
+## Claude Projects: an idle Remote Control session is parked after an hour, not lost
+
+The Claude desktop app stops a Remote Control session that has had no activity for about an hour, and resumes it within seconds when the next message arrives.
+This is the app's `idleSweep`, not a network, suspend or out-of-memory failure.
+The one-hour limit comes from a server-side config, so no local setting changes it.
+Measured 2026-11-14 on cf463-02 ([ai-config#5672](https://github.com/Morrison-Lab/ai-config/issues/5672)): the long-lived runner was parked 12 times between 2026-11-07 and 2026-11-14, each logged as `idle sweep: ... idle for` about 3,600,000 ms followed by `stopping session (idle)`, and each time the session came back with an `attached` line 2 to 8 s after it was re-admitted (usually after `redispatch requested`;
+once, after the 2026-11-14 11:20 park, through `admitted (resume, activity poll)` with no `redispatch requested` line).
+A desktop app restart stops sessions too, logged as `stopping session (quit)`.
+The log is `~/.config/Claude/logs/remote-control.log` on the device.
+
+- **Do:** send the message and expect a short cold start;
+  report the session as parked, not as a dropped connection.
+- **Do:** check that log for `stopping session (idle)` or `(quit)` before reporting a device session as lost.
+- **Don't:** restart the runner or add a keep-alive ping to keep it warm;
+  a ping every 50 minutes would add about 29 turns a day (decided 2026-11-14, ai-config#5672).
+
 ## Claude Projects: practices the coordinator and threads follow
 
 Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16, with later dated additions), where the user asked for each.

@@ -58,7 +58,7 @@ CASES = [
      {"text": "Type `mwc lds 2508 abc1234`:\n" + FENCE + "\nmwc\n" + FENCE}, True),
     ("imperative say", POST, {"text": "Say mwc lds 2508 abc1234 to merge."}, True),
     ("imperative reply without with", POST, {"text": "Reply `approve editing hooks/hooks.json` here."}, True),
-    ("curly-quoted line", POST, {"text": "Type “go ahead with the upload” here."}, True),
+    ("curly-quoted line", POST, {"text": "Type \u201cgo ahead with the upload\u201d here."}, True),
     ("docs say is not an ask", POST, {"text": "The docs say `retry` is safe."}, False),
     ("unrelated tool", "Bash", {"command": "echo 'Type `mwc lds 2508 abc1234`'"}, False),
     ("decision card not covered", "mcp__hearthbot__request_decision",

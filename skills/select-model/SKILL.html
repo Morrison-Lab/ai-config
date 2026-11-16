@@ -358,6 +358,7 @@ cookieconsent.run({
   <li><a href="#decision-tree-pick-your-model" id="toc-decision-tree-pick-your-model" class="nav-link" data-scroll-target="#decision-tree-pick-your-model">Decision tree: Pick your model</a></li>
   <li><a href="#task-model-mapping" id="toc-task-model-mapping" class="nav-link" data-scroll-target="#task-model-mapping">Task → Model mapping</a></li>
   <li><a href="#model-selection-factors" id="toc-model-selection-factors" class="nav-link" data-scroll-target="#model-selection-factors">Model selection factors</a></li>
+  <li><a href="#choosing-a-model-when-you-start-a-thread-session-or-subagent" id="toc-choosing-a-model-when-you-start-a-thread-session-or-subagent" class="nav-link" data-scroll-target="#choosing-a-model-when-you-start-a-thread-session-or-subagent">Choosing a model when you start a thread, session or subagent</a></li>
   <li><a href="#executable-mode-auto-recommend-and-config-update" id="toc-executable-mode-auto-recommend-and-config-update" class="nav-link" data-scroll-target="#executable-mode-auto-recommend-and-config-update">Executable mode (auto-recommend and config update)</a></li>
   </ul></li>
   <li><a href="#how-to-use" id="toc-how-to-use" class="nav-link" data-scroll-target="#how-to-use">How to use</a></li>
@@ -490,6 +491,17 @@ cookieconsent.run({
 <li><strong>Code review:</strong> Tier 1 recommended for adversarial passes</li>
 <li><strong>Token efficiency:</strong> Use Tier 1 for judgment and Tier 2/3 for generation</li>
 </ul>
+</section>
+<section id="choosing-a-model-when-you-start-a-thread-session-or-subagent" class="level3">
+<h3 class="anchored" data-anchor-id="choosing-a-model-when-you-start-a-thread-session-or-subagent">Choosing a model when you start a thread, session or subagent</h3>
+<p>Starting is the only moment the choice can be made: a message to a running thread cannot change its model. <code>hooks/require-model-choice.py</code> denies a launch that records no choice (<code>model</code>, or a <code>Model-fit: &lt;model&gt; -- &lt;why&gt;</code> line on a thread or session start).</p>
+<ol type="1">
+<li>Name the task’s category in the mapping table above.</li>
+<li>Take the lowest tier that does the job: Haiku for lookups and scans, Sonnet for bounded edits and implementation from a clear spec, Opus for large content passes, hard reasoning and adversarial review.</li>
+<li>Never Fable without the user’s explicit permission for that launch.</li>
+<li>Pass <code>model</code>, and say why in the brief when the choice is not obvious.</li>
+</ol>
+<p>To decide whether the work belongs in a new thread at all, see <a href="../../skills/choose-thread/SKILL.html"><code>choose-thread</code></a>.</p>
 </section>
 <section id="executable-mode-auto-recommend-and-config-update" class="level3">
 <h3 class="anchored" data-anchor-id="executable-mode-auto-recommend-and-config-update">Executable mode (auto-recommend and config update)</h3>

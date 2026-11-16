@@ -48,6 +48,17 @@ When orchestrating complex or multi-step work: 1. **Conductor (Tier 1):** Breaks
 - **Code review:** Tier 1 recommended for adversarial passes
 - **Token efficiency:** Use Tier 1 for judgment and Tier 2/3 for generation
 
+### Choosing a model when you start a thread, session or subagent
+
+Starting is the only moment the choice can be made: a message to a running thread cannot change its model. `hooks/require-model-choice.py` denies a launch that records no choice (`model`, or a `Model-fit: <model> -- <why>` line on a thread or session start).
+
+1.  Name the task’s category in the mapping table above.
+2.  Take the lowest tier that does the job: Haiku for lookups and scans, Sonnet for bounded edits and implementation from a clear spec, Opus for large content passes, hard reasoning and adversarial review.
+3.  Never Fable without the user’s explicit permission for that launch.
+4.  Pass `model`, and say why in the brief when the choice is not obvious.
+
+To decide whether the work belongs in a new thread at all, see [`choose-thread`](../../skills/choose-thread/SKILL.llms.md).
+
 ### Executable mode (auto-recommend and config update)
 
 Instead of consulting the decision tree manually, invoke the skill with a task description. The script will analyze complexity, check your current settings, recommend the right model, and optionally suggest a config update:

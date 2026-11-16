@@ -45,6 +45,7 @@ its description does not use (ai-config#949).
 | `skills/check-prose-claims/SKILL.md` | Check prose claims, read-only. |  |
 | `skills/check-rendered-refs/SKILL.md` | Find broken refs in render. |  |
 | `skills/checkpoint/SKILL.md` | Save mid-task snapshot. |  |
+| `skills/choose-thread/SKILL.md` | New or existing thread? |  |
 | `skills/chores/SKILL.md` | Handle chore and bump PRs. |  |
 | `skills/ciq/SKILL.md` | -> check-info-quality. |  |
 | `skills/claim-pr/SKILL.md` | Post claim comment on PR/issue. |  |
@@ -88,7 +89,7 @@ its description does not use (ai-config#949).
 | `skills/do-as-you-think-best/SKILL.md` | -> daytb. |  |
 | `skills/do-it-for-me/SKILL.md` | Do the step yourself; retry blocks, then lift auto mode. |  |
 | `skills/done/SKILL.md` | -> wrap-up. |  |
-| `skills/draft-in-ezras-voice/SKILL.md` | Draft communications for Ezra in his own voice: announcements, emails, and comments sent under his name. |  |
+| `skills/draft-in-ezras-voice/SKILL.md` | Draft Ezra's announcements, emails and comments in his voice. |  |
 | `skills/drive/SKILL.md` | -> ardi. |  |
 | `skills/dta/SKILL.md` | -> delegate-to-agy. |  |
 | `skills/dtc/SKILL.md` | -> delegate-to-codex. |  |

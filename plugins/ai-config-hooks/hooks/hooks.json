@@ -2133,6 +2133,21 @@
             "why": "ai-config#5474 (part of #5317). Ezra, 2026-11-12, chose \"Adopt CC Safety Net, pinned\": the MIT-licensed CC Safety Net is the base guard for every agent, with ai-config hooks only for the gaps it leaves. Runs the release hooks/cc-safety-net.pin.json names (fetched once with npm pack --ignore-scripts, sha512-checked against the pin, cached under ~/.cache/ai-config) and passes its deny through unchanged. Fails open with a once-per-session notice when Node.js 22 or npm is missing or the download fails, since failing closed would stop every tool call on a machine without Node.js; a tarball that does not match the pin is never run. The timeout covers the first call's fetch."
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task|mcp__hearthbot__start_thread|mcp__hearthbot__message_thread|mcp__claude-code-remote__create_session|mcp__Claude_Code_Remote__create_session",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-model-choice.py\"'",
+            "timeout": 10,
+            "script": "require-model-choice.py",
+            "why": "Denies a subagent, thread or session launch that records no deliberate model choice, and a message to an existing thread that does not say why a new thread would not be better. Ezra 2026-11-16 (daytb): coordinators pick the best-fit model per task with select-model/recm; a running thread's model cannot be changed, so the choice must be made at launch.",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only when `model` (or a `Model-fit:` line for thread/session starts, or `Why-not-new-thread:` / `No-new-work:` for message_thread) is missing. Never emits `allow`."
+            ]
+          }
+        ]
       }
     ],
     "PostToolUse": [

@@ -332,3 +332,10 @@ The Claude app shows a copy button only on a fenced block.
 Read the message yourself;
 do not report the output of `hooks/no-unfenced-typed-line-ask.py` as your finding.
 See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
+
+## Model and thread choice at launch
+
+On a transcript, brief or skill change that starts a subagent, thread or session, check that a model was chosen for the task (a bounded edit on a lighter tier, a large content pass or hard reasoning on a stronger one) rather than inherited by default, and that Fable was not used without the user's permission for that launch.
+On a message that hands new work to an existing thread, check that the transcript shows a reason a new thread would not do (the topic, the files or the context is already there), not a reflex to reuse the nearest thread.
+Read the transcript yourself; do not report the output of `hooks/require-model-choice.py` as your finding.
+See [`choose-thread`](../../skills/choose-thread/SKILL.md) and [`select-model`](../../skills/select-model/SKILL.md).

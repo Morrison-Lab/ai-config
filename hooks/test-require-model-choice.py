@@ -34,10 +34,13 @@ check("start_thread without model denied", verdict("mcp__hearthbot__start_thread
 check("start_thread with model silent", verdict("mcp__hearthbot__start_thread", {"prompt": "x", "model": "opus"}), None)
 check("start_thread with Model-fit line silent",
       verdict("mcp__hearthbot__start_thread", {"prompt": "do x\nModel-fit: sonnet -- bounded edit"}), None)
+check("create_thread is not a start tool", verdict("mcp__hearthbot__create_thread", {"prompt": "x"}), None)
 check("create_session without model denied", verdict("mcp__claude-code-remote__create_session", {"prompt": "x"}), "deny")
 check("message_thread without reason denied", verdict("mcp__hearthbot__message_thread", {"text": "do more"}), "deny")
 check("message_thread with reason silent",
       verdict("mcp__hearthbot__message_thread", {"text": "do more\nWhy-not-new-thread: same PR, context needed"}), None)
+check("No-new-work line silent",
+      verdict("mcp__hearthbot__message_thread", {"text": "pin sha abc\nNo-new-work: head for the runner"}), None)
 check("empty Why-not-new-thread denied",
       verdict("mcp__hearthbot__message_thread", {"text": "Why-not-new-thread:"}), "deny")
 check("Bash ignored", verdict("Bash", {"command": "ls"}), None)

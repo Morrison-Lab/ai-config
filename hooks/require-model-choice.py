@@ -16,11 +16,12 @@ a message, so the choice only exists at launch. A reminder would be read past
 
   - `Agent` / `Task` / `invoke_subagent` with no non-blank `model`  -> DENY.
     (`no-fable-subagent.py` separately denies Fable.)
-  - Thread/session START tools (`start_thread`, `create_thread`,
+  - Thread/session START tools (`mcp__hearthbot__start_thread`,
     `create_session`) with no non-blank `model` field and no
     `Model-fit: <model> -- <reason>` line in any string field -> DENY.
-  - `message_thread` with no `Why-not-new-thread: <reason>` line in the text
-    -> DENY: it forces the "should this be a new thread, and which model?"
+  - `message_thread` with neither a `Why-not-new-thread: <reason>` line nor a
+    `No-new-work: <what it carries>` line (a relay of an answer, a pinned sha,
+    a head to merge) -> DENY: it forces the "should this be a new thread, and which model?"
     question before work is handed to an existing thread. A message that
     really belongs in the existing thread says why, e.g.
     `Why-not-new-thread: same files, context is needed`.
@@ -37,10 +38,12 @@ import re
 import sys
 
 AGENT_TOOLS = ("Agent", "Task", "invoke_subagent")
-START_SUFFIXES = ("__start_thread", "__create_thread", "__create_session")
-MESSAGE_SUFFIX = "__message_thread"
+START_SUFFIXES = ("mcp__hearthbot__start_thread", "__create_session")
+MESSAGE_SUFFIX = "mcp__hearthbot__message_thread"
 MODEL_FIT = re.compile(r"^\s*Model-fit:\s*\S.*\S", re.M | re.I)
-WHY_NOT_NEW = re.compile(r"^\s*Why-not-new-thread:\s*\S.*\S", re.M | re.I)
+# A message either assigns work (and says why not a new thread) or declares
+# that it assigns none (a relay of an answer, a pinned sha, a head to merge).
+WHY_NOT_NEW = re.compile(r"^\s*(Why-not-new-thread|No-new-work):\s*\S.*\S", re.M | re.I)
 
 
 def _payload():
@@ -102,7 +105,9 @@ def decide(payload):
                 "new thread would be better (fresh context, a different "
                 "model: a message cannot change a thread's model). Add a line "
                 "`Why-not-new-thread: <reason>` to the message, for example "
-                "`Why-not-new-thread: same PR and files, context is needed`.")
+                "`Why-not-new-thread: same PR and files, context is needed`. A "
+                "message that assigns no new work (a relay, a sha) says "
+                "`No-new-work: <what it carries>` instead.")
     return None
 
 

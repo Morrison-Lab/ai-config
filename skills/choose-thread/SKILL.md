@@ -1,6 +1,6 @@
 ---
 name: choose-thread
-description: "Decide new thread or existing thread, and the model."
+description: "New or existing thread?"
 user-invocable: true
 allowed-tools:
   - Read
@@ -36,6 +36,7 @@ Answer each criterion from live state (the thread's latest message, its open PRs
 5. **Decide and record.**
    - New thread: start it with `model` set (or a `Model-fit: <model> -- <why>` line).
    - Existing thread: add `Why-not-new-thread: <the criterion that decided it>` to the message.
+   - A message that assigns no new work (relaying an answer, pinning a sha, routing a head): add `No-new-work: <what it carries>`.
 
 Never choose Fable without the user's explicit permission for that launch ([`no-fable-subagents`](../../shared/workflow/no-fable-subagents.md)).
 

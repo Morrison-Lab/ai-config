@@ -1,6 +1,6 @@
 ---
 name: "choose-thread"
-description: "Decide new thread or existing thread, and the model."
+description: "New or existing thread?"
 ---
 
 # choose-thread (Codex wrapper)

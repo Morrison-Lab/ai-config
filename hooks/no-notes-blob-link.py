@@ -15,6 +15,7 @@ SHA-pinned link (an open PR's undeployed content), an unrendered path
 a URL in a code span or fence, and a line saying the content is not deployed
 yet or that it means the source lines, text or file (the writer states
 whether the deploy is current; no text shows it). Bash `gh` posts: ai-config#5706.
+Writer rule: shared/writing/hyperlink-liberally.md; reviewer: adversarial-reviewer.
 `ALLOW_NOTES_BLOB_LINK=1` overrides. Fails open on any parse trouble.
 """
 import json
@@ -58,7 +59,6 @@ REASON = (
 
 
 def strings(value, key=None):
-    """Every string in the tool input under a key that carries prose."""
     if isinstance(value, str):
         if key in TEXT_KEYS:
             yield value

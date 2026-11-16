@@ -45,6 +45,7 @@ its description does not use (ai-config#949).
 | `skills/check-prose-claims/SKILL.md` | Check prose claims, read-only. |  |
 | `skills/check-rendered-refs/SKILL.md` | Find broken refs in render. |  |
 | `skills/checkpoint/SKILL.md` | Save mid-task snapshot. |  |
+| `skills/choose-thread/SKILL.md` | Decide new thread or existing thread, and the model. |  |
 | `skills/chores/SKILL.md` | Handle chore and bump PRs. |  |
 | `skills/ciq/SKILL.md` | -> check-info-quality. |  |
 | `skills/claim-pr/SKILL.md` | Post claim comment on PR/issue. |  |

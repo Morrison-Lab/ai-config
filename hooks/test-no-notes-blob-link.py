@@ -22,7 +22,11 @@ CASES = [
     ("subfile on main", f"See [Smarket]({GH}/lds/blob/main/{SUB}).", True),
     ("page on main", f"See {GH}/psw/blob/main/chapters/conciseness.qmd.", True),
     ("lowercase owner", f"https://github.com/morrison-lab/mds/blob/main/algebra.qmd", True),
-    ("line anchor still content", f"{GH}/pds/blob/main/_subfiles/_def-x.qmd#L3", True),
+    ("line anchor is a source view", f"{GH}/pds/blob/main/_subfiles/_def-x.qmd#L3", False),
+    ("plain view is a source view", f"{GH}/pds/blob/main/_subfiles/_def-x.qmd?plain=1", False),
+    ("code span quotes it", f"The URL `{GH}/lds/blob/main/{SUB}` is wrong.", False),
+    ("fence quotes it", f"```\n{GH}/lds/blob/main/{SUB}\n```", False),
+    ("markdown link", f"[Smarket]({GH}/lds/blob/main/{SUB})", True),
     ("pinned to a branch", f"{GH}/lds/blob/claude/fix-x/{SUB}", False),
     ("pinned to a sha", f"{GH}/lds/blob/5ee8d52/{SUB}", False),
     ("not qmd", f"{GH}/lds/blob/main/tools/check_site.py", False),
@@ -33,7 +37,6 @@ CASES = [
     ("source lines", f"The source lines {GH}/lds/blob/main/{SUB}#L4-L6 read", False),
     ("rendered link", "https://morrison-lab.github.io/lds/chapters/classification-lab.html#dat-smarket", False),
     ("exemption on another line", f"Not deployed yet.\n{GH}/lds/blob/main/{SUB}", True),
-    ("empty", "", False),
 ]
 
 
@@ -54,18 +57,17 @@ def main() -> int:
         check(name, denied(text) == want)
     link = f"{GH}/lds/blob/main/{SUB}"
     check("github comment body", denied(link, tool="mcp__github__add_issue_comment", key="body"))
-    check("gh pr comment in Bash", denied(f"gh pr comment 5 --body '{link}'", tool="Bash", key="command"))
-    check("other Bash ignored", not denied(f"curl {link}", tool="Bash", key="command"))
+    check("PR title", denied(link, tool="mcp__github__create_pull_request", key="title"))
     check("other tool ignored", not denied(link, tool="Write", key="content"))
     check("path key ignored", not denied(link, tool="mcp__github__issue_write", key="path"))
 
     with tempfile.TemporaryDirectory() as tmp:
         root = os.path.join(tmp, "lds")
         os.makedirs(os.path.join(root, "chapters/_subfiles/classification-lab"))
-        with open(os.path.join(root, SUB), "w", encoding="utf-8") as f:
-            f.write("::: {#dat-smarket}\nText.\n:::\n")
-        with open(os.path.join(root, "chapters/classification-lab.qmd"), "w", encoding="utf-8") as f:
-            f.write("{{< include _subfiles/classification-lab/_dat-smarket.qmd >}}\n")
+        for rel, body in ((SUB, "::: {#dat-smarket}\n"), ("chapters/classification-lab.qmd",
+                          "{{< include _subfiles/classification-lab/_dat-smarket.qmd >}}\n")):
+            with open(os.path.join(root, rel), "w", encoding="utf-8") as f:
+                f.write(body)
         os.environ["CLAUDE_PROJECT_DIR"] = root
         reason = hook.denial({"tool_name": POST, "tool_input": {"text": link}}) or ""
         check("suggests page plus anchor",

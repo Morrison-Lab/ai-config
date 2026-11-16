@@ -2155,6 +2155,18 @@
             ]
           }
         ]
+      },
+      {
+        "matcher": "mcp__hearthbot__.*|mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment|mcp__github__add_comment_to_pending_review|mcp__github__pull_request_review_write|mcp__github__create_pull_request|mcp__github__update_pull_request|mcp__github__issue_write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-notes-blob-link.py\"",
+            "timeout": 10,
+            "script": "no-notes-blob-link.py",
+            "why": "ai-config#5705. Ezra, 2026-11-16: 'when you hyperlink to content in the notes, can you prefer hyperlinking to the rendered github pages site (when the relevant content is up to date there)?' Denies a user-visible post, a forge comment, issue or PR body, that links github.com/Morrison-Lab/<notes repo>/blob/main/<path>.qmd, and suggests the rendered URL (a subfile maps to the page that includes it plus its first div id, read from a local checkout). Passes a link pinned to a branch or SHA, a non-.qmd or unrendered path (tools/, .github/, _extensions/, filters/, outtakes/), a #L or ?plain=1 source view, a URL in a code span or fence, and a line that says the content is not deployed yet or that the link points at source lines, text or file. A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_NOTES_BLOB_LINK=1 overrides. Fails open on parse trouble."
+          }
+        ]
       }
     ],
     "PostToolUse": [

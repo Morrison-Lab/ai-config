@@ -21,6 +21,9 @@ A hyperlink provides 1-click access directly to the authoritative documentation,
 - **The exact content a reply mentions, not its container.**
   When a reply names a figure, page, section, file, comment, or preview, link that item itself (Ezra, 2026-11-03: "always give me direct links to content you mention").
   A figure links to its anchor on the page or preview (`<preview root>/chapters/<page>.html#fig-<id>`), a file to its path or blob URL, and a comment to its own URL.
+  Link notes content (lds, mds, pds, sds, mcs, psw, psc and the rest) on the rendered GitHub Pages site, the page that includes a subfile plus its div id (Ezra, 2026-11-16: "when you hyperlink to content in the notes, can you prefer hyperlinking to the rendered github pages site (when the relevant content is up to date there)?").
+  **Do:** link `https://morrison-lab.github.io/lds/chapters/classification-lab.html#dat-smarket`, and link the source only when the change is not deployed yet (pinned to the PR's branch or SHA, or said on the same line) or for its source lines (a `#L` anchor).
+  **Don't:** link deployed content as `github.com/Morrison-Lab/lds/blob/main/...qmd`; `hooks/no-notes-blob-link.py` denies it, and [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#notes-page-prose) looks for it.
   A link to the PR, the preview root, or the repository alone leaves the reader to hunt for the thing named.
   Check the anchor id in the source before linking it, and say when a link has not been opened.
 - **Error messages, diagnostic codes, and flags.**

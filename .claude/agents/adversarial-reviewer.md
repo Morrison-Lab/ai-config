@@ -161,6 +161,7 @@ Report; the authoring session Addresses, Rebuts, or Defers each finding.
 
 On a diff that edits a notes `.qmd` page, check the prose against psw's `defining-terms`, `conciseness` and `relative-pronouns` chapters, even when the hook that requires reading them is absent.
 Look for an unlinked term at first use, filler that adds nothing, and a dropped "that" before a relative clause.
+Flag a link to deployed notes content as `github.com/Morrison-Lab/<notes repo>/blob/main/...qmd` in the diff or PR description: it should be the rendered page plus div anchor ([`hyperlink-liberally`](../../shared/writing/hyperlink-liberally.md), `hooks/no-notes-blob-link.py`).
 Read the diff; do not report a script's output as your finding.
 See [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md#read-the-psw-chapters-before-editing-a-page).
 

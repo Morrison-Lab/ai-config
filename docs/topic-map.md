@@ -275,6 +275,7 @@ its description does not use (ai-config#949).
 | `shared/principles/admitting-vs-branching-site.md` | When enabling a new condition, trigger, or input case, that condition must be handled at two distinct sites that must agree: |  |
 | `shared/principles/dead-code-is-tech-debt.md` | Dead code is not harmless surplus; it is active technical debt that accumulates carrying costs on every reader, coding agent, search tool, and test suite pas... |  |
 | `shared/principles/deterministic-tools.md` | **Automate everything.** Never do by hand any work that can be automated. |  |
+| `shared/principles/dont-copy-decompose.md` | When a second place needs something that already exists in another place, do not copy it. Factor the shared part into one reusable component, and have every... |  |
 | `shared/principles/dont-incur-technical-debt.md` | Don't incur technical debt. When the right way to do the work in front of you needs a change you have not made yet, make that change as part of the work, rat... |  |
 | `shared/principles/dont-reinvent-wheel.md` | Don't reinvent the wheel (DRW). Before writing custom code or implementing a new function or feature, always perform a research step to verify that it hasn't... |  |
 | `shared/principles/dont-take-my-word-for-it.md` | Give users the whole truth and nothing but the truth, including your full, honest opinions; never defer to the user's opinion when you disagree. Even when th... |  |

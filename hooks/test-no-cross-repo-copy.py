@@ -43,7 +43,7 @@ def main():
     with tempfile.TemporaryDirectory() as base:
         lds, mcsg = os.path.join(base, "lds"), os.path.join(base, "mcsg")
         for repo in (lds, mcsg):
-            git("init", "-q", repo)
+            git("init", "-q", "-b", "main", repo)
         put(os.path.join(lds, ".github", "workflows", "publish.yml"), WORKFLOW)
         put(os.path.join(lds, ".github", "workflows", "callers.yml"), CALLER)
         for name in ("filter.lua", "notes.md"):

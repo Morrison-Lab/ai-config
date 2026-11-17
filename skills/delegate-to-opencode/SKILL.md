@@ -208,6 +208,11 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   Without a system message saying the reviewer has no tools, it tried to call tools and stopped with no verdict.
   So send the newest commit's diff when the whole diff is large, and say in the system message that no tools exist.
 
+  On 2026-11-16 a non-streamed review of a 190-line or 360-line diff ([ai-config#5716](https://github.com/Morrison-Lab/ai-config/pull/5716), [#5717](https://github.com/Morrison-Lab/ai-config/pull/5717)) returned `upstream request failed` or timed out after 280 s, on both `deepseek-v4.1-flash` and `glm-5.3`.
+  Streaming fixed it for `deepseek-v4.1-flash`: send `"stream": true` with `curl -N`, `"reasoning_effort": "low"` and `"max_tokens": 60000`, and read the answer from the SSE `delta.content` fields.
+  With 24000 tokens the model spent the whole budget on reasoning and stopped with `finish_reason: length`.
+  Streaming did not fix it for `glm-5.3`, which streams its reasoning under `delta.reasoning`: on one 190-line review it was still reasoning when a 570 s `--max-time` ran out, so prefer `deepseek-v4.1-flash`.
+
   Check `/models` for the current free ids and try them before relying on this route.
 - **Make the request with `curl` itself if it is to satisfy the merge gate.**
   `hooks/warn-merge-without-cross-harness-review.py` counts a Bash command whose command word is `curl`, with a data flag (`-d`, `--data-binary`, `--json` and the like) and a literal `https://opencode.ai/zen/go/v1/chat/completions` URL, that exits without error after the last push.

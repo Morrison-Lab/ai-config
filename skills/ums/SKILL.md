@@ -317,6 +317,11 @@ committed pass.
    `tools.md` on 2026-09-01 when a UMS append crossed the budget),
    `NLB_BASE_REF=origin/main python3 scripts/vendor/gha-check-new-line-breaks.py`,
    `python3 scripts/check-links.py`, and `markdownlint` on the changed files.
+   Also run `python3 scripts/check-personal-identifiers.py`,
+   which fails a shared file that gains a machine name, home path or account.
+   An entry recording where a fact was measured names the machine by its kind,
+   such as "a Linux desktop whose home is on NFS", not by its host name
+   (ai-config#5747 failed `validate` on a host name in its first push).
 
    `check-memory-file-size.py` prints its warning band here too, but this run
    is the pass/fail one: the band is actionable in step 3, before the append is

@@ -104,8 +104,10 @@ Who may trigger the bot, and which comments count as a mention, live in
   (Third instance on UCD-SERG/lab-manual#441, 2026-07-24: a status comment
   reporting "the `@claude` review verdict is clean" dispatched a run against
   `main`'s HEAD rather than the PR branch (the `gha#285`/`gha#286`
-  `workflow_dispatch`-without-`--ref` pattern documented under "@claude CI
-  action" below), even though the PR's own review had already gone clean.
+  `workflow_dispatch`-without-`--ref` pattern, documented in
+  [`claude-review-dispatch.md`](claude-review-dispatch.md)'s "Root-caused and
+  fixed at the source in gha#286" bullet), even though the PR's own review had
+  already gone clean.
   It self-resolved with an "Acknowledge @claude mention" no-op rather than
   making any change, but still cost a wasted agent run.)
   **The vector is not limited to comments: an issue's own body or title

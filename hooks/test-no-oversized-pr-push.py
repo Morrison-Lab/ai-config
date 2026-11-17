@@ -119,7 +119,7 @@ def main():
     def push_tip(d):
         """Publish the branch to a bare origin, as an earlier approved push did."""
         bare = tempfile.mkdtemp()
-        git(bare, "init", "-q", "--bare")
+        git(bare, "init", "-q", "--bare", "-b", "main")
         git(d, "remote", "add", "origin", bare)
         git(d, "push", "-q", "origin", "feature")
         git(d, "update-ref", "refs/remotes/origin/feature", "HEAD")

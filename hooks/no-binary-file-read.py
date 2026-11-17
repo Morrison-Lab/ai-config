@@ -78,18 +78,22 @@ import glob
 import json
 import os
 import re
-import shlex
 import sys
 
-# ---------------------------------------------------------------------------
-# Splitting a compound Bash command into simple-command argv lists.
-#
-# Same construction as `flag-add-a-outside-pathspec.py`'s `_simple_commands`:
-# join `\`-continued lines, blank heredoc bodies, turn unquoted newlines into
-# `;`, then let `shlex` (in punctuation-aware mode) do the real splitting and
-# dequoting.
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
-_SHELL_OPS = set("();|&")
+# The shared splitter (ai-config#3178). A broken install fails open, saying so.
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import simple_commands as _simple_commands
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"no-binary-file-read: cannot load scripts/lib/shellcmd.py ({_exc}); "
+          "no command will be checked", file=sys.stderr)
+
+    def _simple_commands(_cmd):
+        """Parse nothing when the shared splitter is missing."""
+        return None
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # Leading words that do not change WHICH file-reading command runs, so the
@@ -138,30 +142,6 @@ BINARY_EXTENSIONS = {
 }
 
 SNIFF_BYTES = 8192
-
-
-def _simple_commands(cmd):
-    """Split a shell command into simple-command argv lists; None on error."""
-    cmd = re.sub(r"\\\r?\n", " ", cmd)
-    cmd = RX_HEREDOC.sub("<<", cmd)
-    cmd = cmd.replace("\n", ";")
-    try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
-        return None
-    cmds, cur = [], []
-    for t in toks:
-        if t and set(t) <= _SHELL_OPS:
-            if cur:
-                cmds.append(cur)
-                cur = []
-        else:
-            cur.append(t)
-    if cur:
-        cmds.append(cur)
-    return cmds
 
 
 def _command_name(argv):

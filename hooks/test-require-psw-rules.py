@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for require-psw-rules.py (ai-config#5166)."""
+"""Tests for require-psw-rules.py (ai-config#5166, #5632)."""
 import json
 import os
 import subprocess
@@ -68,6 +68,33 @@ check("Read tool ignored", run({"tool_name": "Read", "tool_input": {"file_path":
 check("Write denied", run(edit(PAGE, transcript([]), "Write")) is not None)
 check("missing transcript fails open", run(edit(PAGE, "/nonexistent")) is None)
 check("malformed payload fails open", run(None, raw="not json") is None)
+
+# ai-config#5632: exercises and solutions also need teaching.qmd.
+TEACH = ("Read", {"file_path": PSW + "teaching.qmd"})
+EXR = "/repo/mcs/chapters/_subfiles/t/_boolean_exr.qmd"
+ex = run(edit(EXR, transcript(ALL)))
+check("exercise denied without teaching.qmd",
+      ex is not None and "teaching" in ex["hookSpecificOutput"]["permissionDecisionReason"])
+check("exercise allowed after teaching.qmd", run(edit(EXR, transcript(ALL + [TEACH]))) is None)
+check("solution file gated",
+      run(edit("/repo/mcs/chapters/_subfiles/t/_boolean_sol.qmd", transcript(ALL))) is not None)
+check("mds-style _exr- name gated",
+      run(edit("/repo/mds/_subfiles/t/_exr-boolean.qmd", transcript(ALL))) is not None)
+check("exercise outside chapters/ gated",
+      run(edit("/repo/mcsg/exercises/logic/_exr-boolean.qmd", transcript(ALL))) is not None)
+check("teaching alone does not discharge an exercise",
+      run(edit(EXR, transcript([TEACH]))) is not None)
+div = {"tool_name": "Write", "transcript_path": transcript(ALL),
+       "tool_input": {"file_path": PAGE, "content": ":::{#exr-x}\nAsk.\n:::\n"}}
+check("exr div in content gated", run(div) is not None)
+multi = {"tool_name": "MultiEdit", "transcript_path": transcript(ALL),
+         "tool_input": {"file_path": PAGE, "edits": [{"new_string": "::: {#sol-x}"}]}}
+check("sol div in MultiEdit gated", run(multi) is not None)
+check("ordinary page needs no teaching.qmd", run(edit(PAGE, transcript(ALL))) is None)
+check("console.qmd is not an exercise",
+      run(edit("/repo/x/console.qmd", transcript([]))) is None)
+check("non-qmd exercise name ignored",
+      run(edit("/repo/x/_a_exr.py", transcript([]))) is None)
 
 if fails:
     print("FAILED:", *fails, sep="\n  ")

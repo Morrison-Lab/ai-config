@@ -155,6 +155,117 @@ def test_dynamic_probes() -> None:
 test_dynamic_probes()
 
 
+# Each case runs in its own Python under subprocess's timeout, because a
+# regression that holds the GIL would also stop any watchdog thread here.
+_OFF_MAIN = r"""
+import sys, threading
+sys.path.insert(0, sys.argv[1])
+import check_regex_patterns as m
+out = []
+t = threading.Thread(target=lambda: out.append(m.test_dynamic_probe(sys.argv[2], 0, sys.argv[3], 0.15)))
+t.start()
+t.join()
+print(repr(out[0]))
+"""
+
+_WORKER_DEATH = r"""
+import sys, threading, time
+sys.path.insert(0, sys.argv[1])
+import regex_probe
+from regex_probe import ProbeWorker
+w = ProbeWorker()
+assert w.search("abc", 0, "abc", 5.0)[0] is True
+w._proc.kill()
+w._proc.wait()
+between = w.search("abc", 0, "abc", 5.0)
+print("between", between[0], between[2])
+debug = w.search("(ab+)+c", 128, "abab", 5.0)
+after = w.search("x+", 0, "xxx", 5.0)
+print("debug", debug[0], after[0], after[2])
+child = w._proc
+slow = w.search("(a+)+$", 0, "a" * 18 + "!", 0.001)  # about 0.02 s: answered, then failed
+print("slow", slow[0], w._proc is child, "timed out" in slow[2])
+timer = threading.Timer(0.5, lambda: w._proc.kill())
+timer.start()
+try:
+    w.search("(a+)+$", 0, "a" * 40 + "!", 20.0)
+    print("mid no-error")
+except RuntimeError as exc:
+    print("mid RuntimeError", "exited" in str(exc))
+w.close()
+for name, worker in [
+        ("nostart", "import sys; sys.exit(3)"),
+        ("garbage", "import sys\nprint('ready', flush=True)\nfor _ in sys.stdin: print('garbage', flush=True)")]:
+    regex_probe._WORKER = worker
+    w = ProbeWorker()
+    try:
+        w.search("abc", 0, "abc", 5.0)
+        print(name, "no-error")
+    except RuntimeError:
+        print(name, "RuntimeError", w._proc is None)
+"""
+
+
+def _run_case(script: str, *args: str) -> str:
+    """Run a case; after 30 s kill it and the probe worker it started."""
+    with tempfile.TemporaryFile() as out:
+        # Output goes to a file, not a pipe: the worker inherits it, and on
+        # Windows subprocess.run would wait for every holder of a pipe to exit.
+        proc = subprocess.Popen(
+            [sys.executable, "-I", "-c", script, *args],
+            stdout=out, stderr=subprocess.STDOUT, start_new_session=os.name != "nt")
+        try:
+            proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                               capture_output=True, check=True)
+            else:
+                os.killpg(proc.pid, 9)
+            proc.wait(timeout=30)
+            return "hung for 30 s"
+        out.seek(0)
+        return out.read().decode("utf-8", "replace")
+
+
+def test_dynamic_probe_off_the_main_thread() -> None:
+    """Off the main thread there is no SIGALRM, as on Windows (ai-config#5503).
+
+    The probe must still time out: before the child-process fallback, a
+    thread running the match held the GIL and this hung indefinitely.
+    """
+    scripts = str(ROOT / "scripts")
+    out = _run_case(_OFF_MAIN, scripts, r"(a+)+$", "a" * 40 + "!")
+    check(
+        "a catastrophic probe off the main thread reports a timeout within 30 s",
+        out.startswith("(False,") and "timed out" in out,
+        out,
+    )
+    out = _run_case(_OFF_MAIN, scripts, "abc", "x" * 1000)
+    check(
+        "a safe probe off the main thread passes",
+        out.startswith("(True,") and out.rstrip().endswith("None)"),
+        out,
+    )
+
+
+test_dynamic_probe_off_the_main_thread()
+
+
+def test_probe_worker_death() -> None:
+    """A dead child is replaced between probes, and a death mid-probe is an error, not a timeout."""
+    out = _run_case(_WORKER_DEATH, str(ROOT / "scripts" / "lib"))
+    check("a child that died between probes is replaced", "between True None" in out, out)
+    check("re.DEBUG output does not break this or the next probe", "debug True True None" in out, out)
+    check("a search that answers after its timeout fails, without a kill", "slow False True True" in out, out)
+    check("a child that never starts raises RuntimeError", "nostart RuntimeError True" in out, out)
+    check("an undecodable answer raises RuntimeError and drops the child", "garbage RuntimeError True" in out, out)
+    check("a child that dies mid-probe raises RuntimeError", "mid RuntimeError True" in out, out)
+
+
+test_probe_worker_death()
+
+
 # --- 4. Subprocess execution against synthetic Python files ---
 
 def run_script(args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> tuple[int, str, str]:

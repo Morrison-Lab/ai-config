@@ -45,3 +45,6 @@ _site/
 # Codex tooling does, mid-session, which is how `git add -A` swept it into an
 # unrelated commit (ai-config#3683).
 .codex/
+
+# claude plugin eval run output (aggregate-result.json, report.html)
+evals/results/

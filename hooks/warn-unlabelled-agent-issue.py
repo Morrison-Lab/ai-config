@@ -49,10 +49,35 @@ A heredoc body is prose, so it is stripped before matching; the opener line's
 tail is still shell and is kept, since `gh issue create --body-file -` behind
 a heredoc is the idiomatic way to file with a long body.
 
-The discharge splits that same heredoc-stripped text into shell tokens and
-reads a label flag's argument, covering `--label a --label b`, `--label a,b`,
-`--label=a`, `--labels`, and `-l a`. `ai-authored` quoted inside a title or a
+The discharge hands that same heredoc-stripped text to
+`scripts/lib/shellcmd.py`'s `simple_commands`, which returns one argument
+list per simple command, and reads a label flag's argument in the create's
+own list (so a label on another command in a chain, on the next line, or in
+a trailing comment, discharges nothing).
+The forms covered are `--label a --label b`, `--label a,b`, `--label=a`,
+`--labels`, and `-l a`. `ai-authored` quoted inside a title or a
 body sits at no argument position, so it does not discharge.
+
+A command is read whole by regex instead when the splitter returns no
+argument list that starts with the create. Three shapes do that: a create
+inside a double-quoted string (`echo "$(gh issue create ...)"`), which is one
+argument of another command; a create after a brace (`{ gh issue create ...;
+}`), where the brace is the first argument; and a command whose quoting does
+not balance. On that path a label flag anywhere in the command discharges
+the reminder, including one on a neighbouring command and one written inside
+a quoted title or body. A create in one of the first two shapes is also not
+examined when the same command holds a second create that the splitter does
+isolate. The path errs toward silence, because a reminder that cannot
+establish its precondition must not fire.
+
+KNOWN LIMITS
+------------
+The splitter removes quotes before it looks for operators and comments, so
+three shapes cut the create's argument list short and can warn on a labelled
+create whose label flags come later: a quoted argument that is only an
+operator (`--title ";"`, or a lone quoted backtick), an unquoted `$( )`
+argument, and a `#` in the middle of an unquoted word (`t#x`). Put the label
+flags first, or quote the word, to avoid the reminder (ai-config#5365).
 
 WHY WARN RATHER THAN BLOCK
 --------------------------
@@ -85,8 +110,8 @@ and bounded.
 from __future__ import annotations
 
 import json
+import os
 import re
-import shlex
 import sys
 
 # `gh issue create` / `glab issue create` at a command position. The separator
@@ -107,6 +132,9 @@ RX_HEREDOC = re.compile(
     r".*?\n[ \t]*\1\b",
     re.DOTALL,
 )
+
+# An environment assignment before a command name: `GH_TOKEN=x`.
+RX_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 
 AUTHORSHIP_LABEL = "ai-authored"
 
@@ -141,12 +169,15 @@ def strip_single_quoted(command: str) -> str:
 
 LABEL_FLAGS = ("--label", "--labels", "-l")
 
-# Fallback for a command shlex cannot tokenize: the value of a `--label` /
+# Fallback for a command the splitter cannot isolate: the value of a `--label` /
 # `--labels` / `-l` flag, separated by `=` or whitespace. A quoted value runs to
 # its closing quote, so `"ai-authored, P2"` is read whole; a bare one runs to
-# the next space.
+# the next space, closing parenthesis, backtick or control operator, so the
+# `)` that ends `$( ... -l P2)` is not read as part of the label.
+# The short flag also takes a glued value (`-lP2`), so its separator is
+# optional.
 RX_LABEL_FLAG = re.compile(
-    r"(?:--labels?|(?<![-\w])-l)[=\s]+(?:\"([^\"]*)\"|'([^']*)'|([^'\"\s]+))"
+    r"(?:--labels?[=\s]+|(?<![-\w])-l[=\s]*)(?:\"([^\"]*)\"|'([^']*)'|([^'\"\s)`;|&]+))"
 )
 
 BASH_TOOLS = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
@@ -221,27 +252,83 @@ def strip_heredocs(command: str) -> str:
     return RX_HEREDOC.sub(lambda m: m.group(2), command)
 
 
-def command_labels(command: str) -> set:
-    """Every label named in a label flag's ARGUMENT."""
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
-        values = ["".join(groups) for groups in RX_LABEL_FLAG.findall(command)]
-    else:
-        values = []
-        for index, token in enumerate(tokens):
-            for flag in LABEL_FLAGS:
-                if token == flag and index + 1 < len(tokens):
-                    values.append(tokens[index + 1])
-                elif token.startswith(flag + "="):
-                    values.append(token[len(flag) + 1:])
-            # The short flag also takes a glued value: `-lP2`.
-            if token.startswith("-l") and len(token) > 2 and token[2] != "=":
-                values.append(token[2:])
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import simple_commands as _simple_commands
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"warn-unlabelled-agent-issue: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); "
+          "label flags are read across the whole command", file=sys.stderr)
+
+    def _simple_commands(_cmd):
+        """Parse nothing when the shared splitter is missing."""
+        return None
+
+
+def create_segments(commands: list) -> list:
+    """The argument tokens of each issue create among `commands`, the argv
+    lists `shellcmd.simple_commands` returns, one list per create. Each argv
+    is one simple command, so a label flag on another command in the chain
+    (`gh pr create --label P2 && gh issue create ...`) is in another list and
+    does not discharge the reminder. The create is at the command position,
+    after any environment assignments (`GH_TOKEN=x gh issue create ...`), so
+    `echo gh issue create --label P2` is not a create."""
+    segments = []
+    for argv in commands:
+        start = 0
+        while start < len(argv) and RX_ASSIGNMENT.match(argv[start]):
+            start += 1
+        if argv[start:start + 1] in (["gh"], ["glab"]) and argv[start + 1:start + 3] == ["issue", "create"]:
+            segments.append(argv[start + 3:])
+    return segments
+
+
+def token_labels(tokens: list) -> set:
+    """Every label named in a label flag's ARGUMENT among `tokens`."""
+    values = []
+    for index, token in enumerate(tokens):
+        for flag in LABEL_FLAGS:
+            if token == flag and index + 1 < len(tokens):
+                values.append(tokens[index + 1])
+            elif token.startswith(flag + "="):
+                values.append(token[len(flag) + 1:])
+        # The short flag also takes a glued value: `-lP2`.
+        if token.startswith("-l") and len(token) > 2 and token[2] != "=":
+            values.append(token[2:])
     labels = set()
     for value in values:
         labels |= split_labels(value)
     return labels
+
+
+def fallback_labels(command: str) -> set:
+    """Labels read by regex across the whole of `command`. This path cannot
+    tell one command in a chain from the next, or a flag from the same text
+    inside a quoted title."""
+    labels = set()
+    for groups in RX_LABEL_FLAG.findall(command):
+        labels |= split_labels("".join(groups))
+    return labels
+
+
+def command_label_sets(command: str) -> list:
+    """One label set per issue create in `command`.
+
+    A backtick becomes `;` first, so a create inside backticks is split off
+    like one inside `$( )`. A backtick inside a longer quoted value stays
+    inside that value, where the extra `;` changes no label. A quoted value
+    that is only a backtick becomes a lone `;`, the first shape under KNOWN
+    LIMITS in the module docstring."""
+    commands = _simple_commands(command.replace("`", ";"))
+    segments = create_segments(commands) if commands is not None else []
+    if not segments:
+        # The quoting does not balance, or the create sits inside a quoted
+        # string, where it is part of one token. Read the whole command.
+        return [fallback_labels(command)]
+    return [token_labels(segment) for segment in segments]
 
 
 def evaluate_bash(command: str) -> str | None:
@@ -251,7 +338,11 @@ def evaluate_bash(command: str) -> str | None:
     stripped = strip_heredocs(command)
     if not RX_ISSUE_CREATE.search(strip_single_quoted(stripped)):
         return None
-    return build_note(command_labels(stripped))
+    for labels in command_label_sets(stripped):
+        note = build_note(labels)
+        if note:
+            return note
+    return None
 
 
 def _label_values(tool_input: dict) -> list:

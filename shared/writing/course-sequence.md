@@ -53,3 +53,27 @@ mcs -> mds -> pds -> sds -+-> lds   (prediction-focused statistics)
 - When content moves from a later site into an earlier one,
   as rme's statistics appendices are moving into sds,
   the later site then links back to the earlier site for it.
+
+## When a full render runs too long, consider splitting the repo
+
+Ezra, 2026-11-12 (`cai:`, [ai-config#5568](https://github.com/Morrison-Lab/ai-config/issues/5568)): "when full-repo renders in notes projects are taking excessively long, consider whether it's time to split the repo into multiple repos".
+
+When a notes repo's full render (the publish on `main`, or a full PR preview) takes excessively long,
+consider splitting the repo into several topic repos, and bring Ezra a recommendation.
+The split itself is Ezra's decision.
+
+- **Measure first.**
+  Find where the time goes before blaming the repo's size:
+  the freeze cache, umbrella pages that re-render their children in every format, and the fixed cost of starting each page.
+  Fix those first if they are the cause.
+  [mds#631](https://github.com/Morrison-Lab/mds/issues/631) is the worked example:
+  per-page timings showed that splitting optimization out of mds would save at most about 14% of its HTML render.
+- **Split along a topic seam**, not along a course syllabus ([ai-config#5012](https://github.com/Morrison-Lab/ai-config/issues/5012)),
+  and place the new repo in the sequence above.
+- **Count the cost of the split**:
+  redirect stubs for every moved page and anchor, repointed links from the later sites,
+  and one more repo's CI to keep green.
+
+This rule is prose, not a hook or a check, because it asks for a judgment.
+Its trigger is the wall-clock time of a render, which no PreToolUse hook sees.
+A PR check cannot fail on a slow publish either, since the slowness is not a defect of the PR that started the publish.

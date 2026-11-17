@@ -32,6 +32,9 @@ and requiring consensus clean verdicts at the current HEAD.
   List runs with `output.annotations_count > 0`, read each through `check-runs/<id>/annotations`, and fix it or state in the PR why it is a false positive.
   `check-pr-fully-clean.py` fails until you rerun it with `--annotations-read <id>[,<id>...]` (or `all`, after reading every run the checker listed;
   GitHub puts a platform notice on every Actions job, so the checker cannot tell a notice you can ignore from a warning you cannot).
+- **Do:** before that rerun, post a PR comment beginning `Annotation dispositions for head <sha7>:` that names each warning or failure annotation as fixed or as a false positive, with the reason, and may group routine notices (Ezra, 2026-11-12, ai-config#4893).
+  The checker fails while runs are marked read and no such comment, newer than the head commit, names the head.
+- **Don't:** judge a warning a false positive and merge with the reason written nowhere, as mds#770 did: `--annotations-read` is only your word that you read it.
 - **Do:** when you compare a head's annotations with the base branch's tip, run `scripts/diff-annotations-vs-base.py --repo <owner/repo> --base <sha> --head <sha>` (ai-config#5281).
   It reads every page of check runs and annotations on both commits, compares per check-run name after normalizing temp paths, shas and run ids, exits 1 on any difference you have not traced and named with `--explained <run name>`, and exits 2 until every run on both commits has finished.
 - **Don't:** report a bare annotation total, or a total from the first page of `commits/<sha>/check-runs`, as evidence that a head adds nothing (gha#1825 counted 174 against 168 that way, but over every page both had 249).
@@ -675,6 +678,16 @@ A prose withdrawal ("the blocking concern is withdrawn") that fails the structur
 Measured again 2026-10-08 on `ai-config#4419`: an Antigravity `agy --print` review posted verbatim under `d-morrison` was skipped because its headings were numbered `### 2. Blocking Defects` and it lacked `Reviewed-Commit:`;
 ai-config#4425 updated `check-pr-fully-clean.py` to recognize numbered headings, the `Defects` family, and header commit references.)
 
+**An agent's reply to a review is cleared by the bot's next clean review of the head.**
+A reply that quotes a finding's label ("**Blocking line break** in `x.qmd`: fixed.") can read as a not-clean verdict under the maintainer's login.
+`check-pr-fully-clean.py` drops it once a review bot posts a clean review whose `review-data` names the current head after the reply, as long as the reply carries the disclosure footer, answers a review (fixed, addressed, rebutted, deferred, declined, "reply to") and names no other reviewer.
+Before that bot review the reply still blocks, so a reply stating an open defect is not lost ([ai-config#5748](https://github.com/Morrison-Lab/ai-config/issues/5748), lds#2635).
+
+- **Do:** after answering a review, let the next bot review of the new head clear the reply.
+  Post nothing else, and edit nothing.
+- **Don't:** edit your own reply or post a clean status under the maintainer's login to clear it.
+- **Reviewer:** flag a change to the checker that lets a reply be cleared by anything but a later bot clean naming the current head, or by a same-login head-clean status (ai-config#5283).
+
 This is a different question from how much two reviewers **agreeing** is worth,
 which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
 settles: there, same-vendor agreement measures a shared blind spot, and a
@@ -1191,7 +1204,7 @@ Per the rule above, the payload wins and the PR is not clean --- confirmed by
 `scripts/check-pr-fully-clean.py`, which consumed the structured payload
 directly and refused, rather than by reading either line by eye.
 The reviewer's own "suggestions/nits, not blockers" classification is not
-this corpus's bar: `CLAUDE.md`'s Strict Merge Control Policy vetoes a merge
+this corpus's bar: [`strict-merge-policy`](strict-merge-policy.md) vetoes a merge
 over any standing not-clean, nits included, regardless of how the reviewer
 itself prioritized its findings.
 A second failure stacked on the first here: the driving session had cached
@@ -1677,8 +1690,32 @@ and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com
 `check-pr-fully-clean.py` now reads the compare endpoint and exits 1 when the base gained commits that touch anything under `.github/workflows/` since the head's merge base ([#2982](https://github.com/Morrison-Lab/ai-config/issues/2982)).
 It also exits 1 when the list reaches 300 files, the cap [GitHub's compare endpoint](https://docs.github.com/en/rest/commits/commits#compare-two-commits) documents, since a workflow change may then be unlisted.
 Drift that touches no workflow file is a NOTE, and a `--from-json` payload built before this check (no `base_compare` key) passes with a NOTE saying the check did not run.
-That would have caught #2965, but no path diff can prove the base gained no check through a script or a reusable workflow,
-so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
+That would have caught #2965, but no path diff can prove the base gained no check through a script or a reusable workflow.
+
+**A base that moved only by other PRs' content is not a reason to update the branch before merging** (Ezra, 2026-11-14 23:22 PT, on a decision card in the CSCI 201 merge thread;
+[#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)).
+Each update moved the head, voided the review on it and re-ran CI, about 25 minutes a PR, for a currency that the next merge expired again.
+So merge once, on the current head, when all three hold:
+
+- `check-pr-fully-clean.py` exits 0 and its base-drift check actually ran, so the content-only drift shows only as `NOTE: head is N commit(s) behind <base>; none of them changed .github/workflows/` (a `NOTE: base drift not checked` line does not count);
+- GitHub reports the PR mergeable, with no conflict (`mergeable` true, `mergeable_state` neither `dirty` nor `behind`);
+- the latest review names that head.
+
+This is the GitHub direct-merge rule.
+The GitLab form below keeps its `--is-ancestor` currency check.
+On a base whose protection or ruleset requires an up-to-date branch, GitHub reports every drifting PR `behind` and will not merge it, so the rule gives no relief there:
+read the ruleset's `strict_required_status_checks_policy` rather than assuming either way.
+
+Update the branch only when one of those fails for a reason an update fixes: a real conflict, the checker's base-drift failure (the base gained a workflow gate the head never ran, or the comparison hit the 300-file cap), or a base whose protection requires an up-to-date branch (`mergeable_state` `behind`).
+The residual risk is accepted rather than closed: a gate the base gained through a script or a reusable workflow is invisible to the path diff, and the post-merge CI run on the base is what catches it, under the red-main rule ([`red-main`](red-main.md)).
+`hooks/no-update-branch-on-clean-pr.py` is the instrument:
+it denies the update, by the MCP `update_pull_request_branch` call, `gh api .../update-branch` or `gh pr update-branch`, on a PR the transcript shows as fully clean,
+until the checker reports that the branch needs the base (base drift, a conflict, or a required up-to-date branch).
+A `gh api` path built from shell variables and a `git merge` then `git push` name no PR it can match, so this prose carries those.
+
+- **Do:** merge a PR that is behind only by content, on its current head, once the three conditions hold.
+- **Don't:** merge `main` into a fully clean PR at merge time because `behind_by` is non-zero.
+
 Under a merge queue where every clean-gate check both executes for `merge_group` and is required (or aggregated behind a required check),
 the queue's speculative merge test will cover this once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) defines the queue form of the gate,
 and [`merge-queue`](merge-queue.md) forbids the manual update loop there.
@@ -1721,28 +1758,30 @@ Auto-merge stays enabled across a later push by anyone with write access (GitHub
 Merge synchronously, right after the check, with the merge command pinned.
 
 - **Do:** for a direct merge from a session with `git` and `gh`, record `headRefOid` and `baseRefName` before the clean gate runs, so the gate's verdict is tied to one head and one target.
-  Then, before the merge command, confirm the live `baseRefName` is still the recorded one, fetch that base, confirm the live PR head is still the recorded SHA, and confirm the merge-base with it is that base's current tip.
+  Then, before the merge command, confirm the live `baseRefName` is still the recorded one, fetch that base, confirm the live PR head is still the recorded SHA, and record that base's current tip.
+  The merge-base need not be that tip: a base that moved only by content is merged as it stands, per the content-only rule above.
   A retarget to another branch at the same tip during the gate would otherwise pass both the ancestry check and the head pin with a verdict produced for the old target.
   A concurrent push after the gate can already contain the base tip, so an ancestry check alone would admit a head no verdict covers.
   Until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires this into `check-pr-fully-clean.py`, which [`mwc`](../../skills/mwc/SKILL.md) already runs, both [`mwc`](../../skills/mwc/SKILL.md) and [`merge-it`](../../skills/merge-it/SKILL.md) name it as a manual step after their readiness check and before the merge command:
-  `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && [ "$b" = "<pinned-base>" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$head" = "<pinned-sha>" ] && [ "$(git merge-base "$tip" "$head")" = "$tip" ] && echo "$tip"`,
+  `url=$(gh repo view "<owner>/<repo>" --json url -q .url) && b=$(gh pr view "<N>" -R "<owner>/<repo>" --json baseRefName -q .baseRefName) && [ -n "$url" ] && [ -n "$b" ] && [ "$b" = "<pinned-base>" ] && git fetch "$url" "$b" && tip=$(git rev-parse --verify FETCH_HEAD) && git fetch "$url" "refs/pull/<N>/head" && head=$(git rev-parse --verify FETCH_HEAD) && [ "$head" = "<pinned-sha>" ] && echo "$tip"`,
   where `<pinned-sha>` and `<pinned-base>` are the `headRefOid` and `baseRefName` recorded before the gate ran.
   The trailing `echo` prints the tested base tip: record it as `<pinned-tip>` before the gate reruns, since a shell variable does not survive into the later tool call that makes the pre-merge comparison.
   The live base name is compared to the pin rather than trusted, so a retarget fails the check instead of steering the fetch.
-  `git merge-base` needs both tips' history: in a shallow clone the two can appear disjoint ([`claude-code-consumer-wiring`](../../memories/claude-code-consumer-wiring.md) records the bogus merge-base), so run `git fetch --unshallow` (or `--deepen=<n>` with a depth that reaches the common ancestor) first, or use the compare endpoint, which is unaffected.
   Both fetches name the repository the `-R` reads came from, not the checkout's `origin`, which in a fork or another checkout can be a different repository whose same-numbered PR would let the gate compare unrelated commits.
-  Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing two empty strings as equal.
+  Each result is assigned inside the `&&` chain so an unresolved branch or a failed command fails the check rather than comparing an empty head with the pin.
   Reading `FETCH_HEAD` after each fetch uses the tip the fetch just returned and writes no remote-tracking ref, so it holds in a single-branch clone (where a bare `git fetch origin` leaves `origin/<branch>` stale) and under `fetch.prune=true` (where an explicit `branch:refs/remotes/origin/branch` refspec was measured to delete the ref and fail `rev-parse` on its first run).
   The base comes from the PR, not from the repository's default branch: a stacked or release PR targets another branch, and [`merge-it`](../../skills/merge-it/SKILL.md) already warns not to assume `main` for those.
-- **Do:** for a direct merge from a remote session without `git`, re-read the PR's `headRefOid` and `baseRefName` and require both to equal the recorded pins, then read the compare endpoint instead of `git merge-base`, `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"`, with the base name encoded as one path segment (`jq -rn --arg b "<base>" '$b|@uri'`, so `release/1.x` does not split the path), and require `behind_by` of 0.
+- **Do:** for a direct merge from a remote session without `git`, re-read the PR's `headRefOid` and `baseRefName` and require both to equal the recorded pins, then read the compare endpoint instead of `git merge-base`, `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"`, with the base name encoded as one path segment (`jq -rn --arg b "<base>" '$b|@uri'`, so `release/1.x` does not split the path).
+  A non-zero `behind_by` is not a failure by itself: the checker's base-drift check decides whether the drift needs an update, per the content-only rule above.
   The pin comparison is the same one the local path makes, since `expectedHeadSha` on the merge protects the head and nothing protects the target branch.
-  When `behind_by` is 0, record the response's `base_commit.sha` as `<pinned-tip>` (the base tip at that moment, equal to `merge_base_commit.sha` in that state).
-  The pre-merge comparison re-reads the same endpoint and requires both `behind_by` of 0 again and `base_commit.sha` equal to `<pinned-tip>`, since with an unchanged head `merge_base_commit.sha` keeps the old ancestor after the base moves and would compare equal on its own.
+  Record the response's `base_commit.sha` as `<pinned-tip>` (the base tip at that moment).
+  The pre-merge comparison re-reads the same endpoint and requires `base_commit.sha` equal to `<pinned-tip>`, since with an unchanged head `merge_base_commit.sha` keeps the old ancestor after the base moves and would compare equal on its own.
+  When the tip moved, rerun the checker, whose base-drift check then reads the new drift, rather than updating the branch.
   Without that record the remote path has nothing to compare.
   Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): `behind_by` was 0 and `base_commit.sha` and `merge_base_commit.sha` were both the base tip, the same answer the `git merge-base` form gives.
   Where no raw API call is available either, as in an MCP-only session whose tools expose neither endpoint, the gate cannot run, so do not merge from that session until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
   That is the fail-closed direction, per [`fail-fast`](../principles/fail-fast.md).
-- **Do:** when the merge-base is not that tip and the merge is direct, update the branch pinned to the recorded head (the `expected_head_sha` update call, or `update_pull_request_branch` with `expectedHeadSha` remotely), then rerun the whole clean gate on the new head, review included, before merging.
+- **Do:** when the merge is direct and an update is needed under the content-only rule above (a conflict, a base-drift failure, or a required up-to-date branch), update the branch pinned to the recorded head (the `expected_head_sha` update call, or `update_pull_request_branch` with `expectedHeadSha` remotely), then rerun the whole clean gate on the new head, review included, before merging.
   The update is a new head, so a clean verdict on the old one no longer counts, per [`sync-with-main`](sync-with-main.md).
   The update is asynchronous: the REST endpoint answers `202 Accepted` while the merge is still in progress, and the MCP tool reports that answer as success, so a gate rerun started at once can read the old head.
   Pin the update itself to the head that failed the currency check.
@@ -1752,7 +1791,8 @@ Merge synchronously, right after the check, with the merge command pinned.
   Match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show.
   So re-read `headRefOid` and compare it to the SHA you sent before routing to the ownership rule (settle who owns the branch per [`claim-pr`](claim-pr.md)) instead of merging the base into someone else's push: only a head that has actually changed is the another-writer signal, and treating the message alone as that signal sends a self-inflicted bad pin into a concurrent-writer investigation instead of the one-command fix (re-read the real SHA and retry).
   The endpoint uses `422` for other validation failures too, so any other message is a failed update: stop and read it rather than treating it as a moved head.
-  Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): a deliberately wrong `expected_head_sha` returned `422` with a message reading "expected head sha didn't match current head ref." (curly apostrophe in the live text) and changed nothing.
+  Measured 2026-09-02 (Pacific) on [#2989](https://github.com/Morrison-Lab/ai-config/pull/2989): a deliberately wrong `expected_head_sha` returned `422` with a message reading "expected head sha didn't match current head ref."
+  (curly apostrophe in the live text) and changed nothing.
   Measured 2026-09-20 on [Lacaedemon/sparta#1615](https://github.com/Lacaedemon/sparta/pull/1615): a 40-character SHA constructed by padding the 8-character abbreviation that `check-pr-fully-clean.py` had printed (`d4691095`) returned the identical `422`, with no other writer involved --- the padded string was never a real commit on the PR.
   - **Do:** re-read the live `headRefOid` and compare it to the SHA you pinned before concluding a writer moved the head.
   - **Do:** read the full SHA from the API or `git rev-parse` at the point of use.
@@ -1761,7 +1801,8 @@ Merge synchronously, right after the check, with the merge command pinned.
   Then poll `headRefOid` until it changes, with a deadline (five minutes is generous for a merge commit GitHub has accepted), and treat expiry as a failed update to stop on and report, since a `202` can be returned without a new head ever appearing.
   Once it changes, record that SHA, rerun the base-currency check on it, and only then rerun the gate, pinned to that SHA.
   The gate itself takes minutes, so the base can advance again while it runs, and so can the head: a concurrent push that already contains the current base passes a currency-only recheck while the gate's verdict belongs to the earlier SHA ([`github`](../../memories/github.md) records that unpinned-head race).
-  So immediately before the merge command, check that the live `headRefOid` still equals the pinned SHA, that `baseRefName` is still the branch the gate ran against (a retarget to another branch at the same commit would otherwise pass a tip comparison), and that the live base tip still equals `<pinned-tip>`, and repeat the update-and-gate cycle when any of them moved.
+  So immediately before the merge command, check that the live `headRefOid` still equals the pinned SHA, that `baseRefName` is still the branch the gate ran against (a retarget to another branch at the same commit would otherwise pass a tip comparison), and that the live base tip still equals `<pinned-tip>`.
+  Repeat the gate when any of them moved, and update again only when the rerun checker or GitHub's mergeable state calls for it.
   Then make the merge itself carry the pin: `gh pr merge --match-head-commit "<pinned-sha>"` (measured 2026-09-02 (Pacific) in `gh` 2.98.0: the flag is documented as the commit SHA the head must match to allow the merge), or `expectedHeadSha` on the MCP `merge_pull_request` tool, so a push in the seconds after the read is refused by the API rather than merged.
   A remote session's bash has neither: `gh` is absent, and the MCP tool belongs to the agent rather than to the shell.
   The third form is plain REST, and it takes the pin as `sha`:

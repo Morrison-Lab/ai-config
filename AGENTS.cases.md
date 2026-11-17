@@ -1,7 +1,7 @@
 # Case records: AGENTS.md
 
 Worked-example case records and authentic incident directives for the rules in [`AGENTS.md`](AGENTS.md), moved here to keep them out of the auto-loaded context while preserving historical context and provenance.
-Each heading names the section and the rule the record supports.
+Each heading names the rule the record supports, as an `AGENTS.md` section heading or a bold-led bullet within a section, followed by the record's topic.
 
 The wording is unchanged from `AGENTS.md`, word for word, conforming to ASCII punctuation (`---` for em-dashes) and semantic line breaks (one sentence per line).
 

@@ -10,7 +10,9 @@ merge a question for the user: do it when `main` has moved, and say so after.
 
 The one exception is a PR that is already fully clean on its current head and waiting for a merge word.
 Merging `main` into it moves the head and voids the Clean review and the checker pass (ids#47 lost its Clean verdict this way, 2026-11-07, [ai-config#5093](https://github.com/Morrison-Lab/ai-config/issues/5093)).
-`hooks/no-update-branch-on-clean-pr.py` denies `update_pull_request_branch` there, unless `check-pr-fully-clean.py` has reported that the base gained a CI gate the head never ran.
+`hooks/no-update-branch-on-clean-pr.py` denies `update_pull_request_branch`, `gh api .../update-branch` and `gh pr update-branch` there,
+unless `check-pr-fully-clean.py` has reported that the branch needs the base (base drift adding a CI gate, a conflict, or a required up-to-date branch).
+At merge time the no-update rule covers every repository, not only lds (Ezra, 2026-11-14, [#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)): a PR behind only by other PRs' content merges on its current head, and the branch is updated only on a real conflict, a base-drift failure, or a base that requires an up-to-date branch, per the content-only rule in [`fully-clean`](fully-clean.md).
 
 **Exception for `Morrison-Lab/lds`** (Ezra, 2026-11-09, [ai-config#5210](https://github.com/Morrison-Lab/ai-config/issues/5210)):
 do not merge `main` into an lds PR branch unless the runner's checker reports that PR stale.
@@ -212,6 +214,10 @@ already existed on one side or the other.
 So after merging `main` into a prose branch, run the duplicate check against
 the branch's full current diff and the neighbouring corpus, not only against
 lines added by the merge commit.
+The same merge can also show that `main` now refutes a claim the branch adds.
+A block on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) would have re-added a claim a merged PR had replaced (2026-09-02).
+A file-set overlap check had reported it only as a conflict risk.
+Reread each block the branch adds against what `main` now says.
 
 - **Do:** after a `main` merge, re-run a cross-file duplication check over the
   merged branch's whole prose diff.
@@ -596,6 +602,8 @@ awk '...' NEWS.md              | wc -l               # after
 ```
 
 A merge must not increase the count.
+This sketch reads its baseline from `main` alone, so it charges the merge with any tight list your branch added.
+For a merge with two contributing sides, use the pair-set form in [`batch-merge-and-resolve`](batch-merge-and-resolve.md#the-instrument-lesson-which-is-the-transferable-part), which compares against both sides ([#1441](https://github.com/Morrison-Lab/ai-config/issues/1441)).
 That is an [`algorithmatize-checks`](algorithmatize-checks.md) instrument in
 the strict sense --- two integers decide it --- and it holds whoever authored
 the surrounding lines.

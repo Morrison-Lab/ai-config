@@ -33,145 +33,35 @@ skill's procedure, if the policy itself changes).
 
 ## Procedure
 
-### 1. Identify the target and extract checkable units
+### 1. Check (forked)
 
-A PR/MR diff (`gh pr diff <N>` / `glab mr diff <N>`), a file, or pasted text.
-Read the changed prose and pull out the checkable units:
+Run the `check-prose-claims` skill on the target the user named.
+It runs forked as the read-only `prose-claim-auditor` agent: it extracts the factual claims, reasoning chains, computed values and citations, runs the pre-flight readiness gate for cited sources, checks each unit against local sources, a re-derivation or the rendered output, and returns a `| Claim/step | Verdict | Basis |` table plus citations worth adding.
+The extraction rules, the gate and the check for each kind of unit live in that skill's file, not here.
 
-- **Factual claims** — statements that cite a value, a behavior, a result, an
-  external fact ("X was introduced in version Y", "the estimator is
-  unbiased under Z").
-- **Undefended claims** — a factual claim with no internal reasoning and no
-  citation backing it, even if it turns out to be accurate.
-  Flag it
-  separately from an accuracy check (below) — a claim can pass accuracy and
-  still fail this one.
-- **Reasoning chains** — an argument the document makes, not just its
-  individual facts.
-  This includes **formal mathematical reasoning**
-  (derivations, proofs, algebraic manipulations — check every step follows
-  from the last, check dimensional/unit consistency, check edge cases) and
-  **informal reasoning** (X therefore Y, a causal claim, a design
-  justification).
-- **Computed/rendered values** — a number, table entry, or figure the prose
-  describes as the output of code, a model fit, or a render.
-- **Citations to external works** --- identify all sources cited that will need to be checked.
-- **Config list and allowlist criteria** --- when prose describes why an entry
-  belongs on an allowlist or exclusion list, or what its entries have in common,
-  verify the claim against the defining comment or documentation in code.
-- **Protections, sandboxes, and security controls** --- when prose documents
-  how to configure a protection (a sandbox, an allowlist, a permission, a firewall),
-  check each mode, platform limitation, precedence rule, and escape hatch against
-  source documentation before pushing.
+For a document with many independent claims, the main session can instead fan the units out to `prose-fact-checker` workers in a `Workflow`, one unit each;
+the forked agent has no `Agent` tool, so it checks every unit itself.
 
-### 2. Pre-flight Readiness Gate (Hard Stop)
+### 2. Offer to apply corrections
 
-Before evaluating any claim against an external source,
-check whether the repository's local source corpus (`sources/` or equivalent)
-actually contains the needed sources:
-**(Note: If the target document contains zero citations to external works, skip this gate and proceed to Step 3).**
-
-1. **Are required sources missing from the local corpus?**
-2. **Is the required source present but unconverted?**
-   For example, a `.pdf`, `.docx`, or `.epub` file without a corresponding Markdown conversion.
-
-If **either** of these conditions hold, **refuse to run**.
-- Do NOT silently narrow scope.
-- Do NOT partially check around the gap.
-- Do NOT fall back to memory or the open web for the missing sources.
-
-Return **`Pre-flight: NOT READY`** instead of a report,
-and print remediation instructions.
-For example, "Populate the `sources/` directory with Markdown conversions of the cited works so they can be verified locally."
-
-Only proceed to Step 3 if the gate passes.
-
-### 3. Check factual claims
-
-For each factual claim, check it against domain knowledge first.
-Where it's
-checkable against an external source --- a package's own docs, a spec, a
-paper, a dataset's documentation --- fetch that source **from the local `sources/` corpus**.
-Do **not** fall back to the open web (`WebFetch`) if the local source is missing.
-If you discover during verification that a local source is incomplete (e.g. missing a chapter), abort and return **`Pre-flight: NOT READY`**.
-Confirm or refute the claim against the local source, not against a secondhand summary.
-Don't wave a plausible-sounding claim through
-unchecked — see
-[`challenge-ambiguous-terminology`](../../shared/workflow/challenge-ambiguous-terminology.md)
-for the sibling rule on ambiguous phrasing specifically.
-
-Separately from accuracy, check that the claim is **defended**: does the
-surrounding text give reasoning for it, or does it carry a citation? A
-claim can be accurate and still undefended — flag both kinds of gap, not
-just outright inaccuracy.
-
-When prose documents how to configure a protection or security control,
-verify four specific dimensions against the upstream source docs:
-- **Modes:** what happens in non-default modes (e.g. bypass vs prompt vs strict).
-- **Platforms:** where it does not run, and whether it fails open or fails closed.
-- **Precedence:** what overrides it (project vs user settings, flags, env vars),
-  and whether list-valued options merge or replace.
-- **Escape hatches:** retries, exclusions, exceptions, or unmonitored tools.
-
-### 4. Verify document-internal reasoning
-
-Walk each reasoning chain step by step:
-
-- **Formal math** — re-derive or spot-check each step; confirm dimensions and
-  units are consistent at every operation; check boundary/edge cases the
-  claim implies; confirm a cited theorem's hypotheses actually hold in this
-  application (e.g. don't apply a result that requires independence to
-  correlated data without noting it).
-- **Informal arguments** — does the stated reasoning actually support the
-  conclusion drawn, or is there a gap (an unstated assumption doing the
-  real work, a non sequitur, an overgeneralization from one example)?
-
-### 5. Cross-check computed values and figures against the rendered output
-
-Don't trust the source prose's own description of a computed value — verify
-it against what was actually produced:
-
-1. Check whether the project has a **PR-preview deploy**. Look for a sticky
-   preview-link comment on the PR, or check the project's `CLAUDE.md` /
-   `.github/workflows/` for a preview workflow (e.g. `preview.yml` +
-   `preview-deploy.yml` built on `rossjrw/pr-preview-action`, common in this
-   lab's Quarto repos — those deploy to a `gh-pages` branch under
-   `pr-preview/pr-<N>/<path>`).
-2. If a live preview exists, fetch the rendered page (`WebFetch`) and read
-   the actual value/figure off it.
-3. If no preview covers the changed page yet, fall back to the project's
-   render command (e.g. `quarto render <chapter.qmd> --to html` in an R/
-   Quarto repo) and check the local render instead of skipping the check.
-4. Compare what's rendered against what the prose claims. A mismatch is a
-   finding even if the prose "sounds" right — the rendered output is ground
-   truth, not the sentence describing it.
-
-### 6. Report
-
-For every unit checked:
-
-```
-| Claim/step | Verdict | Basis (source checked) |
-|------------|---------|-------------------------|
-| "the estimator is unbiased" | Inaccurate | Biased under this design per [source/derivation]; see step 3 below |
-| Derivation step 4 → 5 | Confirmed | Re-derived; algebra holds, dimensions consistent |
-| "Table 2, row 3 = 4.7" | Inaccurate | Rendered preview (pr-preview/pr-N/chapter.html) shows 4.9 |
-| "adoption has grown steadily" | Undefended | No citation or reasoning given; claim itself checks out but needs a source or an explicit basis |
-```
-
-Then, separately, list **additional citations/references worth adding** —
-proactively, anywhere a pointer to a source would help a reader, not only
-where a claim is currently flagged as uncited.
-
-### 7. Offer to apply corrections
-
-On request, fix the flagged inaccuracies and reasoning gaps in place with
-`Edit`, preserving the author's intent and voice — same posture as
-`find-ai-tells`'s apply step. Don't silently rewrite without being asked;
+On request, fix the flagged inaccuracies and reasoning gaps in place with `Edit`, preserving the author's intent and voice, the same posture as `find-ai-tells`'s apply step.
+Don't silently rewrite without being asked;
 report first.
+
+### Why the check phase is its own skill
+
+With `context: fork`, a skill's whole body runs in the forked agent, so a
+skill cannot fork only one step
+([ai-config#914](https://github.com/Morrison-Lab/ai-config/issues/914)).
+Step 2 needs `Edit`, which the read-only `prose-claim-auditor` agent cannot
+provide, so the checks live in `check-prose-claims` and this skill keeps the
+corrections in the main session, as `purge-hallucinations` does with
+`detect-hallucinations`.
 
 ## Relationship to other skills
 
+- **`check-prose-claims`** --- this skill's forked, read-only check phase
+  (step 1); run it alone for a report with no edits.
 - [`challenge-ambiguous-terminology`](../../shared/workflow/challenge-ambiguous-terminology.md) —
   catches phrasing whose meaning is *unresolved*; this skill catches claims
   and reasoning that are resolved but *wrong*. Run both during review.
@@ -180,9 +70,9 @@ report first.
 - **`ard` / `ardi`** — when a reviewer (human or bot) flags a factual or
   reasoning error, `ard` handles the response disposition; this skill is how
   you (as reviewer) *find* that class of error in the first place.
-- **`prose-fact-checker` agent** — the read-only, parallelizable version of
-  step 2–4 above, for fanning claim-checking out across a `Workflow` when a
-  document has many independent claims to verify at once.
+- **`prose-fact-checker` agent** --- checks one unit handed to it, for
+  fanning claim-checking out across a `Workflow` when a document has many
+  independent claims to verify at once.
 - **`check-info-quality` (`ciq`)** — this skill verdicts a claim
   **Accurate / Inaccurate / Undefended**; `ciq`'s check C catches a claim
   that's accurate by this skill's own standard yet still misleads (missing

@@ -10,6 +10,10 @@
 - WIP cap: with three open PRs in a repo, open no fourth there (ai-config#5213).
   The 3 is Ezra's daytb on the coordinator's recommendation, 2026-11-10.
   See [`wip-cap`](../shared/workflow/wip-cap.md).
+- A freeze stops new work, not issue filing.
+  Ezra, 2026-11-12: "a freeze shouldn't prevent you from filing issues" ([ai-config#5574](https://github.com/Morrison-Lab/ai-config/issues/5574)).
+  File what you find during any freeze and leave it unclaimed.
+  See [`freezes-allow-filing`](../shared/workflow/freezes-allow-filing.md).
 - Choose explicitly whether to centralize or distribute work, within and across repos ([ai-config#5185](https://github.com/Morrison-Lab/ai-config/issues/5185)).
   See [`centralize-or-distribute`](../shared/workflow/centralize-or-distribute.md).
 - NEVER assume; ALWAYS verify.
@@ -311,7 +315,7 @@
   Order the queue most-blocking first, record each outcome where it belongs (the relevant PR/issue thread, per the post-feedback-to-PR rule), and say explicitly when the queue is empty.
   This is the interactive counterpart to `prompt-me` (surface the single most pressing question) and `prompt-me-all` (all open questions as one numbered list): pm picks one, pma batches all, this walks all of them one per exchange. (Requested on sparta 2026-07-16: "cai: go through the decisions you need from me one at a time.")
 - **Always provide an explicit recommendation with every question or choice presented to the user.**
-  See [`AGENTS.md`](../AGENTS.md) § Always give recommendations with questions (User directive / CAI, 2026-08-29).
+  See [`AGENTS.md`](../AGENTS.md) § Act on the whole request, and decide rather than ask, "Always give recommendations with questions" bullet (User directive / CAI, 2026-08-29).
 - Operate as a COORDINATOR, not an implementer.
   Delegate all hands-on implementation to subagents (Agent tool, worktree isolation) --- even core, high-stakes, architecturally-significant changes.
   Stay at the bird's-eye level: decide WHAT to build and in what order, write precise specs, launch/direct agents, sequence merges, verify results, surface decisions to the user, and relay feedback to the right agent.
@@ -366,10 +370,15 @@
 - When several in-flight PRs touch the SAME files, merging any one moves `main` and re-conflicts the rest --- so serialize the merges: merge one, wait for the others to recompute (CONFLICTING/DIRTY, or briefly UNKNOWN --- re-poll after a few seconds), and merge the next only once it's re-resynced clean.
   Merge the most-isolated PR (disjoint files) FIRST --- it rides through without a re-resync; sequence foundational/big same-file PRs LAST so lighter PRs rebase onto simpler `main`.
   An agent watching a PR must POLL its own `mergeable`/`mergeStateStatus` on EVERY watch tick (a newly-appearing conflict from someone else's merge is NOT a CI event, so a CI-completion monitor never fires on it), and on catching one immediately `git fetch origin main && git merge origin/main`, resolve, re-run checks, push --- staying in the watch loop until the PR is merged or closed (clean regresses to CONFLICTING when main moves).
-  The coordinator's nudge is only a backstop for a genuinely-dead agent. (Learned on sparta 2026-07-01 merging the movement cluster.)
+  The coordinator's nudge is only a backstop for a genuinely-dead agent.
+  (Learned on sparta 2026-07-01 merging the movement cluster.)
   Beyond same-file collisions: after ANY merge that advances the base (`main`), proactively re-sync EVERY trailing open PR branch that passes `memories/reviewing-prs.md`'s scope test and resolve conflicts (an out-of-scope branch is reported to the user and left untouched) --- don't wait for a branch to show DIRTY or for the next review trigger.
+  **Except a PR that is already fully clean and about to merge** (Ezra, 2026-11-14, [#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)): content-only drift does not re-sync it;
+  merge it on its current head per `shared/workflow/fully-clean.md`'s content-only rule, and re-sync only on a conflict, a base-drift failure, or a base that requires an up-to-date branch.
   In R packages the recurring conflicts are DESCRIPTION `Version:` (bump above main) and NEWS.md (union-merge, keeping both sides' bullets and one subsection per heading); the `@claude` bot auto-syncs non-conflicting branches but does NOT resolve these real DESCRIPTION/NEWS conflicts.
-  Sequential merges cascade version-check reds and NEWS/DESCRIPTION conflicts down the whole stack of trailing PRs, so keeping them all synced after each merge keeps the queue mergeable; parallelize with worktree-isolated workers, capped at ~3 concurrent to respect shared CI runners. (Learned on ucdavis/bcs.)
+  Sequential merges cascade version-check reds and NEWS/DESCRIPTION conflicts down the whole stack of trailing PRs, so keeping them all synced after each merge keeps the queue mergeable;
+  parallelize with worktree-isolated workers, capped at ~3 concurrent to respect shared CI runners.
+  (Learned on ucdavis/bcs.)
   **The DESCRIPTION half of this cascade is obsolete once a repo adopts `Morrison-Lab/gha`'s new `bump-dev-version`/`version-check` capabilities (gha#390, tracking gha#388)** --- PRs stop touching `Version:` at all, so there's no version-bump conflict left to cascade down the stack.
   The NEWS.md union-merge half is unaffected until a separate `news.d`-fragment capability ships (deferred, see gha#388).
   Check whether the repo you're stacking PRs in has migrated before applying the DESCRIPTION-bump advice above.
@@ -566,7 +575,7 @@
   always format them as clickable markdown hyperlinks to their forge URLs
   (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
   never as bare unlinked `#123` text
-  (see [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule for the exceptions).
+  (see the [`file-formatting-and-links`](../shared/writing/file-formatting-and-links.md) rule for the exceptions).
   (User directive / CAI, 2026-08-30.)
   Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
   See [`hyperlink-liberally`](../shared/writing/hyperlink-liberally.md) for the broader principle covering tools, internal rules, and technical terms.

@@ -28,6 +28,10 @@ The rest are prose because no condition in the transcript can decide them.
 - One approval ask per message.
   A bare "yes" covers only the primary ask, and any use of a credential or key (ssh key, token, secret) is its own single-question ask (Ezra, 2026-11-02, ai-config#4875).
   Enforced by `hooks/no-bundled-approval-ask.py`.
+- Give every line Ezra must type or paste in a fenced code block of its own, never only in inline code, quotes or plain text, in every project and thread, the coordinator's project chat included: merge words (`mwc <repo> <pr> <sha>`, `merge 95 and 96`), classifier-clearing lines (`approve push of ...`, `approve editing ...`), `retry <repo>#<n>`, `merge anyway <pr>` and commands.
+  The Claude app shows a copy button only on a fenced block (Ezra, 2026-11-15: "always give me the line with a copy button", ai-config#5667;
+  restated the same day as "always give me lines in copy blocks" after a coordinator post asked for "merge 95 and 96" inline, ai-config#5685).
+  Enforced by `hooks/no-unfenced-typed-line-ask.py`, and checked by [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#typed-lines-without-a-copy-button).
 - Routine pushed scripts (Canvas upload and replace, CI_RUNNER and variable scripts) are allow-listed in the user-level settings on the Mac and cf463-02, so the classifier does not demand typed phrases.
   Merge commands are never allow-listed.
   Ezra, 2026-10-25: "stop making me give so many manual orders".
@@ -76,6 +80,8 @@ The rest are prose because no condition in the transcript can decide them.
 
 - A denied push or tool call: retry once unchanged.
   Never route the change through another session.
+  A dispatched subagent, on a classifier denial, reports the refused command and its stated reason to its caller, and never switches permission modes itself;
+  other sessions follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
   Device consent cards are a security boundary, so use environments already approved.
   Not hookable: a denial is not visible to a hook after the fact.
 
@@ -86,6 +92,14 @@ The rest are prose because no condition in the transcript can decide them.
 - When Ezra says `daytb`, take the coordinator's recommendation.
   It never covers merges.
   Covered by the `daytb` skill.
+
+## Resolving threads
+
+- Before resolving a thread because its work or open question moved to another thread, post one line in it saying why, with a link to the thread that took the work over, as you would when closing an issue as a duplicate.
+  A thread resolved without a word looks like a dropped question.
+  Ezra, 2026-11-12, after a coordinator resolved a thread that still held an open question: "should the coordinator post a message in the resolved thread explaining why it was resolved, like we would do when we close an issue as a duplicate?"
+  ([ai-config#5572](https://github.com/Morrison-Lab/ai-config/issues/5572)).
+  Not yet hookable: a thread session cannot see the coordinator's resolve and post tools, so a deny hook on a resolve with no pointer posted waits on checking them (follow-up in ai-config#5572).
 
 ## Actions budget
 

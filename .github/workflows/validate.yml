@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install pyyaml==6.0.2 pytest==8.3.5
+        run: pip install pyyaml==6.0.2 pytest==8.3.5 markdown-it-py==3.0.0
       - name: Validate skills & manifests
         run: python3 scripts/validate-skills.py
       - name: Check markdown links
@@ -46,10 +46,20 @@ jobs:
         # earlier equation is added. This replays that assignment.
         run: python3 scripts/test_resolve_equation_anchors.py
       - name: Check ASCII punctuation in source files
-        # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
+        # ai-config#2550. The rule covers .md too (ai-config#3284), but this
+        # whole-tree scan stays on .py and .R until the .md backlog is cleared
+        # (ai-config#735). Meanwhile "Check lines the PR adds for non-ASCII
+        # punctuation" in the new-line-breaks job checks the lines each PR adds
+        # in .py, .R, .qmd, .md, .sh, .yml and .yaml (DIFF_DEFAULT_EXTENSIONS).
         run: python3 scripts/check-ascii-punctuation.py
       - name: Run check-ascii-punctuation tests
         run: python3 scripts/test_check_ascii_punctuation.py
+      - name: Run check-advisor-seat tests
+        # ai-config#884: the advisor skill's no-same-family-fallback guard.
+        run: python3 scripts/test_check_advisor_seat.py
+      - name: Run run-advisor tests
+        # ai-config#884: the advisor skill's read-only call, between two seat checks.
+        run: python3 scripts/test_run_advisor.py
       - name: Run check-dynamic-note-expiry tests
         # ai-config#5018: a memory note stating a changing condition carries `expires YYYY-MM-DD`.
         run: python3 scripts/test_check_dynamic_note_expiry.py
@@ -59,6 +69,9 @@ jobs:
       - name: Run check-owed-mechanism tests
         # ai-config#5049: a memory note that says a check or hook is owed links its issue.
         run: python3 scripts/test_check_owed_mechanism.py
+      - name: Run find-psw-rule-overlap tests
+        # ai-config#5628: before porting a fragment to psw, find psw lines that quote its example words.
+        run: python3 scripts/test_find_psw_rule_overlap.py
       - name: Run check-stop-hook-shapes tests
         # ai-config#5055: a Stop hook that reads the final message names its transcript shapes.
         run: python3 scripts/test_check_stop_hook_shapes.py
@@ -106,11 +119,24 @@ jobs:
         run: python3 scripts/check-unpinned-git-fixtures.py
       - name: Run unpinned-git-fixtures tests
         run: python3 scripts/test_check_unpinned_git_fixtures.py
+      - name: Check hook mutation anchors
+        run: python3 scripts/check-mutation-anchors.py
+      - name: Run check-mutation-anchors tests
+        run: python3 scripts/test_check_mutation_anchors.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run check-validate-duration tests
+        # ai-config#3384: the judge that flags a slower validate job on main.
+        run: python3 scripts/test_check_validate_duration.py
+      - name: Run validate-duration workflow tests
+        # ai-config#3384: both steps of validate-duration.yml.
+        run: python3 scripts/test_validate_duration_workflow.py
       - name: Run diff-annotations-vs-base tests
         # ai-config#5281: per-name annotation diff over every page.
         run: python3 scripts/test_diff_annotations_vs_base.py
+      - name: Run batch-read-annotations tests
+        # ai-config#5045: annotation reads within the shared REST budget.
+        run: python3 scripts/test_batch_read_annotations.py
       - name: Run check-mr-fully-clean tests
         # ai-config#3021: GitLab's equivalent fully-clean merge gate.
         run: python3 scripts/test_check_mr_fully_clean.py
@@ -221,6 +247,10 @@ jobs:
         run: python3 scripts/test_sync_nlb_checker.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
+      - name: Check every memory file has a row in memories/MEMORY.md
+        # ai-config#4987. The self-test fails an unregistered file first
+        # (the negative control), then checks this repo's memories.
+        run: python3 scripts/test_check_memory_index.py
       - name: Run sources-library audit tests
         run: python3 scripts/test_check_sources_library.py
       - name: Run session-runtime check tests
@@ -262,6 +292,8 @@ jobs:
       - name: Run doctor tests
         # ai-config#2540: doctor.py install diagnostics and path checks.
         run: python3 scripts/test_doctor.py
+      - name: Run retire-leftover-paths tests (ai-config#5309 step 3)
+        run: python3 scripts/test_retire_leftover_paths.py
       - name: Run AI CLI helper and detection tests
         # ai-config#2543: scripts/lib/ai_cli.py tool availability detection.
         run: python3 scripts/test_ai_cli.py
@@ -283,6 +315,14 @@ jobs:
         # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
         # blanking, and git-invocation classification.
         run: python3 scripts/test_shellcmd.py
+      - name: Run tool-name alias tests
+        # ai-config#4266: scripts/lib/tool_names.py, the shared spellings of
+        # the subagent, write and shell tools across harnesses.
+        run: python3 scripts/test_tool_names.py
+      - name: Run sibling-loader tests
+        # ai-config#2018: scripts/lib/sibling.py, the one loader for a hook's
+        # hyphenated sibling module.
+        run: python3 scripts/test_sibling.py
       - name: Run check-rendered-references tests
         # ai-config#2879: verify broken rendered reference checking and footnote isolation.
         run: python3 scripts/test_check_rendered_references.py
@@ -291,6 +331,9 @@ jobs:
         # pre-push check list from THIS file; its dogfood case asserts the
         # derived plan names every scripts/test_*.py suite.
         run: python3 scripts/test_run_local_validation.py
+      - name: Run changed-path test selection tests
+        # ai-config#5087: the selector that decides which hook suites a change can affect.
+        run: python3 scripts/test_changed_selection.py
       - name: Run validate-workflow guard tests
         # ai-config#1730: the new-line-breaks job's pull_request gate and base-ref.
         run: python3 scripts/test_validate_workflow.py
@@ -355,6 +398,12 @@ jobs:
         # `batch-merge-and-resolve.md` warns about, and it is what the
         # hand-run prototype this script replaces actually had.
         run: python3 scripts/test_pr_overlap.py
+      - name: Run mwc-batch tests
+        # Same reasoning as pr-sweep above: mwc-batch.py queries the GitHub
+        # API via `gh` and runs the fully-clean checker, so only its pure
+        # parts run here, and its infra test is checked against the real
+        # merge-infra-pr and merge hook (ai-config#5578).
+        run: python3 -m pytest scripts/test_mwc_batch.py
       - name: Run upload-skills tests
         # Only the tests run here. upload_skills.sh itself requires a live
         # workspace API key, so the offline test suite exercises change
@@ -471,25 +520,35 @@ jobs:
         # of that claim must fail, or a green live-file run is not evidence
         # the predicate works.
         run: python3 scripts/test_adversarial_reviewer_readonly_hedge.py
-      - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
-        # The BUDGET half reports rather than gates, and deliberately so:
-        # the original reasoning was that this repo sat far over the shipped
-        # budget (ai-config#897), so a blocking form would be red on every PR
-        # and would train everyone to ignore it -- the failure mode
-        # algorithmatize-checks warns about.
+      - name: Measure the auto-loaded context closure and gate its budget and hard caps
+        # The BUDGET half first reported rather than gated: this repo sat far
+        # over the shipped budget (ai-config#897), so a blocking form would
+        # have been red on every PR and trained everyone to ignore it -- the
+        # failure mode algorithmatize-checks warns about. That premise no
+        # longer held by 2026-08-31, when the closure measured 185,857 bytes
+        # against the then 200,000-byte budget (ai-config#2636); the default
+        # is now 100,000, mirroring the CLI char gate below.
         #
-        # That premise no longer holds. Measured 2026-08-31 PDT: the closure is
-        # 185,857 bytes across 6 files against the 200,000-byte budget, i.e. ~0.93x
-        # (ai-config#2636).
+        # The byte budget then stayed advisory: crossing it was to be a
+        # prompt for pruning, not a defect that blocks an unrelated PR, the
+        # stance ai-config#695 settled for the memory-file check.
+        # It now runs under --strict (ai-config#4685). The advisory report sat
+        # over budget on main for weeks -- "OVER BUDGET by 3,237 bytes" on
+        # 2026-10-22, 3,133 on 2026-11-11 -- while CI stayed green, so
+        # nobody acted until the CLI char gate below was 125 chars from
+        # failing. The budget
+        # mirrors that gate in bytes, which run ~3% above chars here, so it
+        # now fails a PR a little before the CLI gate would, and so gives the
+        # early warning the char gate lacks. Measured after ai-config#5354:
+        # 98,129 bytes, 1,871 under. A PR that crosses it trims or moves
+        # text out of CLAUDE.md in the same PR.
         #
-        # The check remains advisory: the closure sits within ~7% of the budget
-        # (14,143 bytes of headroom), so gating the total on every PR risks
-        # flapping on legitimate doc changes. Crossing the soft target is a
-        # prompt for pruning or architectural restructure (ai-config#695),
-        # not a broken build on an unrelated PR.
+        # The gates below, and the AGENTS.md byte cap, fail without --strict,
+        # so a caller that drops the flag (a consumer measured with --base)
+        # still gets them.
         #
-        # The root file's CHARACTER CAP is the exception, and gates without
-        # --strict (ai-config#897, #1258). It is not our budget but the
+        # The root file's CHARACTER CAP gates without --strict
+        # (ai-config#897, #1258). It is not our budget but the
         # CLI's per-file limit on the auto-loaded CLAUDE.md, past which it
         # warns at every launch (2.1.283 still loads the file whole;
         # ai-config#4061). The cry-wolf objection above does not transfer:
@@ -502,7 +561,7 @@ jobs:
         # line count cannot see a total and the gitlink diff of a pin bump is
         # one line. A trend line on every PR is what was missing.
         #
-        # The PER-FRAGMENT cap is the second exception, added in
+        # The PER-FRAGMENT cap is the second such gate, added in
         # ai-config#1398, and gates without --strict for the same reason as
         # the root cap: the budget above governs the closure's total and the
         # root cap governs one file, so nothing constrained an individual
@@ -512,7 +571,7 @@ jobs:
         # fragment currently reaches, and the run prints the examined count
         # and every breach's headroom on each PR.
         #
-        # The CLI TOTAL-LIMIT gate is the third exception (ai-config#4061).
+        # The CLI TOTAL-LIMIT gate is the third (ai-config#4061).
         # Claude Code warns at every launch once its instruction files pass
         # a total it derives from the model's context window, 120,000 chars
         # at the floor. The closure is gated, in the CLI's own character
@@ -524,7 +583,14 @@ jobs:
         # on its own line), which is a defect rather than a size finding.
         # An unresolved INLINE @token is reported but does not fail, since
         # most are prose -- see the script's docstring.
-        run: python3 scripts/check-context-closure.py
+        run: python3 scripts/check-context-closure.py --strict
+      - name: Report what each session kind loads at start
+        # ai-config#1138, #5310 step 1. Report-only: the gates above and in
+        # validate-skills.py fail at each cap; this shows every component
+        # against a target of 75% of its cap, so the headroom is visible.
+        run: |
+          python3 scripts/test_measure_session_start.py
+          python3 scripts/measure-session-start.py
       - name: Report this PR's context-closure delta; gate root-file growth near the cap
         # ai-config#1373. The step above reports the closure's LEVEL against a
         # budget; this reports what THIS branch did to it. Those are different
@@ -760,7 +826,7 @@ jobs:
       - name: Run check-split-push-blocks tests
         run: python3 scripts/test_check_split_push_blocks.py
   lint-qmd:
-    uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v3
 
   new-line-breaks:
     # Only a pull_request event supplies a base to diff against. On a push
@@ -884,7 +950,7 @@ jobs:
         continue-on-error: true
 
   lint-markdown:
-    uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v3
     with:
       config-file: '.markdownlint-cli2.jsonc'
       globs: '*.md'

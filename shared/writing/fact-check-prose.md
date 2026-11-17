@@ -276,14 +276,15 @@ long copy actually supports.
 
 - **Do:** re-read a bullet, heading, or summary sentence against the passage
   it condenses, treating the short copy as an unverified claim.
+  This holds when two bullets are merged into one: compare the merged bullet with each source clause.
+  ([ai-config#5425](https://github.com/Morrison-Lab/ai-config/pull/5425), 2026-11-17: in a merged Reason bullet, "the coordinator clarified the gate" became "the coordinator added the bullet", a different fact, and a reviewer caught it.)
 - **Do:** re-read the bullets *after* correcting the prose above them --- a
   bullet written before the correction is not covered by having made it.
-- **Do:** treat a sentence adjacent to a measurement as unverified unless the
-  measurement is about *that sentence*, not merely nearby.
-- **Don't:** count re-checking your measurements as having checked what you
-  wrote about them -- that pass cannot reach the condensed copy.
-- **Don't:** read "both are from this turn" as exempting a restatement from
-  re-verification; the source's freshness says nothing about the copy.
+- **Do:** treat a sentence adjacent to a measurement as unverified unless the measurement is about *that sentence*, not merely nearby.
+- **Don't:** count re-checking your measurements as having checked what you wrote about them -- that pass cannot reach the condensed copy.
+- **Don't:** read "both are from this turn" as exempting a restatement from re-verification;
+  the source's freshness says nothing about the copy.
+- **Don't:** treat a merged bullet as verified because each bullet it came from was verified.
 
 ## A command written into documentation is a condensation of the code that builds it
 
@@ -958,8 +959,8 @@ names for an assignment's author.
 - **Do:** when prose quotes a specific line from a file (not just a claimed
   command's output), derive that quote from the file in the same command that
   writes it into the doc, rather than typing it from an earlier read --- the
-  same shape `CLAUDE.md`'s clock-timestamp rule uses for a time written into a
-  file.
+  same shape [`timestamp-local-recaps`](../workflow/timestamp-local-recaps.md)
+  uses for a time written into a file.
 - **Don't:** treat "I already read this file today" as license to retype a
   line from memory; the read and the transcription are separate acts, and
   only a fresh derivation in the writing command catches drift between them.

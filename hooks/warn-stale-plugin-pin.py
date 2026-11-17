@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SessionStart: warn when this session's ai-config plugin pin lags the marketplace clone.
+"""SessionStart: warn when this session's ai-config plugin pin lags the marketplace or origin.
 
 WHY THIS EXISTS (ai-config#2439)
 --------------------------------
@@ -24,13 +24,26 @@ Each `ai-config@<marketplace>` entry that applies to this session -- the
 session's directory or an ancestor of it -- against the HEAD of the local
 marketplace clone `~/.claude/plugins/marketplaces/<marketplace>`.
 
-It does not fetch. A session-start hook has a short timeout and may have no
-network, so the clone itself can lag origin; the warning says to update the
-marketplace first for that reason. A clean result therefore means "the pin
-matches the local clone", not "the pin matches origin/main".
+It also reads the tip of origin's default branch with one `git ls-remote`
+in the clone (ai-config#5309 step 2; #3589, #3149). It does not fetch. The
+clone advances only when the marketplace is updated, so in #3149 it was 51
+commits behind origin, and a comparison with the clone alone called a pin
+that matched it current. When origin answers, a pin that does not contain
+origin's tip is reported even when it matches the clone or is ahead of it.
+When origin does not answer in time (no network, no remote), the comparison
+falls back to the clone and says so on stderr. All origin reads together get
+at most 6 seconds, inside the hook's registered 10-second timeout
+(AI_CONFIG_REMOTE_BUDGET overrides the 6, for tests).
 
-A pin that is AHEAD of the clone (the clone, not the pin, is behind) is
-not reported. A pin cannot warn about itself: this hook runs only from pins
+Origin is not read for a user-scope pin in a cloud session
+(CLAUDE_CODE_REMOTE=true) unless AI_CONFIG_NO_AUTO_REFRESH is set, because
+there `refresh-stale-plugin-pin-cloud.py` updates the marketplace and the
+user-scope pin at the same session start. That hook leaves project and local
+pins alone, so origin is still read for those. AI_CONFIG_NO_REMOTE_CHECK=1
+turns the origin read off everywhere.
+
+Without an origin reading, a pin that is AHEAD of the clone (the clone, not
+the pin, is behind) is not reported. A pin cannot warn about itself: this hook runs only from pins
 that already contain it, so a pin that predates it stays silent until it is
 updated once by hand.
 
@@ -46,9 +59,12 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 PLUGIN = "ai-config"
+DEFAULT_REMOTE_BUDGET = 6.0
+_deadline: float | None = None
 
 
 def plugins_dir() -> Path:
@@ -79,18 +95,25 @@ def applies(entry: dict, here: Path) -> bool:
     return True
 
 
-def git(clone: Path, *args: str, quiet: bool = False) -> str | None:
+def git(clone: Path, *args: str, quiet: bool = False,
+        timeout: float = 5, silent_codes: tuple[int, ...] = ()) -> str | None:
+    """Run git in the clone; None on failure.
+
+    A failure is printed on stderr unless `quiet` is set or its exit code is
+    in `silent_codes` (an expected "no" answer, such as exit 1 from
+    `merge-base --is-ancestor`)."""
     try:
         out = subprocess.run(
             ["git", "-C", str(clone), *args],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=timeout,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
         )
     except (OSError, subprocess.TimeoutExpired) as err:
         print(f"warn-stale-plugin-pin: git {' '.join(args)} in {clone}: {err}",
               file=sys.stderr)
         return None
     if out.returncode != 0:
-        if not quiet:
+        if not quiet and out.returncode not in silent_codes:
             print(f"warn-stale-plugin-pin: git {' '.join(args)} in {clone}: "
                   f"{out.stderr.strip()}", file=sys.stderr)
         return None
@@ -99,10 +122,7 @@ def git(clone: Path, *args: str, quiet: bool = False) -> str | None:
 
 def pin_is_current(clone: Path, pin: str, head: str) -> bool:
     """True when the pin is HEAD, or HEAD is its ancestor (the clone lags)."""
-    if head.startswith(pin):
-        return True
-    return git(clone, "merge-base", "--is-ancestor", head, pin,
-               quiet=True) is not None
+    return head.startswith(pin) or is_ancestor(clone, head, pin)
 
 
 def behind(clone: Path, pin: str, head: str) -> str:
@@ -110,6 +130,72 @@ def behind(clone: Path, pin: str, head: str) -> str:
     if count is None:
         return "an unknown number of commits (the pin is not in the clone)"
     return f"{count} commit(s)"
+
+
+def remote_budget() -> float:
+    raw = os.environ.get("AI_CONFIG_REMOTE_BUDGET")
+    if not raw:
+        return DEFAULT_REMOTE_BUDGET
+    try:
+        return float(raw)
+    except ValueError:
+        print(f"warn-stale-plugin-pin: AI_CONFIG_REMOTE_BUDGET={raw!r} is not "
+              f"a number; using {DEFAULT_REMOTE_BUDGET}", file=sys.stderr)
+        return DEFAULT_REMOTE_BUDGET
+
+
+def refresh_covers(entry: dict) -> bool:
+    """True when the cloud refresh hook updates this pin at session start."""
+    return (os.environ.get("CLAUDE_CODE_REMOTE") == "true"
+            and not os.environ.get("AI_CONFIG_NO_AUTO_REFRESH")
+            and entry.get("scope") == "user")
+
+
+def origin_tip(clone: Path) -> str | None:
+    """The tip of origin's default branch, or None when it cannot be read."""
+    global _deadline
+    if _deadline is None:
+        _deadline = time.monotonic() + remote_budget()
+    remaining = min(5.0, _deadline - time.monotonic())
+    if remaining <= 0.5:
+        print(f"warn-stale-plugin-pin: no time left to read origin for "
+              f"{clone}; compared with the local clone only", file=sys.stderr)
+        return None
+    out = git(clone, "ls-remote", "origin", "HEAD", timeout=remaining)
+    if not out:
+        print(f"warn-stale-plugin-pin: could not read origin's default branch "
+              f"for {clone}; compared with the local clone only",
+              file=sys.stderr)
+        return None
+    return out.split()[0]
+
+
+def has_commit(clone: Path, rev: str) -> bool:
+    """True when the clone holds `rev` as a commit."""
+    return git(clone, "cat-file", "-e", f"{rev}^{{commit}}",
+               quiet=True) is not None
+
+
+def is_ancestor(clone: Path, older: str, newer: str) -> bool:
+    """True when `older` is an ancestor of `newer` in the clone.
+
+    A commit the clone does not hold is not an ancestor of anything in it:
+    that is the expected case for origin's tip when the clone lags, so it
+    is answered False without a message. `git cat-file -e` gives a missing
+    commit and an unreadable one the same exit code, so both read as
+    missing. Once both commits are found, any merge-base error other than
+    its exit-1 "no" is printed."""
+    if not (has_commit(clone, older) and has_commit(clone, newer)):
+        return False
+    return git(clone, "merge-base", "--is-ancestor", older, newer,
+               silent_codes=(1,)) is not None
+
+
+def clone_lags(clone: Path, head: str, tip: str | None) -> bool:
+    """True when origin's tip is neither the clone's HEAD nor its ancestor."""
+    if tip is None or head == tip:
+        return False
+    return not is_ancestor(clone, tip, head)
 
 
 def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
@@ -129,21 +215,46 @@ def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
             print(f"warn-stale-plugin-pin: no git clone at {clone}; "
                   f"cannot compare {key}", file=sys.stderr)
             continue
-        for entry in entries:
-            if not isinstance(entry, dict) or not applies(entry, here):
-                continue
+        mine = [e for e in entries
+                if isinstance(e, dict) and applies(e, here)]
+        if not mine:
+            continue
+        remote = os.environ.get("AI_CONFIG_NO_REMOTE_CHECK") != "1"
+        read = remote and not all(refresh_covers(e) for e in mine)
+        origin = origin_tip(clone) if read else None
+        for entry in mine:
+            tip = None if refresh_covers(entry) else origin
+            lagging = clone_lags(clone, head, tip)
             pin = entry.get("gitCommitSha") or ""
-            if pin and pin_is_current(clone, pin, head):
+            has_tip = bool(pin and tip) and (tip.startswith(pin)
+                                             or is_ancestor(clone, tip, pin))
+            current = bool(pin) and pin_is_current(clone, pin, head)
+            in_clone = bool(pin) and has_commit(clone, pin)
+            if has_tip and (current or not in_clone):
+                continue
+            if current and not lagging:
                 continue
             scope = entry.get("scope", "?")
             flag = "" if scope == "user" else f" --scope {scope}"
             where = entry.get("projectPath") or "user scope"
             shown = pin[:12] if pin else "no recorded commit"
+            if current:
+                relation = ("matching" if head.startswith(pin)
+                            else "ahead of")
+                state = (f"{relation} the marketplace clone at {head[:12]}, "
+                         f"which has not been updated: origin's default "
+                         f"branch is at {tip[:12]}. ")
+            else:
+                count = (behind(clone, pin, head) if pin
+                         else "an unknown number of commits")
+                state = (f"{count} behind the marketplace clone at "
+                         f"{head[:12]}"
+                         + (f", which itself lags origin at {tip[:12]}. "
+                            if lagging else ". "))
             lines.append(
                 f"- {key}, {scope} scope ({where}): pinned to {shown}, "
-                f"{behind(clone, pin, head) if pin else 'an unknown number of commits'} "
-                f"behind the marketplace clone at {head[:12]}. "
-                f"Run `claude plugin marketplace update {marketplace}`, then "
+                + state
+                + f"Run `claude plugin marketplace update {marketplace}`, then "
                 f"`claude plugin update {key}{flag}`"
                 + ("" if scope == "user" else " from that directory")
                 + "."
@@ -177,7 +288,8 @@ def main() -> int:
         return 0
     text = (
         "STALE PLUGIN PIN (ai-config#2439): this session runs ai-config hooks "
-        "from a cached snapshot older than the local marketplace clone, so "
+        "from a cached snapshot older than the marketplace clone or its "
+        "origin, so "
         "hook fixes merged since then are NOT running here. A guard that "
         "refuses something already fixed on main is most likely this, not a "
         "live bug.\n"

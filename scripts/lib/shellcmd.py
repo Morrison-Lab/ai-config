@@ -10,10 +10,11 @@ This splitter was copied into EIGHT hooks before the module was written:
     hooks/flag-stale-adjacent-comment.py       hooks/no-unreviewed-pr.py
     hooks/remind-ci-crosscheck-sim-verdict.py  hooks/warn-nonglobal-substitution.py
 
-Derive that set from the CONSTANT, not from the function name:
+That set was derived from the CONSTANT, not from the function name; before
+the migration the two queries gave 8 files and 7:
 
-    grep -rlF '_SHELL_OPS = set("();|&")' hooks/   ->  8 files
-    grep -rl  "def _simple_commands"      hooks/   ->  7 files
+    grep -rlF '_SHELL_OPS = set("();|&")' hooks/
+    grep -rl  "def _simple_commands"      hooks/
 
 `remind-ci-crosscheck-sim-verdict.py` spells its copy `simple_commands`, so an
 identifier search misses it and a migration keyed on that search would leave
@@ -24,12 +25,12 @@ The bodies were identical, and so was the heredoc defect `_heredoc_free`
 fixes below -- which is the argument for a module rather than a ninth copy.
 The six that only add context now import `simple_commands` from here
 (ai-config#3178). The two that can REFUSE (`no-clobbering-push.py` denies,
-`no-unreviewed-pr.py` blocks) still carry their copies, and their migration
-is a separate review under the same issue. The same grep also finds later
-copies outside the original eight (`guard-slide-major-tag.py`,
-`no-binary-file-read.py`, `no-interpreter-heredoc.py`), which belong to the
-same migration. This module is where the fix landed and where new callers
-import from.
+`no-unreviewed-pr.py` blocks) need the operators between commands as well as
+the argv, so they walk `shell_tokens` themselves. Three later copies
+(`guard-slide-major-tag.py`, `no-binary-file-read.py`,
+`no-interpreter-heredoc.py`) moved here too, so the first grep now finds only
+this file. This module is where the fix landed and where new callers import
+from.
 
 WHY AN ARGV SPLIT RATHER THAN A REGEX
 -------------------------------------
@@ -180,9 +181,15 @@ _SHELL_OPS = set("();|&")
 # `git`'s own global options that consume the FOLLOWING token, skipped before
 # the subcommand is read so `git -C /repo commit` classifies as `commit`. The
 # `--opt=value` inline spellings need no entry: they are one token, and the
-# generic single-step branch handles them.
-GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
-                  "--exec-path"}
+# generic single-step branch handles them. `--exec-path` is NOT here: its
+# value is optional and only ever attached, and a bare `--exec-path` prints
+# the path and exits, so `git --exec-path /x push` pushes nothing.
+# `--config-env k=ENV` and `--attr-source <tree-ish>` do take a separated
+# value. `--exec-path`, `--config-env` and `--attr-source` were measured on
+# git 2.43 (ai-config#5391, #5392), where `--super-prefix` is an unknown
+# option.
+GIT_VALUE_OPTS = frozenset({"-C", "-c", "--git-dir", "--work-tree",
+                            "--namespace", "--config-env", "--attr-source"})
 
 
 def _heredoc_free(command):
@@ -269,6 +276,13 @@ def _heredoc_free(command):
             if hit is None:
                 return "".join(out)
             pos = hit.end()
+        # Drop the terminator's newline: the opener's was kept, and a second
+        # becomes `;;` once newlines are `;`, which ends a `case` arm
+        # (ai-config#3178).
+        if command.startswith("\r\n", pos):
+            pos += 2
+        elif command.startswith("\n", pos):
+            pos += 1
 
 
 def _comment_free(command):
@@ -277,8 +291,10 @@ def _comment_free(command):
     `simple_commands` turns a newline into `;` so a script's second line is
     seen as its own command. A `#` comment must therefore be removed BEFORE
     that rewrite: afterwards the comment's terminating newline is a `;`, and
-    `shlex` -- whose `commenters` is `#` -- discards everything from the `#`
-    to the end of the WHOLE input rather than to the end of its line.
+    `shlex` with its default `commenters` of `#` discarded everything from the
+    `#` to the end of the WHOLE input rather than to the end of its line.
+    (`shell_tokens` now turns shlex's comments off, so a `#`
+    this leaves in place stays part of its word.)
     Measured: `git commit -m x # note` followed by `git push` returned no
     commands past the comment, so the guard went silent on exactly the chain
     it exists to refuse.
@@ -302,9 +318,20 @@ def _comment_free(command):
     Backslash escapes the following character outside single quotes, so it
     consumes that character rather than only itself. Skipping just the
     backslash let `\"` toggle quote state, and an odd number of them before a
-    `#` corrupted the balance into the same fail-open deletion.
+    `#` corrupted the balance into the same fail-open deletion. An escaped
+    blank (`a\\ #b`) is part of its word, so a `#` after it starts nothing.
+
+    The `)` that closes a `$(` ends a substitution inside a word, not the
+    word: `$(git rev-parse HEAD)#L10` is one word, and reading its `#` as a
+    comment hid every command after it. Unquoted parentheses are tracked to
+    tell that `)` from a subshell's; a `(` after `$`, `<`, `>` or `=` (a
+    substitution, a process substitution, an array) opens one inside a word.
+    A `case` pattern's `)` inside `$(...)` is read as closing it, so a `#`
+    right after that substitution is still taken as a comment.
     """
     single = double = False
+    parens = []  # one entry per open unquoted `(`: True when it is `$(`
+    word_end = True  # whether a token may start at the next character
     out = []
     i = 0
     n = len(command)
@@ -314,14 +341,25 @@ def _comment_free(command):
             out.append(ch)
             out.append(command[i + 1])
             i += 2
+            word_end = False
             continue
+        starts = word_end
+        word_end = False
         if ch == "'" and not double:
             single = not single
         elif ch == '"' and not single:
             double = not double
-        elif ch == "#" and not single and not double:
-            prev = command[i - 1] if i else ""
-            if not prev or prev.isspace() or prev in _SHELL_OPS:
+        elif single or double:
+            pass
+        elif ch == "(":
+            parens.append(i > 0 and command[i - 1] in "$<>=")
+            word_end = True
+        elif ch == ")":
+            word_end = not (parens and parens.pop())
+        elif ch.isspace() or ch in _SHELL_OPS:
+            word_end = True
+        elif ch == "#":
+            if starts:
                 j = command.find("\n", i)
                 if j == -1:
                     break
@@ -330,6 +368,47 @@ def _comment_free(command):
         out.append(ch)
         i += 1
     return "".join(out)
+
+
+def shell_tokens(command):
+    """The dequoted `shlex` token stream of `command`; `None` on a parse error.
+
+    This is the shared front half of every split here: heredoc bodies
+    blanked, backslash-continued lines joined, unquoted `#` comments dropped,
+    unquoted newlines turned into `;`, then `shlex` in punctuation-aware mode.
+    A control-operator run arrives as one token whose characters are all in
+    `_SHELL_OPS` (`&&`, `);`, `)&&(`). A caller that needs more than an argv
+    per command (the operator before or after each one, the subshell it runs
+    in, a `case` pattern's `)`) walks these tokens itself rather than
+    repeating the preprocessing (ai-config#3178).
+    """
+    # ORDER MATTERS, and the natural order is wrong. Joining continuations
+    # first lets a heredoc BODY line ending in a backslash eat its own
+    # terminator, after which `_heredoc_free` closes at some later occurrence of
+    # the delimiter word -- or never -- and everything between is swallowed.
+    # Measured: `git commit -F - <<EOF / a \\ / EOF / git push` lost the push
+    # entirely, so the guard went silent. A heredoc body is literal text and a
+    # backslash in it continues nothing, so it must be removed BEFORE the
+    # continuation join runs over what remains.
+    command = _heredoc_free(command)
+    command = re.sub(r"\\\r?\n", " ", command)
+    command = _comment_free(command)
+    command = command.replace("\n", ";")
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        # `_comment_free` removed every comment above; left to shlex, a `#`
+        # inside a word (`i.sh#v2`, `s#a#b#`, `$#`, `${#A}`) would end the
+        # command there and hide everything after it.
+        lex.commenters = ""
+        return list(lex)
+    except ValueError:
+        return None
+
+
+def is_operator_token(token):
+    """True when `token` is a control-operator run such as `&&` or `);`."""
+    return bool(token) and set(token) <= _SHELL_OPS
 
 
 def simple_commands(command):
@@ -372,27 +451,12 @@ def simple_commands_with_scope(command):
     `{ ... }` grouping is NOT nesting for this purpose and is not counted: it
     runs in the current shell, so a `cd` inside one does move the caller.
     """
-    # ORDER MATTERS, and the natural order is wrong. Joining continuations
-    # first lets a heredoc BODY line ending in a backslash eat its own
-    # terminator, after which `_heredoc_free` closes at some later occurrence of
-    # the delimiter word -- or never -- and everything between is swallowed.
-    # Measured: `git commit -F - <<EOF / a \\ / EOF / git push` lost the push
-    # entirely, so the guard went silent. A heredoc body is literal text and a
-    # backslash in it continues nothing, so it must be removed BEFORE the
-    # continuation join runs over what remains.
-    command = _heredoc_free(command)
-    command = re.sub(r"\\\r?\n", " ", command)
-    command = _comment_free(command)
-    command = command.replace("\n", ";")
-    try:
-        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
+    toks = shell_tokens(command)
+    if toks is None:
         return None
     cmds, cur, scope, cur_scope, opened = [], [], [0], (0,), 0
     for tok in toks:
-        if tok and set(tok) <= _SHELL_OPS:
+        if is_operator_token(tok):
             if cur:
                 cmds.append((cur_scope, cur))
                 cur = []
@@ -536,14 +600,9 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     simulate, and a `$VAR` target expands at runtime -- so a caller must
     treat `None` as "somewhere I cannot name", never as "unchanged".
 
-    Adapted verbatim from `hooks/no-push-without-self-review.py`'s
-    `_resolve_cd_target`, which is the tested in-repo implementation. This is
-    a COPY and not a move: that guard still holds its own, because it can
-    refuse a push and migrating a deny-capable guard is its own change with
-    its own review --- the same call this module's header makes for the two refusing
-    `_simple_commands` copies. The duplication that leaves is tracked as
-    ai-config#3177, not by the closed ai-config#2993, whose scope is
-    `_simple_commands` and `_strip_env`. New callers import from here.
+    Moved here from `hooks/no-push-without-self-review.py`, which now
+    imports it, so one implementation serves every caller
+    (ai-config#3177).
     """
     cmd_name = rest[0]
     if cmd_name == "popd":
@@ -617,6 +676,98 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     if was_windows_drive_forward:
         resolved = resolved.replace("\\", "/")
     return resolved
+
+
+def move_dir(rest, cur):
+    """The directory a `cd`, `pushd` or `popd` argv leaves the shell in.
+
+    `resolve_cd_target`, plus one rule a caller tracking a directory across
+    commands needs: `cur` is None while the directory is unknown, and an
+    unknown directory plus a relative move stays unknown.
+    Moved from `hooks/flag-commit-a-sweeps-submodule.py` (ai-config#1731).
+    """
+    target = resolve_cd_target(rest, cur)
+    if target is None or (cur is None and not os.path.isabs(target)):
+        return None
+    return target
+
+
+_LEAD_KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until",
+                  "time", "!"}
+
+
+def _starts_with_cd(piece):
+    """True if the pipeline stage `piece` is a cd, pushd or popd, after any
+    leading shell keywords (`then cd x`)."""
+    words = piece.split()
+    while words and words[0] in _LEAD_KEYWORDS:
+        words.pop(0)
+    return bool(words) and words[0] in ("cd", "pushd", "popd")
+
+
+_QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+_SEGMENTS = re.compile(r"&&|\|\||[;\n(){}]")
+_PIPE_OR_JOB = re.compile(r"([|&])")
+
+
+def unreachable_cd(command):
+    """True if a `cd`, `pushd` or `popd` in `command` runs in a subshell of
+    its own, so its directory never reaches the commands after it: a stage of
+    a pipeline (`cd /x | cat`, which bash forks) or a backgrounded one
+    (`cd /x &`). Read from the text with the quoted strings blanked.
+    A caller passes the result as `walk_dirs`'s `ignore_cd`, so any such form
+    makes it ignore EVERY directory change in the command and check the
+    starting directory instead (the warn side).
+    Moved from `hooks/flag-commit-a-sweeps-submodule.py` (ai-config#1731)."""
+    text = _QUOTED.sub(" ", command)
+    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f
+    for segment in _SEGMENTS.split(text):
+        parts = _PIPE_OR_JOB.split(segment)  # piece, op, piece, ...
+        stages = parts[0::2]
+        ops = parts[1::2]
+        for pos, piece in enumerate(stages):
+            if not _starts_with_cd(piece):
+                continue
+            if "|" in ops:
+                return True
+            if pos < len(ops) and ops[pos] == "&":
+                return True
+    return False
+
+
+def walk_dirs(cmds, start, ignore_cd=False, skip=None, move=move_dir):
+    """Yield `(argv, env, rest, cur_dir)` for each simple command in `cmds`.
+
+    `cmds` is `simple_commands_with_scope` output, `start` the directory the
+    line starts in (None when unknown), and `cur_dir` the directory the shell
+    stands in when that command runs.
+    Each subshell starts from its parent's directory, and a `cd` inside it
+    never reaches the parent.
+    A `cd`, `pushd` or `popd` is yielded with the directory it starts from,
+    then moves its own scope, unless `ignore_cd` (a line whose `cd` runs in a
+    forked pipeline stage or background job).
+    A command for which `skip(argv)` is true is neither yielded nor moves.
+    `move(rest, cur)` computes each move; a caller that can see the
+    filesystem passes one that keeps `cur` when the target does not exist,
+    since a failed `cd` leaves the shell where it was.
+    Moved from `hooks/flag-commit-a-sweeps-submodule.py` so every hook that
+    needs "where does this command run" calls one walk (ai-config#1731).
+    """
+    dirs = {(0,): start}
+
+    def dir_of(scope):
+        while scope not in dirs:
+            scope = scope[:-1]
+        return dirs[scope]
+
+    for scope, argv in cmds:
+        if skip is not None and skip(argv):
+            continue
+        env, rest = strip_env(argv)
+        cur = dir_of(scope)
+        yield argv, env, rest, cur
+        if rest and rest[0] in ("cd", "pushd", "popd") and not ignore_cd:
+            dirs[scope] = move(rest, cur)
 
 
 # A SHELL specifically, which is a narrower question than "an interpreter".

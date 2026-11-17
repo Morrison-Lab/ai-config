@@ -114,6 +114,8 @@ Operationalized by:
 (the review side),
 [`centralize-or-distribute`](../workflow/centralize-or-distribute.md)
 (the planning-side choice, within and across repos),
+[`dont-copy-decompose`](dont-copy-decompose.md)
+(no copying an existing setup into a second place),
 [`reuse-docs-and-args`](../coding/reuse-docs-and-args.md),
 [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md),
 and the `find-overlap` / `consolidate-skills` / `consolidate-memory`

@@ -410,6 +410,16 @@ See [`reorganize-prose.cases.md`](reorganize-prose.cases.md),
   moved line is in the diff and the content it refers to is not.
 - **Don't:** read a green `check-links.py` as covering this; the broken
   pointer is prose, so no link check can reach it.
+- **Do:** when you rename, move or remove a heading, search the repository
+  for links to its old anchor (`#old-slug`) and update each one, because a
+  link to a missing heading still opens the page and only lands at the top.
+  This is a link, unlike the prose pointer in the bullet above, so
+  [`check-links.py`](../../scripts/check-links.py) fails most such links
+  with "(no such heading)" (ai-config#3630), and the
+  [adversarial reviewer](../../.claude/agents/adversarial-reviewer.md#renamed-headings)
+  looks for them too.
+- **Don't:** rely on the check alone; it misses a rename that changes only
+  punctuation or spacing, or a trailing -N on a fragment, so search anyway.
 
 ## This same staleness arrives through a merge, not only through a deliberate move
 

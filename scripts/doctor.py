@@ -545,8 +545,8 @@ def points_into_ai_config(path: Path) -> bool:
     return False
 
 
-def find_skill_leftovers(home: Path) -> tuple[List[str], List[str]]:
-    """Return (linked, doubled) skill leftovers under `home`/skills.
+def find_skill_leftovers(home: Path) -> tuple[List[Path], List[Path]]:
+    """Return (linked, doubled) skill leftover paths under `home`/skills.
 
     `linked` entries resolve into an ai-config checkout, so their provenance
     is settled. `doubled` entries only share a name with this repo's skills,
@@ -567,18 +567,18 @@ def find_skill_leftovers(home: Path) -> tuple[List[str], List[str]]:
     """
     skills = home / "skills"
     if skills.is_symlink() and points_into_ai_config(skills):
-        return ([f"{skills} ({describe_path(skills)})"], [])
+        return ([skills], [])
     if not skills.is_dir():
         return ([], [])
 
     repo_skills = {p.name for p in (REPO_ROOT / "skills").iterdir() if p.is_dir()}
-    linked: List[str] = []
-    doubled: List[str] = []
+    linked: List[Path] = []
+    doubled: List[Path] = []
     for entry in sorted(skills.iterdir()):
         if entry.is_symlink() and points_into_ai_config(entry):
-            linked.append(f"{entry} ({describe_path(entry)})")
+            linked.append(entry)
         elif entry.is_dir() and entry.name in repo_skills:
-            doubled.append(entry.name)
+            doubled.append(entry)
     return (linked, doubled)
 
 
@@ -629,8 +629,9 @@ def check_consumer_leftovers() -> Dict[str, Any]:
         if name in DOCUMENTED_MANUAL_LINKS and not path.is_symlink():
             manual_copies.append(str(path))
         leftovers.append(entry)
-    linked_skills, doubled_skills = find_skill_leftovers(home)
-    leftovers.extend(linked_skills)
+    linked_skills, doubled_paths = find_skill_leftovers(home)
+    leftovers.extend(f"{p} ({describe_path(p)})" for p in linked_skills)
+    doubled_skills = [p.name for p in doubled_paths]
 
     documented_note = (
         f" {len(documented)} documented manual link(s), not leftovers: {'; '.join(documented)}"

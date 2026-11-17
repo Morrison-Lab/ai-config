@@ -54,8 +54,10 @@ def transcript(commands, sidechain=False, antigravity=False):
 
 
 def run(command, commands, sidechain=False, antigravity=False,
-        transcript_path=None, cwd=REPO, env=None, tool_name="Bash"):
-    """Return (fired, payload_or_none). Raises on a crashed hook."""
+        transcript_path=None, cwd=REPO, env=None, tool_name="Bash",
+        agent_id=None):
+    """Return (partial_note_fired, payload_or_none); the no-run note does
+    not set the flag (use nudged()). Raises on a crashed hook."""
     path = transcript_path
     made = None
     if path is None:
@@ -68,6 +70,8 @@ def run(command, commands, sidechain=False, antigravity=False,
             "transcript_path": path,
             "cwd": cwd,
         }
+        if agent_id:
+            payload["agent_id"] = agent_id
         child_env = dict(os.environ)
         child_env.pop("ANTIGRAVITY_AGENT", None)
         child_env.update(env or {})
@@ -82,10 +86,34 @@ def run(command, commands, sidechain=False, antigravity=False,
         out = proc.stdout.strip()
         if not out:
             return False, None
-        return True, json.loads(out)
+        parsed = json.loads(out)
+        return _context(parsed).startswith(PARTIAL_LEAD), parsed
     finally:
         if made:
             os.unlink(made)
+
+
+# `run()[0]` is True only for the partial note, so a positive case proves a
+# checker was COUNTED; "not counted" is `nudged()` (#3533), "nothing" `silent()`.
+PARTIAL_LEAD = "This session ran "
+NO_RUN_LEAD = "This session has not run "
+
+
+def _context(out):
+    return ((out or {}).get("hookSpecificOutput") or {}).get(
+        "additionalContext", "")
+
+
+def nudged(*args, **kwargs):
+    """True when the hook's context is the no-run note."""
+    _, out = run(*args, **kwargs)
+    return _context(out).startswith(NO_RUN_LEAD)
+
+
+def silent(*args, **kwargs):
+    """True when the hook printed nothing at all."""
+    _, out = run(*args, **kwargs)
+    return out is None
 
 
 def check(label, cond):
@@ -130,8 +158,8 @@ def main():
           run(PUSH, [CHECKER,
                      "sed -n '1,50p' scripts/run-local-validation.py"])[0])
     check("a grep NAMING a checker does not count as having run it",
-          not run(PUSH,
-                  ['grep -rn "scripts/check-ascii-punctuation.py" README.md'])[0])
+          nudged(PUSH,
+                  ['grep -rn "scripts/check-ascii-punctuation.py" README.md']))
     check("a direct (non-interpreter) checker invocation still counts",
           run(PUSH, ["./scripts/check-links.py"])[0])
     check("an interpreter flag before the script does not hide it",
@@ -139,21 +167,49 @@ def main():
 
     # --- the ways it must stay silent ------------------------------------
     check("silent once the derived sweep has run",
-          not run(PUSH, [CHECKER, DERIVED])[0])
+          silent(PUSH, [CHECKER, DERIVED]))
     check("silent when the sweep ran BEFORE the checkers, not only after",
-          not run(PUSH, [DERIVED, CHECKER])[0])
-    check("silent when no checker ran at all (a different failure)",
-          not run(PUSH, ["git status", "ls"])[0])
+          silent(PUSH, [DERIVED, CHECKER]))
+    check("warns with the no-run note when nothing ran at all (#3533)",
+          nudged(PUSH, ["git status", "ls"]))
+    _, out = run(PUSH, [])
+    check("...and it names the --changed run as the command to use",
+          "run-local-validation.py --changed" in _context(out))
+    check("...and tells the operator too",
+          "--changed" in ((out or {}).get("systemMessage") or ""))
+    check("the partial note names the --changed run as well",
+          "run-local-validation.py --changed"
+          in _context(run(PUSH, [CHECKER])[1]))
+    check("silent with no checker once the sweep has run",
+          silent(PUSH, ["git status", DERIVED]))
+    check("silent after the recommended --changed spelling",
+          silent(PUSH, ["python3 scripts/run-local-validation.py --changed"]))
+    for args in ("--changed 2>&1 | tail -40", "--base origin/main --changed",
+                 "--only x", "--list"):
+        check("a run with " + args + " counts as the sweep (#5428)",
+              silent(PUSH, ["python3 scripts/run-local-validation.py " + args]))
+    sweep = "python3 scripts/run-local-validation.py --changed"
+    # The live transcript already holds the push's own command at PreToolUse.
+    check("a sweep in the push's own command is credited",
+          silent(sweep + " && " + PUSH, [sweep + " && " + PUSH]))
+    check("...in either order, a documented limit",
+          silent(PUSH + " && " + sweep, [PUSH + " && " + sweep]))
+    check("...where a push before the sweep is still a push",
+          nudged(PUSH + " && " + sweep, ["git status"]))
+    heredoc = "git commit -F - <<'EOF'\n    " + sweep + "\nEOF\n" + PUSH
+    check("...but not one quoted in a heredoc body", nudged(heredoc, [heredoc]))
     check("silent on a command that is not a push",
-          not run("git status", [CHECKER])[0])
+          silent("git status", [CHECKER]))
     check("silent on a commit, which is not a push",
-          not run("git commit -m x", [CHECKER])[0])
+          silent("git commit -m x", [CHECKER]))
     check("silent on a word merely containing push",
-          not run("git log --grep=push", [CHECKER])[0])
+          silent("git log --grep=push", [CHECKER]))
     check("silent on prose about pushing inside a commit message",
-          not run('git commit -m "please push later"', [CHECKER])[0])
+          silent('git commit -m "please push later"', [CHECKER]))
     check("silent in a repo with no run-local-validation.py to point at",
-          not run(PUSH, [CHECKER], cwd=tempfile.gettempdir())[0])
+          silent(PUSH, [CHECKER], cwd=tempfile.gettempdir()))
+    check("...and the no-run note stays silent there too",
+          silent(PUSH, [], cwd=tempfile.gettempdir()))
 
     # --- wrappers hiding the real program --------------------------------
     # Each of these is a GENUINE run of a checker. Missing one makes the hook
@@ -194,13 +250,13 @@ def main():
     check("...and the read beside it does not", fired and "check-y.py" not in ctx)
 
     check("the sweep run via bash -c silences the hook",
-          not run(PUSH, [CHECKER,
-                         'bash -c "python3 scripts/run-local-validation.py"'])[0])
+          silent(PUSH, [CHECKER,
+                         'bash -c "python3 scripts/run-local-validation.py"']))
     check("...and via uv run",
-          not run(PUSH, [CHECKER, "uv run scripts/run-local-validation.py"])[0])
+          silent(PUSH, [CHECKER, "uv run scripts/run-local-validation.py"]))
     check("...and by absolute path",
-          not run(PUSH, [CHECKER,
-                         "python3 /repo/scripts/run-local-validation.py"])[0])
+          silent(PUSH, [CHECKER,
+                         "python3 /repo/scripts/run-local-validation.py"]))
     check("a push wrapped in bash -c is still seen as a push",
           run('bash -c "git push origin main"', [CHECKER])[0])
 
@@ -217,7 +273,7 @@ def main():
         ("some-linter --file=scripts/check-links.py", "a --file= argument"),
     ):
         check("a checker merely READ by " + label + " does not count",
-              not run(PUSH, [reader])[0])
+              nudged(PUSH, [reader]))
 
     # THE severe case: a runner NAMED as an argument to a reader. A Python
     # file's own text contains "python3" constantly, so this is ordinary.
@@ -225,7 +281,7 @@ def main():
           run(PUSH, [CHECKER,
                      "grep python3 scripts/run-local-validation.py"])[0])
     check("...and does not credit a checker either",
-          not run(PUSH, ["grep python3 scripts/check-links.py"])[0])
+          nudged(PUSH, ["grep python3 scripts/check-links.py"]))
 
     # An interpreter running CODE or a MODULE is not running this file.
     for spelling, label in (
@@ -269,7 +325,7 @@ def main():
     check("fires in the outer repo that has the script",
           run(PUSH, [CHECKER], cwd=nest)[0])
     check("...and NOT in a nested repo that does not",
-          not run(PUSH, [CHECKER], cwd=inner)[0])
+          silent(PUSH, [CHECKER], cwd=inner))
 
     # A BARE repo has no `.git` entry at all, so the boundary test has to
     # recognize its layout directly.
@@ -278,7 +334,7 @@ def main():
     os.makedirs(os.path.join(bare, "refs"))
     open(os.path.join(bare, "HEAD"), "w", encoding="utf-8").close()
     check("...nor in a nested BARE repo",
-          not run(PUSH, [CHECKER], cwd=os.path.join(bare, "refs"))[0])
+          silent(PUSH, [CHECKER], cwd=os.path.join(bare, "refs")))
 
     # --- the tool_name gate ------------------------------------------------
     for name in ("Bash", "bash", "run_command", "execute_command", "terminal",
@@ -286,7 +342,7 @@ def main():
         check("accepts tool_name " + (name or "(empty)"),
               run(PUSH, [CHECKER], tool_name=name)[0])
     check("ignores a tool that carries no shell command",
-          not run(PUSH, [CHECKER], tool_name="Read")[0])
+          silent(PUSH, [CHECKER], tool_name="Read"))
 
     # --- push spellings that must still fire -----------------------------
     for spelling in (
@@ -305,11 +361,15 @@ def main():
 
     # --- scope ------------------------------------------------------------
     check("a subagent's checkers do not count as this session's habit",
-          not run(PUSH, [CHECKER], sidechain=True)[0])
+          nudged(PUSH, [CHECKER], sidechain=True))
+    check("silent on a push inside a subagent when nothing ran",
+          silent(PUSH, ["ls"], agent_id="abc123"))
+    check("...nor the partial note, built from the parent's checkers",
+          silent(PUSH, [CHECKER], agent_id="abc123"))
     check("an Antigravity-shaped transcript is read, not silently skipped",
           run(PUSH, [CHECKER], antigravity=True)[0])
     check("...and its derived sweep silences the hook the same way",
-          not run(PUSH, [CHECKER, DERIVED], antigravity=True)[0])
+          silent(PUSH, [CHECKER, DERIVED], antigravity=True))
 
     fired, out = run(PUSH, [CHECKER], env={"ANTIGRAVITY_AGENT": "1"})
     check("under ANTIGRAVITY_AGENT the context is still emitted",
@@ -317,6 +377,10 @@ def main():
                          .get("additionalContext", "").strip()))
     check("...and systemMessage is omitted, which that harness requires",
           fired and "systemMessage" not in (out or {}))
+    _, out = run(PUSH, ["ls"], env={"ANTIGRAVITY_AGENT": "1"})
+    check("...and the no-run note keeps its context and drops systemMessage",
+          _context(out).startswith(NO_RUN_LEAD)
+          and "systemMessage" not in (out or {}))
 
     # --- the documented limit, pinned rather than discovered --------------
     # The FIRST version of this pin re-ran the same call as "silent once the
@@ -328,13 +392,13 @@ def main():
     open(os.path.join(other, "scripts", "run-local-validation.py"), "w", encoding="utf-8").close()
     open(os.path.join(other, ".git"), "w", encoding="utf-8").close()
     check("a sweep recorded anywhere silences a push from ANOTHER repo (#3698)",
-          not run(PUSH, [CHECKER, DERIVED], cwd=other)[0])
+          silent(PUSH, [CHECKER, DERIVED], cwd=other))
     check("...and that repo would otherwise be warned",
           run(PUSH, [CHECKER], cwd=other)[0])
 
     # --- degraded inputs fail open and silent -----------------------------
     check("silent when the transcript path does not exist",
-          not run(PUSH, [], transcript_path="/nonexistent/path.jsonl")[0])
+          silent(PUSH, [], transcript_path="/nonexistent/path.jsonl"))
 
     proc = subprocess.run([sys.executable, HOOK], input="not json",
                           capture_output=True, text=True)

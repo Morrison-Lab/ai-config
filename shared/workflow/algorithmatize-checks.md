@@ -1620,6 +1620,8 @@ reach.
 That is invisible from either clause alone, because each is individually
 correct about the copy it names.
 
+- **Do:** after extracting a helper, run `python3 scripts/check-mutation-anchors.py`, which lists at once the stale anchors in tables unpacked into `old`/`find`/`anchor`/`edits` and fails on a `.replace` of those names outside a table unless `ALLOWED_SKIPS` names the file, whose anchors it never checks;
+  check those files and every other harness shape by hand until [#5742](https://github.com/Morrison-Lab/ai-config/issues/5742) covers them ([#5738](https://github.com/Morrison-Lab/ai-config/issues/5738)).
 - **Do:** re-run the mutation harness after extracting a helper, and read an
   anchor-uniqueness FATAL as the extraction reporting itself.
 - **Do:** merge colliding clauses and declare the union of their flips, rather
@@ -3059,3 +3061,12 @@ Give bad input its own code (2), validate every field up front, and catch any ot
 
 - **Do:** exit 2 on any failure to examine the input, and print what failed.
 - **Don't:** let an uncaught exception reach the interpreter's default exit.
+
+## A new validate step adds to every push's wait
+
+`validate.yml` runs on every push to every PR, so a step or test suite added there is paid on each of them.
+"Run enforcement-hook tests" doubled between September and November 2026 with nothing to notice it (ai-config#3384).
+[`validate-duration.yml`](../../.github/workflows/validate-duration.yml) now opens an issue when the `validate` job's recent median on `main` is more than 1.5 times its median from 28 days earlier, but it runs weekly and decides on the job's total alone, so it finds a slow step weeks late and does not name its PR.
+
+- **Do:** time a step or test suite you add to `validate.yml` on your own machine, and state the seconds in the PR body.
+- **Don't:** leave the weekly check to find what your step costs.

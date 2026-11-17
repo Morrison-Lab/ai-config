@@ -50,7 +50,8 @@ So ask separately what a procedure costs *by construction*: always-loaded conten
 The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
 That last clause covers a loop you armed yourself: once repeated firings return the same reading, delete the routine rather than lengthening its interval.
 `python3 scripts/check-context-closure.py` is the built instrument for the always-loaded pool.
-It fails CI once the closure passes the Claude Code CLI's own total instruction limit (less a margin for a repo `CLAUDE.md`), and its byte budget below that stays advisory, so read an over-budget line as the prompt it is.
+It fails CI once the closure passes the Claude Code CLI's own total instruction limit (less a margin for a repo `CLAUDE.md`), and this repo's CI also fails on its 100,000-byte budget, which mirrors in bytes the 100,000-character gate (that limit less the margin) and so fails first (`--strict`, ai-config#4685);
+for a consumer measured without `--strict`, read an over-budget line as the prompt it is.
 Two boundaries.
 Efficiency never outranks correctness, so no saving is bought with a skipped check.
 And the restructuring goes in its own issue or PR rather than happening inside whatever task noticed it.
@@ -67,3 +68,23 @@ Pick the rung from the cost of the mistake rather than the strength of the opini
 When several levers genuinely apply at once, do the self-directed ones first.
 Compress, compact, or file the structural finding before asking the user to act on a model change.
 Only the model change costs them a step.
+
+**Parallel workflows share one session limit, and hitting it ends all of them at once.**
+On 2026-09-03 four `Workflow` runs in parallel spent the account's session limit within an hour, and the HTTP 429 ended every in-flight subagent and workflow agent together.
+That session resumed with two runs at a time, then went back to four, and a second limit that evening killed all four.
+A run resumes from its run id, with completed agents replayed from cache, only while its journal is still on disk.
+The second time, none was, so the four loops were relaunched from their scripts with no record of what they had verified.
+When the tool refused a persisted script path as unreadable, a copy under the scratchpad resumed with the same id.
+
+## Delegation rules for every agent
+
+These rules moved verbatim from `AGENTS.md`'s "Manage quota, including the structural kind" section ([ai-config#5310](https://github.com/Morrison-Lab/ai-config/issues/5310)), which keeps its absolute rules inline and points here for the rest.
+
+Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
+See [`restructure-for-efficiency`](restructure-for-efficiency.md) and [`merge-queue`](merge-queue.md).
+In a cloud session (no `agy` or Codex), send bulk, mechanical, and review work to OpenCode Go (`delegate-to-opencode`) while Claude quota is low.
+Claude checks every result.
+A reviewer must differ from the author in model and harness.
+Never send student or PHI data.
+Elsewhere follow `memories/delegation.md`.
+Never use a pay-per-use API anywhere (Ezra, 2026-10-17); see that file.

@@ -823,7 +823,7 @@ the author had already read the same file twice without finding it.)
 - A companion rule on **posing** non-exclusive options as alternatives lives in
   [`avoid-false-dichotomies`](avoid-false-dichotomies.md); read that for the asking side and
   this for the answering side.
-- `CLAUDE.md`'s "Generalize instructions to every AI agent by default" governs
+- `AGENTS.md`'s "Generalize instructions to every AI agent by default" governs
   a different axis than this fragment's own "the check the assignment's
   author owes" bullet.
   That section says an instruction unscoped by *agent* (Claude, Codex,

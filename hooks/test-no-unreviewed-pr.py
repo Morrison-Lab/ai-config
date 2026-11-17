@@ -24,6 +24,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -178,6 +179,92 @@ PUSH_CORPUS = [
     ("gh pr comment 1 --body 'git push'", False),
 ]
 
+# `_argv_request`'s method test (ai-config#1397): `gh api` sends POST when a
+# field is given and no method is set, so a bare `-f` request discharges. Any
+# explicit method other than POST does not: a GET checks who is requested,
+# and a DELETE removes a reviewer. curl keeps the explicit-POST rule.
+REQ_FIELDS = " -f 'reviewers[]=copilot-pull-request-reviewer[bot]'"
+REQ_PATH = "gh api repos/o/r/pulls/1038/requested_reviewers"
+REQUEST_METHOD_CORPUS = [
+    (REQ_PATH + REQ_FIELDS, True),
+    (REQ_PATH + " -F 'reviewers[]=x'", True),
+    (REQ_PATH + " --raw-field 'reviewers[]=x'", True),
+    (REQ_PATH + " --field=reviewers[]=x", True),
+    (REQ_PATH + " -X POST" + REQ_FIELDS, True),
+    (REQ_PATH + " -XPOST" + REQ_FIELDS, True),
+    (REQ_PATH + " --method GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X GET" + REQ_FIELDS, False),
+    (REQ_PATH + " --method=GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -XGET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X DELETE" + REQ_FIELDS, False),
+    (REQ_PATH + " --method DELETE" + REQ_FIELDS, False),
+    # Short-flag clusters (`-i` is --include) carry the method too.
+    (REQ_PATH + " -iX GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -iXDELETE" + REQ_FIELDS, False),
+    (REQ_PATH + " -i" + REQ_FIELDS, True),
+    (REQ_PATH, False),
+    # A flag's value is not a flag: here `-f` is the jq filter of `-q`, so
+    # no field is sent and gh issues a GET.
+    (REQ_PATH + " -q -f x", False),
+    (REQ_PATH + " --jq -f x", False),
+    # gh takes the last method flag.
+    (REQ_PATH + " -X POST -X GET" + REQ_FIELDS, False),
+    (REQ_PATH + " --method POST --method GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X GET --method POST" + REQ_FIELDS, True),
+    # A glued field value still sends a field.
+    (REQ_PATH + " -freviewers[]=x", True),
+    (REQ_PATH + " -if reviewers[]=x", True),
+    # After `--` every token is positional, so this `-f` sends no field.
+    (REQ_PATH + " -- -f x", False),
+    # A glued `--flag=value` consumes nothing after it.
+    (REQ_PATH + " --method=POST" + REQ_FIELDS, True),
+    # Only the exact method POST counts; a lower-case one is not read as POST.
+    (REQ_PATH + " -X post" + REQ_FIELDS, False),
+    (REQ_PATH + " --method=post" + REQ_FIELDS, False),
+    # pflag takes `-X=POST` as the value POST, in a cluster too.
+    (REQ_PATH + " -X=POST" + REQ_FIELDS, True),
+    (REQ_PATH + " -iX=POST" + REQ_FIELDS, True),
+    (REQ_PATH + " -X=GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X= POST -f x", False),
+    # Each gh long value flag consumes the word after it.
+    (REQ_PATH + " --header -f x", False),
+    (REQ_PATH + " --template -f x", False),
+    (REQ_PATH + " --preview -f x", False),
+    (REQ_PATH + " --hostname -f x", False),
+    (REQ_PATH + " --cache -f x", False),
+    (REQ_PATH + " --input -f x", True),
+    (REQ_PATH + " --input -X GET", True),
+    (REQ_PATH + " --field -f x", True),
+    (REQ_PATH + " --raw-field -X GET", True),
+    (REQ_PATH + " --method -f x", False),
+    (REQ_PATH + " --method=get" + REQ_FIELDS, False),
+    # A glued value ends the cluster: `-HX-...` is a header, not a method.
+    (REQ_PATH + " -HX-GitHub-Api-Version:2022-11-28" + REQ_FIELDS, True),
+    (REQ_PATH + " -Hf:1", False),
+    # -H, -p and -t take a value, so a following `-f` is that value.
+    (REQ_PATH + " -H -f x", False),
+    (REQ_PATH + " -p -f x", False),
+    (REQ_PATH + " -t -f x", False),
+    # A request body from --input implies POST, like a field does.
+    (REQ_PATH + " --input body.json", True),
+    (REQ_PATH + " --input=body.json", True),
+    (REQ_PATH + " -X GET --input body.json", False),
+    # A value flag with nothing after it: gh exits without a request.
+    (REQ_PATH + REQ_FIELDS + " -X", False),
+    (REQ_PATH + REQ_FIELDS + " --method", False),
+    (REQ_PATH + " -X POST -f", False),
+    (REQ_PATH + " -X POST --field", False),
+    ("curl -s https://api.github.com/repos/o/r/pulls/1038/requested_reviewers"
+     " -f x", False),
+]
+
+# _gh_api_post on argv directly, where the token after `api` need not be a
+# reviewer path: a positional is never read as a flag cluster.
+GH_API_POST_CORPUS = [
+    (["gh", "api", "xf"], False),
+    (["gh", "api", "xX", "-f", "a=b"], True),
+]
+
 # The issue's reproduction and its operator controls, one level below the
 # end-to-end cases: (command, want_last, want_flagged), where `want_last` is
 # `request_ident`'s fourth field and `want_flagged` says whether
@@ -280,6 +367,53 @@ case([use("update_pull_request", tid="u", owner="o", repo="r",
       res("u", '{"number":1038,"requested_reviewers":[{"login":"Copilot"}]}'),
       say("Marked ready and added the reviewer.")], False,
      "a ready+reviewers edit whose reviewer-add succeeds discharges")
+# ai-config#1095, gap 2: a bare mark-ready (no reviewers) whose whole call
+# failed. github-mcp-server's UpdatePullRequest returns these messages at or
+# before the markPullRequestReadyForReview mutation, so the PR is still a draft
+# and the obligation must not nag.
+for _msg in ("Failed to mark pull request ready for review: Resource not accessible",
+             "Failed to find pull request: Could not resolve to a PullRequest",
+             "failed to update pull request: 422 Validation Failed"):
+    case([use("update_pull_request", tid="u", owner="o", repo="r",
+              pull_number=1038, draft=False),
+          res("u", _msg, err=True),
+          say("Tried to mark it ready; that failed.")], False,
+         f"a mark-ready that failed before the PR left draft drops ({_msg[:30]})")
+# With reviewers in the same call: the mutation failed, so the reviewer request
+# never ran and the PR is still a draft.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False,
+          reviewers=["copilot-pull-request-reviewer"]),
+      res("u", "Failed to mark pull request ready for review: forbidden",
+          err=True),
+      say("Tried to mark it ready with a reviewer; the mark-ready failed.")],
+     False, "a ready+reviewers edit whose mark-ready itself failed drops")
+# The dangerous mirror: an error AFTER the mutation (the final Get) comes back
+# with is_error on a PR that IS ready, so it must stay tracked.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False),
+      res("u", "Failed to get pull request: 502 Bad Gateway", err=True),
+      say("Marked ready; the final fetch failed.")], True,
+     "a mark-ready whose post-mutation fetch fails stays tracked")
+# A pre-mutation message WITHOUT is_error is not evidence of failure.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False),
+      res("u", '{"note":"Failed to mark pull request ready for review"}',
+          err=False),
+      say("Marked ready.")], True,
+     "a mark-ready with failure text but no is_error stays tracked")
+# An unrecognised error message keeps the obligation (fail toward over-warn).
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False),
+      res("u", "something unexpected went wrong", err=True),
+      say("Tried to mark it ready.")], True,
+     "a mark-ready failing with an unrecognised message stays tracked")
+# And the plain success: a bare mark-ready that succeeds is tracked.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False),
+      res("u", '{"id":"1","url":"https://github.com/o/r/pull/1038"}'),
+      say("Marked ready.")], True,
+     "a successful bare mark-ready is tracked")
 # The RESERVED case: a pure reviewer-add via update_pull_request with NO draft
 # transition is a genuine request that discharges an ALREADY-tracked PR. The
 # pending path must still fire here (it is withheld ONLY for draft:false), so a
@@ -2855,6 +2989,22 @@ def main():
         else:
             failures += 1
             print(f"FAIL: _argv_push({cmd!r}) is {got}, want {want}")
+    for argv, want in GH_API_POST_CORPUS:
+        got = hookmod._gh_api_post(argv)
+        if got is want:
+            passes += 1
+            print(f"PASS: _gh_api_post({argv!r}) is {want}")
+        else:
+            failures += 1
+            print(f"FAIL: _gh_api_post({argv!r}) is {got}, want {want}")
+    for cmd, want in REQUEST_METHOD_CORPUS:
+        got = hookmod._argv_request(shlex.split(cmd))[0]
+        if got is want:
+            passes += 1
+            print(f"PASS: _argv_request({cmd!r}) is {want}")
+        else:
+            failures += 1
+            print(f"FAIL: _argv_request({cmd!r}) is {got}, want {want}")
     for cmd, want_last, want_flagged in OPERATOR_CORPUS:
         got_last = hookmod.request_ident(cmd)[3]
         got_flagged = bool(hookmod.undischargeable_requests(cmd))

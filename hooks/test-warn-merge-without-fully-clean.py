@@ -113,6 +113,18 @@ def main():
           not run("gh --repo Morrison-Lab/ai-config pr merge 12", [clean()])[0])
     check("warns on a bare `gh pr merge N` with no -R",
           run("gh pr merge 12", [])[0])
+    # --disable-auto cancels an auto-merge and -h/--help prints usage, so
+    # neither merges anything (ai-config#5406).
+    check("silent on `gh pr merge N --disable-auto`",
+          not run("gh pr merge 12 --disable-auto", [])[0])
+    check("silent on `gh pr merge --help`",
+          not run("gh pr merge --help", [])[0])
+    check("silent on `gh pr merge -h`",
+          not run("gh pr merge -h", [])[0])
+    check("warns when --help is only a flag's value (`--body --help`)",
+          run("gh pr merge 12 --body --help", [])[0])
+    check("warns when --disable-auto follows `--`",
+          run("gh pr merge 12 -- --disable-auto", [])[0])
     check("warns on a merge buried in a && chain",
           run("echo go && gh pr merge 12 --squash", [])[0])
     check("a subagent's (sidechain) clean run is not this session's reading",

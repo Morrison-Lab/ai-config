@@ -99,7 +99,6 @@ See `hooks/test-warn-title-only-issue-edit.py` for the fixtures.
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -113,26 +112,14 @@ _AGENT_NOTICE_LIB = os.path.join(
 if _AGENT_NOTICE_LIB not in sys.path:
     sys.path.insert(0, _AGENT_NOTICE_LIB)
 from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+from sibling import load_sibling  # noqa: E402 -- ai-config#2018
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
 def _sibling(name, key):
-    """Import a hyphenated sibling module, or None if unavailable.
-
-    Same idiom `flag-unmeasured-timestamp.py` uses to reuse
-    `warn-stale-issue-edit.py`'s transcript walk and
-    `require-agent-disclosure.py`'s quote-aware segment splitter, rather
-    than re-implementing either.
-    """
-    path = os.path.join(HERE, name)
-    try:
-        spec = importlib.util.spec_from_file_location(key, path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name, key)
 
 
 _stale = _sibling("warn-stale-issue-edit.py", "_sib_title_only_stale")

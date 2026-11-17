@@ -79,7 +79,7 @@ Gate the aggregate, and keep a looser per-sample bound as a backstop so one
 blown sample cannot hide behind the good ones.
 
 This is one of a family of transformations, and the corpus already carries
-another: [`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s count delta,
+another: [`batch-merge-and-resolve`](batch-merge-and-resolve.md)'s splice delta,
 where a predicate too noisy to report a *level* is sound reporting a *change*
 because taking the difference cancels the baseline.
 Sub-window, phase, aggregate, and delta are the same move --- find the

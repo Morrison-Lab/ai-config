@@ -4,7 +4,7 @@ A consumer repo calls one with a small stub rather than carrying its own copy:
 ```yaml
 jobs:
   check:
-    uses: Morrison-Lab/gha/.github/workflows/check-bibliography-dois.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/check-bibliography-dois.yml@v3
 ```
 
 When a repo you are working in hand-maintains a workflow gha already provides, migrate it.
@@ -67,7 +67,7 @@ The boundary matters as much as the trigger, because a migration that drops beha
   The gha README names `the repository owner`, `ucdavis`, `UCD-SERG`, `UCLA-PHP`, and `UCD-IDDRC` as the owners it is public for, and that sentence predates the `Morrison-Lab` org, so it omits the owner gha itself lives under along with `Morrison-Lab/ai-config`, `Morrison-Lab/wai`, and `Morrison-Lab/psw`, each a documented consumer.
   Read the list as evidence of reach rather than as an allowlist, and treat a repo outside our administration as a question for its maintainer rather than a migration to perform.
 
-Both [`claude-review-workflow`](../../skills/claude-review-workflow/SKILL.md) and [`claude-agent-workflow`](../../skills/claude-agent-workflow/SKILL.md) author caller stubs delegating to `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` and `Morrison-Lab/gha/.github/workflows/claude.yml@v2` (reconciled under [ai-config#2133](https://github.com/Morrison-Lab/ai-config/issues/2133)).
+Both [`claude-review-workflow`](../../skills/claude-review-workflow/SKILL.md) and [`claude-agent-workflow`](../../skills/claude-agent-workflow/SKILL.md) author caller stubs delegating to `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v3` and `Morrison-Lab/gha/.github/workflows/claude.yml@v3` (reconciled under [ai-config#2133](https://github.com/Morrison-Lab/ai-config/issues/2133)).
 
 ## The migration is its own change
 
@@ -157,7 +157,7 @@ it is a repo whose CI has not been written yet.
 
 Every new repo gets these gha-backed callers, whatever the repo's purpose, because none of them depends on the repo having any particular language or build system:
 
-- `claude-review.yml` + `claude-bot.yml` --- the AI review and agent-dispatch pair, pinned per `claude-code-review.yml`'s and `claude.yml`'s own reference pages (`@v2` as of this writing;
+- `claude-review.yml` + `claude-bot.yml` --- the AI review and agent-dispatch pair, pinned per `claude-code-review.yml`'s and `claude.yml`'s own reference pages (`@v3` as of this writing;
   read gha's README Versioning section rather than copying that number).
 - `check-secrets.yml` --- the gitleaks history scan.
 - `check-junk-files.yml` --- tracked OS/editor detritus.
@@ -185,6 +185,8 @@ it does not relax because the action lives in a consumer repo instead.
 A sibling repo of the same shape almost certainly already has this worked out.
 `Morrison-Lab/mln`'s `.github/` is a private-repo Quarto-site example carrying the whole baseline set plus `check-equation-renders.yml`, `check-new-line-breaks.yml`, `check-ai-tells.yml`, and the Quarto preview/publish chain;
 a private R-package repo would instead start from `Morrison-Lab/gha`'s own `examples/` stubs or from `Morrison-Lab/qwt`/`rpt` template repos (see `Morrison-Lab/gha`'s own CLAUDE.md, "Test changes against a template repo").
+A caller stub is already the decomposed form, so copying one is not the copy [`dont-copy-decompose`](../principles/dont-copy-decompose.md) forbids;
+a sibling workflow that runs its own steps instead of calling gha is a setup to decompose into gha first.
 Copy the caller stubs wholesale and then adapt only what is genuinely repo-specific --- the `claude-bot.yml` header comment naming the repo's own visibility posture, a `review-workflow-file:` value, any `install-quarto`/`setup-r` flags the new repo's content actually needs.
 Do not copy blind: a caller file carries prose that describes the repo it came from, and leaving that prose unedited in the new repo is a smaller version of the same problem [`check-the-renders`](check-the-renders.md) names for a stale claim about a different artifact.
 

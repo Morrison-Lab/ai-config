@@ -202,8 +202,8 @@ def describe_consumers(entries: list[tuple[str, str]]) -> str:
     )
 
 
-def check_listing_budget(skill_mds: list[Path], label: str) -> None:
-    """Reject a catalog whose metadata would exceed Claude's routing budget."""
+def listing_entries(skill_mds: list[Path]) -> list[tuple[str, str]]:
+    """The (name, description) pairs a skill catalog contributes to the listing."""
     entries = []
     for skill_md in skill_mds:
         fm = parse_frontmatter(
@@ -215,6 +215,12 @@ def check_listing_budget(skill_mds: list[Path], label: str) -> None:
         description = fm.get("description")
         if isinstance(name, str) and isinstance(description, str):
             entries.append((name, description))
+    return entries
+
+
+def check_listing_budget(skill_mds: list[Path], label: str) -> None:
+    """Reject a catalog whose metadata would exceed Claude's routing budget."""
+    entries = listing_entries(skill_mds)
     total = listing_chars(entries)
     overhead = len(entries) * LISTING_ENTRY_OVERHEAD_CHARS
     if total > SKILL_LISTING_BUDGET_CHARS:

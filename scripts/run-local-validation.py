@@ -41,7 +41,9 @@ Which gates apply to which files is derived, not recalled (#3120). Each
 SKIPPED with the reason. The `validate` job declares no path filter in
 validate.yml, so its steps are repo-wide and always selected -- which is what
 CI does too. A gate is never dropped silently: a run that selected two gates
-and a run that selected five print different plans.
+and a run that selected five print different plans. Under --changed,
+scripts/test_hooks.py runs only the hook suites the change can affect, read
+from RLV_CHANGED_FILES (scripts/lib/changed_selection.py, #5087).
 
 Steps whose name matches --skip (default: the dependency install, which needs
 the network and is already satisfied locally) are skipped and counted.
@@ -94,6 +96,9 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from findbash import probe_bash  # noqa: E402
 
 _REQUIRES_CACHE = {}
 
@@ -215,6 +220,8 @@ LOCAL_EQUIVALENTS = {
     "preview.yml": lambda j, b: None,
     "quarto-publish": lambda j, b: None,
     "sync-shared-fragments": lambda j, b: None,
+    # Labels issues on GitHub on a schedule; nothing to run before a push.
+    "triage-backlog": lambda j, b: None,
 }
 
 
@@ -286,7 +293,8 @@ def changed_files(root: Path, base: str) -> Optional[List[str]]:
     try:
         merge_base = _git(root, "merge-base", base, "HEAD")
         # Both lists in repository-root terms, which the scope globs use.
-        out = _git(root, "diff", "--name-only", merge_base) + "\n" + _git(
+        # --no-renames lists both sides of a rename, so the old path is not lost.
+        out = _git(root, "diff", "--name-only", "--no-renames", merge_base) + "\n" + _git(
             root, "ls-files", "--others", "--exclude-standard", "--full-name", ":/")
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         print(f"warning: could not compute the changed-file list against {base} ({exc}); "
@@ -445,17 +453,45 @@ def load_workflow(path: Path) -> Dict[str, Any]:
     return doc
 
 
-def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None) -> int:
+_BASH: Optional[str] = None
+
+
+def bash() -> str:
+    """The bash that runs every step: one that sees this checkout's own paths.
+
+    A bare "bash" on a Windows runner is the WSL launcher, which fails every
+    step with "Windows Subsystem for Linux has no installed distributions",
+    or, with a distribution installed, sees the checkout under /mnt/c
+    (ai-config#3724). So probe: keep the first candidate that can find this
+    script at its native path, and stop with an error when none can.
+    """
+    global _BASH
+    if _BASH is None:
+        found = probe_bash(("-c", 'test -f "$1"', "bash", Path(__file__).resolve().as_posix()))
+        if found is None:
+            sys.exit("error: no bash here can see this checkout's paths; "
+                     "set AI_SESSION_BASH to one that can (Git Bash on Windows)")
+        _BASH = found
+    return _BASH
+
+
+def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None,
+             changed_listing: Optional[str] = None) -> int:
     env = dict(os.environ)
     # The run's own empty temp directory, as a CI runner starts with one
     # (#4806); a step that sets TMPDIR, TEMP or TMP itself still wins.
     if tmpdir:
         for name in ("TMPDIR", "TEMP", "TMP"):
             env[name] = tmpdir
+    # --changed hands its file list to suites that select their own cases
+    # (scripts/test_hooks.py); CI never sets it, so CI runs everything.
+    env.pop("RLV_CHANGED_FILES", None)
+    if changed_listing:
+        env["RLV_CHANGED_FILES"] = changed_listing
     env.update(step.env)
     cwd = root / step.cwd if step.cwd else root
     proc = subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", step.command],
+        [bash(), "-e", "-o", "pipefail", "-c", step.command],
         cwd=str(cwd), env=env, timeout=timeout,
     )
     return proc.returncode
@@ -634,7 +670,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 s.note = "availability checked at run time"
             else:
                 if s.requires not in _REQUIRES_CACHE:
-                    proc = subprocess.run(["bash", "-c", s.requires], capture_output=True, text=True)
+                    proc = subprocess.run([bash(), "-c", s.requires], capture_output=True, text=True)
                     _REQUIRES_CACHE[s.requires] = (proc.returncode == 0)
                 if not _REQUIRES_CACHE[s.requires]:
                     skipped = True
@@ -678,14 +714,20 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     place = contextlib.nullcontext(root) if args.in_place else snapshot(root)
     try:
-        with place as run_root, tempfile.TemporaryDirectory(prefix="rlv-tmp-") as tmpdir:
-            return _execute(plan, run_root, tmpdir, args)
+        with place as run_root, \
+                tempfile.TemporaryDirectory(prefix="rlv-tmp-", ignore_cleanup_errors=True) as tmpdir, \
+                tempfile.TemporaryDirectory(prefix="rlv-changed-", ignore_cleanup_errors=True) as aside:
+            listing = None
+            if changed:
+                listing = str(Path(aside) / "changed-files.txt")
+                Path(listing).write_text("\n".join(changed) + "\n", encoding="utf-8")
+            return _execute(plan, run_root, tmpdir, listing, args)
     except SnapshotError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
 
-def _execute(plan, root: Path, tmpdir: str, args: argparse.Namespace) -> int:
+def _execute(plan, root: Path, tmpdir: str, listing: Optional[str], args: argparse.Namespace) -> int:
     print(f"info: running in {root}", file=sys.stderr)
     results = []
     for s, skipped, reason in plan:
@@ -701,7 +743,7 @@ def _execute(plan, root: Path, tmpdir: str, args: argparse.Namespace) -> int:
         print(f"==> [{s.source}] {s.name}", flush=True)
         t0 = time.monotonic()
         try:
-            rc = run_step(s, root, args.timeout, tmpdir)
+            rc = run_step(s, root, args.timeout, tmpdir, listing)
         except subprocess.TimeoutExpired:
             rc = "timeout"
         secs = time.monotonic() - t0

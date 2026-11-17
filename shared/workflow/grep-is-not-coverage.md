@@ -254,8 +254,25 @@ but summarized it as a `::: notes` div, so a reader who stopped at the summary g
 
 - **Do:** search PSW (the published site or Morrison-Lab/psw) and `shared/writing/`, by topic and filename, before adding any prose or Quarto-presentation convention,
   and follow a link to PSW rather than trusting the summary beside it.
+- **Do:** before porting a fragment's rule to PSW, run `python3 scripts/find-psw-rule-overlap.py <fragment> --psw <psw checkout>`, which greps PSW for the short phrases the fragment quotes as examples and lists the files that quote them.
+  A rule's example words are often the only words two statements of it share: on 2026-11-13 a search for a fragment's concept words missed PSW's time-relative-word rule in `word-choice.qmd` (psw#418), which names the fragment's own examples "now" and "recently", and only PSW's `check-avoided-words` warning on the new text exposed it ([ai-config#5628](https://github.com/Morrison-Lab/ai-config/issues/5628)).
+- **Don't:** search PSW only for a rule's concept words, and treat no hit as no rule.
 - **Don't:** coin a class or format for something PSW already prescribes;
   follow PSW, or extend it and say which section the new rule extends.
+
+### The organization's tracker is the corpus for whether a repository is still wanted
+
+(2026-11-11, quarto.test.book#5, test.quarto.website#2 and ai-config#4274.)
+A planning session recommended archiving two scratch repositories after searching only each repository's own tracker and code.
+Both looked dead: no description, no Pages site, no forks, one of them untouched since January.
+Ezra accepted the recommendation, and only the dependency check run before acting found ai-config#4274, which he filed on 2026-10-03 and which is still open.
+It names both repositories as "available for debugging quarto issues".
+What a repository is for is often written in another repository's tracker, and most often in ai-config's.
+
+- **Do:** before recommending that a repository be archived, retired, renamed or merged into another, search the whole organization's issues and code for its name:
+  `gh api -X GET search/issues -f q='"<name>" org:<owner> is:issue'` and `gh api -X GET search/code -f q='"<name>" org:<owner>'`.
+- **Do:** run that search before writing the recommendation, not only before acting on it.
+- **Don't:** read "nothing in this repository says what it is for" as "nothing says what it is for".
 
 ### The same failure has a same-repo sibling: the wrong directory
 

@@ -34,8 +34,8 @@ because a hash reads as evidence.
 
 WHY THE PROSE RULE DID NOT REACH IT
 ------------------------------------
-`shared/principles/deterministic-tools.md` and `CLAUDE.md`'s
-"Timestamp recaps in local time" both say to derive a measured value from a
+`shared/principles/deterministic-tools.md` and
+`shared/workflow/timestamp-local-recaps.md` both say to derive a measured value from a
 reading taken in the moment, and the latter's hook covers clock times. Neither
 names a digest. The rule that *would* have caught it --
 `metacognitive-monitoring.md`'s "a claim about state gets re-queried" -- is
@@ -141,7 +141,6 @@ contract.
 """
 
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -161,20 +160,20 @@ MAX_HEX = 64
 CANONICAL_LENGTHS = {32, 40, 64}
 
 
-def _sibling(name, key):
-    """Import a hyphenated sibling module, or None if unavailable.
+_LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
 
-    The same pattern `flag-unmeasured-timestamp.py` uses to reach
-    `no-unmeasured-clock-claim.py`. Fails open, per the file-wide contract.
-    """
-    path = os.path.join(HERE, name)
-    try:
-        spec = importlib.util.spec_from_file_location(key, path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+
+def _sibling(name, key):
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name, key) if load_sibling else None
 
 
 _stamp = _sibling("flag-unmeasured-timestamp.py", "_sib_unmeasured_digest_stamp")

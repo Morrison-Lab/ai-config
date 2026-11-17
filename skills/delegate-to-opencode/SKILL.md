@@ -170,9 +170,11 @@ Two routing consequences:
 - **Don't:** read an empty `openrouter/*` listing as OpenRouter being unreachable --- an unreferenced provider is inactive, and one config entry activates the whole roster.
 - **Don't:** send data-triggered work to `openrouter/*`, `opencode-go/*`, `opencode/*`, or Ollama Cloud --- free or subscription pricing is a billing fact, and bytes still leave the machine.
 
-## Cloud sessions: OpenCode Go over HTTP, no key needed
+## Cloud sessions: OpenCode Go over HTTP, keyless where the proxy holds the key
 
 A claude.ai cloud session has no `opencode` CLI preinstalled (`npm i -g opencode-ai` installs one), but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
+That holds only in an environment that allows `opencode.ai` and has the credential saved;
+on 2026-11-17 the Default environment had neither, as the note on the key below records.
 A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there.
 Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve.
 Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 ("Insufficient account funds" on 2026-11-05).
@@ -190,14 +192,46 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   On 2026-11-09 both returned "Upstream request failed: Model is unavailable".
   Those two ids were free for a limited time and reasoning models (a 16-token request returned only reasoning).
   Give any free reasoning id a generous `max_tokens`.
-  On 2026-11-09 `/models` listed the free ids `beam-free`, `iceman-contributor-free` and `longcat-2.5-free` instead, which were not tried.
+  On 2026-11-09 `/models` listed the free ids `beam-free`, `iceman-contributor-free` and `longcat-2.5-free` instead.
+  On 2026-11-11 every paid Go model returned the weekly `GoUsageLimitError`, and all three free ids answered a one-word probe.
+  On PR-diff reviews that day ([ai-config#5397](https://github.com/Morrison-Lab/ai-config/pull/5397), [#5423](https://github.com/Morrison-Lab/ai-config/pull/5423), [#5426](https://github.com/Morrison-Lab/ai-config/pull/5426)), their record was mixed:
+  - `beam-free` usually gave verdicts with quoted findings.
+  - `iceman-contributor-free` gave a bare verdict on one review, and a reasoned one on another whose brief asked for reasons.
+  - `longcat-2.5-free`'s one streamed review produced only reasoning and no answer.
+
+  Later on 2026-11-11, reviewing [#5472](https://github.com/Morrison-Lab/ai-config/pull/5472) and [#5486](https://github.com/Morrison-Lab/ai-config/pull/5486), `beam-free` returned empty content both streamed and not, which counts as no verdict.
+  `iceman-contributor-free`, not streamed, returned a bare `VERDICT: CLEAN` with no reasons.
+  One HTTP 502 from it cleared on retry.
+  The PR comments recording those merges ([#5472](https://github.com/Morrison-Lab/ai-config/pull/5472#issuecomment-6812712234), [#5486](https://github.com/Morrison-Lab/ai-config/pull/5486#issuecomment-6813363070)) relied on it only beside a reasoned Flash read and a clean Claude review.
+
+  On 2026-11-12 the diff size decided whether `beam-free` answered ([gha#1944](https://github.com/Morrison-Lab/gha/pull/1944)).
+  A streamed review of the whole 611-line diff spent the 32768 reasoning-token cap and returned no verdict twice.
+  A review of only the newest commit's diff returned a reasoned verdict ([comment](https://github.com/Morrison-Lab/gha/pull/1944#issuecomment-6818796677)).
+  Without a system message saying the reviewer has no tools, it tried to call tools and stopped with no verdict.
+  So send the newest commit's diff when the whole diff is large, and say in the system message that no tools exist.
+
+  On 2026-11-16 a non-streamed review of a 190-line or 360-line diff ([ai-config#5716](https://github.com/Morrison-Lab/ai-config/pull/5716), [#5717](https://github.com/Morrison-Lab/ai-config/pull/5717)) returned `upstream request failed` or timed out after 280 s, on both `deepseek-v4.1-flash` and `glm-5.3`.
+  Streaming fixed it for `deepseek-v4.1-flash`: send `"stream": true` with `curl -N`, `"reasoning_effort": "low"` and `"max_tokens": 60000`, and read the answer from the SSE `delta.content` fields.
+  With 24000 tokens the model spent the whole budget on reasoning and stopped with `finish_reason: length`.
+  Streaming did not fix it for `glm-5.3`, which streams its reasoning under `delta.reasoning`: on one 190-line review it was still reasoning when a 570 s `--max-time` ran out, so prefer `deepseek-v4.1-flash`.
+
   Check `/models` for the current free ids and try them before relying on this route.
-- **A review through these two ids worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
+- **Make the request with `curl` itself if it is to satisfy the merge gate.**
+  `hooks/warn-merge-without-cross-harness-review.py` counts a Bash command whose command word is `curl`, with a data flag (`-d`, `--data-binary`, `--json` and the like) and a literal `https://opencode.ai/zen/go/v1/chat/completions` URL, that exits without error after the last push.
+  It never reads the response, and it does not see a request made from a script.
+  In a command that also runs `git push`, a `curl` counts only when every push in that command runs before it, at the same level: both on the top-level command line, or both inside one `bash -c` string.
+  A push in that same command at another level, such as `bash -c 'git push'; curl ...`, makes the review stale whichever runs first, because the hook cannot order the two.
+  In the session that merged #5486 (author's own observation, not recorded on the PR), the hook refused the merge after a review sent from a Python script and allowed it once the same request was sent with `curl`.
+- **A review through `cat-jam-free` and `longcat-2.5-preview-free` worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
   Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`;
   the text comes only after 40,000 to 70,000 characters of `reasoning_content`, about five minutes.
   On [ai-config#4572](https://github.com/Morrison-Lab/ai-config/pull/4572), `longcat-2.5-preview-free` found three real defects in the first push and then returned no text on the fix commit in two attempts, while `cat-jam-free` returned a clean verdict on both heads.
   Run both, treat an empty answer as no verdict rather than clean, and address, rebut or defer every defect in a list as for any review.
   The user accepted a clean verdict from one of these free models as the non-Claude gate while Go is exhausted (relayed by the coordinator session, 2026-10-16), with the other model's empty answer counted as no verdict.
+- **The free ids change, so read them from `/models` each time** rather than reusing the names above.
+  On 2026-11-13, with Go at its weekly limit, `/models` listed `beam-free`, `iceman-contributor-free` and `longcat-2.5-free`, and `cat-jam-free` and `longcat-2.5-preview-free` returned `Upstream request failed: Model is unavailable`.
+  All three listed ids answered the same streamed review request.
+  `longcat-2.5-free` returned no text, so it gives no verdict ([ai-config#5603](https://github.com/Morrison-Lab/ai-config/issues/5603)).
 - **In a cloud session on 2026-10-16 these other routes did not work, so use the streamed Go-endpoint recipe above instead.**
   The free ids on the pay-as-you-go path `https://opencode.ai/zen/v1` (not the Go path) return `FreeTierError` with the message that the free tier can only be used from within OpenCode, whereas the paid ids on that path return the 402 above.
   With the CLI installed by `npm i -g opencode-ai` and the opencode API-key environment variable set to any non-empty value (the proxy supplies the real key), `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout.
@@ -220,6 +254,7 @@ curl -s https://opencode.ai/zen/go/v1/chat/completions \
 **Non-streaming requests fail for review-sized or substantial prompts.**
 Measured in a claude.ai cloud session on 2026-10-12, a non-streaming request with a ~22 KB diff failed: `glm-5.3` returned HTTP 502 after about 30 seconds, and `deepseek-v4-pro` returned an empty body with `upstream request failed` (while a `PONG` smoke test on the same endpoint returned 200 in 1.8 seconds).
 The roughly 30-second gateway cutoff requires streaming for anything longer than a trivial prompt.
+A 2026-11-17 measurement (below) saw a non-streaming request complete after more than 120 seconds, so the cutoff is not constant, but streaming stays the default.
 
 **Always stream review-sized prompts and assemble `delta.content` chunks.**
 Add `"stream": true` to the payload, pass a generous `--max-time` (e.g. 600 or 900 seconds), and pipe into `scripts/parse-sse.py` (or an inline Python extractor):
@@ -255,14 +290,35 @@ for line in sys.stdin:
 ```
 
 **Model reliability for large prompts in cloud sessions:**
-- `deepseek-v4-pro`: Verified reliable with `"stream": true` on review-sized prompts, returning complete reviews over several minutes.
+- `deepseek-v4-pro`: Verified reliable on 2026-10-12 with `"stream": true` on review-sized prompts, returning complete reviews over several minutes.
+  On 2026-11-17 a streamed ~25 KB prompt combining five PRs returned no `delta.content` (see below).
 - `glm-5.3`: Unreliable on large prompts even when streaming.
   In testing, it sent ~4.8 MB of deltas in 290 seconds with no `delta.content` before timing out, or returned `upstream request failed`.
-  Prefer `deepseek-v4-pro` for review-sized or multi-KB prompts.
+  Prefer `deepseek-v4-pro` for review-sized or multi-KB prompts, but see the 2026-11-17 measurement below, where `kimi-k3` succeeded more often.
+
+**From a 2026-11-17 measurement in a claude.ai cloud session, the recommendation is to send one payload per PR, one at a time, through the model fallback loop, and to retry later when every model fails.**
+This measurement qualifies the `deepseek-v4-pro` preference above: on that day no model handled the combined prompt, and only `kimi-k3` and `deepseek-v4-pro` are recorded handling a per-PR prompt, and each only some of the time.
+The attempts, in order:
+
+1. A streamed ~25 KB review prompt (five PRs' diffs in one payload) returned no `delta.content` from `deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max` or `glm-5.3`, and a non-streaming `kimi-k3` retry of the same payload returned the bare body `upstream request failed`.
+2. One PR's payload (0.7 KB) sent alone, non-streaming, got a full `kimi-k3` review after more than 120 seconds, so the roughly 30-second gateway cutoff in "Non-streaming requests fail" above did not stop it.
+3. The other four per-PR payloads (1.6 to 12 KB), sent non-streaming in parallel, returned one review (its model was not recorded) and three empty bodies.
+4. Those three, re-sent one at a time through a non-streaming version of the model fallback loop below, returned two reviews (`deepseek-v4-pro`, then `kimi-k3`).
+   The third failed on every model, then succeeded on `kimi-k3` about 20 minutes later.
+
+No per-PR payload was sent streamed that day, so these attempts do not show which mode suits per-PR prompts better.
+Until that is measured, keep streaming as the first try for a per-PR payload, and fall back to a non-streaming send when the stream returns no `delta.content`.
 
 **Python `urllib` returns 403 Forbidden; always use `curl`.**
 In a claude.ai cloud session (as observed on 2026-10-13), HTTP requests made via Python's `urllib` (or `requests`) to `https://opencode.ai/zen/go/v1/chat/completions` fail with `403 Forbidden` from the cloud agent proxy, while `curl` with the identical body and headers returns `200 OK`.
 Always invoke `curl` in shell commands rather than Python HTTP libraries when calling the OpenCode Go API in cloud sessions.
+
+**The key is not saved in the Default cloud environment (as observed on 2026-11-17).**
+`opencode.ai` was refused by the proxy there until the user approved adding it to Default's allowed hosts: `curl` printed `CONNECT tunnel failed, response 403`, and the proxy's failure note said `connect_rejected`.
+No OpenCode Go API key is saved on that environment, so the keyless `curl` route above still cannot run from a Default cloud session.
+
+- **Do:** probe with one `curl` to `opencode.ai` before planning a cross-model review in a cloud session, and read the "no key needed" claim as holding only where the proxy injects the credential.
+- **Don't:** count on that claim in an environment where you have not seen the probe succeed.
 
 **Per-model 502 upstream errors and fallback loop:**
 Both `glm-5.3` and `deepseek-v4-pro` can intermittently return `502 upstream request failed` (as observed on 2026-10-13) even on short diffs (e.g. 1 KB), while `kimi-k3` answers.
@@ -299,6 +355,17 @@ rm -f "$PAYLOAD_FILE"
   the roughly 30-second gateway cutoff returns 502 or upstream request failure.
 - **Don't:** rely on `glm-5.3` for large prompts;
   it can stream megabytes of empty deltas or fail upstream.
+
+Measured in a claude.ai cloud session on 2026-11-12, while merging [ai-config#5482](https://github.com/Morrison-Lab/ai-config/pull/5482):
+- `hooks/warn-merge-without-cross-harness-review.py` did not recognise an OpenCode Go review whose `curl` ran inside a Python wrapper script.
+  The merge went through only after `curl -sS -N --max-time 1500 https://opencode.ai/zen/go/v1/chat/completions ... --data-binary @req.json -o out.sse` ran directly in a Bash call.
+- The same hook counts only a cross-harness review run in the merging session's own transcript, so a Gemini Flash read that another session posted on the PR did not satisfy it.
+- The merge gate that requires a `check-pr-fully-clean.py` pass did not accept a run whose output was filtered through `grep`, and accepted it once the output was unpiped.
+- With every Go model at its weekly `GoUsageLimitError`, `iceman-contributor-free` returned a bare `VERDICT: CLEAN`, `beam-free` returned no text, and `longcat-2.5-free` spent all 30,000 `max_tokens` on reasoning with no text.
+  Treat the bare verdict as weak evidence and the empty answers as no verdict.
+
+- **Do:** run the OpenCode `curl` directly in Bash, and run `check-pr-fully-clean.py` unpiped, before a merge.
+- **Don't:** wrap the `curl` in a script, or count another session's posted read, as the merge hook's cross-harness review.
 
 Reuse one UUID across the turns of a conversation.
 Prefer Go models for bulk and mechanical work while Claude quota is low.
@@ -345,6 +412,8 @@ Each fact below was measured in a claude.ai cloud session on the date given, so 
   `/api/tags` lists `gemma4:31b`, but the id that answered was `gemma4:31b-cloud`.
   No review from `gemma4:31b-cloud` is recorded here, so the quality of its reviews has not been measured.
   `kimi-k3`, `glm-5.3` and `deepseek-v4-pro:0813` were refused as "not included in your free usage" (2026-11-09).
+  On 2026-11-14 every model tried, `gpt-oss:120b` and `gemma4:31b-cloud` included, was refused with "Add usage credits or subscribe", so the free allowance can run out too ([gha#2004](https://github.com/Morrison-Lab/gha/pull/2004)).
+  Try both free-plan ids before recording Ollama as unavailable in a waiver.
 - Send `"stream": false` and read `message.content`.
   A non-streaming request with a diff of about 30 KB returned a full review on 2026-11-05.
   The Go gateway's 30-second cutoff above did not apply.
@@ -359,8 +428,7 @@ Each fact below was measured in a claude.ai cloud session on the date given, so 
 - The reviewer differs from Claude in model and harness, so it meets the independence rule in [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
   The data rules apply here as to any hosted model, so use it only for work no data trigger covers.
 - When posting the result, use the envelope above with `(Ollama Cloud <model>)` in the heading.
-- `hooks/warn-merge-without-cross-harness-review.py` does not yet count a call to `api.ollama.com`, so it warns on a merge after this review ([ai-config#4849](https://github.com/Morrison-Lab/ai-config/issues/4849)).
-  The warning is a false positive when the transcript shows the review.
+- `hooks/warn-merge-without-cross-harness-review.py` counts a `curl` POST to `https://api.ollama.com/api/chat` as a cross-harness review call ([ai-config#4849](https://github.com/Morrison-Lab/ai-config/issues/4849)).
 
 Write the brief and the diff to files in the scratchpad first, and set `BRIEF` and `DIFF` to their paths.
 The brief must ask the model to end with one line, `VERDICT: CLEAN` or `VERDICT: NOT_CLEAN`.
@@ -519,6 +587,12 @@ On that machine and date, `opencode models` listed no `opencode-go/*` ids, so `o
 Step 1's "confirmed-working" result for `opencode-go/*` (2026-09-04) did not reproduce there;
 the cause (account, configuration, or version) was not determined.
 The alternative delegation CLIs were also unusable there: agy returned HTTP 429 "Individual quota reached", and gemini and cursor-agent were unauthenticated ([ai-config#4688](https://github.com/Morrison-Lab/ai-config/issues/4688)).
+
+On the lab's Linux workstation on 2026-11-16 (Remote Control session, opencode 1.18.34), `opencode` was not on the shell's `PATH`.
+The npm global install put it at `~/.npm-global/bin/opencode`, so prefix that directory onto `PATH` before reading `command not found` as no install.
+`opencode models` again listed no `opencode-go/*` ids, only eleven `opencode/*-free` ids.
+The recipe above, on `glm-5.3-flash-free` with a 19,996-byte attachment under `timeout 300`, returned a reasoned review of [gha#2065](https://github.com/Morrison-Lab/gha/pull/2065) with a `VERDICT:` line.
+Two of its six findings were false positives, disproved by running the claimed-missing command in the image.
 
 `opencode run` has no sandbox flag.
 `opencode run --help` on 2026-08-19 listed none, and permissions come from the `permission` block in the opencode config.

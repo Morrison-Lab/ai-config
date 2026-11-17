@@ -60,7 +60,6 @@ are decisions to respect or deterministic answers, not samples.
 Fails OPEN and SILENT on any parse trouble, a missing transcript or a missing
 helper library. A deny that fired on a broken parse would be switched off.
 """
-import importlib.util
 import json
 import os
 import re
@@ -69,25 +68,28 @@ import sys
 _HERE = os.path.dirname(os.path.realpath(__file__))
 
 
+_LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
+
+
 def _load(name, filename):
-    try:
-        spec = importlib.util.spec_from_file_location(
-            name, os.path.join(_HERE, filename))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception as exc:
-        print(f"block-redo-denied-write-via-other-tool: cannot load "
-              f"{filename} ({exc}); not gating", file=sys.stderr)
-        return None
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, filename, name) if load_sibling else None
 
 
 _REMIND = _load("_sib_retry", "remind-retry-before-declaring-blocked.py")
 _MERGE = _load("_sib_merge", "block-merge-without-clean-checker.py")
+if _REMIND is None or _MERGE is None:
+    print(f"{os.path.basename(__file__)}: a sibling hook is missing; not gating",
+          file=sys.stderr)
 try:
-    _LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
-    if _LIB not in sys.path:
-        sys.path.insert(0, _LIB)
     from shellcmd import simple_commands, strip_env, shell_c_expansions
 except Exception as _exc:
     print(f"block-redo-denied-write-via-other-tool: cannot load "

@@ -242,3 +242,11 @@ this section is the briefing side.
 - **Don't:** brief "measure how `ps` behaves" (or `env`, or `/proc`) and leave the agent to choose a command whose output it will then echo.
 - **Don't:** treat a `ps -o` field list as keeping the environment out,
   since the `e` modifier appends it regardless.
+
+### Credential files printed
+
+A credential file (`~/.netrc`, `~/.config/canvas/token`, a private SSH key) is never printed, by you or by an agent you brief: on 2026-10-27 a `sed` redaction matched nothing and a bare token landed in the transcript ([ai-config#4780](https://github.com/Morrison-Lab/ai-config/issues/4780)).
+`hooks/no-credential-file-read.py` denies the read, and [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#credential-files-printed) looks for it.
+
+- **Do:** pass the file to the program that needs it (`curl -H "Authorization: Bearer $(cat <path>)"`), or check it with `test -s <path>`.
+- **Don't:** `cat`, `sed`, `echo $(cat ...)` or Read a credential file, even through a redaction.

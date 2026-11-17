@@ -4,7 +4,8 @@
 The guard asks for two things on a create: the `ai-authored` label and one of
 the priority labels `P1`, `P2`, `P3`. The FIRES lists hold creates missing the
 authorship label, the ONE_MISSING lists pin that each label is asked for
-separately, and the QUIET lists hold creates carrying both.
+separately. The QUIET lists hold creates carrying both labels, and commands
+that are not creates.
 
 The NEGATIVE cases carry the weight, in both directions. A guard that fired on
 prose quoting `gh issue create` would go off in every reply that cites the rule
@@ -19,8 +20,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
+import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location(
@@ -40,11 +43,56 @@ BASH_FIRES = [
     ("after &&", 'git status && gh issue create --title "t" --body "b"'),
     ("after a newline", 'set -e\ngh issue create --title "t" --body "b"'),
     ("env-assignment prefix", 'GH_TOKEN=x gh issue create --title "t"'),
+    ("unlabelled inside backticks, the labels on the next command",
+     'URL=' + chr(96) + 'gh issue create -t x' + chr(96) + '; gh pr create -l ai-authored,P2'),
+    ("unlabelled behind an environment assignment, the labels on the next command",
+     'GH_TOKEN=x gh issue create -t x; gh pr create -l ai-authored,P2'),
+    ("the labels belong to an issue edit before the create",
+     'gh issue edit 3 -l ai-authored,P2; gh issue create -t x'),
+    ("unlabelled create first, a labelled create after it",
+     'gh issue create -t y && gh issue create -t x -l ai-authored,P2'),
+    ("unlabelled create in a brace group", "{ gh issue create -t x; }"),
+    ("brace group, the title holds a word ending in -l and label names",
+     '{ gh issue create -t "a-l ai-authored,P2"; }'),
+    ("unlabelled glab create, the labels on the next command",
+     'glab issue create -t x; gh pr create -l ai-authored,P2'),
+    ("unlabelled inside a double-quoted command substitution",
+     'echo "$(gh issue create -t x)"'),
+    ("the labels belong to an echo that only names the command",
+     'echo gh issue create -l ai-authored,P2; gh issue create --title "t"'),
     (
         "body-file behind a heredoc, unlabelled",
         "gh issue create --title 't' --body-file - <<'EOF'\nsome body\nEOF",
     ),
     ("--repo form", 'gh issue create --repo O/R --title "t" --body "b"'),
+    (
+        "both labels on an earlier command in the chain",
+        'gh pr create --label P2 --label ai-authored && gh issue create --title "t"',
+    ),
+    (
+        "both labels on a later command in the chain",
+        'gh issue create --title "t"; gh issue edit 3 --add-label x -l ai-authored,P2',
+    ),
+    (
+        "both labels on the next line's command",
+        'gh issue create --title "t"\ngh pr create --label ai-authored,P2',
+    ),
+    (
+        "a trailing comment, then both labels on the next line's command",
+        'gh issue create --title "t" # note\ngh pr create --label ai-authored,P2',
+    ),
+    (
+        "an apostrophe in a trailing comment, labels on the next line",
+        "gh issue create --title t # don't\ngh pr create --label ai-authored,P2",
+    ),
+    (
+        "both labels in a trailing comment",
+        'gh issue create --title "t" # --label ai-authored --label P2',
+    ),
+    (
+        "the second of two creates is unlabelled",
+        'gh issue create --title "a" -l ai-authored,P2 && gh issue create --title "b"',
+    ),
     (
         "the label named in a heredoc body, not in a flag",
         "gh issue create --title 't' --body-file - <<'EOF'\n"
@@ -85,15 +133,61 @@ BASH_QUIET = [
      'gh issue create --title "t" --label ai-authored --label p2'),
     ("a mixed-case authorship label, which GitHub resolves to the label",
      'gh issue create --title "t" --label AI-Authored --label P2'),
+    ("labelled inside a command substitution",
+     'URL=$(gh issue create --title "t" --label ai-authored --label P3) && echo "$URL"'),
+    ("labelled inside backticks",
+     'URL=`gh issue create --title "t" --label ai-authored --label P3`'),
+    ("labelled across a backslash-newline continuation",
+     'gh issue create --title "t" \\\n  --label ai-authored \\\n  --label P2'),
+    ("labelled, with a newline inside the quoted body",
+     'gh issue create --body "line one\nline two" --label ai-authored --label P2'),
+    ("labelled, then an unrelated command on the next line",
+     'gh issue create --title "t" -l ai-authored,P2\ngit status'),
+    ("labelled, with a quoted title that starts with a hash",
+     'gh issue create --title "#5 follow-up" --label ai-authored --label P2'),
+    ("labelled, with a quoted body that starts with a hash",
+     'gh issue create --title "t" --body "# Heading" --label ai-authored,P2'),
+    ("labelled, then a trailing comment with an apostrophe",
+     "gh issue create --title t --label ai-authored,P2 # don't"),
+    ("two labelled creates",
+     'gh issue create --title "a" -l ai-authored,P2 && gh issue create --title "b" -l ai-authored,P3'),
+    ("unbalanced quoting with a glued short flag",
+     'gh issue create -lai-authored -lP2 --title "t'),
     ("a glued short flag", 'gh issue create --title "t" -lai-authored -lP2'),
+    ("labelled, after an issue list that carries no labels",
+     'gh issue list --state all; gh issue create -t x -l ai-authored,P2'),
+    ("labelled, after an empty quoted body",
+     'gh issue create --title "t" --body "" --label ai-authored --label P2'),
+    ("labelled, behind an environment assignment",
+     'GH_TOKEN=x gh issue create --title "t" -l ai-authored -l P2'),
+    ("labelled inside a double-quoted command substitution, read by the fallback",
+     'echo "$(gh issue create -t x -l ai-authored,P2)"'),
+    ("fallback: the bare label ends at a semicolon",
+     'echo "$(gh issue create -t x -l ai-authored,P2; true)"'),
+    ("fallback: the bare label ends at a pipe",
+     'echo "$(gh issue create -t x -l ai-authored,P2|cat)"'),
+    ("fallback: the bare label ends at an ampersand",
+     'echo "$(gh issue create -t x -l ai-authored,P2&& true)"'),
+    ("fallback: the bare label ends at a backtick",
+     'echo "' + chr(96) + 'gh issue create -t x -l ai-authored,P2' + chr(96) + '"'),
+    ("labelled, with the label flags before a quoted operator title",
+     'gh issue create -l ai-authored,P2 --title ";"'),
     ("unbalanced quoting with a comma-and-space value",
      'gh issue create --label "ai-authored, P2" --title "t'),
     ("unbalanced quoting with a single-quoted value",
      "gh issue create --label 'ai-authored,P2' --title \"t"),
+    ("labelled issue create, then a pull request create without labels",
+     'gh issue create -t x -l ai-authored,P2; gh pr create -t y'),
     ("not a create at all", "gh issue list --state all --search 'x'"),
     ("editing labels on an existing issue", 'gh issue edit 12 --add-label ai-authored'),
     ("a PR create", 'gh pr create --title "t" --body "b"'),
     ("no gh command at all", "git commit -F /tmp/msg.txt"),
+    ("labelled create in a brace group",
+     "{ gh issue create -t x -l ai-authored,P2; }"),
+    (
+        "a heredoc body line that opens with the command",
+        "cat > /tmp/note.md <<'EOF'\ngh issue create -t y\nEOF",
+    ),
     (
         "the phrase quoted inside a heredoc body",
         "cat > /tmp/note.md <<'EOF'\nRun gh issue create to file it.\nEOF",
@@ -256,6 +350,64 @@ def main() -> int:
             failures += 1
         else:
             print(f"OK   one reminder (mcp): {label}")
+
+    # With scripts/lib/shellcmd.py missing, the hook says so on stderr and
+    # reads label flags across the whole command: a bare create still warns
+    # and a labelled one stays quiet. The copy sits in a directory tree that
+    # has no scripts/lib beside it.
+    with tempfile.TemporaryDirectory() as tree:
+        copy_dir = pathlib.Path(tree) / "hooks"
+        copy_dir.mkdir()
+        copy = copy_dir / "warn-unlabelled-agent-issue.py"
+        shutil.copy(HERE / "warn-unlabelled-agent-issue.py", copy)
+        runs = {}
+        for name, command in (
+            ("bare", "gh issue create -t x"),
+            ("labelled", "gh issue create -t x -l ai-authored,P2"),
+        ):
+            runs[name] = subprocess.run(
+                [sys.executable, str(copy)],
+                input=json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}),
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+    if (
+        "cannot load scripts/lib/shellcmd.py" not in runs["bare"].stderr
+        or "ai-authored" not in runs["bare"].stdout
+        or runs["labelled"].stdout.strip()
+        or runs["bare"].returncode != 0
+        or runs["labelled"].returncode != 0
+    ):
+        print("::error::wrong behaviour with scripts/lib/shellcmd.py missing", file=sys.stderr)
+        failures += 1
+    else:
+        print("OK   degrades to the whole-command read without the splitter")
+
+    # Reached through a symbolic link, the hook still finds scripts/lib beside
+    # the real file: it prints no load warning, and it warns for a create
+    # whose labels sit on the next command, which only the splitter can tell.
+    with tempfile.TemporaryDirectory() as tree:
+        link = pathlib.Path(tree) / "warn-unlabelled-agent-issue.py"
+        link.symlink_to(HERE / "warn-unlabelled-agent-issue.py")
+        linked = subprocess.run(
+            [sys.executable, str(link)],
+            input=json.dumps({"tool_name": "Bash", "tool_input": {
+                "command": "gh issue create -t x; gh pr edit 1 --add-label ai-authored,P2"}}),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    if (
+        "cannot load" in linked.stderr
+        or "ai-authored" not in linked.stdout
+        or linked.returncode != 0
+    ):
+        print("::error::the hook does not load the splitter through a symbolic link",
+              file=sys.stderr)
+        failures += 1
+    else:
+        print("OK   loads the splitter through a symbolic link")
 
     # The message must name both labels and the escape, or it teaches nothing.
     message = guard.evaluate_bash('gh issue create --title "t"')

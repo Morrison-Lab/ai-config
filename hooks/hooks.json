@@ -308,6 +308,13 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-ruleset-on-repo-create.py\"",
+            "timeout": 10,
+            "script": "require-ruleset-on-repo-create.py",
+            "why": "Ezra, 2026-11-17: 'why didn't you add branch protections to Morrison-Lab/answer-space when you created it?' The ruleset-at-creation rule (shared/workflow/repo-templates.md, ai-config#4671) was prose only, and 32 qwt course repos missed it too (ai-config#5610). DENIES a `gh repo create` whose own command chain does not also apply the ruleset (apply-all.sh --apply <name>, a template's apply-rulesets.sh, or a gh api ruleset write), and denies mcp__github__create_repository outright because the cloud proxy refuses ruleset writes. Stateless, so no pending repo can be lost between turns. Fails open on a broken shellcmd import."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-local-render-when-ci-built.py\"",
             "timeout": 10,
             "script": "warn-local-render-when-ci-built.py",
@@ -1227,6 +1234,13 @@
       {
         "matcher": "mcp__github__.*",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-ruleset-on-repo-create.py\"",
+            "timeout": 10,
+            "script": "require-ruleset-on-repo-create.py",
+            "why": "Ezra, 2026-11-17: 'why didn't you add branch protections to Morrison-Lab/answer-space when you created it?' The ruleset-at-creation rule (shared/workflow/repo-templates.md, ai-config#4671) was prose only, and 32 qwt course repos missed it too (ai-config#5610). DENIES a `gh repo create` whose own command chain does not also apply the ruleset (apply-all.sh --apply <name>, a template's apply-rulesets.sh, or a gh api ruleset write), and denies mcp__github__create_repository outright because the cloud proxy refuses ruleset writes. Stateless, so no pending repo can be lost between turns. Fails open on a broken shellcmd import."
+          },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unauthorized-merge.py\"",

@@ -67,6 +67,7 @@ When you configure a repository, always give it a branch ruleset, and follow the
   `qmt`, `qet` and `grt` get theirs from [qmt#14](https://github.com/Morrison-Lab/qmt/pull/14), [qet#3](https://github.com/Morrison-Lab/qet/pull/3) and [grt#3](https://github.com/Morrison-Lab/grt/pull/3) (2026-10-22), and carry one once those merge.
 - A template without an example gets one by its own pull request, modelled on the closest template that has one, before any repo is made from it.
   A repo with no template uses `examples/branch-rulesets/base.json`.
+- `hooks/require-ruleset-on-repo-create.py` enforces this at creation: it denies a `gh repo create` unless the same command chain also applies the ruleset, and denies `mcp__github__create_repository` (Morrison-Lab/answer-space shipped with none on 2026-11-17).
 - Apply it with the template's `apply-rulesets.sh` (idempotent by ruleset name), or audit and apply across the org with
   `examples/branch-rulesets/apply-all.sh` (a dry run unless `--apply`).
 - Naming repos on the command line restricts the run to those repos, so after an override run such as `mcs=qwt mcsg=grt --apply`, rerun `--apply` with no names, then a final dry run must show 0 `MISSING` (2026-10-22: 20 repos applied in two runs).

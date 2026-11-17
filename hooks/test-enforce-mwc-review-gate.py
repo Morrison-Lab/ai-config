@@ -273,6 +273,55 @@ def main():
         })
         check("Antigravity run_command gh pr merge with clean review allows", out.get("decision") == "allow")
 
+    # 6b. Pending CI blocks unless the user typed the override phrase
+    pending_state = clean_pr_state()
+    pending_state["statusCheckRollup"].append(
+        {"name": "lint", "status": "IN_PROGRESS", "conclusion": None})
+    out = gate.evaluate("gh pr merge 123 --squash", pending_state)
+    check("pending check without override denies",
+          out.get("decision") == "deny" and "lint" in out.get("reason", ""))
+    out = gate.evaluate("gh pr merge 123 --squash", pending_state, override=True)
+    check("pending check with override allows", out.get("decision") == "allow")
+    failing_state = clean_pr_state()
+    failing_state["statusCheckRollup"].append(
+        {"name": "lint", "status": "COMPLETED", "conclusion": "FAILURE"})
+    out = gate.evaluate("gh pr merge 123 --squash", failing_state, override=True)
+    check("failing check with override still denies", out.get("decision") == "deny")
+
+    import tempfile
+
+    def transcript_with(*records):
+        fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+        for rec in records:
+            fh.write(json.dumps(rec) + "\n")
+        fh.close()
+        return fh.name
+
+    user_said = transcript_with(
+        {"type": "user", "message": {"role": "user", "content": [
+            {"type": "text", "text": "merge them anyway"}]}})
+    check("typed_override reads the user's phrase",
+          gate.typed_override(user_said) is True)
+    note_said = transcript_with(
+        {"type": "user", "message": {"role": "user", "content": [
+            {"type": "text", "text": "<note>merge them anyway</note>"}]}})
+    check("typed_override ignores an agent's note",
+          gate.typed_override(note_said) is False)
+    agent_said = transcript_with(
+        {"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "text", "text": "merge them anyway"}]}})
+    check("typed_override ignores the assistant's words",
+          gate.typed_override(agent_said) is False)
+    negated = transcript_with(
+        {"type": "user", "message": {"role": "user", "content": [
+            {"type": "text", "text": "don't merge them anyway"}]}})
+    check("typed_override ignores a negated phrase",
+          gate.typed_override(negated) is False)
+    check("typed_override with no transcript is False",
+          gate.typed_override("/nonexistent/transcript.jsonl") is False)
+    for p in (user_said, note_said, agent_said, negated):
+        os.unlink(p)
+
     # 7. Unparseable stdin fails closed
     out = run_main("not-json{{{")
     check("Unparseable stdin denies fail-closed", out.get("decision") == "deny" and

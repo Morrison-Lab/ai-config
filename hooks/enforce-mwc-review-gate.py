@@ -316,6 +316,9 @@ BLOCKED_CI_CONCLUSIONS = {
 }
 PENDING_CI_STATUSES = {"IN_PROGRESS", "QUEUED", "PENDING", "WAITING", "REQUESTED"}
 BLOCKED_STATUS_STATES = {"FAILURE", "ERROR", "PENDING", "EXPECTED"}
+# The subset of BLOCKED_STATUS_STATES that means "not finished yet" rather
+# than "failed": the user's typed override lets a merge through these only.
+PENDING_STATUS_STATES = {"PENDING", "EXPECTED"}
 
 
 def deny(reason):
@@ -1452,8 +1455,41 @@ def unresolved_review_threads(pr_data):
     ]
 
 
-def evaluate(cmd, pr_data):
-    """Pure decision function: merge command + PR state -> hook decision."""
+def typed_override(transcript_path):
+    """True when the user typed the merge override phrase in this session.
+
+    Reuses `typed_override` from the sibling hook
+    `block-merge-without-clean-checker.py`, so both hooks accept the same
+    words ("merge it anyway", "merge them anyway", "override the merge
+    check") from the same sources: a user-role text block or a relayed
+    `<cited author="user">` entry, never an agent's note, negation-aware.
+    The sibling is found through `realpath(__file__)`, which resolves a
+    staged symlink back to this repo's `hooks/` directory. Fails closed:
+    no transcript, or a sibling that cannot load, means no override.
+    """
+    if not transcript_path or not os.path.isfile(transcript_path):
+        return False
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                        "block-merge-without-clean-checker.py")
+    try:
+        spec = importlib.util.spec_from_file_location("_sib_block_merge", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return bool(module.typed_override(transcript_path))
+    except Exception as exc:
+        print(f"enforce-mwc-review-gate: cannot read the merge override ({exc}); "
+              "pending checks still block", file=sys.stderr)
+        return False
+
+
+def evaluate(cmd, pr_data, override=False):
+    """Pure decision function: merge command + PR state -> hook decision.
+
+    `override` is True when the user typed the merge override phrase (see
+    `typed_override`). It lets a merge through CI checks that are still
+    pending, and nothing else: failing checks and every other gate still deny.
+    """
     if GRAPHQL_MERGE_RE.search(cmd):
         return deny(
             "Strict Merge Control Policy: merge via a GraphQL mutation is "
@@ -1513,6 +1549,7 @@ def evaluate(cmd, pr_data):
                 latest_success_run_id[key] = run_id
 
     failures = []
+    pending = []
     for idx, check in enumerate(status_rollup):
         conc = (check.get("conclusion") or "").upper()
         status = (check.get("status") or "").upper()
@@ -1532,7 +1569,9 @@ def evaluate(cmd, pr_data):
             if is_superseded_cancelled:
                 continue
             failures.append(name)
-        elif status in PENDING_CI_STATUSES or st in BLOCKED_STATUS_STATES:
+        elif status in PENDING_CI_STATUSES or st in PENDING_STATUS_STATES:
+            pending.append(name)
+        elif st in BLOCKED_STATUS_STATES:
             failures.append(name)
 
     failures = list(dict.fromkeys(failures))
@@ -1541,6 +1580,14 @@ def evaluate(cmd, pr_data):
             "Strict Merge Control Policy: Cannot merge with failing or "
             f"incomplete CI checks: {', '.join(failures)}. Never ignore red "
             "CI; wait for all checks to complete."
+        )
+    pending = list(dict.fromkeys(pending))
+    if pending and not override:
+        return deny(
+            "Strict Merge Control Policy: Cannot merge with incomplete CI "
+            f"checks: {', '.join(pending)}. Wait for all checks to complete, "
+            "or have the user type 'merge it anyway' (or 'merge them anyway') "
+            "to merge through pending checks; failing checks still block."
         )
 
     # Reviews in flight check: never merge while reviews are still running/requested (ai-config#3570).
@@ -2101,7 +2148,8 @@ def main():
                     ), is_antigravity)
                     return
             cmd_desc = f"mcp merge_pull_request {repo_slug}#{number}"
-            _emit(evaluate(cmd_desc, pr_data), is_antigravity)
+            override = typed_override(payload.get("transcript_path") or "")
+            _emit(evaluate(cmd_desc, pr_data, override), is_antigravity)
         except Exception as e:
             _emit(deny(f"Hook exception during MCP PR review check: {e}"), is_antigravity)
         return
@@ -2163,7 +2211,8 @@ def main():
         if error:
             _emit(deny(error), is_antigravity)
             return
-        _emit(evaluate(cmd, pr_data), is_antigravity)
+        override = typed_override(payload.get("transcript_path") or "")
+        _emit(evaluate(cmd, pr_data, override), is_antigravity)
     except Exception as e:  # fail closed: an undiagnosed state never merges
         _emit(deny(f"Hook exception during PR review check: {e}"), is_antigravity)
 

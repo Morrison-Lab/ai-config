@@ -123,7 +123,25 @@ class TestEvaluate(unittest.TestCase):
         )
         decision = gate.evaluate(MERGE_CMD, state)
         self.assertEqual(decision["decision"], "deny")
-        self.assertIn("Cannot merge with failing or incomplete CI checks: validate", decision["reason"])
+        self.assertIn("Cannot merge with incomplete CI checks: validate", decision["reason"])
+
+    def test_ci_pending_with_typed_override_allows(self):
+        """The user's typed override lets a merge through pending checks."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            checks=[{"name": "validate", "conclusion": None, "status": "IN_PROGRESS"}],
+        )
+        decision = gate.evaluate(MERGE_CMD, state, override=True)
+        self.assertEqual(decision["decision"], "allow")
+
+    def test_ci_failing_with_typed_override_denies(self):
+        """The typed override does not let a merge through a failing check."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            checks=[{"name": "validate", "conclusion": "FAILURE", "status": "COMPLETED"}],
+        )
+        decision = gate.evaluate(MERGE_CMD, state, override=True)
+        self.assertEqual(decision["decision"], "deny")
 
     def test_ci_cancelled_alone_denies(self):
         """A PR with a cancelled CI check and no success cannot merge."""

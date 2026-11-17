@@ -218,8 +218,8 @@ if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
     from shellcmd import simple_commands_with_scope as _simple_commands
-    from shellcmd import resolve_cd_target as _resolve_cd_target
-    from shellcmd import strip_env as _strip_env
+    from shellcmd import move_dir as _move
+    from shellcmd import walk_dirs as _walk_dirs
     from shellcmd import shell_c_expansions as _shell_c_expansions
 except Exception as _exc:  # broken install: fail open, like every guard here
     print("flag-commit-a-sweeps-submodule: cannot load "
@@ -347,17 +347,6 @@ def add_kind(args):
     return ("add", paths) if paths else None
 
 
-def _move(rest, cur):
-    """The directory a `cd`, `pushd` or `popd` leaves the shell in, by the
-    shared resolver: None when it cannot be named (`cd -`, `popd`, `$VAR`,
-    a backtick), `~` expanded. `cur` is None while the directory is unknown,
-    and an unknown directory plus a relative move stays unknown."""
-    target = _resolve_cd_target(rest, cur)
-    if target is None or (cur is None and not os.path.isabs(target)):
-        return None
-    return target
-
-
 _LEAD_KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until",
                   "time", "!"}
 
@@ -424,26 +413,14 @@ def _scan(command, start):
     if cmds is None:
         return [], False
     ignore_cd = _unreachable_cd(command)
-    # Directory per subshell scope: a subshell starts from its parent's
-    # directory and a `cd` inside it never reaches the parent. A directory is
-    # None once a `cd` goes somewhere the text does not name.
-    cds = {(0,): start}
-
-    def cd_of(scope):
-        while scope not in cds:
-            scope = scope[:-1]
-        return cds[scope]
-
+    # The shared walk tracks the directory per subshell scope; it is None once
+    # a `cd` goes somewhere the text does not name. `env -C dir git ...` runs
+    # elsewhere, so it is skipped and the hook goes silent on it.
     hits, moved = [], False
-    for scope, argv in cmds:
-        if _env_chdir(argv):
-            continue  # `env -C dir git ...` runs elsewhere; go silent
-        env, rest = _strip_env(argv)
-        cd = cd_of(scope)
+    for argv, env, rest, cd in _walk_dirs(cmds, start, ignore_cd=ignore_cd,
+                                          skip=_env_chdir):
         if rest and rest[0] in ("cd", "pushd", "popd"):
             moved = True
-            if not ignore_cd:
-                cds[scope] = _move(rest, cd)
             continue
         inv = _git_invocation(rest)
         if inv is None or _redirects_git(env):

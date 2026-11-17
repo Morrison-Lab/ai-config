@@ -241,6 +241,16 @@ SHOULD_STAY_SILENT = [
     ("S10", cwd_scope_clean_sub_repo, "git add .", "sub",
      "cwd-scoped `.`, run from a clean sub/, filters out the untracked file "
      "OUTSIDE it and finds nothing to warn about"),
+    ("S12", cwd_scope_clean_sub_repo, "cd sub && git add .", None,
+     "M7: the command's own `cd sub` sets the scope, so launched from the "
+     "repo root it still filters out the untracked file outside sub/ "
+     "(ai-config#1731)"),
+    ("S13", explicit_path_repo, "cd {clean} && git add -A", None,
+     "M7: launched from a dirty repo, a `cd` into ANOTHER, clean repository "
+     "checks that repository, not the launch directory -- the #1731 "
+     "cross-worktree repro"),
+    ("S14", explicit_path_repo, 'cd "$X" && git add -A', None,
+     "M7: a `cd` to a directory the text does not name fails open"),
 ]
 
 
@@ -270,11 +280,18 @@ def verdict(hook_path, repo, command, subdir):
 
 
 def build_and_verdict(hook_path, builder, command, subdir):
+    """`{clean}` in `command` names a second, clean repository built for the
+    case, so a test can `cd` from the launch repo into another one."""
     repo = _repo(builder)
+    other = _repo(clean_repo) if "{clean}" in command else None
     try:
+        if other:
+            command = command.replace("{clean}", other)
         return verdict(hook_path, repo, command, subdir)
     finally:
         shutil.rmtree(repo, ignore_errors=True)
+        if other:
+            shutil.rmtree(other, ignore_errors=True)
 
 
 if not os.path.isfile(HOOK):
@@ -371,13 +388,27 @@ MUTATIONS = {
     "M6_cwd_filter": (
         "cwd scope filters out untracked paths outside the current directory",
         [('    if scope == "cwd":\n'
-          "        rel = _repo_relative_cwd()\n"
+          "        rel = _repo_relative_cwd(run_dir)\n"
           '        if rel and rel != ".":\n'
           '            prefix = rel.rstrip("/") + "/"\n'
           "            untracked = [p for p in untracked\n"
           "                        if p == rel or p.startswith(prefix)]",
           "    if False:\n        pass")],
-        {"S10"},
+        {"S10", "S12"},
+    ),
+    "M7_status_dir": (
+        "`git status` runs in the directory the `git add` runs in, not the "
+        "hook process's own (ai-config#1731)",
+        [("        untracked = _untracked_files(run_dir)",
+          "        untracked = _untracked_files(None)")],
+        {"S13"},
+    ),
+    "M7_scope_dir": (
+        "the cwd-scope filter is relative to the `git add`'s directory, not "
+        "the hook process's own (ai-config#1731)",
+        [("        rel = _repo_relative_cwd(run_dir)",
+          "        rel = _repo_relative_cwd(os.getcwd())")],
+        {"S12"},
     ),
     "M_named_include_scopes": (
         "`-A` plus a specific non-`.` pathspec does NOT mean whole-repo scope",

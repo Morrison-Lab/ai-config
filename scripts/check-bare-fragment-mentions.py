@@ -475,6 +475,9 @@ def collect(
     common_phrases: tuple[str, ...] = DEFAULT_COMMON_PHRASES,
 ) -> dict:
     """Scan `root` and return the full report as data."""
+    # scan_files returns resolved paths, so resolve the root too: on macOS a
+    # temp root under /var resolves to /private/var (ai-config#5494).
+    root = root.resolve()
     files = scan_files(root, globs)
     scripts = script_stems(root)
     findings: list[dict] = []

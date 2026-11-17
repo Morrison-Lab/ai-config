@@ -173,10 +173,17 @@ def latin1_path_repo(path):
     """A tracked file whose name is not valid UTF-8 (POSIX only), plus a
     moved submodule: `ls-files -z` and `status -z` emit that name raw."""
     _base_with_submodule(path)
-    raw = os.path.join(os.fsencode(path), b"caf\xe9.txt")
-    with open(raw, "w", encoding="utf-8") as handle:
-        handle.write("x\n")
-    _run(path, "add", "-A")
+    # Staged straight into the index, never created on disk: APFS (macOS)
+    # refuses a file name that is not valid UTF-8 (ai-config#5494). Git still
+    # tracks the name, so `ls-files -z` and `status -z` (as a deletion) emit
+    # it raw, which is what this case needs.
+    blob = subprocess.run(
+        ["git", "hash-object", "-w", "--stdin"], cwd=path, check=True,
+        capture_output=True, input=b"x\n").stdout.strip()
+    subprocess.run(
+        ["git", "update-index", "--index-info"], cwd=path, check=True,
+        capture_output=True,
+        input=b"100644 " + blob + b"\tcaf\xe9.txt\n")
     _run(path, "commit", "-qm", "latin-1 name")
     _move_submodule_head(path)
 

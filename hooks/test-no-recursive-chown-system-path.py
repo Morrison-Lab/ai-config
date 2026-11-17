@@ -105,6 +105,9 @@ class Denies(unittest.TestCase):
     def test_more_system_trees_and_wrappers(self):
         self.assert_denied("chown -R me /var/log")
         self.assert_denied("chown -R me ~root")
+        # What `~root` expands to on macOS, so the case above is host-independent.
+        self.assert_denied("chown -R me /var/root")
+        self.assert_denied("chown -R me /private/var/root")
         self.assert_denied("sudo -u root -g wheel -H -n -E chown -R me /etc")
         self.assert_denied("setsid chmod -R 755 /usr")
         self.assert_denied("chmod -R 755 /usr/local")

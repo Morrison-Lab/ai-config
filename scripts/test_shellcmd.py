@@ -416,10 +416,18 @@ check("walk_dirs: ignore_cd keeps every command in the start directory",
           "", ignore_cd=True)],
       ["", "", ""])
 check("walk_dirs: a skipped command is neither yielded nor moves",
-      [rest[0] for _a, _e, rest, _c in shellcmd.walk_dirs(
+      [(rest[0], cur) for _a, _e, rest, cur in shellcmd.walk_dirs(
           shellcmd.simple_commands_with_scope("env -C /x cd /y; git add ."),
           "", skip=lambda argv: argv[0] == "env")],
-      ["git"])
+      [("git", "")])
+check("unreachable_cd: a `cd` in a pipeline stage never moves the shell",
+      shellcmd.unreachable_cd("cd sub | cat; git add ."), True)
+check("unreachable_cd: a backgrounded `cd` never moves the shell",
+      shellcmd.unreachable_cd("cd sub & git add ."), True)
+check("unreachable_cd: `cd x && cmd` does move the shell",
+      shellcmd.unreachable_cd("cd sub && git add ."), False)
+check("unreachable_cd: a quoted `| cat` is not a pipeline",
+      shellcmd.unreachable_cd("cd sub && echo 'a | b'"), False)
 
 # ------------------------------------------------- subshell nesting depth
 #

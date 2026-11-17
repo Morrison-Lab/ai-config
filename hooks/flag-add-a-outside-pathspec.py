@@ -68,7 +68,14 @@ README's "A hook that misfires is worse than a missing one".
       `git add` itself runs in: the payload's `cwd` (or `tool_input.Cwd`),
       moved by every `cd`/`pushd`/`popd` before it in the same subshell, by
       the shared `shellcmd.walk_dirs`.
+      A `cd` in a pipeline stage or a background job (`cd x | cat`,
+      `cd x &`) runs in a forked shell and moves nothing, so a command
+      holding one is checked from its starting directory
+      (`shellcmd.unreachable_cd`).
       A directory the text does not name (`cd -`, `cd "$X"`) fails open.
+      A named directory that does not exist is checked from the starting
+      directory instead: `cd nope; git add -A` runs the add there, and after
+      `cd nope && git add -A` the over-warning is the safe direction.
       Before ai-config#1731 both calls ran in the hook process's own
       directory, so `cd <worktree> && git add -A` reported another
       checkout's untracked files and could miss the real ones.
@@ -99,6 +106,7 @@ try:
         sys.path.insert(0, _LIB)
     from shellcmd import simple_commands_with_scope as _simple_commands
     from shellcmd import walk_dirs as _walk_dirs
+    from shellcmd import unreachable_cd as _unreachable_cd
 except Exception as _exc:  # broken install: degrade, never block
     print(f"flag-add-a-outside-pathspec: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); "
@@ -172,7 +180,8 @@ def offending(command):
     cmds = _simple_commands(command)
     if cmds is None or _walk_dirs is None:
         return None
-    for argv, _env, _rest, cur in _walk_dirs(cmds, ""):
+    ignore_cd = _unreachable_cd(command)
+    for argv, _env, _rest, cur in _walk_dirs(cmds, "", ignore_cd=ignore_cd):
         i = 0
         while i < len(argv) and (ASSIGNMENT.match(argv[i])
                                   or argv[i] in LEAD_WORDS):
@@ -337,12 +346,13 @@ def main() -> int:
     # process's: tool_input.Cwd, then the payload's `cwd`, then ours.
     base = next((c for c in (inp.get("Cwd"), payload.get("cwd"))
                  if isinstance(c, str) and c), None) or os.getcwd()
-    run_dir = (None if rel_dir is None
-               else os.path.normpath(os.path.join(base, rel_dir)))
-    if run_dir is None or not os.path.isdir(run_dir):
+    if rel_dir is None:
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
-        return 0  # the git add runs somewhere unnamed or absent -- fail open
+        return 0  # the git add runs somewhere the text does not name
+    run_dir = os.path.normpath(os.path.join(base, rel_dir))
+    if not os.path.isdir(run_dir):
+        run_dir = base  # a failed `cd` leaves the shell where it started
 
     sim_untracked = os.environ.get("SIMULATE_UNTRACKED")
     if sim_untracked is not None:

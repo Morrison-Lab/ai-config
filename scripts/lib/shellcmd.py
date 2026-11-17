@@ -692,6 +692,49 @@ def move_dir(rest, cur):
     return target
 
 
+_LEAD_KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until",
+                  "time", "!"}
+
+
+def _starts_with_cd(piece):
+    """True if the pipeline stage `piece` is a cd, pushd or popd, after any
+    leading shell keywords (`then cd x`)."""
+    words = piece.split()
+    while words and words[0] in _LEAD_KEYWORDS:
+        words.pop(0)
+    return bool(words) and words[0] in ("cd", "pushd", "popd")
+
+
+_QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+_SEGMENTS = re.compile(r"&&|\|\||[;\n(){}]")
+_PIPE_OR_JOB = re.compile(r"([|&])")
+
+
+def unreachable_cd(command):
+    """True if a `cd`, `pushd` or `popd` in `command` runs in a subshell of
+    its own, so its directory never reaches the commands after it: a stage of
+    a pipeline (`cd /x | cat`, which bash forks) or a backgrounded one
+    (`cd /x &`). Read from the text with the quoted strings blanked.
+    A caller passes the result as `walk_dirs`'s `ignore_cd`, so any such form
+    makes it ignore EVERY directory change in the command and check the
+    starting directory instead (the warn side).
+    Moved from `hooks/flag-commit-a-sweeps-submodule.py` (ai-config#1731)."""
+    text = _QUOTED.sub(" ", command)
+    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f
+    for segment in _SEGMENTS.split(text):
+        parts = _PIPE_OR_JOB.split(segment)  # piece, op, piece, ...
+        stages = parts[0::2]
+        ops = parts[1::2]
+        for pos, piece in enumerate(stages):
+            if not _starts_with_cd(piece):
+                continue
+            if "|" in ops:
+                return True
+            if pos < len(ops) and ops[pos] == "&":
+                return True
+    return False
+
+
 def walk_dirs(cmds, start, ignore_cd=False, skip=None):
     """Yield `(argv, env, rest, cur_dir)` for each simple command in `cmds`.
 

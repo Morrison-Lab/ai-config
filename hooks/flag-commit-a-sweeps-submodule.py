@@ -219,6 +219,7 @@ if _LIB not in sys.path:
 try:
     from shellcmd import simple_commands_with_scope as _simple_commands
     from shellcmd import move_dir as _move
+    from shellcmd import unreachable_cd as _unreachable_cd
     from shellcmd import walk_dirs as _walk_dirs
     from shellcmd import shell_c_expansions as _shell_c_expansions
 except Exception as _exc:  # broken install: fail open, like every guard here
@@ -345,48 +346,6 @@ def add_kind(args):
     if "--all" in names or "--no-ignore-removal" in names or "A" in letters:
         return "add -A", paths
     return ("add", paths) if paths else None
-
-
-_LEAD_KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until",
-                  "time", "!"}
-
-
-def _starts_with_cd(piece):
-    """True if the pipeline stage `piece` is a cd, pushd or popd, after any
-    leading shell keywords (`then cd x`)."""
-    words = piece.split()
-    while words and words[0] in _LEAD_KEYWORDS:
-        words.pop(0)
-    return bool(words) and words[0] in ("cd", "pushd", "popd")
-
-
-
-_QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
-_SEGMENTS = re.compile(r"&&|\|\||[;\n(){}]")
-_PIPE_OR_JOB = re.compile(r"([|&])")
-
-
-def _unreachable_cd(command):
-    """True if a `cd`, `pushd` or `popd` in `command` runs in a subshell of
-    its own, so its directory never reaches the commands after it: a stage of
-    a pipeline (`cd /x | cat`, which bash forks) or a backgrounded one
-    (`cd /x &`). Read from the text with the quoted strings blanked; any such
-    form makes the hook ignore EVERY directory change in the command, which
-    checks the session directory instead (the warn side)."""
-    text = _QUOTED.sub(" ", command)
-    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f
-    for segment in _SEGMENTS.split(text):
-        parts = _PIPE_OR_JOB.split(segment)  # piece, op, piece, ...
-        stages = parts[0::2]
-        ops = parts[1::2]
-        for pos, piece in enumerate(stages):
-            if not _starts_with_cd(piece):
-                continue
-            if "|" in ops:
-                return True
-            if pos < len(ops) and ops[pos] == "&":
-                return True
-    return False
 
 
 def _env_chdir(argv):

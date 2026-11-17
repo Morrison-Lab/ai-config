@@ -348,6 +348,9 @@ FILTERED_IN_SHALLOW = [
 
 # Each must be allowed in SHALLOW (and so in FULL).
 ALLOWED_IN_SHALLOW = [
+    # A `#` inside a word is not a comment; the `| head` limit must survive it.
+    "git log --format=%h#%s | head -1",
+    "echo a#b; git log --format=%h | head -1",
     # Ranges whose walk stays inside the fetched history.
     "git log --oneline origin/main..HEAD",
     "git rev-list --count origin/main..HEAD",
@@ -578,6 +581,12 @@ def main():
         expect(f"git -C {shallow} {mb[4:]}", full, "deny", "git -C <shallow> not refused")
         expect(f"git -C shallow {mb[4:]}", root, "deny", "relative -C <shallow> not refused")
         expect(f"git -C full {mb[4:]}", root, None, "relative -C <full> refused")
+        # Value-taking global options before -C must be skipped as a pair, or
+        # the -C after them is never read and the guard fails open (#5391).
+        expect(f"git --config-env core.x=HOME -C {shallow} {mb[4:]}", full, "deny",
+               "--config-env before -C <shallow> not refused")
+        expect(f"git --attr-source HEAD -C {shallow} {mb[4:]}", full, "deny",
+               "--attr-source before -C <shallow> not refused")
         expect(f"cd {shallow} && {mb}", full, "deny", "cd <shallow> not refused")
         expect(f"cd {full} && {mb}", shallow, None, "cd <full> refused from a shallow cwd")
         expect(f"cd $SOMEWHERE && {mb}", shallow, None, "unresolvable cd not skipped")

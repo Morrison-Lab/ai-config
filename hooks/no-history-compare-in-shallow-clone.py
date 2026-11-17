@@ -176,7 +176,6 @@ its shallowness cannot be read. A PreToolUse hook that raises blocks the call.
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 
@@ -187,7 +186,7 @@ try:
         sys.path.insert(0, _LIB)
     from shellcmd import (simple_commands_with_scope, strip_env, git_subcommand,
                           resolve_cd_target, env_value, shell_c_expansions,
-                          _heredoc_free)
+                          shell_tokens, GIT_VALUE_OPTS)
 except Exception as _exc:  # broken install: degrade, never block
     print(f"no-history-compare-in-shallow-clone: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); no guard will run", file=sys.stderr)
@@ -244,7 +243,6 @@ LOG_VALUE_OPTS = frozenset({
     "--encoding", "-L", "-O", "--diff-filter", "--output", "--decorate-refs",
     "--decorate-refs-exclude", "--exclude", "--glob",
 })
-GIT_VALUE_OPTS = ("-c", "--namespace", "--exec-path", "--work-tree")
 
 # Options that add commits to the walk, as revisions do.
 REV_SET_OPTS = ("--all", "--branches", "--tags", "--remotes", "--glob", "--exclude")
@@ -875,7 +873,7 @@ def _git_opts(argv):
             continue
         if rest[i].startswith("-c") and len(rest[i]) > 2:
             out.append(rest[i][2:])
-        elif rest[i] in GIT_VALUE_OPTS or rest[i] in ("-C", "--git-dir"):
+        elif rest[i] in GIT_VALUE_OPTS:
             i += 1
         i += 1
     return out
@@ -892,12 +890,11 @@ def _head_limits(command):
     """{argv: N} for each simple command piped straight into `head`, read
     from the parsed pipeline. An argv that also appears without such a pipe
     gets no limit."""
-    try:
-        lex = shlex.shlex(_heredoc_free(command).replace("\n", ";"), posix=True,
-                          punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except Exception:
+    # The same token stream `simple_commands_with_scope` walks, so both
+    # passes agree on comments, heredocs and continuations: a `#` inside a
+    # word (`--format=%h#%s`) is not a comment and must not cut the argv.
+    toks = shell_tokens(command)
+    if toks is None:
         return {}
     cmds, cur = [], []
     for tok in toks:

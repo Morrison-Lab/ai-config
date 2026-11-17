@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """Report every mutation anchor in hooks/test-*.py that no longer resolves.
 
-A harness stops at its FIRST bad anchor, after its slow cases, so a refactor
-surfaces them one red push at a time (ai-config#5735, #5738).  This reads
-them all statically.  The `for ... in MUTATIONS[.items()]` loop names the
-fields: an anchor is bound to old/find/anchor, or sits in an `edits` list of
-(find, replace), or (TARGET, find, replace) for scripts/lib/<TARGET>.py.
-Edits in a clause apply in order.  An anchor must occur once (once or more if
-the loop tests it only with `not in`).  What this cannot follow is SKIPPED.
-Usage: check-mutation-anchors.py [ROOT].  Exit 0 clean, 1 a bad anchor, 2 the
-negative control failed or nothing was examined.
+Most harnesses `sys.exit` at their first bad anchor, after the slow cases
+(ai-config#5735, #5738); this reads every one statically.  A table is any
+literal (MUTATIONS, MUTANTS, ...) a `for` loop reads into old/find/anchor or an
+`edits` list of (find, replace) or (LIBNAME, find, replace) for scripts/lib.
+An anchor must occur once (once or more if the loop only tests `not in`).
+A SKIP fails the run unless ALLOWED_SKIPS names its file.  Usage: [ROOT].
+Exit 0 clean, 1 bad anchor, 2 unallowed skip, nothing examined, or control failed.
 """
 import ast
 import glob
@@ -22,18 +20,44 @@ from contextlib import suppress
 FIND = {"old", "find", "anchor"}
 LABEL = {"clause", "name", "mid", "label"}
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Harnesses that mutate source outside a table; their anchors go unchecked here.
+ALLOWED_SKIPS = {
+    "hooks/test-flag-uncited-rebuttal.py": "one inline anchor, not a table",
+    "hooks/test-warn-status-read-after-pipe.py": "anchors passed to load_mutant() calls",
+}
 
 
 class Skip(Exception):
     """A harness, or one clause of it, this reader cannot follow."""
 
 
-def _loop_kind(node):
-    if getattr(node, "id", None) == "MUTATIONS":
-        return "list"
-    func = getattr(node, "func", None)
-    if getattr(func, "attr", None) == "items" and getattr(func.value, "id", None) == "MUTATIONS":
-        return "items"
+def _passes_find(node, method=None):
+    """True when `node` calls something (or `.method`) with an old/find/anchor name argument."""
+    return any(isinstance(n, ast.Call) and (method is None or getattr(n.func, "attr", None) == method)
+               and any(getattr(a, "id", None) in FIND for a in (n.args[:1] if method else n.args))
+               for n in ast.walk(node))
+
+
+def _table_loop(tree):
+    """(entries, loop) for the first loop over a literal mutation table, else None."""
+    assigned = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+            assigned.setdefault(node.targets[0].id, []).append(node.value)
+    for loop in (n for n in ast.walk(tree) if isinstance(n, ast.For)):
+        table, items = loop.iter, getattr(getattr(loop.iter, "func", None), "attr", None) == "items"
+        table = table.func.value if items else table
+        values = assigned.get(getattr(table, "id", None), [])
+        names = {n.id for n in ast.walk(loop.target) if isinstance(n, ast.Name)}
+        if len(values) != 1 or not (names & FIND or "edits" in names) or not _passes_find(loop):
+            continue
+        if items and isinstance(values[0], ast.Dict):
+            return [ast.Tuple(elts=[k, v]) for k, v in zip(values[0].keys, values[0].values)], loop
+        if not items and isinstance(values[0], (ast.List, ast.Tuple)):
+            return values[0].elts, loop
+        raise Skip(f"table {table.id} is not a literal the loop can read")
+    if _passes_find(tree, "replace"):
+        raise Skip("mutation code outside a table this reads")
     return None
 
 
@@ -66,8 +90,7 @@ def _bind(pattern, node, out):
     if isinstance(pattern, ast.Name):
         out[pattern.id] = node
         return
-    if (not isinstance(pattern, (ast.Tuple, ast.List)) or not isinstance(node, (ast.Tuple, ast.List))
-            or len(node.elts) != len(pattern.elts)):
+    if len(getattr(node, "elts", ())) != len(getattr(pattern, "elts", [None])):
         raise Skip("entry shape does not match the loop target")
     for sub_pattern, sub_node in zip(pattern.elts, node.elts):
         _bind(sub_pattern, sub_node, out)
@@ -75,10 +98,6 @@ def _bind(pattern, node, out):
 
 def _edits(bound, consts):
     """[(target, find, replace)]; target None is the hook, replace None unknown."""
-    def maybe(node):
-        with suppress(Skip):
-            return _string(node, consts)
-        return None
     find = [n for n in bound if n in FIND]
     if find:  # one anchor per clause, so its replacement never matters
         return [(None, _string(bound[find[0]], consts), None)]
@@ -91,7 +110,8 @@ def _edits(bound, consts):
         if len(parts) not in (2, 3):
             raise Skip("an edit is not a 2- or 3-tuple")
         target = _string(parts[0], consts) if len(parts) == 3 else None
-        out.append((target, _string(parts[-2], consts), maybe(parts[-1])))
+        literal = isinstance(parts[-1], ast.Constant) and isinstance(parts[-1].value, str)
+        out.append((target, _string(parts[-2], consts), parts[-1].value if literal else None))
     return out
 
 
@@ -102,32 +122,18 @@ def check_file(test_path, root):
             tree = ast.parse(handle.read())
         except SyntaxError as exc:
             raise Skip(f"does not parse: {exc.msg}") from None
-    tables = [n.value for n in ast.walk(tree) if isinstance(n, ast.Assign)
-              and getattr(n.targets[0], "id", None) == "MUTATIONS"]
-    loops = [n for n in ast.walk(tree)
-             if isinstance(n, ast.For) and _loop_kind(n.iter)]
-    if len(tables) != 1 or not loops:
-        raise Skip(f"{len(tables)} MUTATIONS assignment(s), {len(loops)} loop(s); need 1 and 1+")
-    table, loop = tables[0], loops[0]
-    if _loop_kind(loop.iter) == "items" and isinstance(table, ast.Dict):
-        entries = [ast.Tuple(elts=[k, v]) for k, v in zip(table.keys, table.values)]
-    elif _loop_kind(loop.iter) == "list" and isinstance(table, (ast.List, ast.Tuple)):
-        entries = table.elts
-    else:
-        raise Skip("MUTATIONS literal does not match how the loop reads it")
-    names = {n.id for n in ast.walk(loop.target) if isinstance(n, ast.Name)}
-    if not names & (FIND | {"edits"}):
-        raise Skip("loop binds no anchor field (" + ", ".join(sorted(names)) + ")")
+    found = _table_loop(tree)
+    if found is None:
+        return None  # not a mutation harness
+    entries, loop = found
     stem = os.path.basename(test_path)[len("test-"):-len(".py")]
     hook = os.path.join(os.path.dirname(test_path), stem + ".py")
     if not os.path.isfile(hook):
         raise Skip(f"no subject hooks/{stem}.py")
     consts = _constants(tree)
-    calls_count = any(getattr(getattr(n, "func", None), "attr", None) == "count"
-                      for n in ast.walk(loop))
-    not_in = any(isinstance(n, ast.Compare) and isinstance(n.ops[0], ast.NotIn)
-                 and getattr(n.left, "id", None) in FIND for n in ast.walk(loop))
-    exact = calls_count or not not_in
+    exact = _passes_find(loop, "count") or not any(
+        isinstance(n, ast.Compare) and isinstance(n.ops[0], ast.NotIn)
+        and getattr(n.left, "id", None) in FIND for n in ast.walk(loop))
     sources, bad, skipped, anchors = {}, [], [], 0
     for index, entry in enumerate(entries):
         bound, label = {}, f"#{index}"
@@ -138,13 +144,10 @@ def check_file(test_path, root):
                           and isinstance(node.value, str)), label)
             current = {}
             for target, find, replace in _edits(bound, consts):
-                path = hook
-                if target is not None:
-                    path = os.path.join(root, "scripts", "lib", target + ".py")
-                    if not os.path.isfile(path):
-                        raise Skip(f"edit target {target!r} is not scripts/lib/{target}.py")
+                path = hook if target is None else os.path.join(root, "scripts", "lib", target + ".py")
                 if path not in sources:
-                    with open(path, encoding="utf-8") as handle:
+                    sources[path] = ""  # a missing target file holds no anchor
+                    with suppress(FileNotFoundError), open(path, encoding="utf-8") as handle:
                         sources[path] = handle.read()
                 body = current.get(path, sources[path])
                 anchors += 1
@@ -160,33 +163,37 @@ def check_file(test_path, root):
 
 
 def run(paths, root, out):
-    """Check `paths` and write the report to `out`; return (examined, bad)."""
+    """Check `paths`, write the report to `out`; return (examined, bad, unallowed skips)."""
     examined = clauses = anchors = bad_total = 0
-    skipped_files = []
+    skips = []  # (rel, where, reason)
     for path in paths:
         rel = os.path.relpath(path, root)
         try:
-            n_clauses, n_anchors, bad, skipped, exact = check_file(path, root)
+            result = check_file(path, root)
         except Skip as exc:
-            skipped_files.append(f"SKIP {rel}: {exc}\n")
+            skips.append((rel, "", str(exc)))
             continue
+        if result is None:
+            continue
+        n_clauses, n_anchors, bad, skipped, exact = result
         examined, clauses, anchors = examined + 1, clauses + n_clauses, anchors + n_anchors
         bad_total += len(bad)
         need = "exactly 1" if exact else "1 or more"
         for label, target, count, find in bad:
             out.write(f"BAD  {rel}: clause {label}: {target} has {count}, need {need}: {find.strip()[:80]!r}\n")
-        for label, reason in skipped:
-            out.write(f"SKIP {rel}: clause {label}: {reason}\n")
-    out.write("".join(skipped_files) + f"examined {examined} harness(es), {clauses} clause(s), "
-              f"{anchors} anchor(s); skipped {len(skipped_files)} file(s); {bad_total} bad anchor(s)\n")
-    return examined, bad_total
+        skips += [(rel, f" clause {label}:", reason) for label, reason in skipped]
+    unallowed = 0
+    for rel, where, reason in skips:
+        allowed = rel.replace(os.sep, "/") in ALLOWED_SKIPS
+        unallowed += not allowed
+        out.write(f"SKIP {rel}:{where} {reason}{' (allowed)' if allowed else ''}\n")
+    out.write(f"examined {examined} harness(es), {clauses} clause(s), {anchors} anchor(s); "
+              f"{len(skips)} skip(s), {unallowed} not allowed; {bad_total} bad anchor(s)\n")
+    return examined, bad_total, unallowed
 
 
 def _harnesses(root):
-    for path in sorted(glob.glob(os.path.join(root, "hooks", "test-*.py"))):
-        with open(path, encoding="utf-8") as handle:
-            if "MUTATIONS" in handle.read():
-                yield path
+    return sorted(glob.glob(os.path.join(root, "hooks", "test-*.py")))
 
 
 def negative_control():
@@ -196,11 +203,12 @@ def negative_control():
         files = {"probe.py": "if alpha:\n", "test-probe.py": (
             "MUTATIONS = {'good': ('s', [('if alpha:', '')], set()),\n"
             "             'gone': ('s', [('if beta:', '')], set())}\n"
-            "for clause, (statement, edits, flips) in MUTATIONS.items():\n    pass\n")}
+            "for clause, (statement, edits, flips) in MUTATIONS.items():\n"
+            "    for find, replace in edits:\n        SOURCE.count(find)\n")}
         for name, text in files.items():
             with open(os.path.join(tmp, "hooks", name), "w", encoding="utf-8") as handle:
                 handle.write(text)
-        return run(list(_harnesses(tmp)), tmp, io.StringIO()) == (1, 1)
+        return run(_harnesses(tmp), tmp, io.StringIO()) == (1, 1, 0)
 
 
 def main(argv):
@@ -208,11 +216,10 @@ def main(argv):
     if not negative_control():
         print("negative control FAILED: a known-missing anchor was not reported", file=sys.stderr)
         return 2
-    examined, bad = run(list(_harnesses(root)), root, sys.stdout)
-    if not examined:
-        print("no mutation harness examined; nothing was checked", file=sys.stderr)
-        return 2
-    return 1 if bad else 0
+    examined, bad, unallowed = run(_harnesses(root), root, sys.stdout)
+    if not examined or unallowed:
+        print("nothing examined" if not examined else f"{unallowed} skip(s) not in ALLOWED_SKIPS", file=sys.stderr)
+    return 2 if not examined or unallowed else 1 if bad else 0
 
 
 if __name__ == "__main__":

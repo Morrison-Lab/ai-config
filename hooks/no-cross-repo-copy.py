@@ -10,7 +10,7 @@ checkout. Not judged: Edit, MultiEdit and a Write over an existing file (they
 change a file rather than create a copy); vendored paths (EXEMPT_PATH), which a
 sync workflow should write; a thin caller of a `gha` reusable workflow, which
 is the decomposed form; a copy within one repo, which is not compared (see the fragment).
-A line comment `decompose: allow <reason>` passes (`<!--` only in .md/.qmd/.Rmd, where `#` is a heading; a bare README is plain text).
+A line comment `decompose: allow <reason>` passes (`<!--` only in Markdown, where `#` is a heading).
 Fails OPEN and SILENT on any parse trouble, and stops after TIME_BUDGET.
 """
 import json
@@ -112,8 +112,8 @@ def same_name_files(sib, basename, deadline):
 
 def copied_source(path, content):
     """Path of a sibling-repo file that new file `content` mostly repeats, or None."""
-    root, common = common_dir(os.path.dirname(path))
-    if not common or os.path.exists(path):
+    root, common = (None, None) if os.path.exists(path) else common_dir(os.path.dirname(path))
+    if not common:
         return None
     rel = os.path.relpath(path, root).replace(os.sep, "/")  # so a checkout under vendor/ is not exempt
     new_lines = meaningful_lines(content)

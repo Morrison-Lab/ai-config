@@ -114,8 +114,10 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   In a project thread with a coordinator, send the coordinator the head SHA and wait for the verdict.
   Where there is no coordinator, dispatch the reviewer yourself, as [`adversarial-self-review`](adversarial-self-review.md#cross-model-and-cross-harness-reviews-are-required-for-merging-and-the-harness-list-is-concrete) says.
   As of 2026-10-30, the reviewer is Gemini Flash through `agy`, because Argon is out of quota.
+- **Do:** count a verdict as the cross-harness one only when its PR comment names the model that produced it, and that model runs in a different harness from the one that wrote the change (for a Claude author, a model such as Gemini Flash).
 - **Do:** let local validation (`scripts/run-local-validation.py`) finish before the merge call.
 - **Don't:** treat the standing grant, a clean Claude review, or green CI as covering the cross-harness gate.
+- **Don't:** count a read from the author's own harness as cross-harness because a router or a subagent posted it, even when that read answers a cross-harness request.
 - **Don't:** merge while the local validation run is still going, or while a step it skipped is unexplained.
 - **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read.
   The coordinator's rule also requires local validation to finish first.
@@ -123,6 +125,8 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   that hook has denied such a merge since ai-config#5290.
   The project coordinator set this rule on 2026-10-30, in Ezra's DATA 571 project, after those two merges.
   Ezra has not restated it.
+- **Reason (model-naming bullets):** on 2026-11-11, [gha#1906](https://github.com/Morrison-Lab/gha/issues/1906) and [gha#1911](https://github.com/Morrison-Lab/gha/issues/1911) merged with CLEAN verdicts that the router had produced from its own Claude read while Flash was unavailable.
+  The coordinator clarified the gate the same day.
 
 ## Keep removed content
 

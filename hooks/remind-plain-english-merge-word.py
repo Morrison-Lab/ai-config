@@ -137,6 +137,42 @@ def merge_word(prompt: str, strict: bool = False):
     return None
 
 
+# A merge instruction that names its PRs (ai-config#5703, #5723): "merge PR 113",
+# "merge csci201 PRs 28, 24, 25, 26 and 27", "merge mcsg#113". It grants
+# those PRs only, so it is read apart from merge_word(), which grants all.
+_NUMS = r"#?\d+(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+|\s*&\s*)#?\d+)*"
+NAMED = re.compile(
+    r"\bmerge\s+(?:(?:[\w.-]+/)?(?P<repo>[A-Za-z][\w.-]*)\s+)?(?:PRs?|pull\s+requests?)\s+"
+    r"(?P<nums>" + _NUMS + r")\b"
+    r"|\bmerge\s+(?:(?:[\w.-]+/)?(?P<repo2>[A-Za-z][\w.-]*))?#(?P<nums2>\d+"
+    r"(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+|\s*&\s*)#?\d+)*)\b",
+    re.I,
+)
+
+
+def named_merge_grants(prompt: str) -> set:
+    """{(repo or None, number)} for each PR the user's merge instruction names.
+
+    Held to the strict test merge_word() applies for the guard: the
+    instruction opens a clause and is not a question. `repo` is the bare
+    repository name, lowercased, or None when the user named none.
+    """
+    grants = set()
+    for body in user_bodies(prompt):
+        text = typed(body)
+        if not text or QUESTION.search(text):
+            continue
+        for match in NAMED.finditer(text):
+            if match.start() > 0 and not CLAUSE_START.search(text[: match.start()]):
+                continue
+            if QUESTION_SENTENCE.match(text, match.end()):
+                continue
+            repo = match.group("repo") or match.group("repo2")
+            nums = match.group("nums") or match.group("nums2")
+            grants |= {((repo or "").lower() or None, int(n)) for n in re.findall(r"\d+", nums)}
+    return grants
+
+
 def revokes(prompt: str) -> bool:
     """Whether the user's own words in `prompt` withdraw a merge grant."""
     match = SLASH_COMMAND.search(prompt)

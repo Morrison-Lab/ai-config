@@ -42,6 +42,12 @@ jobs:
       - name: Install dependencies
         run: python3 -m pip install pyyaml==6.0.2 pytest==8.3.5 markdown-it-py==3.0.0
       - name: Run the validate.yml steps
+        env:
+          # hooks/test-flag-commit-a-sweeps-submodule.py took 860 s on the
+          # macOS runner on 2026-11-17 and hit the 900 s per-suite default on
+          # the next run (ai-config#5494). It is the job's long pole, so 1800 s
+          # still leaves the job inside timeout-minutes.
+          HOOK_TEST_SUITE_TIMEOUT: "1800"
         run: python3 scripts/run-local-validation.py --no-other-workflows --base origin/main
 
   report:

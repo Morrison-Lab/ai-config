@@ -242,6 +242,14 @@ On a diff or a delivered `.docx` produced by an edit that merged runs, check tha
 Read the document; do not report a hook's output as your finding.
 See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).
 
+## History read from a shallow clone
+
+On a report, PR or command that deletes, force-pushes or recommends removing a ref, or that claims a branch is merged, unmerged, unrelated to `main`, or "first committed" on a date, check that the transcript shows the clone was confirmed complete (`git rev-parse --is-shallow-repository` printing `false`, or an unshallow fetch) before the read the claim rests on.
+A shallow clone gives a wrong answer with a real SHA and exit 0, so a plausible-looking result is not that evidence.
+Read the transcript and the claim;
+do not report a hook's refusal or silence as your finding.
+See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-reads-in-shallow-clones.md).
+
 ## Announcements need approval
 
 On a transcript, brief or script that posts or edits a class announcement, check that the user's own message approved that exact text before the post.
@@ -349,3 +357,9 @@ On a transcript, brief or skill change that starts a subagent, thread or session
 On a message that hands new work to an existing thread, check that the transcript shows a reason a new thread would not do (the topic, the files or the context is already there), not a reflex to reuse the nearest thread.
 Read the transcript yourself; do not report the output of `hooks/require-model-choice.py` as your finding.
 See [`choose-thread`](../../skills/choose-thread/SKILL.md) and [`select-model`](../../skills/select-model/SKILL.md).
+
+## Merge-queue claims in thread replies
+
+On a transcript or reply that says a PR is in a merge queue, check that something enqueued it (an auto-merge call or `gh pr merge --auto`), and flag the claim when the PR only waits for a merge word or the runner.
+Read the transcript yourself; do not report the output of `hooks/no-merge-queue-claim-in-post-message.py` as your finding.
+See [`merge-queue`](../../shared/workflow/merge-queue.md#reporting-a-prs-state-to-the-user).

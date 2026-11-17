@@ -50,6 +50,14 @@ never `--git-dir`, which in a linked worktree points at
 its `No such file or directory` then reads as "not shallow", and this corpus
 assigns subagents a worktree by default.
 
+This paragraph did not stop the worst case so far.
+On 2026-11-11 a cloud session audited Morrison-Lab/lds's branches from a shallow clone.
+It reported main's first commit as 2026-11-04 (it was 2026-09-04) and 23 branches as sharing no history with main.
+It came within seconds of deleting 41 branches, 12 of them holding unmerged work.
+`hooks/no-history-compare-in-shallow-clone.py` now refuses ancestry comparisons, first-commit reads and ref-deleting pushes in a shallow clone (ai-config#5323).
+It refuses `log -S`/`--follow` whenever their walk reaches the cut-off, but it does not cover `blame`, so this section's rule still applies there.
+The writer and reviewer rules for every history read are in [`no-history-reads-in-shallow-clones`](../shared/workflow/no-history-reads-in-shallow-clones.md).
+
 - **Do:** `git fetch --unshallow` before deriving an "introduced in #N" claim.
 - **Don't:** read a plausible commit from `-S`/`--follow`/`blame` as evidence
   the clone was deep enough --- plausibility is what this mode produces.

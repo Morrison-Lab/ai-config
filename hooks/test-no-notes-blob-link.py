@@ -55,6 +55,14 @@ def main() -> int:
         check(name, denied(text) == want)
     link = f"{GH}/lds/blob/main/{SUB}"
     check("github comment body", denied(link, tool="mcp__github__add_issue_comment", key="body"))
+    bash = lambda cmd: denied(cmd, tool="Bash", key="command")  # noqa: E731
+    check("gh pr comment --body", bash(f"gh pr comment 5 --body 'see {link}'"))
+    check("gh issue comment --body=", bash(f"gh issue comment 5 --body='see {link}'"))
+    check("gh pr create --title", bash(f"gh pr create -t '{link}' -b x"))
+    check("curl ignored", not bash(f"curl {link}"))
+    check("commit message beside gh ignored", not bash(f"git commit -m '{link}' && gh pr comment 1 -b x"))
+    check("shell comment ignored", not bash(f"gh pr comment 1 --body-file b.md  # {link}"))
+    check("unbalanced quote fails open", not bash(f"gh pr comment 1 --body '{link}"))
     check("PR title", denied(link, tool="mcp__github__create_pull_request", key="title"))
     check("other tool ignored", not denied(link, tool="Write", key="content"))
     check("path key ignored", not denied(link, tool="mcp__github__issue_write", key="path"))

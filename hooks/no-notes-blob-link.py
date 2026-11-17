@@ -14,13 +14,14 @@ SHA-pinned link (an open PR's undeployed content), an unrendered path
 (`tools/`, `.github/`, `outtakes/`, ...), a `#L<n>` or `?plain=1` source view,
 a URL in a code span or fence, and a line saying the content is not deployed
 yet or that it means the source lines, text or file (the writer states
-whether the deploy is current; no text shows it). Bash `gh` posts: ai-config#5706.
+whether the deploy is current; no text shows it). In Bash, only the --body/--title values of a gh issue/pr post are read (ai-config#5706).
 Writer rule: shared/writing/hyperlink-liberally.md; reviewer: adversarial-reviewer.
 `ALLOW_NOTES_BLOB_LINK=1` overrides. Fails open on any parse trouble.
 """
 import json
 import os
 import re
+import shlex
 import sys
 
 OVERRIDE = "ALLOW_NOTES_BLOB_LINK"
@@ -31,6 +32,8 @@ TOOL = re.compile(
     r"|^mcp__github__(?:add_issue_comment|update_issue_comment|add_reply_to_pull_request_comment"
     r"|add_comment_to_pending_review|pull_request_review_write|issue_write"
     r"|create_pull_request|update_pull_request)$")
+GH_POST = re.compile(r"\bgh\s+(?:issue|pr)\s+(?:comment|create|edit|review)\b")
+BODY_FLAGS = {"--body", "-b", "--title", "-t"}
 TEXT_KEYS = {"text", "body", "title", "question", "label", "consequence", "comment", "message"}
 FENCE = re.compile(r"^```.*?^```|^~~~.*?^~~~|`[^`\n]*`", re.S | re.M)
 BLOB = re.compile(
@@ -68,6 +71,19 @@ def strings(value, key=None):
     elif isinstance(value, list):
         for v in value:
             yield from strings(v, key)
+
+
+def bash_text(command: str) -> str:
+    """The --body and --title values of a gh issue/pr post; a --body-file is not read."""
+    if not GH_POST.search(command):
+        return ""
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return ""
+    values = [t for prev, t in zip([""] + tokens, tokens) if prev in BODY_FLAGS]
+    values += [t.split("=", 1)[1] for t in tokens if t.split("=", 1)[0] in BODY_FLAGS and "=" in t]
+    return "\n".join(values)
 
 
 def candidate_roots(repo: str) -> list:
@@ -153,9 +169,12 @@ def denial(payload: dict):
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return None
-    if not TOOL.search(tool):
+    if tool == "Bash":
+        text = bash_text(str(tool_input.get("command") or ""))
+    elif TOOL.search(tool):
+        text = "\n".join(strings(tool_input))
+    else:
         return None
-    text = "\n".join(strings(tool_input))
     hits = flagged(text)
     if not hits:
         return None

@@ -112,7 +112,9 @@ the bot-sender and allowed-bots short-circuit gates), see
   "@claude CI action"), posting `@claude review` or
   `/review` gets you a fresh, real verdict in the PR thread, but
   `review / claude-review` and any gate job on the PR's head SHA (checked via
-  `get_check_runs`, not `get_status` --- see below) stay red.
+  `get_check_runs`, not `get_status`, per
+  [`github-mcp-tools.md`](github-mcp-tools.md)'s "`get_status` can return
+  'pending / 0 checks'" bullet) stay red.
   Since reruns 403 in
   these sessions, the only way to get a fresh **gating** run is to push a new
   commit (an empty `git commit --allow-empty` is fine) so a real `pull_request`

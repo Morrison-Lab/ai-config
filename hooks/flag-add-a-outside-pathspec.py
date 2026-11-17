@@ -73,10 +73,14 @@ README's "A hook that misfires is worse than a missing one".
       holding one is checked from its starting directory
       (`shellcmd.unreachable_cd`).
       A directory the text does not name (`cd -`, `cd "$X"`) fails open.
-      A `cd` to a named directory that does not exist leaves the directory
-      where it was before that `cd`, as bash's failed `cd` does:
-      `cd sub; cd nope; git add .` runs the add in `sub/`, and after
-      `cd nope && git add -A` the over-warning is the safe direction.
+      A `cd` to a named directory that does not exist yet fails open too.
+      The hook runs before the command, so it cannot tell a `cd` that will
+      fail (`cd nope; git add -A`, which then adds in the old directory)
+      from one into a directory the command creates first
+      (`mkdir -p d && cd d && git add .`,
+      `git worktree add ../w && cd ../w && git add -A`).
+      Guessing the old directory would report another checkout's files,
+      the #1731 defect, so it does not guess.
       Before ai-config#1731 both calls ran in the hook process's own
       directory, so `cd <worktree> && git add -A` reported another
       checkout's untracked files and could miss the real ones.
@@ -180,8 +184,9 @@ def offending(command, base=None):
     `cd /abs`, or None when a `cd` before it goes somewhere the text does
     not name (M7).
     `base` is that starting directory on disk; given it, a `cd` to a
-    directory that does not exist leaves the shell where it was, as bash's
-    failed `cd` does."""
+    directory that does not exist yet makes the directory unknown, since the
+    text alone cannot tell a `cd` that will fail from one into a directory an
+    earlier `mkdir` or `git worktree add` in the same command creates."""
     cmds = _simple_commands(command)
     if cmds is None or _walk_dirs is None:
         return None
@@ -191,7 +196,7 @@ def offending(command, base=None):
         if base is None or target is None:
             return target
         exists = os.path.isdir(os.path.join(base, target))
-        return target if exists else cur
+        return target if exists else None
 
     ignore_cd = _unreachable_cd(command)
     for argv, _env, _rest, cur in _walk_dirs(cmds, "", ignore_cd=ignore_cd,

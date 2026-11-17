@@ -25,7 +25,7 @@ works out where the matched `git add` will run (M7, ai-config#1731): the
 payload's `cwd`, then each `cd`/`pushd`/`popd` before it in the same shell.
 Two kinds of case cover that. W5 and S10 run the hook with its process cwd in
 `<repo>/sub` and a bare `git add .`, a session already sitting in `sub/`.
-The `cd`-prefixed cases (W8-W12, S12-S15) put the directory change in the
+The `cd`-prefixed cases (W8-W11, S12-S17) put the directory change in the
 command itself, or in the payload's `cwd`, with the hook process launched
 somewhere else, so a hook that read its own process cwd would get them
 wrong.
@@ -225,9 +225,6 @@ SHOULD_WARN = [
     ("W11", cwd_scope_clean_sub_repo, "cd sub | cat; git add .", None,
      "M7: a `cd` in a pipeline stage runs in a forked shell, so the `.` "
      "still means the repo root"),
-    ("W12", explicit_path_repo, "cd nope; git add -A", None,
-     "M7: a `cd` to a missing directory fails, so the add runs where the "
-     "command started"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -268,8 +265,15 @@ SHOULD_STAY_SILENT = [
     ("S14", explicit_path_repo, 'cd "$X" && git add -A', None,
      "M7: a `cd` to a directory the text does not name fails open"),
     ("S15", cwd_scope_clean_sub_repo, "cd sub; cd nope; git add .", None,
-     "M7: the failed `cd nope` leaves the shell in sub/, so `.` is the "
-     "clean sub/, not the repo root"),
+     "M7: a `cd` into a directory that does not exist yet fails open "
+     "rather than guessing the repo root"),
+    ("S16", explicit_path_repo, "cd nope; git add -A", None,
+     "M7: the accepted trade-off -- a `cd` that will fail cannot be told "
+     "from one into a directory the command creates, so it fails open"),
+    ("S17", explicit_path_repo, "mkdir -p zz-new && cd zz-new && git add .",
+     None,
+     "M7: the add runs in the directory the command itself creates, not in "
+     "the dirty launch directory"),
 ]
 
 
@@ -367,7 +371,7 @@ MUTATIONS = {
         "`-A`/`--all` with no including pathspec means whole-repo scope",
         [('    if has_all and not includes:\n        return "repo", excludes',
           "    if False:\n        return \"repo\", excludes")],
-        {"W1", "W2", "W4", "W6", "W7", "W8", "W10", "W12"},
+        {"W1", "W2", "W4", "W6", "W7", "W8", "W10"},
     ),
     "M3_bare_dot": (
         "a bare `.`/`./` including pathspec means cwd scope",
@@ -422,7 +426,7 @@ MUTATIONS = {
           "            untracked = [p for p in untracked\n"
           "                        if p == rel or p.startswith(prefix)]",
           "    if False:\n        pass")],
-        {"S10", "S12", "S15"},
+        {"S10", "S12"},
     ),
     "M7_status_dir": (
         "`git status` runs in the directory the `git add` runs in, not the "
@@ -442,24 +446,18 @@ MUTATIONS = {
         {"W11"},
     ),
     "M7_missing_dir": (
-        "a `cd` to a missing directory leaves the add where it started",
-        [("        return target if exists else cur",
-          "        return target")],
-        {"W12"},
-    ),
-    "M7_failed_cd_keeps_dir": (
-        "a failed `cd` leaves the shell where it was just before that `cd`, "
-        "not where the command started",
-        [("        return target if exists else cur",
-          '        return target if exists else ""')],
-        {"S15"},
+        "a `cd` to a directory that does not exist yet makes the directory "
+        "unknown, never the old one",
+        [("        return target if exists else None",
+          "        return target if exists else cur")],
+        {"S16", "S17"},
     ),
     "M7_scope_dir": (
         "the cwd-scope filter is relative to the `git add`'s directory, not "
         "the hook process's own (ai-config#1731)",
         [("        rel = _repo_relative_cwd(run_dir)",
           "        rel = _repo_relative_cwd(os.getcwd())")],
-        {"S12", "S15", "W9"},
+        {"S12", "W9"},
     ),
     "M_named_include_scopes": (
         "`-A` plus a specific non-`.` pathspec does NOT mean whole-repo scope",

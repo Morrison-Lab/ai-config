@@ -507,21 +507,18 @@ WRITE_TOOLS = {
     "write_to_file", "replace_file_content", "edit_file", "strreplace", "create_file",
 }
 
-# A shell write TO A RULE SURFACE (ai-config#1962). A whole-string test (rule
-# surface anywhere AND a write verb anywhere) read `cat CLAUDE.md | tee /tmp/x`
-# as durable: a false DISCHARGE. As with `_poller_executed()`, the question is
-# grammatical, so it is asked per simple command, of the write's own OPERANDS
-# and never an option's value (a commit message, a sed script, `--config x`):
-# a redirect target; a `git add|commit|mv|rm` pathspec or an applying `git
-# apply`'s patch; a file operand of `tee`, `mkdir`, `sed -i`; an operand of a
-# `--write` command. Whole tokens keep #1966/#1968 closed (`--write-out`,
-# `commit-tree`, a `tee-notes.md` path). Residuals are all loud (no
-# discharge): `cp`/`mv`/`patch`; `git commit -am` with no pathspec; an
-# unlisted value-taking option; a variable path; an interpreter writing from
-# a heredoc; a command `shlex` cannot parse.
+# A shell write TO A RULE SURFACE (ai-config#1962). A whole-string test read
+# `cat CLAUDE.md | tee /tmp/x` as durable: a false DISCHARGE. As with
+# `_poller_executed()`, ask per simple command, of the write's own OPERANDS and
+# never an option's value: a redirect target; a `git add|commit|mv|rm`
+# pathspec or an applying `git apply`'s patch; a file operand of `tee`,
+# `mkdir`, `sed -i`; an operand of a `--write` command. Whole tokens keep
+# #1966/#1968 closed. Residuals are all loud (no discharge): `cp`/`mv`/`patch`;
+# `git commit -am` with no pathspec; an unlisted value-taking option; a
+# variable path; an interpreter writing from a heredoc; unparseable shell.
 try:
     from shellcmd import (COMMAND_WRAPPERS, ENV_ASSIGNMENT, SHELL_KEYWORDS,
-                          WRAPPER_ARG_WINDOW, git_subcommand, simple_commands)
+                          git_subcommand, simple_commands)
 except ImportError as _exc:  # broken install: say so, and discharge nothing
     print(f"no-empty-promise: no scripts/lib/shellcmd.py ({_exc})",
           file=sys.stderr)
@@ -533,12 +530,12 @@ _GIT_WRITES = {"add", "commit", "mv", "rm", "apply"}
 _GIT_APPLY_READS = {"--check", "--stat", "--numstat", "--summary"}
 # Options taking the NEXT token as a value; a glued form is one token already.
 _GIT_VALUE_SHORT = set("mFCct")
-_GIT_VALUE_LONG = set(
-    "--message --file --reuse-message --reedit-message --template --author "
-    "--date --fixup --squash --cleanup --trailer --pathspec-from-file "
-    "--directory --exclude --include".split())
-# Programs found past a wrapper's options (`sudo -u root tee`).
-_TARGET_PROGRAMS = {"tee", "mkdir", "sed"}
+_GIT_VALUE_LONG = set("--message --file --reuse-message --reedit-message "
+                      "--template --author --date --fixup --squash --cleanup "
+                      "--trailer --pathspec-from-file --directory --exclude "
+                      "--include".split())
+# Wrapper options taking a value (`sudo -u root`, `nice -n 5`, `timeout -s`).
+_WRAPPER_VALUE_OPTS = set("-u -g -n -c -p -C -D -h -r -t -U -s -k -S".split())
 _is_rule_surface = MECHANISM_PATH.search
 
 
@@ -591,25 +588,19 @@ def _git_writes_rule_surface(subcommand, rest):
 
 
 def _resolve_program(operands):
-    """(program, args) past assignments and wrappers; a wrapper's options
-    are skipped by a bounded look-ahead, as `strip_env` does for `git`."""
-    index, wrapped = 0, False
+    """(program, args) past assignments, keywords, and each wrapper's own
+    options; the first other token is the program (`time grep tee x`)."""
+    index = 0
     while index < len(operands):
-        token = operands[index]
-        if os.path.basename(token) in COMMAND_WRAPPERS:
-            wrapped = True
-        elif not (ENV_ASSIGNMENT.match(token) or token in SHELL_KEYWORDS):
-            break
+        token, name = operands[index], os.path.basename(operands[index])
         index += 1
-    rest = operands[index:]
-    if not rest:
-        return None
-    for offset, token in enumerate(rest[:WRAPPER_ARG_WINDOW + 1] if wrapped
-                                   else []):
-        name = os.path.basename(token)
-        if name in _TARGET_PROGRAMS or _SHELL.match(name):
-            return name, rest[offset + 1:]
-    return os.path.basename(rest[0]), rest[1:]
+        if name in COMMAND_WRAPPERS:
+            while index < len(operands) and operands[index].startswith("-"):
+                index += 2 if operands[index] in _WRAPPER_VALUE_OPTS else 1
+            index += name == "timeout"  # its duration
+        elif not (ENV_ASSIGNMENT.match(token) or token in SHELL_KEYWORDS):
+            return name, operands[index:]
+    return None
 
 
 def _sed_files(args):
@@ -621,7 +612,8 @@ def _sed_files(args):
         index += 1
         name = token.split("=", 1)[0]
         if token == "--":
-            return in_place, files + args[index:]
+            rest = args[index:]  # `--` ends options, not the script operand
+            return in_place, files + (rest if has_script else rest[1:])
         if name == "--in-place":
             in_place = True
         elif name in ("--expression", "--file", "--line-length"):
@@ -904,8 +896,8 @@ def discharges(name, inp):
     still matching bare nouns, so it is not reintroduced here.
 
     What a delegated build discharges on instead is the parent's own next
-    act: staging or committing the artifact (`git add hooks/x.py`) is a
-    `bash` write against a rule surface and discharges normally, and that
+    act: staging the artifact (`git add hooks/x.py`), or committing with a
+    pathspec naming it, is a `bash` write to a rule surface, and that
     is how such work actually ends. A turn that dispatches a build, makes
     a promise, and stops before touching the result is the residual false
     positive -- deliberate, named, and one command from clearing.

@@ -3,7 +3,7 @@ type: regex
 target: trace
 flags: im
 match: not_contains
-pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?:\b|(?<=\\n))(?:I.ll|I\s+will|let\s+me|we.ll|plan:?)\s+(?:(?!(?:not|never|avoid|rather|instead|than)\b)\S+\s+){0,3}?(?:copy|duplicate|mirror)\s+(?:(?!(?:not|rather|instead|than)\b)\S+\s+){0,5}?(?:workflow|setup|render-condor|into\s+`?(?:Morrison-Lab/)?mcsg)'
+pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?:\b|(?<=\\n))(?:I.ll|I\s+will|let\s+me|we.ll|we\s+will|plan:?)\s+(?:(?!(?:not|never|avoid|rather|instead|than)\b)\S+\s+){0,3}?(?:copy|duplicate|mirror)\s+(?:(?!(?:not|rather|instead|than)\b)\S+\s+){0,5}?(?:workflow|setup|render-condor|into\s+`?(?:Morrison-Lab/)?mcsg)'
 ---
 
 Fails a plan that copies lds's own render workflow into mcsg ("I'll copy lds's render-condor.yml", "I'll copy the setup into mcsg").

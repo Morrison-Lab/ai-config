@@ -622,10 +622,10 @@ Hosted providers enforce their own rate and concurrency limits.
 Start with the provider's documented limit and reduce parallelism when responses report throttling.
 
 A local bound sits below the provider's.
-On `cf463-02` on 2026-11-17 (opencode 1.18.34), three `opencode run` processes started together under one user left two failing at once with `Error: Unexpected error` and `database is locked`, exit 1.
+On a Linux desktop whose home directory is on NFS, on 2026-11-17 (opencode 1.18.34), three `opencode run` processes started together under one user left two failing at once with `Error: Unexpected error` and `database is locked`, exit 1.
 The third ran on.
 opencode keeps its session state in the SQLite file `~/.local/share/opencode/opencode.db`, with `-wal` and `-shm` files beside it.
-On that machine the file sits on the NFS home directory.
+There the file sat on that NFS home.
 So treat runs under one user's home as serial unless measured otherwise.
 
 - **Do:** run one `opencode run` at a time per user, looping over models one after another.

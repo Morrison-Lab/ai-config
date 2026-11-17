@@ -122,7 +122,9 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
 - **Do:** batch the actions that need approval into one manual-mode stretch, then end it as "Say when it is over" describes.
   A `difm` stretch is the exception: it covers its one step.
 - **Do:** in a Claude Project, when the user answers the coordinator instead of the denied thread, the coordinator tells that thread, with the user's message attached by id, to ask the user again in its own thread.
-  The relayed message is not approval.
+  The coordinator's own note is never approval.
+  The user's message the server copies into the relay, as a `<cited author="user">` entry, is the user's own words:
+  where user or managed settings carry `scripts/wire-user-config.py`'s cited-message rule ([ai-config#5752](https://github.com/Morrison-Lab/ai-config/issues/5752)), the denied thread retries once on it before asking again.
 - **Don't:** when the switch conditions hold, end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
 - **Don't:** retry a denied command more than once, or rephrase it.
   A rerun after the session has left auto mode is not a retry.

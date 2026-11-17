@@ -536,8 +536,9 @@ comment proposes extending that hook rather than adding a second detector:
 a gate name on the left of a pipe into `tail`, `head`, or `grep`, an `&&`
 after it, and no `set -o pipefail` earlier in the command.)
 
-(The reverse case, the false failure the first **Do** names, hit
-Morrison-Lab/mcsg PR #121 on 2026-11-16:
+(The reverse case, the false failure that the `set -o pipefail;` **Do**
+warns a producer piped to `head` can raise, hit
+[mcsg#121](https://github.com/Morrison-Lab/mcsg/pull/121) on 2026-11-16:
 its `.github/ci-image/test.sh`, under `set -euo pipefail`, picked a file with
 `first=$(ls exercises/*/_exr-*.qmd | head -n 1)`.
 The glob matched 606 files, so `ls` took `SIGPIPE` once `head` exited,

@@ -2246,7 +2246,72 @@ def resolve_session_id(payload: dict | None = None) -> str | None:
     return os.environ.get("AI_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID")
 
 
+def _load_merge_word_detector():
+    """The merge-word hook, loaded by path (one copy of the rule), or None (fails closed)."""
+    import importlib.util
+    path = Path(__file__).resolve().parent / "remind-plain-english-merge-word.py"
+    try:
+        spec = importlib.util.spec_from_file_location("_nua_merge_word", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    except Exception:
+        return None
+
+
+def _user_prompts(transcript_path: str):
+    """Each prompt the user typed, oldest first; tool results, meta and sidechain records skipped."""
+    with open(transcript_path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(rec, dict) or rec.get("type") != "user":
+                continue
+            if rec.get("isMeta") or rec.get("isSidechain") or rec.get("isCompactSummary"):
+                continue
+            if "toolUseResult" in rec:
+                continue
+            msg = rec.get("message")
+            content = msg.get("content") if isinstance(msg, dict) else None
+            if isinstance(content, str):
+                yield content
+            elif isinstance(content, list):
+                if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
+                    continue
+                text = "\n".join(b.get("text", "") for b in content
+                                 if isinstance(b, dict) and b.get("type") == "text")
+                if text:
+                    yield text
+
+
+def transcript_merge_grant(payload: dict | None = None) -> bool:
+    """Whether this session's latest merge word or revocation is a grant (ai-config#5612).
+
+    Needs no Bash call, so a cloud session can merge with the MCP tool.
+    """
+    path = (payload or {}).get("transcript_path") or (payload or {}).get("transcriptPath")
+    if not isinstance(path, str) or not path.strip() or not os.path.isfile(path.strip()):
+        return False
+    detector = _load_merge_word_detector()
+    if detector is None:
+        return False
+    granted = False
+    try:
+        for prompt in _user_prompts(path.strip()):
+            if detector.revokes(prompt):
+                granted = False
+            elif detector.merge_word(prompt, strict=True):
+                granted = True
+    except Exception:
+        return False
+    return granted
+
+
 def check_mwc_active(payload: dict | None = None) -> bool:
+    if transcript_merge_grant(payload):
+        return True
     try:
         current_session = resolve_session_id(payload)
         if not current_session:
@@ -2508,9 +2573,11 @@ def main() -> int:
         "by the user, executing under an explicit override (e.g. ALLOW_MERGE=1 or active /mwc), or "
         "merging a PR whose target repo carries a standing grant (see STANDING_MERGE_GRANT_REPOS), "
         "or merging an infra-only PR under the standing infra-PR grant (see INFRA_PATH_PATTERNS).\n\n"
-        "Only if the user themselves gave a grant in this session (a bare /mwc or /mwc all, "
-        "no PR number needed, possibly relayed with their message id), this block means "
-        "`ai-session.sh enable-mwc` has not run: run it, confirm with `check-mwc`, then retry. "
+        "A plain-English grant the user typed in this session (`mwc`, \"merge them all\", "
+        "\"merge when ready\") is read from the transcript and needs no command; if one was "
+        "given and this still blocks, the words were not recognized, so say so rather than "
+        "retrying. Otherwise, only if the user gave a grant (possibly relayed with their "
+        "message id), run `ai-session.sh enable-mwc`, confirm with `check-mwc`, then retry. "
         "Without that grant, do not merge.\n\n"
         + mwc_diagnosis(payload)
     )

@@ -51,9 +51,7 @@ The check has to be armed or awaited, not remembered:
   to catch a late-starting `workflow_run` job the first pass could not have seen.
 - **Schedule a check-in** when the runs will not finish quickly (a render, a deploy),
   rather than reporting the merge done and moving on.
-  This is the same obligation [`AGENTS.md`](../../AGENTS.md)'s
-  "Resume every non-clean pause" already states in general,
-  applied to the specific moment right after a merge.
+  This is the same obligation [`AGENTS.md`](../../AGENTS.md)'s "Leave every pause honest and resumable" section already states in general (its "Resume every non-clean pause" bullet), applied to the specific moment right after a merge.
 
 - **Do:** after every merge, run the instrument above against the merge
   commit and read its exit code before reporting the merge done.

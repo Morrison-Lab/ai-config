@@ -58,6 +58,10 @@ python3 scripts/triage-backlog.py -R <owner>/<repo> --override N=P ... --apply  
 
 Adding a label the repo lacks creates it with GitHub's default colour.
 
+A run that nobody reviews first, such as a scheduled one, adds `--labels-only`:
+it applies the priority labels and leaves every proposed close for this attended pass.
+Add `--ceiling N` to any run to print the open count against the backlog's ceiling.
+
 ### 4. Report
 
 Post nothing to the tracker beyond the closes' own comments.

@@ -66,6 +66,15 @@ Do not send restricted data (FERPA records, PHI): the briefing leaves the machin
 
 Run the advisor in the engine's read-only or plan mode, with no session persistence where the engine supports it.
 Pass `model` and `effort` explicitly.
+`scripts/run-advisor.py` makes the call and runs step 4's seat check before it, and after it where the engine names the model that answered:
+
+```bash
+python3 scripts/run-advisor.py --caller-model <caller> --engine opencode --model <model> --effort <effort> --briefing <briefing_path>
+```
+
+For `opencode`, it sends one streamed request with no tools to the OpenCode Go endpoint, so the advisor can only answer, and it checks the model the reply names.
+It relies on the cloud proxy for the API key, and whether the endpoint honours its `reasoning_effort` field is unmeasured.
+For `agy`, it runs `agy --mode plan --print=<briefing>`, which names no model, so the wrapper labels that seat unverified.
 Engine invocation details are in the delegate skills' memories (`memories/delegation.md`, `memories/antigravity.md`).
 
 ### 4. Never fall back to the caller's family
@@ -73,6 +82,21 @@ Engine invocation details are in the delegate skills' memories (`memories/delega
 If the chosen model is unavailable, report that and stop, or pick another engine outside the caller's family.
 A same-family substitute is not independent, so it defeats the point of asking.
 A different model in the caller's own family is a weaker and cheaper option: name it as weaker in the result, and do not call it equivalent.
+
+`scripts/check-advisor-seat.py` checks this rule and step 3's explicit `model` and `effort`.
+`run-advisor.py` runs it for you.
+For a call the wrapper does not make, run it before the call, and again after with `--reported-model` set to the model the reply names:
+
+```bash
+python3 scripts/check-advisor-seat.py --caller-model <caller> --engine <engine> --model <model> --effort <effort>
+```
+
+It exits 2 on a same-family seat, an engine whose name contains `codex`, an effort that names no level (blank, or a word such as `default` or `inherit`), a model name that is unknown or names two families, or a reply from a model other than the one requested or its dated snapshot.
+`--allow-same-family` accepts a same-family seat and prints it as weaker, and `--family PREFIX=FAMILY` classifies a model the built-in table does not know.
+The `adversarial-reviewer` agent's "Advisor consults from the caller's own family" item is the reviewer's layer for this rule.
+
+- **Do:** run the script before and after the call, and stop on exit 2.
+- **Don't:** take an answer from whatever model the engine fell back to, since a substitute from your own family is not the independent read you asked for.
 
 ### 5. Treat the answer as evidence
 
@@ -84,5 +108,4 @@ Do not settle it by coin flip.
 
 ## Not covered yet
 
-[ai-config#884](https://github.com/Morrison-Lab/ai-config/issues/884) tracks the later slices:
-a script that enforces steps 3 and 4 mechanically, and whether `context: fork` can replace a separate process (it isolates conversation history but stays on an agent type in this session, so it is not a cross-family consult).
+[ai-config#884](https://github.com/Morrison-Lab/ai-config/issues/884) tracks the last open question: whether `context: fork` can replace a separate process (it isolates conversation history but stays on an agent type in this session, so it is not a cross-family consult).

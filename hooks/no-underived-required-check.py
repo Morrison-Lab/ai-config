@@ -73,14 +73,30 @@ as this repo's cautionary example.
 Fails OPEN on any parse trouble.
 """
 import functools
-import importlib.util
 import json
 import os
 import re
 import shlex
 import sys
 
-_HERE = os.path.dirname(os.path.realpath(__file__))
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"no-underived-required-check: cannot load scripts/lib/sibling.py "
+          f"({_exc}); require-gh-repo-flag.py will not load", file=sys.stderr)
+    load_sibling = None
+
+
+def _load_gh_repo_flag_hook():
+    """Import `require-gh-repo-flag.py` (scripts/lib/sibling.py); raises if it cannot load."""
+    if load_sibling is None:
+        raise ImportError("scripts/lib/sibling.py is not importable")
+    return load_sibling(__file__, "require-gh-repo-flag.py", "_gh_repo_flag_parser",
+                        required=True)
 
 
 @functools.lru_cache(maxsize=None)
@@ -94,10 +110,7 @@ def _load_shell_parser():
     whole parser file, and a mutation harness calls it hundreds of times per
     run.
     """
-    path = os.path.join(_HERE, "require-gh-repo-flag.py")
-    spec = importlib.util.spec_from_file_location("_gh_repo_flag_parser", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    module = _load_gh_repo_flag_hook()
     return module.strip_heredocs, module.split_command
 
 

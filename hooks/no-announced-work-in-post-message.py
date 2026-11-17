@@ -31,21 +31,27 @@ past tense.
 
 Fails open on any parse trouble.
 """
-import importlib.util
 import json
 import os
 import sys
 
-HERE = os.path.dirname(os.path.realpath(__file__))
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"no-announced-work-in-post-message: cannot load scripts/lib/sibling.py "
+          f"({_exc}); its sibling hook will not load", file=sys.stderr)
+    load_sibling = None
 
 
 def _load_stop_hook():
-    spec = importlib.util.spec_from_file_location(
-        "announced_start", os.path.join(HERE, "no-announced-start-without-starting.py")
-    )
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """Import `no-announced-start-without-starting.py` (scripts/lib/sibling.py); raises if it cannot load."""
+    if load_sibling is None:
+        raise ImportError("scripts/lib/sibling.py is not importable")
+    return load_sibling(__file__, "no-announced-start-without-starting.py", "announced_start", required=True)
 
 
 def last_checklist(path):

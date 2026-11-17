@@ -10,7 +10,6 @@ flag-config-deletion-without-ref-check.py antigravity
 flag-stale-clean-tree-claim.py post_message
 no-clean-stop-with-live-agent.py antigravity
 no-clean-stop-with-live-agent.py post_message
-no-empty-promise.py post_message
 no-incomplete-check-enumeration.py post_message
 no-memory-only-learning.py antigravity
 no-memory-only-learning.py post_message

@@ -1,0 +1,92 @@
+# The unattended half of the weekly backlog triage pass
+# (shared/workflow/triage-backlog.md, "The unattended half: labels only").
+#
+# Gives each open issue with no priority label the label the plan proposes for
+# it (P1, P2 or P3), and closes nothing. An issue the plan would close (junk or
+# a duplicate) is left unlabelled for the attended `triage` skill, where a
+# reader reviews each close. Also reports the open count, against the ceiling
+# in the repository variable ISSUE_CEILING when that variable is set.
+#
+# The `label` job calls the shared workflow in Morrison-Lab/gha (gha#1900),
+# which runs gha's copy of scripts/triage-backlog.py.
+# The `script-drift` job fails when that copy and this repository's differ.
+name: Triage backlog (labels only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Print each label command without running it.
+        type: boolean
+        default: true
+  schedule:
+    - cron: '0 7 * * 1' # Weekly on Monday at 07:00 UTC
+  # A pull request that changes the script or this file runs `script-drift`
+  # only, so a change that is not ported to gha fails before it merges.
+  # The check reads gha at the v3 tag, so gha's copy changes first: its pull
+  # request merges and v3 moves before the same change can pass here.
+  pull_request:
+    paths:
+      - scripts/triage-backlog.py
+      - .github/workflows/triage-backlog.yml
+
+permissions: {}
+
+jobs:
+  label:
+    name: Label unprioritized issues
+    if: github.repository == 'Morrison-Lab/ai-config' && github.event_name != 'pull_request'
+    permissions:
+      issues: write
+    # On the job, not the workflow, so a pull request's drift check never
+    # waits behind a labelling run. The called workflow sets no group.
+    concurrency:
+      group: triage-backlog
+      cancel-in-progress: false
+    uses: Morrison-Lab/gha/.github/workflows/triage-backlog.yml@v3
+    with:
+      # false on the schedule, the ticked box on a manual run,
+      # and true on any other trigger added later.
+      dry-run: ${{ github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.dry-run) }}
+      ceiling: ${{ vars.ISSUE_CEILING }}
+
+  script-drift:
+    name: Compare the script with gha's copy
+    if: github.repository == 'Morrison-Lab/ai-config'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check out gha at the tag the label job runs
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: Morrison-Lab/gha
+          ref: v3
+          path: gha
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: triage-backlog
+
+      - name: Fail when the two copies differ
+        run: |
+          set -euo pipefail
+          ours=scripts/triage-backlog.py
+          theirs=gha/triage-backlog/triage-backlog.py
+          for copy in "$ours" "$theirs"; do
+            if [ ! -s "$copy" ]; then
+              echo "::error::$copy is missing or empty, so the copies were not compared."
+              exit 1
+            fi
+          done
+          if ! diff -u "$ours" "$theirs"; then
+            echo "::error::scripts/triage-backlog.py differs from Morrison-Lab/gha's triage-backlog/triage-backlog.py at v3. Port the change to the other repository."
+            exit 1
+          fi
+          echo "The two copies are identical."

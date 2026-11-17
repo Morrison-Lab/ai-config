@@ -489,7 +489,8 @@ def test_changed_end_to_end():
                        env=env)
         # Create a file and commit it
         (Path(tmp) / "test.md").write_text("x", encoding="utf-8")
-        subprocess.run(["git", "add", "test.md"], cwd=tmp, check=True,
+        (Path(tmp) / "keep.md").write_text("".join(f"line {i}\n" for i in range(40)), encoding="utf-8")
+        subprocess.run(["git", "add", "test.md", "keep.md"], cwd=tmp, check=True,
                        env=env)
         subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp, check=True,
                        env=env)
@@ -510,9 +511,204 @@ def test_changed_end_to_end():
         # md file changed, lint-markdown should be RUN/PARTIAL/NOT RUN, not skipped
         check("lint-markdown is not skipped by file scope", "SKIP     [validate] lint-markdown: no scoped files changed" not in text)
         check("lint-qmd is skipped because no qmd file changed", "SKIP     [lint-qmd] lint-qmd: no scoped files changed" in text)
+        # ai-config#5087: a rename lists both sides, so a suite reading the old path is still selected.
+        subprocess.run(["git", "mv", "keep.md", "renamed.md"], cwd=tmp, check=True, env=env)
+        subprocess.run(["git", "commit", "-q", "-m", "rename"], cwd=tmp, check=True, env=env)
+        check("a rename lists both the old and the new path",
+              {"keep.md", "renamed.md"} <= set(rlv.changed_files(Path(tmp), "main") or []))
+
+
+SNAPSHOT_FIXTURE = """
+jobs:
+  validate:
+    steps:
+      - name: Sees the new file
+        run: test -n "$(git ls-files new.py)"
+      - name: Starts with an empty TMPDIR
+        run: test -z "$(ls -A "$TMPDIR")" && touch "$TMPDIR/sentinel"
+      - name: Shares the TMPDIR across steps, as a CI job does
+        run: test -e "$TMPDIR/sentinel"
+      - name: Runs at the root it was given
+        run: test "$(git rev-parse --show-prefix)" = "$EXPECT_PREFIX"
+"""
+
+
+def test_snapshot_sees_untracked_files():
+    """ai-config#4910: a checker listing `git ls-files` must see a new file, as CI does."""
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        env = {**os.environ, **GIT_IDENTITY}
+        wf = Path(tmp) / "wf.yml"
+        wf.write_text(SNAPSHOT_FIXTURE, encoding="utf-8")
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        (repo / "README.md").write_text("x\n", encoding="utf-8")
+        for cmd in (["init", "-q", "-b", "main"], ["add", "README.md"], ["commit", "-q", "-m", "init"]):
+            subprocess.run(["git", *cmd], cwd=repo, check=True, env=env)
+        (repo / "new.py").write_text("print(1)\n", encoding="utf-8")
+        args = ["--workflow", str(wf), "--root", str(repo), "--no-other-workflows"]
+        os.environ["EXPECT_PREFIX"] = ""
+        try:
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                rc = rlv.main(args)
+            check("the snapshot run sees an untracked new file and passes",
+                  rc == 0 and "4 passed, 0 failed" in out.getvalue())
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                rc = rlv.main(args + ["--in-place"])
+            check("--in-place misses the untracked file (the #4910 false pass, negative control), "
+                  "and a second run starts with an empty TMPDIR",
+                  rc == 1 and "3 passed, 1 failed" in out.getvalue()
+                  and "FAILED: Sees the new file" in out.getvalue())
+            (repo / "sub").mkdir()
+            (repo / "sub" / "new.py").write_text("print(2)\n", encoding="utf-8")
+            os.environ["EXPECT_PREFIX"] = "sub/"
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                rc = rlv.main(["--workflow", str(wf), "--root", str(repo / "sub"), "--no-other-workflows"])
+            check("a subdirectory root runs at that subdirectory inside the snapshot",
+                  rc == 0 and "4 passed, 0 failed" in out.getvalue())
+        finally:
+            del os.environ["EXPECT_PREFIX"]
+            (repo / "sub" / "new.py").unlink(missing_ok=True)
+            if (repo / "sub").is_dir():
+                (repo / "sub").rmdir()
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=repo, capture_output=True,
+                                text=True, check=True, env=env).stdout
+        worktrees = subprocess.run(["git", "worktree", "list"], cwd=repo, capture_output=True,
+                                   text=True, check=True, env=env).stdout
+        check("the snapshot leaves the index untouched and removes its worktree",
+              status == "?? new.py\n" and len(worktrees.splitlines()) == 1)
+        changed = rlv.changed_files(repo, "main")
+        check("--changed counts an untracked file as changed", changed == ["new.py"])
+
+        real_git = rlv._git
+
+        def failing_git(root, *git_args, env=None):
+            if git_args[:1] == ("write-tree",):
+                raise subprocess.CalledProcessError(128, ["git", *git_args], stderr="planted failure")
+            return real_git(root, *git_args, env=env)
+
+        before = set(Path(tempfile.gettempdir()).glob("rlv-snapshot-*"))
+        rlv._git = failing_git
+        try:
+            err = io.StringIO()
+            with redirect_stdout(io.StringIO()), redirect_stderr(err):
+                rc = rlv.main(args)
+        finally:
+            rlv._git = real_git
+        after = set(Path(tempfile.gettempdir()).glob("rlv-snapshot-*"))
+        check("a git failure building the snapshot exits 2 with the reason and leaves no temp dir",
+              rc == 2 and "planted failure" in err.getvalue() and after == before)
+
+
+HANDOFF_FIXTURE = """
+jobs:
+  validate:
+    steps:
+      - name: Reads the changed list
+        run: grep -qx new.md "$RLV_CHANGED_FILES"
+"""
+
+NO_LIST_FIXTURE = """
+jobs:
+  validate:
+    steps:
+      - name: Gets no changed list
+        run: test -z "${RLV_CHANGED_FILES:-}"
+"""
+
+
+def test_changed_list_handoff():
+    """ai-config#5087: --changed hands each step its list; a plain run hands none."""
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        env = {**os.environ, **GIT_IDENTITY}
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        (repo / "README.md").write_text("x\n", encoding="utf-8")
+        for cmd in (["init", "-q", "-b", "main"], ["add", "README.md"], ["commit", "-q", "-m", "init"],
+                    ["checkout", "-q", "-b", "feature"]):
+            subprocess.run(["git", *cmd], cwd=repo, check=True, env=env)
+        (repo / "new.md").write_text("y\n", encoding="utf-8")
+        reads, none = Path(tmp) / "reads.yml", Path(tmp) / "none.yml"
+        reads.write_text(HANDOFF_FIXTURE, encoding="utf-8")
+        none.write_text(NO_LIST_FIXTURE, encoding="utf-8")
+
+        def run(wf, *extra):
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                return rlv.main(["--workflow", str(wf), "--root", str(repo), "--no-other-workflows", *extra])
+
+        check("--changed hands a step the changed list", run(reads, "--changed", "--base", "main") == 0)
+        check("a plain run hands it no list (negative control)", run(reads) == 1)
+        old = os.environ.get("RLV_CHANGED_FILES")
+        os.environ["RLV_CHANGED_FILES"] = str(Path(tmp) / "inherited.txt")
+        try:
+            check("a plain run drops an inherited list", run(none) == 0)
+        finally:
+            os.environ.pop("RLV_CHANGED_FILES")
+            if old is not None:
+                os.environ["RLV_CHANGED_FILES"] = old
+
+
+def test_bash_needs_a_shell_that_sees_this_checkout():
+    """bash() keeps only a shell that sees the checkout's own paths (ai-config#3724).
+
+    Every stand-in here runs on any runner: a Python interpreter fails the
+    probe as the WSL launcher with no distribution does, and the real bash
+    run with the path moved under /mnt shows the probe depends on the path,
+    which is what a WSL launcher with a distribution would see.
+    """
+    findbash = sys.modules["findbash"]
+    saved = (rlv._BASH, os.environ.get("AI_SESSION_BASH"), findbash.CANDIDATES,
+             findbash.shutil.which)
+    try:
+        os.environ["AI_SESSION_BASH"] = sys.executable
+        rlv._BASH = None
+        chosen = rlv.bash()
+        check("a shell that fails the probe is passed over", chosen != sys.executable)
+
+        probes = []
+        real_probe = rlv.probe_bash
+        rlv.probe_bash = lambda args: probes.append(args) or chosen
+        try:
+            rlv._BASH = None
+            rlv.bash()
+        finally:
+            rlv.probe_bash = real_probe
+        args = list(probes[0])
+        check("the probe is handed this checkout's own script path",
+              args[-1] == Path(rlv.__file__).resolve().as_posix())
+        seen = subprocess.run([chosen, *args], capture_output=True).returncode
+        args[-1] = "/mnt/x" + args[-1]
+        moved = subprocess.run([chosen, *args], capture_output=True).returncode
+        check("the probe passes on this checkout's own path", seen == 0)
+        check("the probe fails when the checkout sits elsewhere", moved != 0)
+
+        findbash.CANDIDATES = ()
+        findbash.shutil.which = lambda name: None
+        rlv._BASH = None
+        try:
+            rlv.bash()
+            message = None
+        except SystemExit as exc:
+            message = str(exc.code)
+        check("no usable bash stops the run with an error",
+              message is not None and "AI_SESSION_BASH" in message)
+    finally:
+        rlv._BASH = saved[0]
+        if saved[1] is None:
+            os.environ.pop("AI_SESSION_BASH", None)
+        else:
+            os.environ["AI_SESSION_BASH"] = saved[1]
+        findbash.CANDIDATES = saved[2]
+        findbash.shutil.which = saved[3]
 
 
 def main():
+    print('running test_changed_list_handoff()', flush=True)
+    test_changed_list_handoff()
+    print('running test_snapshot_sees_untracked_files()', flush=True)
+    test_snapshot_sees_untracked_files()
     print('running test_expression_regex_edge_cases()', flush=True)
     test_expression_regex_edge_cases()
     print('running test_other_workflow_files()', flush=True)
@@ -545,6 +741,8 @@ def main():
     test_live_workflow_derives_every_python_test_suite()
     print('running test_equivalents_table_covers_all_uses_jobs()', flush=True)
     test_equivalents_table_covers_all_uses_jobs()
+    print('running test_bash_needs_a_shell_that_sees_this_checkout()', flush=True)
+    test_bash_needs_a_shell_that_sees_this_checkout()
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

@@ -126,6 +126,61 @@ check("and its remainder is not either",
       shellcmd.git_subcommand(["push", "--force"]), None)
 check("empty input", shellcmd.simple_commands(""), [])
 
+# The token stream the two refusing hooks walk themselves (ai-config#3178):
+# operators stay in it as runs, a heredoc body and a comment do not.
+check("shell_tokens keeps operator runs",
+      shellcmd.shell_tokens("(cd a && make) & git push"),
+      ["(", "cd", "a", "&&", "make", ")", "&", "git", "push"])
+check("shell_tokens blanks a heredoc and keeps the next command",
+      shellcmd.shell_tokens("git commit -F - <<'EOF'\ngit push\nEOF\nls"),
+      ["git", "commit", "-F", "-", "<<", ";", "ls"])
+check("a blanked heredoc leaves ONE separator, so no `;;` ends a case arm",
+      shellcmd.shell_tokens("case x in a) git commit -F - <<EOF\nmsg\nEOF\n"
+                            "(cd wt && git push);; esac"),
+      ["case", "x", "in", "a", ")", "git", "commit", "-F", "-", "<<", ";(",
+       "cd", "wt", "&&", "git", "push", ");;", "esac"])
+check("two heredocs on one line still leave one separator",
+      shellcmd.shell_tokens("cat <<A > f1 && cat <<B > f2\na\nA\nb\nB\ngit push"),
+      ["cat", "<<", ">", "f1", "&&", "cat", "<<", ">", "f2", ";", "git",
+       "push"])
+
+
+def _mutant_tokens(find, replace, command):
+    """`shell_tokens(command)` from a copy of the module with one edit.
+
+    The hooks' own mutation harnesses rewrite only the hook file, so the
+    preprocessing that moved here gets its reversions here (ai-config#3178).
+    """
+    path = os.path.join(HERE, "lib", "shellcmd.py")
+    with open(path, encoding="utf-8") as handle:
+        source = handle.read()
+    if source.count(find) != 1:
+        failures.append(f"mutation anchor not present exactly once: {find!r}")
+        return None
+    namespace = {"__name__": "shellcmd_mutant"}
+    exec(compile(source.replace(find, replace), path, "exec"), namespace)
+    return namespace["shell_tokens"](command)
+
+
+HEREDOC_CASE = "git commit -F - <<'EOF'\ngit push\nEOF\nls"
+check("mutation: without heredoc blanking the body's push is a command",
+      "push" in (_mutant_tokens("    command = _heredoc_free(command)\n",
+                                "", HEREDOC_CASE) or []),
+      True)
+check("mutation: keeping the terminator's newline reintroduces `;;`",
+      ";;" in (_mutant_tokens('        elif command.startswith("\\n", pos):\n'
+                              "            pos += 1\n", "",
+                              HEREDOC_CASE) or []),
+      True)
+check("shell_tokens drops a comment",
+      shellcmd.shell_tokens("git status # git push\nls"),
+      ["git", "status", ";", "ls"])
+check("shell_tokens is None on a parse error",
+      shellcmd.shell_tokens("echo 'unclosed"), None)
+check("is_operator_token on a run",
+      [shellcmd.is_operator_token(t) for t in (")&&(", ";", "<<", "", "a")],
+      [True, True, False, False, False])
+
 # ------------------------------------------------------------- heredocs
 #
 # The substitution `" << "` rather than `"<<"` is the load-bearing detail, and
@@ -613,6 +668,87 @@ for given, want in (
     check(f"native_path({given!r}) on Windows", shellcmd.native_path(given, True), want)
 check("native_path leaves /c/... alone off Windows",
       shellcmd.native_path("/c/Users/x", False), "/c/Users/x")
+
+# A `#` inside a word starts no comment; one after a blank does.
+for given, want in (
+    ("echo x#y; chmod -R u+w /etc", [["echo", "x#y"], ["chmod", "-R", "u+w", "/etc"]]),
+    ("sed -i s#a#b#g f && ls", [["sed", "-i", "s#a#b#g", "f"], ["ls"]]),
+    ("echo $# ${#A}; ls", [["echo", "$#", "${#A}"], ["ls"]]),
+    ("echo x # cd /etc\nls", [["echo", "x"], ["ls"]]),
+    ("echo a\\ #b; ls", [["echo", "a #b"], ["ls"]]),
+    ("(echo x)#y\nls", [["echo", "x"], ["ls"]]),
+):
+    check(f"simple_commands({given!r})", shellcmd.simple_commands(given), want)
+
+# The `)` closing a `$(` or `$((` ends no word, so a `#` after it is kept.
+for given, want in (
+    ("echo $(x)#y; ls", "echo $(x)#y; ls"),
+    ("echo $((1))#y; ls", "echo $((1))#y; ls"),
+    ("echo $(a $(b))#y; ls", "echo $(a $(b))#y; ls"),
+    ("diff <(ls)#x; ls", "diff <(ls)#x; ls"),
+    ("tee >(cat)#x; ls", "tee >(cat)#x; ls"),
+    ("a=(x y)#z; ls", "a=(x y)#z; ls"),
+    ("echo $(x) #y\nls", "echo $(x) \nls"),
+    ("(echo x)#y\nls", "(echo x)\nls"),
+    ("echo a\\ #b", "echo a\\ #b"),
+    ("echo \\ #b; ls", "echo \\ #b; ls"),
+):
+    check(f"_comment_free({given!r})", shellcmd._comment_free(given), want)
+
+# Push-detector parity (ai-config#1920). no-clobbering-push and
+# no-unreviewed-pr each decide whether an argv is a `git push`, and a guard
+# that misses one stays silent. One corpus, three readers, one answer.
+import importlib.util  # noqa: E402
+
+
+def _load_hook(name):
+    path = os.path.join(os.path.dirname(HERE), "hooks", name + ".py")
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_clobber = _load_hook("no-clobbering-push")
+_unreviewed = _load_hook("no-unreviewed-pr")
+# Each argv carries git's own answer (checked on git 2.43), so the corpus
+# tests correctness as well as agreement.
+for argv, is_push in (
+    (["git", "push", "origin", "main"], True),
+    (["git", "-C", "/repo", "push"], True),
+    (["git", "-c", "push.default=current", "push"], True),
+    (["git", "--git-dir", "/r/.git", "push"], True),
+    (["git", "--git-dir=/r/.git", "push"], True),
+    (["git", "--work-tree", "/r", "push"], True),
+    (["git", "--namespace", "ns", "push"], True),
+    (["git", "--config-env", "user.name=NAME", "push"], True),
+    (["git", "--exec-path=/x", "push"], True),
+    (["git", "--exec-path", "/x", "push"], False),  # prints the path, exits
+    (["git", "--attr-source", "HEAD", "push"], True),
+    (["git", "-C", "/repo", "-c", "k=v", "push"], True),
+    (["git", "--work-tree=/r", "push"], True),
+    (["git", "--config-env=k=v", "push"], True),
+    (["git", "-c", "alias.x=push", "push"], True),
+    (["git", "-c", "alias.x=push", "status"], False),
+    (["git", "push", "--force", "origin", "main"], True),
+    (["git", "--no-pager", "push"], True),
+    (["git", "-C", "push", "status"], False),
+    (["git", "-c", "push"], False),
+    (["git", "status"], False),
+    (["git", "push-it"], False),
+    (["echo", "git", "push"], False),
+):
+    via_lib = shellcmd.git_subcommand(argv)
+    check(f"shellcmd reads {argv} as a push",
+          via_lib is not None and via_lib[0] == "push", is_push)
+    check(f"no-clobbering-push reads {argv} as a push",
+          _clobber._push_argv(argv)[0] is not None, is_push)
+    idx = _unreviewed._git_subcommand_index(argv)
+    check(f"no-unreviewed-pr reads {argv} as a push",
+          idx is not None and argv[idx] == "push", is_push)
+    # No case pushes with --dry-run or --delete, so _argv_push agrees too.
+    check(f"no-unreviewed-pr's _argv_push reads {argv} as a push",
+          _unreviewed._argv_push(argv), is_push)
 
 if failures:
     print("FAILED:")

@@ -41,7 +41,9 @@ Which gates apply to which files is derived, not recalled (#3120). Each
 SKIPPED with the reason. The `validate` job declares no path filter in
 validate.yml, so its steps are repo-wide and always selected -- which is what
 CI does too. A gate is never dropped silently: a run that selected two gates
-and a run that selected five print different plans.
+and a run that selected five print different plans. Under --changed,
+scripts/test_hooks.py runs only the hook suites the change can affect, read
+from RLV_CHANGED_FILES (scripts/lib/changed_selection.py, #5087).
 
 Steps whose name matches --skip (default: the dependency install, which needs
 the network and is already satisfied locally) are skipped and counted.
@@ -49,6 +51,20 @@ the network and is already satisfied locally) are skipped and counted.
 A dirty working tree is reported before anything runs: a check measured
 against a tree an edit is about to change expires with the edit (#1262).
 --require-clean turns that report into exit 2.
+
+Steps run in a snapshot, not in the working tree (ai-config#4910). CI checks
+out a commit, so a checker that lists `git ls-files` sees every file the PR
+adds; run in place, the same checker never saw a new file that was not yet
+`git add`ed, and passed a tree CI then failed. The snapshot is a detached
+worktree at a throwaway commit holding the working tree as `git add -A` would
+stage it (tracked edits plus untracked, non-ignored files), so a step sees
+what CI will check out and nothing git ignores. Like CI's merge commit, HEAD
+there is a commit no one authored. Checked-out submodules are linked in, not
+copied. The index and refs are never written, and the worktree is removed
+afterwards. --in-place runs in the working tree instead; a root with no git
+commit runs in place and says so. The run also gets its own empty TMPDIR
+(and TEMP, TMP), shared by its steps as a CI job's are, so a sentinel an
+earlier run left behind cannot change a result (#4806).
 
 Exit codes:
   0  every step that ran passed
@@ -68,15 +84,21 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import fnmatch
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from findbash import probe_bash  # noqa: E402
 
 _REQUIRES_CACHE = {}
 
@@ -198,6 +220,8 @@ LOCAL_EQUIVALENTS = {
     "preview.yml": lambda j, b: None,
     "quarto-publish": lambda j, b: None,
     "sync-shared-fragments": lambda j, b: None,
+    # Labels issues on GitHub on a schedule; nothing to run before a push.
+    "triage-backlog": lambda j, b: None,
 }
 
 
@@ -258,14 +282,20 @@ def matches_scope(path: str, globs: List[str], paths_ignore: List[str]) -> bool:
 
 
 def changed_files(root: Path, base: str) -> Optional[List[str]]:
-    """`git diff --name-only <base>...HEAD`, or None when it cannot be read.
+    """Files changed since the merge base with `base`, or None when unreadable.
+
+    The working tree is compared, not HEAD, and untracked non-ignored files
+    are added, so the set matches the snapshot the steps run in (#4910).
 
     None is not an empty diff. An empty list would select no scoped gate at
     all, which is the clean-verdict-over-an-empty-population failure
     (ai-config#3114); the caller reports the failure and selects everything."""
     try:
-        out = subprocess.run(["git", "diff", "--name-only", f"{base}...HEAD"],
-                             cwd=str(root), capture_output=True, text=True, check=True).stdout
+        merge_base = _git(root, "merge-base", base, "HEAD")
+        # Both lists in repository-root terms, which the scope globs use.
+        # --no-renames lists both sides of a rename, so the old path is not lost.
+        out = _git(root, "diff", "--name-only", "--no-renames", merge_base) + "\n" + _git(
+            root, "ls-files", "--others", "--exclude-standard", "--full-name", ":/")
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         print(f"warning: could not compute the changed-file list against {base} ({exc}); "
               "every gate is selected", file=sys.stderr)
@@ -423,15 +453,139 @@ def load_workflow(path: Path) -> Dict[str, Any]:
     return doc
 
 
-def run_step(step: Step, root: Path, timeout: Optional[float]) -> int:
+_BASH: Optional[str] = None
+
+
+def bash() -> str:
+    """The bash that runs every step: one that sees this checkout's own paths.
+
+    A bare "bash" on a Windows runner is the WSL launcher, which fails every
+    step with "Windows Subsystem for Linux has no installed distributions",
+    or, with a distribution installed, sees the checkout under /mnt/c
+    (ai-config#3724). So probe: keep the first candidate that can find this
+    script at its native path, and stop with an error when none can.
+    """
+    global _BASH
+    if _BASH is None:
+        found = probe_bash(("-c", 'test -f "$1"', "bash", Path(__file__).resolve().as_posix()))
+        if found is None:
+            sys.exit("error: no bash here can see this checkout's paths; "
+                     "set AI_SESSION_BASH to one that can (Git Bash on Windows)")
+        _BASH = found
+    return _BASH
+
+
+def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None,
+             changed_listing: Optional[str] = None) -> int:
     env = dict(os.environ)
+    # The run's own empty temp directory, as a CI runner starts with one
+    # (#4806); a step that sets TMPDIR, TEMP or TMP itself still wins.
+    if tmpdir:
+        for name in ("TMPDIR", "TEMP", "TMP"):
+            env[name] = tmpdir
+    # --changed hands its file list to suites that select their own cases
+    # (scripts/test_hooks.py); CI never sets it, so CI runs everything.
+    env.pop("RLV_CHANGED_FILES", None)
+    if changed_listing:
+        env["RLV_CHANGED_FILES"] = changed_listing
     env.update(step.env)
     cwd = root / step.cwd if step.cwd else root
     proc = subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", step.command],
+        [bash(), "-e", "-o", "pipefail", "-c", step.command],
         cwd=str(cwd), env=env, timeout=timeout,
     )
     return proc.returncode
+
+
+def _git(root: Path, *args: str, env: Optional[Dict[str, str]] = None) -> str:
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
+                          check=True, env=env).stdout.strip()
+
+
+class SnapshotError(RuntimeError):
+    """A git command building the snapshot failed; the run stops with exit 2."""
+
+
+def _has_commit(root: Path) -> bool:
+    try:
+        _git(root, "rev-parse", "--verify", "-q", "HEAD")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    return True
+
+
+def _populated_submodules(top: Path) -> List[str]:
+    """Paths (relative to top) of the submodules checked out in the working tree."""
+    gitmodules = top / ".gitmodules"
+    if not gitmodules.is_file():
+        return []
+    proc = subprocess.run(["git", "-C", str(top), "config", "-f", str(gitmodules), "--get-regexp",
+                           r"^submodule\..*\.path$"], capture_output=True, text=True)
+    if proc.returncode == 1:  # no entry matched: a .gitmodules naming no submodule
+        return []
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, proc.args, proc.stdout, proc.stderr)
+    paths = [line.split(" ", 1)[1] for line in proc.stdout.splitlines() if " " in line]
+    return [p for p in paths if (top / p).is_dir() and any((top / p).iterdir())]
+
+
+@contextlib.contextmanager
+def snapshot(root: Path):
+    """Yield where to run: root's place inside a detached worktree of the working tree.
+
+    The worktree sits at a throwaway commit holding the working tree as
+    `git add -A` would stage it, built under a temporary GIT_INDEX_FILE, so
+    the real index and refs are never written (ai-config#4910). Its objects
+    land in the repository's object store, unreferenced, for `git gc` to
+    collect. Yields root itself, after saying why, when root has no commit to
+    build on. Every git failure raises SnapshotError, and the worktree and
+    its directory are removed on every exit path.
+    """
+    if not _has_commit(root):
+        print(f"info: {root} has no git commit to snapshot; running in place", file=sys.stderr)
+        yield root
+        return
+    holder = Path(tempfile.mkdtemp(prefix="rlv-snapshot-"))
+    wt = holder / "tree"
+    top = None
+    try:
+        try:
+            top = Path(_git(root, "rev-parse", "--show-toplevel"))
+            real_index = Path(_git(top, "rev-parse", "--git-path", "index"))
+            if not real_index.is_absolute():
+                real_index = top / real_index
+            index = holder / "index"
+            if real_index.is_file():
+                shutil.copyfile(real_index, index)
+            env = {**os.environ, "GIT_INDEX_FILE": str(index),
+                   "GIT_AUTHOR_NAME": "rlv", "GIT_AUTHOR_EMAIL": "rlv@localhost",
+                   "GIT_COMMITTER_NAME": "rlv", "GIT_COMMITTER_EMAIL": "rlv@localhost"}
+            _git(top, "add", "-A", env=env)
+            tree = _git(top, "write-tree", env=env)
+            commit = _git(top, "commit-tree", tree, "-p", "HEAD", "-m", "run-local-validation snapshot", env=env)
+            _git(top, "worktree", "add", "-q", "--detach", str(wt), commit)
+            # A new worktree leaves each submodule empty; link the checked-out ones.
+            for path in _populated_submodules(top):
+                target = wt / path
+                if not target.parent.is_dir():
+                    continue  # the snapshot commit does not hold this submodule
+                if target.is_dir():
+                    target.rmdir()
+                target.symlink_to(top / path, target_is_directory=True)
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError) as exc:
+            detail = getattr(exc, "stderr", "") or ""
+            raise SnapshotError(f"could not build the snapshot worktree: {exc} {detail.strip()}"
+                                "; --in-place runs in the working tree instead") from exc
+        yield wt / root.resolve().relative_to(top.resolve())
+    finally:
+        if top is not None and wt.exists():
+            proc = subprocess.run(["git", "-C", str(top), "worktree", "remove", "--force", str(wt)],
+                                  capture_output=True, text=True)
+            if proc.returncode != 0:
+                print(f"warning: could not remove snapshot worktree {wt}: {proc.stderr.strip()}; "
+                      "`git worktree prune` clears its record once the directory is gone",
+                      file=sys.stderr)
+        shutil.rmtree(holder, ignore_errors=True)
 
 
 def dirty_tree(root: Path) -> List[str]:
@@ -460,6 +614,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--no-other-workflows", action="store_true", help="do not list the other workflow files as NOT RUN (#1881)")
     p.add_argument("--require-clean", action="store_true", help="exit 2 instead of warning when the working tree is dirty")
     p.add_argument("--timeout", type=float, default=None, help="per-step timeout in seconds")
+    p.add_argument("--in-place", action="store_true",
+                   help="run in the working tree, not a snapshot of it (#4910); misses files git does not track")
     p.add_argument("--root", default=str(ROOT), help=argparse.SUPPRESS)
     return p.parse_args(argv)
 
@@ -514,7 +670,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 s.note = "availability checked at run time"
             else:
                 if s.requires not in _REQUIRES_CACHE:
-                    proc = subprocess.run(["bash", "-c", s.requires], capture_output=True, text=True)
+                    proc = subprocess.run([bash(), "-c", s.requires], capture_output=True, text=True)
                     _REQUIRES_CACHE[s.requires] = (proc.returncode == 0)
                 if not _REQUIRES_CACHE[s.requires]:
                     skipped = True
@@ -556,6 +712,23 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 2
         print(f"warning: {msg}", file=sys.stderr)
 
+    place = contextlib.nullcontext(root) if args.in_place else snapshot(root)
+    try:
+        with place as run_root, \
+                tempfile.TemporaryDirectory(prefix="rlv-tmp-", ignore_cleanup_errors=True) as tmpdir, \
+                tempfile.TemporaryDirectory(prefix="rlv-changed-", ignore_cleanup_errors=True) as aside:
+            listing = None
+            if changed:
+                listing = str(Path(aside) / "changed-files.txt")
+                Path(listing).write_text("\n".join(changed) + "\n", encoding="utf-8")
+            return _execute(plan, run_root, tmpdir, listing, args)
+    except SnapshotError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+
+def _execute(plan, root: Path, tmpdir: str, listing: Optional[str], args: argparse.Namespace) -> int:
+    print(f"info: running in {root}", file=sys.stderr)
     results = []
     for s, skipped, reason in plan:
         if skipped:
@@ -570,7 +743,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"==> [{s.source}] {s.name}", flush=True)
         t0 = time.monotonic()
         try:
-            rc = run_step(s, root, args.timeout)
+            rc = run_step(s, root, args.timeout, tmpdir, listing)
         except subprocess.TimeoutExpired:
             rc = "timeout"
         secs = time.monotonic() - t0

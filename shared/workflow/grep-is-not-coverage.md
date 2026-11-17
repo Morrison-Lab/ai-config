@@ -254,6 +254,9 @@ but summarized it as a `::: notes` div, so a reader who stopped at the summary g
 
 - **Do:** search PSW (the published site or Morrison-Lab/psw) and `shared/writing/`, by topic and filename, before adding any prose or Quarto-presentation convention,
   and follow a link to PSW rather than trusting the summary beside it.
+- **Do:** before porting a fragment's rule to PSW, run `python3 scripts/find-psw-rule-overlap.py <fragment> --psw <psw checkout>`, which greps PSW for the short phrases the fragment quotes as examples and lists the files that quote them.
+  A rule's example words are often the only words two statements of it share: on 2026-11-13 a search for a fragment's concept words missed PSW's time-relative-word rule in `word-choice.qmd` (psw#418), which names the fragment's own examples "now" and "recently", and only PSW's `check-avoided-words` warning on the new text exposed it ([ai-config#5628](https://github.com/Morrison-Lab/ai-config/issues/5628)).
+- **Don't:** search PSW only for a rule's concept words, and treat no hit as no rule.
 - **Don't:** coin a class or format for something PSW already prescribes;
   follow PSW, or extend it and say which section the new rule extends.
 

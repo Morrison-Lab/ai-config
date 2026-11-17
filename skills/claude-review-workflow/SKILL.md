@@ -12,7 +12,7 @@ allowed-tools:
 # claude-review-workflow
 
 Sets up or edits the Claude PR **review** workflow (`.github/workflows/claude-code-review.yml` or `.github/workflows/claude-review.yml`),
-which delegates to the reusable [`claude-code-review.yml`](https://github.com/Morrison-Lab/gha/blob/v2/.github/workflows/claude-code-review.yml) workflow from `Morrison-Lab/gha`.
+which delegates to the reusable [`claude-code-review.yml`](https://github.com/Morrison-Lab/gha/blob/v3/.github/workflows/claude-code-review.yml) workflow from `Morrison-Lab/gha`.
 For the **agent** workflow that edits files in response to `@claude` mentions,
 use [`claude-agent-workflow`](../claude-agent-workflow/SKILL.md).
 
@@ -65,7 +65,7 @@ jobs:
       issues: write
       actions: read
       checks: read
-    uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v3
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -76,7 +76,7 @@ jobs:
 
 ## Load-bearing pieces (managed by `Morrison-Lab/gha`)
 
-By delegating to `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`,
+By delegating to `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v3`,
 the consumer repo automatically inherits:
 
 1. **History preservation**: Fresh review comment posted per run without deleting prior review history.

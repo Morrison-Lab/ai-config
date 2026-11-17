@@ -95,6 +95,10 @@ general form: a reviewer's enumeration is the extent of that reviewer's read
 and never the extent of the pattern, so derive your own site list rather than
 inheriting theirs.
 
+An ambiguous referent often arrives with a fix to another defect in the same sentence.
+On [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154), replacing a sentence's anchor noun while fixing something else left a pronoun pointing at the wrong noun (2026-09-03).
+After rewriting a sentence, re-read each pronoun in it against its new nearest antecedent.
+
 Nothing decides this mechanically.
 "Is the nearest antecedent the intended one" has no decidable condition, so it
 stays in the judgment residue
@@ -212,6 +216,26 @@ The block's own worked example settles it in the same direction:
 `Morrison-Lab/ai-config#1395` appended a fourth entry recording its second
 refresh, leaving the third entry's figures where they were.
 Fixed to "record the SHA the new figures were derived at alongside them".)
+
+## An inserted sentence moves the next sentence's referent
+
+Inserting a sentence into the middle of a paragraph changes what comes
+before every sentence after it.
+A definite noun phrase in the next sentence ("the check", "the run") then
+reads as referring to the inserted case, even when it still means the case
+before the insertion.
+
+- **Do:** after inserting a sentence, reread the sentence that now follows
+  it and confirm it still describes what it described before.
+- **Do:** put a new case in its own bullet or paragraph when the sentences
+  after the insertion point describe only the old case.
+- **Don't:** check only the inserted lines; the defect is in the unchanged
+  line below them.
+
+(`Morrison-Lab/ai-config#5650`, 2026-11-14, cross-harness review on
+`83d1b71`: an inserted `opened`-event case ended "the next human-actor push
+heals it", and the unchanged next sentence, "The check stays red with no new
+run at all", then read as contradicting it.)
 
 ## Relationship to neighbouring rules
 

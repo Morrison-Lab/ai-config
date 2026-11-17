@@ -22,6 +22,14 @@ import subprocess
 import sys
 import tempfile
 
+# A mutant is written to a temporary directory, where the hook's own
+# `scripts/lib` lookup (relative to its file) finds nothing, so every hook run
+# gets the shared splitter on `PYTHONPATH` (ai-config#3178).
+SHELLCMD_LIB = os.path.join(os.path.dirname(os.path.dirname(
+    os.path.realpath(__file__))), "scripts", "lib")
+HOOK_ENV = dict(os.environ, PYTHONPATH=os.pathsep.join(
+    p for p in (SHELLCMD_LIB, os.environ.get("PYTHONPATH")) if p))
+
 HOOK = os.path.realpath(sys.argv[1])
 
 
@@ -67,6 +75,9 @@ SHOULD_WARN = [
      "a numeric line address before the `s`; a word boundary never fires "
      "between a digit and `s`, so this was missed while the equivalent "
      "regex-addressed form warned"),
+    ("W14", "bash -c \"sed -i 's/a/b/' file.txt\"",
+     "wrapped in a shell's -c, which shlex hands over as one opaque token "
+     "(ai-config#3641)"),
     ("W11", "sed -i 's/a#b/c/' file.txt",
      "a pattern containing ANOTHER delimiter character still matches -- the "
      "lookahead is keyed to the delimiter actually in use, so excluding "
@@ -102,6 +113,9 @@ SHOULD_STAY_SILENT = [
      "three delimiter-shaped characters (a genuine `s<delim>..<delim>.."
      "<delim>flags` shape once the `s`-prefix requirement is ignored) with "
      "no leading `s` anywhere nearby -- not a substitution"),
+    ("S12", "bash -c \"sed -i 's/a/b/g' file.txt\"",
+     "a global substitution inside a shell's -c: the descent adds no "
+     "false positive (ai-config#3641)"),
 ]
 
 # Two non-command payload shapes that must fail open silently, tested
@@ -135,7 +149,7 @@ with open(HOOK, encoding="utf-8") as handle:
 def verdict(hook_path, payload):
     proc = subprocess.run(
         [sys.executable, hook_path], input=json.dumps(payload),
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=HOOK_ENV,
     )
     # a crashed hook must NOT read as 'silent' -- that is the failure mode
     # where the pass path and the broken path print the same thing
@@ -265,13 +279,7 @@ MUTATIONS = {
         [('        if "g" not in flags and not any(c.isdigit() for c in '
           'flags):\n            out.append((m.group(0), flags))',
           "        out.append((m.group(0), flags))")],
-        {"S1", "S5", "S10"},
-    ),
-    "M5_heredoc_blanking": (
-        "a heredoc body is blanked before parsing, so a MENTION inside one "
-        "is not an invocation",
-        [('    cmd = RX_HEREDOC.sub("<<", cmd)', "    pass")],
-        {"S8"},
+        {"S1", "S5", "S10", "S12"},
     ),
     "M6_lead_skip": (
         "a leading env-assignment (or lead word) is skipped before "
@@ -300,6 +308,12 @@ MUTATIONS = {
         "digit, so a numeric sed line address still reads as a substitution",
         [(r'r"(?<![A-Za-z_])s(?P<delim>["', r'r"\bs(?P<delim>["')],
         {"W13"},
+    ),
+    "M11_shell_c_descent": (
+        "a command line reached through a shell's -c is scanned too",
+        [("    for piece in shell_c_expansions(command):",
+          "    for piece in [command]:")],
+        {"W14"},
     ),
     "M9_perl_octal_zero_flag": (
         "perl's -0 takes an optional octal argument, so -0777 must still "

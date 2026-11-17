@@ -57,7 +57,7 @@ Then ask, and link the clean verdict (or the deadlocked item) in the request.
 
 ## Why it is a gate on the request, not a step in the loop
 
-The rule was already in the corpus as step 3 of a PR loop ("request human review only after AI approval or deadlock"), in the `AGENTS.md` section "Request review and drive every started PR to clean" (since replaced by its section "Get a clean automated review before asking a person to review" and this fragment), worded for GitHub pull requests.
+The rule was already in the corpus as step 3 of a PR loop ("request human review only after AI approval or deadlock"), in the `AGENTS.md` section "Request review and drive every started PR to clean" (since replaced by the "Get a clean automated review before asking a person to review" bullet of its section "Review your work before anyone sees it, and watch every PR you drive", and this fragment), worded for GitHub pull requests.
 The rule was skipped anyway: on 2026-10-02 an agent asked the user to review a GitLab MR on which no automated review had been triggered.
 The same day, a scheduled read-only status check listed six GitLab MRs as waiting on the user's review although their manual AI review job had never run;
 the rule's PR-loop wording did not read as covering a status pass.

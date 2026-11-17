@@ -21,9 +21,10 @@ The two failure directions are both bad and only one is visible:
   - A fail-closed guard (`no-push-without-self-review.py`) loses its detector
     and denies every push-shaped command, including a heredoc that merely
     QUOTES a push line -- a session-wide lockout (ai-config#2981).
-  - A fail-open hook (`no-empty-promise.py`, whose `_sibling()` catches a bare
-    `Exception`) silently runs without its sibling's helpers, and says nothing
-    at all.
+  - A fail-open hook (`no-empty-promise.py`, whose `_sibling()` caught a bare
+    `Exception`) went silent on every input, and said nothing at all. Since
+    ai-config#2018 the shared loader in `scripts/lib/sibling.py` says why on
+    stderr, but the hook still checks nothing without its sibling.
 
 The corpus has paid for this twice: once in `plugins/ai-config/
 claude-hook-adapter.py` under ai-config#2681, and again across 19 sites in

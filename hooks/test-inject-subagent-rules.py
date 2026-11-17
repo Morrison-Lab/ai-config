@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Tests for hooks/inject-subagent-rules.py (ai-config#4698)."""
+import importlib.util
 import json
 import subprocess
 import sys
@@ -7,6 +8,9 @@ from pathlib import Path
 
 HOOK = Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).with_name("inject-subagent-rules.py"))
 RULES = HOOK.resolve().parent.parent / "shared" / "workflow" / "subagent-core-rules.md"
+_spec = importlib.util.spec_from_file_location("inject_subagent_rules", HOOK)
+_hook = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_hook)
 
 
 def run(stdin):
@@ -27,8 +31,8 @@ def main():
     rc, out = run("not json")
     if rc != 0 or not out:
         fails.append("garbage stdin must still inject")
-    if len(RULES.read_text(encoding="utf-8")) > 4_000:
-        fails.append("rules file over its 4,000-character budget")
+    if len(RULES.read_text(encoding="utf-8")) > _hook.RULES_BUDGET:
+        fails.append(f"rules file over its {_hook.RULES_BUDGET:,}-character budget")
     for f in fails:
         print("FAIL:", f)
     print("ok" if not fails else f"{len(fails)} failed")

@@ -85,48 +85,46 @@ LIMITS
 * Fails OPEN when the payload or transcript is unreadable (some harnesses
   supply no transcript); a broken `shellcmd` import writes one STDERR line.
 """
-import importlib.util
 import json
 import os
 import re
 import sys
 
-_HERE = os.path.dirname(os.path.realpath(__file__))
-
-
-def _load_records():
-    """Reuse `records` from sibling `warn-merge-without-fully-clean.py` so
-    Antigravity `PLANNER_RESPONSE` / `GENERIC` / `SYSTEM_MESSAGE` records are
-    normalized into `_agy_blocks` (`tool_use` and `tool_result`). Falls back to
-    raw JSONL iteration if the sibling cannot be loaded.
-    """
-    try:
-        path = os.path.join(_HERE, "warn-merge-without-fully-clean.py")
-        spec = importlib.util.spec_from_file_location("_sib_wmwfc", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod.records
-    except Exception as exc:
-        print(f"block-merge-without-clean-checker: cannot load "
-              f"warn-merge-without-fully-clean.py ({exc}); using raw JSONL "
-              f"reader", file=sys.stderr)
-        def _fallback(path):
-            with open(path, encoding="utf-8", errors="ignore") as fh:
-                for line in fh:
-                    try:
-                        rec = json.loads(line)
-                    except Exception:
-                        continue
-                    if isinstance(rec, dict):
-                        yield rec
-        return _fallback
-
-
-_records = _load_records()
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
 try:
-    _LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
-    if _LIB not in sys.path:
-        sys.path.insert(0, _LIB)
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"block-merge-without-clean-checker: cannot load scripts/lib/sibling.py "
+          f"({_exc}); using the raw JSONL reader", file=sys.stderr)
+    load_sibling = None
+
+
+# `records` normalizes Antigravity `PLANNER_RESPONSE` / `GENERIC` /
+# `SYSTEM_MESSAGE` records into `_agy_blocks` (`tool_use` and `tool_result`);
+# without the sibling the hook reads raw JSONL and still gates
+# (scripts/lib/sibling.py).
+_SIB_WMWFC = None
+if load_sibling is not None:
+    _SIB_WMWFC = load_sibling(__file__, "warn-merge-without-fully-clean.py", "_sib_wmwfc")
+
+
+def _raw_records(path):
+    """Yield each JSON object line of the transcript, skipping the rest."""
+    with open(path, encoding="utf-8", errors="ignore") as fh:
+        for line in fh:
+            try:
+                rec = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(rec, dict):
+                yield rec
+
+
+_records = getattr(_SIB_WMWFC, "records", None) or _raw_records
+try:
     from shellcmd import simple_commands, strip_env, shell_c_expansions
 except Exception as _exc:  # broken install: degrade, never block
     print(f"block-merge-without-clean-checker: cannot load "

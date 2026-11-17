@@ -11,7 +11,6 @@ Two warn-only checks on the final reply, once per distinct message:
 See shared/workflow/growth-mindset.md. Lexical, and fails OPEN.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -23,14 +22,13 @@ _LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 from agent_notice import stop_notice  # noqa: E402
+from sibling import load_sibling  # noqa: E402
 
 
 def _sibling():
-    spec = importlib.util.spec_from_file_location(
-        "flag_cop_out_offer", os.path.join(_HERE, "flag-cop-out-offer.py"))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """`flag-cop-out-offer.py` (scripts/lib/sibling.py); raises if it cannot load."""
+    return load_sibling(__file__, "flag-cop-out-offer.py", "flag_cop_out_offer",
+                        required=True)
 
 
 # Ezra, 2026-11-04, on psw#480's reply "I haven't rendered the page, and

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse warning: pushing after running only SOME of the repo's checks.
+"""PreToolUse warning: pushing after running only some of the repo's checks, or none.
 
 ## The failure this exists for
 
@@ -60,6 +60,18 @@ a long option taking a separate argument (`git --git-dir /path push`), which a
 hand-rolled regex here missed. A second derivation of that grammar is exactly
 the defect this hook warns about.
 
+## A push with no checking at all (ai-config#3533)
+
+A session that ran no checker and no sweep gets a shorter note. It was
+silent while the only command to name was the full sweep (over ten minutes).
+`--changed` narrows the slowest `validate` step, the hook test suites, to
+those the branch reaches, and skips a path-filtered job the branch does not
+touch. Measured 2026-11-11 on a
+one-hook change: 6 of 193 suites, and 188 s for the whole run. So both notes
+name it. Any run of the script counts as the sweep, `--only` and `--list`
+included (ai-config#5428), and so does one in the push's own command, which
+the transcript already holds when this hook runs.
+
 ## Scope
 
 Fires only when `run-local-validation.py` actually exists in the working
@@ -85,6 +97,18 @@ ai-config#3698. The gap is pinned rather than left to be discovered: the
 suite is a flat sequence of labelled `check()` calls rather than named test
 functions, so grep its label fragment
 `silences a push from ANOTHER repo`.
+
+A push inside a subagent carries the parent's `transcript_path`
+(ai-config#2496), so it gets neither note; reading the subagent's own
+transcript, as `no-push-without-self-review.py` does, would restore them.
+Both notes name `--changed` and describe this repository's runner, though
+the hook fires in any repository that has a `scripts/run-local-validation.py`
+(only ai-config has one as of 2026-11-11).
+
+A sweep the push's own command runs is credited whatever its order (one
+quoted in a heredoc body is not run, so not credited), so
+`git push && <sweep>` is silent although the sweep runs after the push:
+`scan` reads commands, not their order.
 
 The residue in the OTHER direction is larger and safer: a genuine run behind
 a wrapper this cannot see through -- `timeout 60 python3 <script>`,
@@ -135,7 +159,18 @@ NOTE = (
     "on 2026-09-14/15 went red in CI for exactly this reason, the second one "
     "on a checker the session did not know existed.\n"
     "Run it before the push, or say why this push does not need it:\n\n"
-    "    python3 scripts/{derived} --base origin/main\n"
+    "    python3 scripts/{derived} --changed --base origin/main\n"
+)
+
+NO_RUN_NOTE = (
+    "This session has not run `scripts/{derived}`, which derives its checks "
+    "from `.github/workflows/validate.yml`, before this push.\n"
+    "`--changed` narrows the hook test suites, the step that takes most "
+    "of the run's time, to those whose inputs this branch touched, and "
+    "skips a path-filtered job this branch does not touch. Run it "
+    "before the push, or say why "
+    "this push does not need it:\n\n"
+    "    python3 scripts/{derived} --changed --base origin/main\n"
 )
 
 
@@ -252,7 +287,7 @@ def _commands(record):
 
     Handles the Claude Code shape (`message.content` blocks of `tool_use`) and
     the Antigravity shape (`tool_calls`, whose arguments may arrive as a JSON
-    string), matching `hooks/remind-ums-after-error.py`. CLAUDE.md's
+    string), matching `hooks/remind-ums-after-error.py`. AGENTS.md's
     "Generalize instructions to every AI agent by default" applies: this hook
     branches on `ANTIGRAVITY_AGENT` below, so it must be able to read that
     harness's records.
@@ -405,25 +440,34 @@ def main() -> int:
     except Exception:
         return 0
 
-    if derived or not checkers:
+    # A push inside a subagent carries the PARENT's transcript_path
+    # (ai-config#2496), which says nothing about what the subagent ran.
+    if derived or payload.get("agent_id"):
         return 0
 
-    names = ", ".join(sorted(checkers)[:3])
-    if len(checkers) > 3:
-        names += ", ..."
+    if checkers:
+        names = ", ".join(sorted(checkers)[:3])
+        if len(checkers) > 3:
+            names += ", ..."
+        context = NOTE.format(n=len(checkers), names=names, derived=DERIVED)
+        message = (
+            f"Pushed after running {len(checkers)} checker(s) by hand and not "
+            f"{DERIVED}, which derives the full list from validate.yml."
+        )
+    else:
+        context = NO_RUN_NOTE.format(derived=DERIVED)
+        message = (f"Pushing with no run of {DERIVED} this session; --changed "
+                   "narrows the hook suites to those this branch "
+                   "reaches.")
 
     out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "additionalContext": NOTE.format(
-                n=len(checkers), names=names, derived=DERIVED),
+            "additionalContext": context,
         },
     }
     if not os.environ.get("ANTIGRAVITY_AGENT"):
-        out["systemMessage"] = (
-            f"Pushed after running {len(checkers)} checker(s) by hand and not "
-            f"{DERIVED}, which derives the full list from validate.yml."
-        )
+        out["systemMessage"] = message
     print(json.dumps(out))
     return 0
 

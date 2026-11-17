@@ -15,7 +15,6 @@ whose changed paths all match no-unauthorized-merge.py's INFRA_PATH_PATTERNS
 (the single source of truth for "infra path"). A message that says the PR merges
 under the infra grant is allowed. Fails open on any parse or lookup trouble.
 """
-import importlib.util
 import json
 import os
 import re
@@ -52,17 +51,29 @@ MAX_REFS = 8
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n")
 
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"no-mwc-ask-for-infra-pr: cannot load scripts/lib/sibling.py "
+          f"({_exc}); its sibling hook will not load", file=sys.stderr)
+    load_sibling = None
+
+
 _MERGE_HOOK = None
 
 
 def load_merge_hook():
+    """Import `no-unauthorized-merge.py` once (scripts/lib/sibling.py); raises if it cannot load."""
     global _MERGE_HOOK
     if _MERGE_HOOK is None:
-        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-unauthorized-merge.py")
-        spec = importlib.util.spec_from_file_location("no_unauthorized_merge", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        _MERGE_HOOK = mod
+        if load_sibling is None:
+            raise ImportError("scripts/lib/sibling.py is not importable")
+        _MERGE_HOOK = load_sibling(__file__, "no-unauthorized-merge.py",
+                                   "no_unauthorized_merge", required=True)
     return _MERGE_HOOK
 
 

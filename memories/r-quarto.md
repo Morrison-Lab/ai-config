@@ -4,7 +4,7 @@ The lintr, air, and jarl material now lives in [`r-linting.md`](r-linting.md),
 split out on 2026-09-08 when this file reached two lines of headroom under the
 1250-line gate (ai-config#1306, ai-config#2003).
 
-Every pull request and issue *cited* below is a clickable link, per [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule,
+Every pull request and issue *cited* below is a clickable link, per the [`file-formatting-and-links`](../shared/writing/file-formatting-and-links.md) rule,
 whose illustrative-token exception is what leaves `d-morrison/altdoc#26` in the spellcheck entry bare.
 
 Four of the sixteen cited repositories --- `ucdavis/bcs`, `ucdavis/epi204`, `ucdavis/hac.sap`, and `ucdavis/matt.contracts` --- did not answer a `git ls-remote` run on 2026-09-04 from a container routing outbound HTTPS through a credential-injecting agent proxy, each failing with `could not read Username`, so the reading measures that container's reach rather than clean anonymous visibility.

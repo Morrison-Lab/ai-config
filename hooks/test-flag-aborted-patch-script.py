@@ -461,9 +461,7 @@ def main():
             ("a" * 30000, "one long token"),
             ("abc/" * 7500, "a shallow component chain"),
             (_near * (30000 // _hook.PATH_COMPONENT_MAX),
-             "a near-cap component chain"),
-            (_near * (2 * _hook.SCAN_MAX_CHARS // _hook.PATH_COMPONENT_MAX),
-             "an over-cap near-cap chain")):
+             "a near-cap component chain")):
         _t0 = _time.time()
         _hook._paths(_payload)
         _elapsed = _time.time() - _t0
@@ -474,6 +472,45 @@ def main():
             passes += 1
         else:
             print(f"FAIL: {_label} (expected under 2.0s)")
+            failures += 1
+
+    # The over-cap case pins SCAN_MAX_CHARS. It used to assert an absolute
+    # 2.0s budget, which measured the runner as much as the regex: CI ran
+    # it in 2.07-2.10s and a slower machine in 2.25-2.40s while the scan was
+    # linear and capped (ai-config#3456). Assert the two properties as
+    # ratios of the same machine's own timings instead, best of three runs
+    # each so one scheduling hiccup cannot decide it:
+    #   - linear below the cap: doubling the input from half the cap to the
+    #     cap should about double the time (quadratic would be about 4x);
+    #   - capped above it: doubling again, to twice the cap, should leave
+    #     the time about flat (an uncapped linear scan would double it).
+    def _best_of_three(payload):
+        best = None
+        for _ in range(3):
+            t0 = _time.perf_counter()
+            _hook._paths(payload)
+            dt = _time.perf_counter() - t0
+            best = dt if best is None or dt < best else best
+        return best
+
+    def _near_chain(chars):
+        return _near * (chars // _hook.PATH_COMPONENT_MAX)
+
+    _t_half = _best_of_three(_near_chain(_hook.SCAN_MAX_CHARS // 2))
+    _t_cap = _best_of_three(_near_chain(_hook.SCAN_MAX_CHARS))
+    _t_over = _best_of_three(_near_chain(2 * _hook.SCAN_MAX_CHARS))
+    for _ratio, _limit, _what in (
+            (_t_cap / _t_half, 3.0,
+             "PATHISH stays linear up to SCAN_MAX_CHARS on a near-cap chain"),
+            (_t_over / _t_cap, 1.5,
+             "PATHISH stops scanning at SCAN_MAX_CHARS on an over-cap chain")):
+        _label = (f"{_what} (time ratio {_ratio:.2f}; half-cap {_t_half:.2f}s, "
+                  f"cap {_t_cap:.2f}s, twice-cap {_t_over:.2f}s)")
+        if _ratio < _limit:
+            print(f"PASS: {_label}")
+            passes += 1
+        else:
+            print(f"FAIL: {_label} (expected a ratio under {_limit})")
             failures += 1
 
     # The whole HOOK must fit its registered budget, not just PATHISH. This

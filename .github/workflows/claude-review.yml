@@ -86,7 +86,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.issue.number }}
           # Hardcoded, where gha's own copy of this job derives it from
-          # `github.workflow_ref` via `parse-workflow-ref@v2`. Safe here because
+          # `github.workflow_ref` via `parse-workflow-ref@v3`. Safe here because
           # this is a caller workflow in a fixed location rather than a reusable
           # one that can be invoked under another filename; rename this file and
           # this line has to change with it.
@@ -191,8 +191,8 @@ jobs:
       pull-requests: write
       issues: write
       actions: read   # lets the reviewer read CI status (github_ci MCP server)
-      checks: read    # commits/<ref>/check-runs, required by gha@v2 since gha#830
-    uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2
+      checks: read    # commits/<ref>/check-runs, required since gha#830
+    uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v3
     secrets: inherit
     with:
       pr-number: ${{ github.event.pull_request.number || inputs.pr_number }}

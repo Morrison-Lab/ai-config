@@ -451,3 +451,10 @@ A `git diff` holding a U+201D then raises `UnicodeDecodeError` in the reader thr
 - **Do:** pass `encoding="utf-8", errors="replace"` to every text-mode subprocess call that can see git output, file paths, or commit messages.
 - **Don't:** read a green CI run as covering an encoding fix, since CI's UTF-8 locale never exercises the cp1252 path (and see the em-dash fixture note above).
 
+## Close a `mkstemp` descriptor before unlinking the file (Windows)
+
+Tests here, hook self-tests included, also run on Windows, where `os.unlink` refuses a file that is still open (`PermissionError: [WinError 32]`).
+`tempfile.mkstemp()` returns an open descriptor, so `tempfile.mkstemp(...)[1]` leaks it, and the test passes on Linux and crashes on Windows (ai-config#5531's Stop test, reproduced by the Flash read on the XPS, 2026-11-12).
+
+- **Do:** write `fd, path = tempfile.mkstemp(...)` and `os.close(fd)` before reopening or unlinking `path`.
+- **Don't:** index `mkstemp(...)[1]` and drop the descriptor.

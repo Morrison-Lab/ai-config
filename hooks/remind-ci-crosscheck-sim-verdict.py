@@ -64,9 +64,8 @@ and re-arm it -- an ordinary sequence (dump, read CI, report the CI figure,
 dump again to keep investigating) that would then nag about a properly
 grounded number.
 
-Commands are split into simple commands with `shlex` before matching, the same
-construction `no-clobbering-push.py` and `flag-reset-hard-uncommitted-work.py`
-use. A free `search()` over the raw string reads inside quoted arguments, so
+Commands are split into simple commands before matching, by
+`scripts/lib/shellcmd.py`'s `simple_commands` (ai-config#3178). A free `search()` over the raw string reads inside quoted arguments, so
 `gh pr comment --body "...via gh run view 123..."` would discharge the guard
 without any CI read having happened -- the false-NEGATIVE direction, and the
 one this hook exists to prevent. That is the same failure class README names
@@ -78,13 +77,10 @@ import hashlib
 import json
 import os
 import re
-import shlex
 import sys
 import tempfile
 
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-_SHELL_OPS = set("();|&")
 
 # Local tools that produce sim state or judge it, none of which involve CI.
 # Matched against a token, so a bare `godot` is deliberately absent -- it would
@@ -137,31 +133,20 @@ def visible_prose(text):
     return QUOTED.sub(" ", text)
 
 
-def simple_commands(cmd):
-    """Split a shell command into simple-command argv lists; None on error.
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import simple_commands as simple_commands
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"remind-ci-crosscheck-sim-verdict: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); "
+          "no command will be checked", file=sys.stderr)
 
-    Same construction as `no-clobbering-push.py`'s `_simple_commands`.
-    """
-    cmd = re.sub(r"\\\r?\n", " ", cmd)
-    cmd = RX_HEREDOC.sub("<<", cmd)
-    cmd = cmd.replace("\n", ";")
-    try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
+    def simple_commands(_cmd):
+        """Parse nothing when the shared splitter is missing."""
         return None
-    cmds, cur = [], []
-    for t in toks:
-        if t and set(t) <= _SHELL_OPS:
-            if cur:
-                cmds.append(cur)
-                cur = []
-        else:
-            cur.append(t)
-    if cur:
-        cmds.append(cur)
-    return cmds
 
 
 # Words that may precede the command itself, matching the sibling hooks'

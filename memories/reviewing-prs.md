@@ -282,3 +282,48 @@ The fix's commit message and PR body named a different root cause, and nothing i
 - **Do:** test the author's stated root cause against the input that hung, rather than accepting it because the symptom stopped.
 - **Don't:** rate a fix ready because its output is byte-identical on inputs where the new skip does not fire.
 - **Don't:** treat "the hang is gone" as evidence of the cause the author named.
+
+## First-push misses on the priority-label PRs, 2026-11-11
+
+Each of these was found by a reviewer or a hook, not by the author ([ai-config#5359](https://github.com/Morrison-Lab/ai-config/issues/5359)).
+
+- **A truncated search is not an absence.**
+  A grep piped through `head` hid the matching lines, and a comment on [ai-config#5357](https://github.com/Morrison-Lab/ai-config/pull/5357) said they did not exist.
+  - **Do:** count matches with `grep -c`, or read the whole result, before writing "there is no X".
+  - **Don't:** assert an absence from output that `head` or `tail` cut.
+- **A rebuttal is itself a claim to check.**
+  A reply on [ai-config#5358](https://github.com/Morrison-Lab/ai-config/pull/5358) said a pin audit passed on the head when none had been run.
+  - **Do:** write only what a command in the same turn showed, and say "I did not check this" for the rest.
+  - **Don't:** close a reviewer's question with a check you assume exists.
+- **A test where the fallback agrees with the wrong answer is vacuous.**
+  Cases for `hooks/warn-unlabelled-agent-issue.py` passed whether the command was split or read whole, because the labels sat on the create itself.
+  - **Do:** before the first review, mutate each new condition, index and slice in the diff, and confirm a named case fails.
+  - **Don't:** count a case as coverage until a mutation of the code it names turns it red.
+- **A sentence about a workflow needs a check per step that can fail.**
+  "The counts go to the job summary, on a failed run too" was written from one failure path and was false for a failure in an earlier step.
+  - **Do:** list each step and each early exit, and test the sentence against each.
+  - **Don't:** write "on a failed run too" from the one failure path that was tested.
+- **`scripts/check-github-actions-step-if.py` takes an optional memory-file path, not a workflow path.**
+  Given a workflow file, it checks that file for the memory bullet and reports "missing step-if bullet".
+  Run it with no argument.
+
+## Check a reviewer's reason before repeating it
+
+A commit message on [ai-config#3044](https://github.com/Morrison-Lab/ai-config/pull/3044) kept a reviewer's suggested change and also restated its reason, that GitHub-flavoured Markdown would render the old text wrongly, as fact (2026-09-02).
+The reason was false: CommonMark turns a newline inside a code span into a space, which a CommonMark renderer confirmed.
+The change was still right, so only the stated reason had to go.
+
+- **Do:** check a reviewer's stated reason on its own before writing it into a commit message, PR body or memory.
+- **Don't:** carry a reviewer's justification over as fact because the change it came with was correct.
+
+## A hedge that denies its own claim is a contradiction, not a qualification
+
+A block of text on [ai-config#3024](https://github.com/Morrison-Lab/ai-config/pull/3024) said the exit status of a chain ending in a review request "belongs to that later command" (2026-09-02).
+Two sentences later, it said a `&&` chain may have stopped before the request ran.
+Both cannot be true, and only the negative claim holds: the combined status cannot be attributed to the request.
+The overclaim survived three review rounds, because each round read the hedge as a qualification.
+The first fix then corrected that paragraph and left a second paragraph making the same claim.
+A test that pins the claim in one paragraph passes while another paragraph still makes it.
+
+- **Do:** when a hedge contradicts the sentence it follows, drop the unconditional claim, and pin the corrected claim in every paragraph that can carry it.
+- **Don't:** treat a later hedge as a qualification that rescues an earlier unconditional claim.

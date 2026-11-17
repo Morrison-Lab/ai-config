@@ -18,6 +18,8 @@ Keep it under 4,000 characters: it is injected on every dispatch.
   A bare `mwc` covers every ready PR.
   Ask one question at a time.
   Retry a denied step once, and never route it through another session.
+  On a classifier denial, report the refused command and its stated reason to your caller, and never switch permission modes yourself.
+  Reporting it up your dispatch chain is not routing it: the caller decides under `shared/workflow/ask-for-manual-approval.md` whether and how the action runs.
 - **Record what you learn in a repo** (hook, check or `shared/` fragment), not only in project memory.
   Facts the user pastes go into a repo file in the same turn.
   See `shared/workflow/lab-operating-rules.md`.

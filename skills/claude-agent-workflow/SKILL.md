@@ -12,7 +12,7 @@ allowed-tools:
 # claude-agent-workflow
 
 Sets up or edits the `@claude` agent GitHub Actions workflow (`.github/workflows/claude.yml` or `.github/workflows/claude-bot.yml`),
-which delegates to the reusable [`claude.yml`](https://github.com/Morrison-Lab/gha/blob/v2/.github/workflows/claude.yml) workflow from `Morrison-Lab/gha`.
+which delegates to the reusable [`claude.yml`](https://github.com/Morrison-Lab/gha/blob/v3/.github/workflows/claude.yml) workflow from `Morrison-Lab/gha`.
 For the read-only **PR review** workflow,
 use [`claude-review-workflow`](../claude-review-workflow/SKILL.md).
 
@@ -54,7 +54,7 @@ jobs:
       issues: write
       id-token: write
       actions: write
-    uses: Morrison-Lab/gha/.github/workflows/claude.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/claude.yml@v3
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -68,7 +68,7 @@ jobs:
 
 ## Load-bearing pieces (managed by `Morrison-Lab/gha`)
 
-By delegating to `Morrison-Lab/gha/.github/workflows/claude.yml@v2`,
+By delegating to `Morrison-Lab/gha/.github/workflows/claude.yml@v3`,
 the consumer repo automatically inherits:
 
 1. **Bot-actor filtering**: Evaluates mention triggers (`@claude`) on comments, reviews, and assigned issues while filtering out bot-generated loops.

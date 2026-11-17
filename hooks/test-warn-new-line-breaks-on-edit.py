@@ -374,14 +374,18 @@ def test_mutations():
                 sys.exit(f"FATAL: anchor not present once in {HOOK} (found {count}):\n{find}")
             mutated = mutated.replace(find, replace)
 
-        fd, path = tempfile.mkstemp(suffix=".py")
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        # The mutated copy imports its sibling by its OWN directory, through
+        # the loader in ../scripts/lib, so the real push hook (needed for
+        # `_git_root`/`_find_checker`) must sit alongside it and the loader
+        # one level up.
+        tree = tempfile.mkdtemp()
+        os.makedirs(os.path.join(tree, "hooks"))
+        shutil.copytree(os.path.join(os.path.dirname(os.path.dirname(HOOK)), "scripts", "lib"),
+                        os.path.join(tree, "scripts", "lib"))
+        path = os.path.join(tree, "hooks", "warn-new-line-breaks-on-edit.py")
+        with open(path, "w", encoding="utf-8") as handle:
             handle.write(mutated)
-        # The mutated copy imports its sibling by its OWN directory, so the
-        # real push hook (needed for `_git_root`/`_find_checker`) must sit
-        # alongside it.
-        mutated_push_hook = os.path.join(os.path.dirname(path), "warn-new-line-breaks-on-push.py")
-        shutil.copy(PUSH_HOOK_SRC, mutated_push_hook)
+        shutil.copy(PUSH_HOOK_SRC, os.path.join(tree, "hooks"))
 
         try:
             flipped = set()
@@ -394,8 +398,7 @@ def test_mutations():
                 if got != "silent":
                     flipped.add(case_id)
         finally:
-            os.unlink(path)
-            os.unlink(mutated_push_hook)
+            shutil.rmtree(tree, ignore_errors=True)
 
         ok = flipped == expected_flips
         mutation_wrong += not ok

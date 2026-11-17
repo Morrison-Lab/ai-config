@@ -79,7 +79,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`flag-uncounted-comment-claims.py`](../hooks/flag-uncounted-comment-claims.py) | Warn | Warns when a forge comment asserts file counts or lists identifiers without a deriving command. | Run deriving commands (`grep -c`, `wc -l`, `ls`, etc.) in the session and cite the deriving command when stating cardinality. | None. |
 | [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when a `gh` comment or review body states a Pacific clock time (`HH:MM`, optional seconds, optional AM/PM, then `PDT`, `PST`, or `PT`) with no clock read in the current turn, or when the body cannot be read (a `--body-file` not yet on disk). | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` immediately before typing a time into a claim or status comment, and restate the stamp from its output. | None. |
 | [`flag-cd-into-main-checkout.py`](../hooks/flag-cd-into-main-checkout.py) | Warn | Warns when a worktree-rooted session `cd`s into the primary/main checkout of the repository. | Keep all file edits and command executions rooted within the dedicated worktree directory. | None. |
-| [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `gh issue create` / `glab issue create` runs with no `ai-authored` label in the command. | Pass `--label ai-authored --label "model:<model-id>"` (both CLIs also accept the comma-separated `--label "ai-authored,model:<model-id>"`) in the creating command, per `shared/workflow/issue-first.md`. | None. |
+| [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `gh issue create` / `glab issue create` runs with no `ai-authored` label, or no `P1`/`P2`/`P3` label, in the command. | Pass `--label ai-authored --label "model:<model-id>" --label P2` (both CLIs also accept the comma-separated `--label "ai-authored,model:<model-id>"`) in the creating command, per `shared/workflow/issue-first.md`. | None. |
 | [`no-mutation-in-read-only-reviewer.py`](../hooks/no-mutation-in-read-only-reviewer.py) | **Block** | Blocks mutating git commands (`commit`, `checkout`, `switch`, `restore`, `stash`, `merge`, `reset`, `rebase`, `branch`, `tag`, `add`, `stage`, `pull`, `push`) and write tools when executing in read-only personas (`adversarial-reviewer`, `Explore`, `Plan`). | Reviewer personas must stay strictly read-only and report findings to the authoring session rather than mutating working tree or branch state. | Set `ALLOW_READ_ONLY_MUTATION=1 <cmd>` if mutation is explicitly intended. |
 | [`no-find-root-on-windows.py`](../hooks/no-find-root-on-windows.py) | **Block** | Blocks `find` or `find.exe` starting at `/` or bare drive roots on Windows/MSYS. Disambiguates Windows `find.exe` text search (e.g. `find /c "needle" file.txt`), which does not traverse directories. | Search a bounded path (`find . -name ...`, `find src/ ...`, `~/.claude`, `find /c/Users/dougm/repo`), or use `command -v`, `where.exe`, or `gh api` to locate files or binaries. | Set `ALLOW_FIND_ROOT=1 <cmd>` if a whole-system search is intentional. |
 
@@ -89,6 +89,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 |---|---|---|---|---|
 | [`flag-unassigned-worktree.py`](../hooks/flag-unassigned-worktree.py) | `Agent` | Warn | Warns when a write-capable subagent is launched without worktree isolation. | Specify `isolation: "worktree"` (or workspace branch) when launching subagents that perform file modifications. |
 | [`no-fable-subagent.py`](../hooks/no-fable-subagent.py) | `Agent`, `Task`, `Workflow` | Block | Denies an Agent launch on Fable, explicit or inherited from a Fable session, without the user's grant; warns on a Workflow launch in a Fable session. | Pass `model: sonnet` (or `haiku`) on the call, or, once the user has approved that specific launch, run it with `FABLE_SUBAGENT_OK=1` for that one command. Set `FABLE_SUBAGENT_OK=1` for the one approved launch only; never export it for a session. |
+| [`require-model-choice.py`](../hooks/require-model-choice.py) | `Agent`, `Task`, thread/session start, `message_thread` | Block | Denies a launch with no deliberate model choice, and a message to an existing thread with no stated reason it is not a new thread. | Pass `model` (or a `Model-fit: <model> -- <why>` line on thread starts) chosen with `select-model`/`recm`; add `Why-not-new-thread: <reason>` to a `message_thread`. Never Fable without permission. |
 | [`remind-brief-premises.py`](../hooks/remind-brief-premises.py) | `Agent`, `Task`, `SendMessage` | Warn / Reminder | Reminds when subagent briefs assert corpus facts or file counts not derived in the session. | Include verified derivation commands or concrete file paths in subagent briefs rather than unverified assertions. |
 
 ### 2.3 MCP Tool Interceptors (`mcp__github__.*`)
@@ -97,7 +98,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 |---|---|---|---|
 | [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks `merge_pull_request` and the `enable`/`disable_auto_merge` tools, under any `mcp__<server>__` prefix, without authorization. `check_mcp_merge` reads `owner`/`repo` out of `tool_input` and clears the call on an `allow_merge` override, an active `mwc` grant, or a target in `STANDING_MERGE_GRANT_REPOS` --- the same three grounds the shell path uses. | Do not invoke MCP merge tools without explicit permission or an active `/mwc`; a target carrying the standing per-repository grant needs neither. |
 | [`warn-pr-create-without-dupe-check.py`](../hooks/warn-pr-create-without-dupe-check.py) | Warn | Warns when creating PRs/issues via MCP without a prior search query. | Run `search_issues` or `search_pull_requests` before creating items via MCP tools. |
-| [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `mcp__github__issue_write` (`method: create`) files an issue with no `ai-authored` label. | Pass `labels: ["ai-authored", "model:<model-id>"]` on the create call. |
+| [`warn-unlabelled-agent-issue.py`](../hooks/warn-unlabelled-agent-issue.py) | Warn | Warns when `mcp__github__issue_write` (`method: create`) files an issue with no `ai-authored` label, or no `P1`/`P2`/`P3` label. | Pass `labels: ["ai-authored", "model:<model-id>", "P2"]` on the create call. |
 | [`require-agent-disclosure.py`](../hooks/require-agent-disclosure.py) | Warn | Warns when posting comments via MCP without the disclosure trailer. | Include `\n\n_Posted by <Agent Name> (AI agent) --- not written by a human._` in the `body` argument of MCP comment tools. |
 | [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when the `body` of any `mcp__github__` comment tool that `require-agent-disclosure.py` covers states a Pacific clock time with no clock read in the current turn. | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` before typing a time into the `body` argument of MCP comment tools. |
 
@@ -474,6 +475,9 @@ The shipped version shares one 6-second budget across both calls, returns "no de
 When authoring a new hook:
 1. Place the implementation script in `hooks/<name>.py` (or `.sh`).
 2. Add comprehensive unit tests in `hooks/test-<name>.py`.
+   A hook that parses Bash commands imports `scripts/lib/shellcmd.py` (`shell_c_expansions`, `simple_commands`) and matches whole argv tokens, never a command-position regex of its own.
+   [ai-config#5678](https://github.com/Morrison-Lab/ai-config/pull/5678) spent four review rounds on a hand-written one before switching to the splitter.
+   [`shell.md`](shell.md#a-hook-that-parses-bash-commands-reuses-scriptslibshellcmdpy) has the case.
 3. Register the hook in [`hooks/hooks.json`](../hooks/hooks.json) under the correct event and matcher.
 4. Add a row to the README hooks table in [`README.md`](../README.md#enforcement-hooks-hooks).
    The row's matcher list must equal the `hooks.json` groups for that script joined by `, `, in file order:
@@ -839,9 +843,10 @@ Measured on `test-guard-slide-major-tag.py` before the sweep, invoking it throug
 Running a suite against the real registration path is the natural way to reproduce this by hand, and under the lexical spelling the suite cannot run at all.
 Both halves are swept, and `scripts/check-hook-file-resolution.py` covers both.
 `no-push-without-self-review.py` was the visible one only because it fails closed --- with its detector unreachable it fell into degraded mode and denied any push-shaped command, including a heredoc whose body merely *quoted* a push line while writing an issue body, leaving `ALLOW_UNREVIEWED_PUSH=1` as the only way to run anything.
-The hooks that load a sibling for context fail the other way, silently: `no-empty-promise.py`'s `_sibling()` catches a bare `Exception` --- the error actually raised is a `FileNotFoundError` out of `spec.loader.exec_module` --- and returns `None`, so it simply runs without its sibling's code-region stripping.
+A hook that loads part of its detector from a sibling can fail the other way, silently: `no-empty-promise.py`'s `_sibling()` caught a bare `Exception` --- the error actually raised was a `FileNotFoundError` out of `spec.loader.exec_module` --- and returned `None`, and the hook then returns 0 on every input when the sibling's `visible_prose` is missing, so the guard was off with nothing said.
 Measured the same day in the layout above --- `sibling loaded: False` under `abspath`, `True` under `realpath` --- for that hook;
 the remaining sites were fixed by inspection rather than each measured.
+Later, ai-config#2018 moved `no-empty-promise.py`'s loader to the shared `scripts/lib/sibling.py`, which still returns `None` but says why on stderr.
 
 `realpath` resolves symlinks before collapsing `..`, and is identical to `abspath` wherever no symlink is involved, so it strictly widens the set of layouts that work.
 It was already the idiom in the newer hooks (`no-commit-chained-to-push.py`, `warn-heredoc-doubled-backslash.py`).
@@ -1180,5 +1185,24 @@ What ended the oscillation was a structural rule, not a sharper pattern.
 - **Do:** reuse the sibling hooks' regexes (`flag-idea-without-issue.py`, `no-unfiled-finding.py`) for discharge detection, and fail open when they cannot load.
 - **Don't:** widen or narrow one pattern per review round.
   The third round on the same pattern is the signal to restructure.
+
+## A hook that parses git or shell commands must follow git's grammar and the user's git config
+
+Three hook PRs in one wave surfaced gaps where a hook read a command differently from git or `gh`, through the issue it fixed or through review rounds before merge.
+
+- **Working directory** (`hooks/guard-slide-major-tag.py`, fixed in [ai-config#5445](https://github.com/Morrison-Lab/ai-config/pull/5445)): `git ls-tree` paths and `git diff` pathspecs are relative to the current directory, so a run from a subdirectory compared no files and allowed the slide.
+- **User git config** (the same hook and PR): `diff.noprefix` removes the `a/` and `b/` prefixes and `diff.mnemonicPrefix` replaces them, so a parser keyed on them found no files.
+  `diff.relative` makes diff paths relative to the current directory and drops changes outside it, which running from the toplevel cures.
+- **Short-flag clusters** (`hooks/no-unreviewed-pr.py`, fixed in [ai-config#5459](https://github.com/Morrison-Lab/ai-config/pull/5459) for [ai-config#1397](https://github.com/Morrison-Lab/ai-config/issues/1397)): the issue was a request that omitted `-X POST`, since `gh` sends POST once a field is given.
+  Rewriting the parser also showed that `gh api -iX POST` and `-iXPOST` set the method inside a cluster, which the old exact `-X` and `-XPOST` token check missed.
+- **Long-option prefixes** (`hooks/warn-one-sided-conflict-resolution.py`, added in [ai-config#5461](https://github.com/Morrison-Lab/ai-config/pull/5461) for [ai-config#5407](https://github.com/Morrison-Lab/ai-config/issues/5407)): git accepts any unique prefix of a long option, and uniqueness depends on the subcommand.
+  `--t` abbreviates `--theirs` on `git restore` but is ambiguous on `git checkout`, which also has `--track`.
+
+- **Do:** resolve the working directory from the hook payload, then run every git call from its `git rev-parse --show-toplevel`, and decide explicitly whether the hook fails open when that call fails.
+- **Do:** pass `--src-prefix=a/ --dst-prefix=b/` to any `git diff` whose output the hook parses.
+- **Do:** read short-flag clusters and unique long-option prefixes per subcommand, from `git <sub> -h` or `gh <cmd> --help`.
+- **Do:** add each spelling (cluster, prefix, subdirectory run, non-default config) to the hook's suite as a must-catch case.
+- **Don't:** test a hook only from the repo root under a default git config, with every flag spelled out in full.
+- **Don't:** match a flag as a separate exact token, such as `-X`, when git or `gh` also accepts it inside a cluster or as a prefix.
 
 See also `scripts/check-text-encoding.py`, which flags bare `write_text` (give `encoding=`), and `skills/mwc/SKILL.md`, which names the `expectedHeadSha` pin the GitHub MCP `merge_pull_request` takes.

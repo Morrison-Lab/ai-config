@@ -26,7 +26,8 @@ human message in the transcript.
   * The earlier message fires only when no LATER assistant tool call recorded
     it: a Write/Edit under ai-config, psw, shared/, memories/, AGENTS.md or
     CLAUDE.md; a Bash command that writes or runs git on such a path; or an
-    Agent/Task dispatch whose prompt names ai-config or psw.
+    subagent launch (Agent, Task, invoke_subagent and the other spellings in
+    scripts/lib/tool_names.py) whose brief names ai-config or psw.
 
 "Reads as standing guidance" is a conservative regex over visible prose
 (code fences, blockquotes and inline code removed), skipping messages under
@@ -34,7 +35,8 @@ MIN_CHARS characters and matches that sit inside a question.
 
 Fires once per distinct message, via a sentinel in the temp dir keyed on a
 hash of the transcript path and the message text. Fails OPEN and SILENT: any
-parse trouble prints nothing.
+parse trouble prints nothing. If scripts/lib/tool_names.py cannot load, it
+says so on stderr and counts no tool call as recording, so it still reminds.
 """
 import hashlib
 import json
@@ -42,6 +44,19 @@ import os
 import re
 import sys
 import tempfile
+
+# Tool-name aliases are shared (ai-config#4266). On a broken install no tool
+# call counts as recording the rule, so the reminder still fires.
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    import tool_names
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"remind-record-standing-guidance: cannot load scripts/lib/tool_names.py ({_exc}); "
+          f"no tool call will count as recording a rule", file=sys.stderr)
+    tool_names = None
 
 # Shorter messages are acknowledgements ("ok thanks"), not rules.
 MIN_CHARS = 25
@@ -85,15 +100,6 @@ GLOBAL_PATH = re.compile(
 # A Bash command only counts when it writes or uses git, not when it reads.
 WRITE_CMD = re.compile(r"\bgit\b|\btee\b|\bsed\s+-i|>>?\s*\S|\bcp\b|\bmv\b")
 AGENT_TARGET = re.compile(r"\bai-config\b|\bpsw\b", re.I)
-
-# Compared case-insensitively: harnesses spell the same tool differently.
-WRITE_TOOLS = {
-    "write", "edit", "notebookedit", "multiedit", "write_to_file", "replace_file_content",
-    "apply_diff", "strreplace", "editnotebook", "edit_file", "create_file", "apply_patch",
-    "str_replace_editor",
-}
-BASH_TOOLS = {"bash", "run_command", "execute_command", "terminal", "shell"}
-AGENT_TOOLS = {"task", "agent"}
 
 
 def visible_prose(text):
@@ -166,27 +172,23 @@ def scan(path):
             blocks = (m.get("message") or {}).get("content") or m.get("content") or []
             if not isinstance(blocks, list):
                 continue
+            if tool_names is None:
+                continue
             for b in blocks:
                 if not isinstance(b, dict) or b.get("type") != "tool_use":
                     continue
                 name, inp = b.get("name") or "", b.get("input") or {}
                 if not isinstance(inp, dict):
                     continue
-                if name.lower() in WRITE_TOOLS:
-                    target = str(
-                        inp.get("file_path") or inp.get("notebook_path") or inp.get("path")
-                        or inp.get("TargetFile") or inp.get("target_file") or inp.get("filePath")
-                        or inp.get("target_notebook") or ""
-                    )
-                    if GLOBAL_PATH.search(target):
+                if tool_names.is_write_tool(name):
+                    if GLOBAL_PATH.search(tool_names.write_target(inp)):
                         recorded.append(i)
-                elif name.lower() in BASH_TOOLS:
-                    cmd = str(inp.get("command") or "")
+                elif tool_names.is_shell_tool(name):
+                    cmd = tool_names.shell_command(inp)
                     if GLOBAL_PATH.search(cmd) and WRITE_CMD.search(cmd):
                         recorded.append(i)
-                elif name.lower() in AGENT_TOOLS:
-                    blob = str(inp.get("prompt") or "") + str(inp.get("description") or "")
-                    if AGENT_TARGET.search(blob):
+                elif tool_names.is_subagent_tool(name):
+                    if AGENT_TARGET.search(tool_names.subagent_brief(inp)):
                         recorded.append(i)
     return humans, recorded
 

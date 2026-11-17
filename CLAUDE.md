@@ -31,36 +31,6 @@ The fragment walks through the specific moments this gets skipped even by someon
 When a `cai` or `ums` entry records a correction, write both sides as a labelled pair: the behaviour to adopt (**Do**) and the specific near-miss to stop (**Don't**), each an action a later reader could observe.
 Detail, rationale, and cases: [`shared/writing/record-pattern-and-anti-pattern.md`](shared/writing/record-pattern-and-anti-pattern.md).
 
-## No empty promises
-
-A commitment about your own future behaviour ships an implemented mechanism in the same turn (a memory entry at minimum, a hook, a filed issue, or an armed wake for an owed action), or is not made;
-`hooks/no-empty-promise.py` guards it.
-Detail, rationale, and cases: [`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md).
-
-## Generalize instructions to every AI agent by default
-
-Unless the user explicitly scopes an instruction to one agent, project, or
-session, apply it to every available AI-agent configuration and shared
-automation surface. A Claude-only implementation is incomplete when Codex,
-Gemini, Antigravity, or another installed agent can encounter the same rule.
-
-- **Do:** update the shared source and every applicable agent-specific entry
-  point; prefer an agent-independent service for operational behavior.
-- **Don't:** treat the name of the agent currently speaking as an implicit
-  scope restriction.
-
-## Interpret instructions broadly and maximize safe progress
-
-Unless the user narrows a request, take the broad reading that advances its
-obvious objective and complete every safe, authorized, relevant step. Do not
-reduce an instruction to the smallest literal action when its context makes a
-larger in-scope outcome clear.
-
-- **Do:** inspect for adjacent actionable work, resolve it, verify it, and
-  carry it through the normal PR/review/monitoring lifecycle.
-- **Don't:** stop at a narrow literal reading that leaves the requested outcome
-  only partially achieved.
-
 ## Status requests do not make issues report-only
 
 A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
@@ -104,35 +74,6 @@ Detail, rationale, and cases: [`shared/workflow/manage-quota.md`](shared/workflo
 Keep a dated, append-only `session-YYYY-MM-DD[-slug].md` notebook in the project auto-memory directory, and append a timestamped entry at every state change worth resuming from, so an interruption with no clean exit loses nothing.
 Detail, rationale, and cases: [`shared/workflow/session-lab-notebook.md`](shared/workflow/session-lab-notebook.md).
 
-## Keep ai-config and repo checkouts fresh
-
-[`shared/workflow/keep-checkouts-fresh.md`](shared/workflow/keep-checkouts-fresh.md)
-
-Four freshness checks to run each session: the ai-config checkout itself (on `main`, pulled --ff-only, with a safe recovery path for a diverged/orphaned local `main`), the consumer install (Claude Code and Cursor load this repo as a native plugin that auto-updates, so confirm the plugin is enabled and not doubled --- any leftover `~/.claude` copies of `shared/`, `hooks/`, or `memories/` predate the symlink-install removal and want a content diff;
-sweep for a leftover `~/.claude/skills` too, in symlink form as well as copy, whose symptom is a doubled skill listing rather than drift --- a symlink into the checkout diffs clean --- and which must not be deleted on presence or on a name match, with `install-hooks.py` answering only the registration half), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
-The fragment above carries the mechanics, the failure modes each check catches, and the case records.
-
-## Timestamp recaps in local time
-
-[`shared/workflow/timestamp-local-recaps.md`](shared/workflow/timestamp-local-recaps.md)
-
-A status recap or summary carries a timestamp in the user's local zone, so "as of when" is unambiguous when they read it later.
-The rest of this section governs where the time comes from.
-Every clock time you write down --- that recap, a date typed into a file, a time stamped on a forge comment, a session-notebook heading --- comes from a reading taken **in that moment**, in the user's zone (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
-A reading expires immediately, and the thing that most reliably licenses an invented stamp later is the memory of having honestly measured one earlier: the clock keeps moving while a count of elapsed tool calls does not, so the two drift apart and the drift compounds across comments posted in sequence.
-
-**Print the reading.**
-A reading captured into a shell variable whose only destination is a heredoc never reaches the transcript, so the next stamp you type still comes from a sense of elapsed work --- a reading you cannot quote is not a reading.
-The fragment carries the platform mechanics (Git Bash silently falls back to GMT, so check the `%Z`, and use the PowerShell form when it does), every surface the drift reaches, and the measured cases.
-
-- **Do:** run the clock command on its own, immediately before typing a time anywhere, and quote what it returned.
-- **Do:** derive a time written into a file from a `date` read in the same command that writes it.
-- **Don't:** infer a clock time from how many tool calls or actions have happened since the last real reading.
-- **Don't:** treat an earlier honest measurement as still valid, or a reading the session never observed as one it did.
-
-`hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop` and `hooks/flag-unmeasured-timestamp.py` reads a comment body at `PreToolUse`;
-both warn, never block, when a Pacific clock time appears with no clock read in the transcript since the turn began (ai-config#2903).
-
 ## State the actual time when reporting a scheduled check-in
 
 When reporting a scheduled wakeup or check-in, state the clock time it fires at in Pacific time ("I'll check back at 08:22 PT (~4 min)"), not only the delay.
@@ -164,6 +105,7 @@ See [`dmmhyh`](skills/dmmhyh/SKILL.md).
 `fw` ("finish the current wave but don't start a new one", longhand `finish-wave`) caps an orchestration run at the wave already in flight.
 It bounds *issue grabs* only, so the review rounds, fixes, and the owed UMS pass that finish the wave's PRs all run under it.
 See [`finish-wave`](skills/finish-wave/SKILL.md).
+No freeze stops filing, `fw` included ([`freezes-allow-filing`](shared/workflow/freezes-allow-filing.md)).
 
 - **Do:** read a bare "finish the current wave" as `fw`, hold every new grab, and drive the wave's open PRs to a terminal state.
 - **Don't:** read it as "open no more PRs" --- a UMS PR or a follow-up issue is not a grab from the backlog.
@@ -271,23 +213,6 @@ Detail, rationale, and cases: [`shared/workflow/monitor-pushed-heads.md`](shared
 
 The `claim-pr` skill operationalizes this (the exact claim wording, when it applies, and the closing/unclaim comment).
 
-## Every comment you post to a forge says an agent posted it
-
-[shared/workflow/disclose-agent-authorship.md](shared/workflow/disclose-agent-authorship.md)
-
-A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login and reads as `type: User`, so nothing in the API distinguishes it from a comment they typed --- `memories/gh-cli.md` records auditors mistaking exactly that.
-The forge cannot say it, so the body must: end every agent-posted comment with
-
-```
-_Posted by Claude Code (AI agent) --- not written by a human._
-```
-
-The marker deliberately avoids the robot emoji, which `scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry --- a disclosed claim comment would otherwise scan as a finding-free **review**.
-The fragment carries the rest: the two exemptions, the comment-bodies-only scope, and the queries that verify a marker or a bot identity.
-
-- **Do:** append the marker to every claim, release, status, reply, and self-review comment, including ones whose prose already names the session.
-- **Don't:** use the robot emoji in it, or put it in a commit message, a title, an issue body, or a PR body.
-
 ## Read a repo's canonical contributor doc before starting work, not just before pushing
 
 [shared/workflow/read-canonical-doc-before-starting.md](shared/workflow/read-canonical-doc-before-starting.md)
@@ -301,16 +226,6 @@ When a short `CLAUDE.md` names a fuller document as the actual authority --- `.g
 The strong form of the claim: after claiming an issue you're about to work, open the PR right away — before implementing — from an empty commit, kept as a draft until the implementation lands.
 An open PR is the visible in-flight signal other sessions check, so opening it up front stops parallel duplicates.
 The `gi`, `gii`, `gip`, and `st` skills operationalize this.
-
-## Every self-review is an adversarial review by a separate subagent
-
-[shared/workflow/adversarial-self-review.md](shared/workflow/adversarial-self-review.md)
-
-Whenever reviewing your own work is called for --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only) against `git diff origin/<default-branch>...HEAD`, and treat its findings as findings.
-The authoring session cannot do it inline: it knows what the change was *meant* to say, so it reads the diff and recovers the intent, which is confirmation rather than review.
-Brief the reviewer with the diff and the standards, never with the rationale for the change --- handing over your account of it is what makes the reviewer agree with you.
-`hooks/no-push-without-self-review.py` gates the pre-push case on Claude Code.
-The fragment covers the rest, including why a same-vendor subagent buys independence of *intent* and not of blind spot.
 
 ## Open a PR for every pushed feature branch
 
@@ -352,7 +267,7 @@ Covers marketplace verification, permission review, avoiding redundant submodule
 
 Before branching, editing, or opening a PR for new work, search the tracker across all states (`gh issue list --state all --search`, `glab issue list --all --search`) and file an issue if none covers the task;
 surface a closed match and confirm rather than redoing the work.
-Label every agent-filed issue `ai-authored` and `model:<model-id>` in the creating command.
+Label every agent-filed issue `ai-authored`, `model:<model-id>` and one of `P1`, `P2` or `P3` in the creating command.
 The `st` (Start Task) skill operationalizes this; `gi` (Grab Issue) is the path when the issue already exists.
 
 Its last section is the mirror, and it covers requests that arrive rather than work you go looking for: a request the user makes mid-flight may be deferred on your own judgment when it would grow the change past what it set out to do, provided the deferred item is filed as an issue in the same reply and the reply says what was deferred and why.
@@ -490,7 +405,7 @@ If you and the reviewer reach an impasse on a single item (your rebuttal didn't 
 
 ## Request review and drive every started PR to clean
 
-`AGENTS.md`'s "Get a clean automated review before asking a person to review" governs: no request for human review, on any forge, before a clean or deadlocked automated review that you triggered yourself ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
+The "Get a clean automated review before asking a person to review" bullet of `AGENTS.md`'s "Review your work before anyone sees it, and watch every PR you drive" governs: no request for human review, on any forge, before a clean or deadlocked automated review that you triggered yourself ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
 This section is the GitHub mechanics.
 
 Whenever starting or working on a Pull Request:
@@ -503,26 +418,6 @@ Whenever starting or working on a Pull Request:
 - **Don't:** Manually trigger a redundant `@claude review` comment when an automated review is already running or triggered by the push/ready event.
 - **Don't:** Request human review when the PR is first opened empty or before code pushes are complete.
 
-
-## Check the remote immediately before every push
-
-[`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md)
-
-Take a fresh `git ls-remote` reading of the branch immediately before every `git push` --- not at the start of the round, not when you last synced, not when you opened the PR.
-Your own branch is the one you are least likely to check, and an earlier fetch expires like a clock reading.
-
-`--force-with-lease` alone is not the safe form: any background fetch silently satisfies the lease over the very commits it was protecting.
-Always pair it with `--force-if-includes` (Git 2.30.0 or later), and never pair `--force` with the lease, since `--force` disables the lease's checks.
-A `stale info` refusal is not a reason to force either.
-It never says why: the branch may have been deleted (after a squash-merge with auto-delete), a peer may have pushed, or you may never have fetched it.
-`git ls-remote --heads origin <branch>` settles existence and nothing further: empty means deleted.
-Non-empty means the branch is live, so compare its tip against the ref you are pushing before choosing a remedy --- an ancestor tip fast-forwards, and only a diverged one needs a reconcile.
-When it is empty, query `gh pr list --state all --head <branch>` before a plain push.
-MERGED means auto-delete, not a first publish: do not recreate
-(see [`check-before-pushing`](shared/workflow/check-before-pushing.md)).
-Otherwise a plain push is the fix.
-`ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee, and using it means stating why.
-`hooks/no-clobbering-push.py` is the mechanism: it refuses a bare force push, whose remedy costs one word, and only warns on a divergence, whose significance it cannot judge.
 
 ## Keep PR branches synced with main
 
@@ -596,6 +491,12 @@ Pass `model` on every `Agent` call and `Workflow` `agent()` call, and never laun
 `FABLE_SUBAGENT_OK=1` on the approved command only).
 Detail, rationale, and cases: [`shared/workflow/no-fable-subagents.md`](shared/workflow/no-fable-subagents.md).
 
+## Choose each launch's model deliberately, and weigh a new thread before messaging an old one
+
+When you start a subagent, thread or session, pick the best-fit model with `select-model` and `recm` (Sonnet or Haiku for bounded edits and lookups, Opus for large content passes and hard reasoning).
+A message cannot change a running thread's model, so before giving new work to an existing thread, decide whether a new thread would fit better (Ezra, 2026-11-16).
+`hooks/require-model-choice.py` denies a launch with no `model` (or `Model-fit:` line) and a `message_thread` with neither a `Why-not-new-thread:` line (new work) nor a `No-new-work:` line (a relay or a sha).
+
 ## Derive a set of work items; never hand over an enumeration of it
 
 The section above governs *whether* to dispatch.
@@ -609,14 +510,6 @@ Every agent does its job correctly on the list it was given, so the items that a
 `scripts/pr-sweep.py` is the deterministic half for open PRs, and reports what it examined rather than only what it found.
 
 [`shared/workflow/derive-dont-enumerate.md`](shared/workflow/derive-dont-enumerate.md)
-
-## Help your subagents improve over time
-
-[`shared/workflow/improve-your-subagents.md`](shared/workflow/improve-your-subagents.md)
-
-The brief, the memory a dispatched agent can read, and the loop that feeds findings back to it are the orchestrator's, so the agent's mistake rate is too.
-`AGENTS.md` carries the rule;
-the fragment carries the mechanisms (a per-agent mistake ledger prepended to every brief, a loop change after every fix round, rounds-to-clean as the measure, promotion into skills and hooks).
 
 ## Subagent worktrees are assigned, and an incident never silently repeals a decision
 
@@ -701,36 +594,10 @@ rather than a fixed reserve.
 
 ## Checklists: Do-Confirm, Read-Do, pause points, killer items
 
-Where a check is mechanical but no instrument can decide it -- because it
-spans several unrelated observations at one moment, like a pre-push sweep --
-the instrument is a **checklist**, and the same discipline applies.
-
-Add one only where a failure is repeatable, expensive, and mechanically
-observable, then get four things right:
-
-- **Type.** *Do-Confirm* (work freely, then stop and confirm) is the default.
-  Use *Read-Do* (read each item and perform it in order) only when
-  reordering the steps changes the answer, or when a step cannot be undone --
-  a merge, a release, session-start freshness.
-- **Pause point.** State the moment it fires as an observable event ("before
-  `git push`", "before reporting the PR ready"), not a topic.
-  A checklist with no trigger is read only by whoever was already careful.
-- **Killer items.** Mark the one or two steps most often skipped and most
-  costly to skip, since a flat list gets triaged under pressure and the
-  dropped item is usually the one that looks like bookkeeping.
-  The known ones: the UMS pass ending `post-merge`/`ardi`, and `wrap-up`'s
-  state sweep.
-- **Length.** Five to nine items, action plus evidence.
-  Past that it has started teaching; move the explanation into the prose
-  above it.
-
-Treat every checklist as a draft until it has been run on real work, and
-treat UMS as its revision loop: when a checklist was followed and the failure
-happened anyway, the finding is about the checklist, not only the incident.
-Don't checklist-ize skills that are mostly design judgment, exploratory
-research, or one-off improvisation.
-
-[`shared/workflow/skill-checklists.md`](shared/workflow/skill-checklists.md)
+Where a check is mechanical but no instrument can decide it, because it spans several unrelated observations at one moment (a pre-push sweep), the instrument is a **checklist**.
+Add one only for a repeatable, expensive, observable failure, default to Do-Confirm (Read-Do only when order matters or a step is irreversible), fire it at an observable pause point, mark its killer items, and keep it to at most nine items.
+Treat UMS as its revision loop.
+Detail, rationale, and cases: [`shared/workflow/skill-checklists.md`](shared/workflow/skill-checklists.md).
 
 ## Never pattern-match blindly: check the purpose transfers
 
@@ -1467,54 +1334,9 @@ Detail, rationale, and cases: [`shared/coding/powershell-cli-safety.md`](shared/
 
 ## Tool transport collapses doubled backslashes
 
-[`shared/coding/heredoc-backslash-collapse.md`](shared/coding/heredoc-backslash-collapse.md)
-
-The sibling of the backtick hazard above, and the same class: content silently transformed between what you type and what the interpreter receives.
-On some transports a doubled `\\` inside a Bash-tool heredoc body arrives as a single `\`, **even with a quoted delimiter** that should make the body literal.
-
-It fails silently and plausibly: the worst case is not a failed assert but a corrupted regex with no syntax error and a green suite.
-
-**It is a property of the environment, not of heredocs**, so measure yours rather than trusting either answer --- it reproduced on Windows MINGW64, and did not reproduce either in a GitHub Actions Linux runner or in a Linux remote Claude Code container --- two different environments, and the second is where many sessions actually execute.
-Knowing the rule also does not stop you tripping it, since nothing about typing an escape sequence announces itself as the trigger.
-
-**So the default is not to carry content in a heredoc at all.**
-Write it with the Write tool (Edit for an existing file) to a uniquely named scratchpad file, and hand the command the path (`git commit -F`, `--body-file`, `python3 script.py`).
-The Write tool passes bytes unchanged, and it cannot be silently skipped the way a heredoc inside a hook-denied Bash call is.
-
-- **Do:** use Write or Edit for any content with a backslash, a backtick, code, or more than a few lines.
-- **Do:** where a heredoc is genuinely unavoidable, build the character with `chr(92)` or a placeholder token before it enters the body, and print `repr()` of the constructed string.
-- **Do:** parse-check or read back any file a heredoc just wrote with escapes in it.
-- **Don't:** embed a patch script, regex, commit message or PR body in a heredoc.
-- **Don't:** type a doubled backslash directly inside a heredoc body, quoted delimiter or not.
-- **Don't:** treat having read this rule as the check --- it was loaded, and the collapse happened anyway.
-
-`hooks/warn-heredoc-doubled-backslash.py` scans a command's heredoc bodies at `PreToolUse` and names the offending line (ai-config#1923, #3362).
-
-## Strict Merge Control Policy
-
-- **NEVER merge any Pull Request or Merge Request without explicit user permission.**
-  Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
-  Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
-- **Never merge over open review findings or treat skip notices as approval.**
-  Under `mwc`, a PR must be fully clean across CI and all review findings.
-  A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
-  All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
-  A disagreement among reviews is not fully clean: any standing not-clean
-  --- nits included --- vetoes merge even with `mwc` active
-  (ai-config#2274).
-- **Another session's PR needs a second condition: clean, and clean for more than twenty minutes --- then warned.**
-  Every other rule here settles *when* a PR may be merged;
-  this one settles *whose*.
-  A peer may have further commits planned, so merging one that just went clean can destroy work it was about to push --- and that is exactly the case where the peer's PR unblocks yours and the temptation is strongest.
-  Start the clock at the clean verdict on the current head, which a push resets, rather than at the PR's `updatedAt`, which any comment bumps.
-  The threshold is an inference, so confirm it: message the owning session directly when `ListAgents` reaches it, and otherwise post a comment saying you intend to merge and wait a further five minutes for a hold-off.
-  The path applies only to a peer PR that passes `memories/reviewing-prs.md`'s scope test (a peer session under your own login satisfies the author arm).
-  Another lab member's PR that fails the test gets neither the comment nor the merge.
-  [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
-
-**One standing exception: PRs targeting `Morrison-Lab/ai-config`, `Morrison-Lab/gha` or the macros repo `d-morrison/macros` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
-[`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.
-It is scoped to the **target**, so a merge from an ai-config checkout into another repo is unaffected.
-
-- **Do:** merge a fully-clean ai-config PR without asking, and say in the same reply that you did and why it qualified.
-- **Don't:** read it as covering a PR that is not fully clean, or another repo's PR merged from an ai-config checkout.
+On some transports a doubled `\\` inside a Bash-tool heredoc arrives as a single `\`, even with a quoted delimiter, and it fails silently (a corrupted regex under a green suite).
+Write content with a backslash, backtick, code, or more than a few lines through the Write or Edit tool to a scratchpad file and pass the path;
+where a heredoc is unavoidable, build the character with `chr(92)` and print `repr()` of the result.
+The collapse is a property of the environment, so measure yours rather than assuming either answer.
+`hooks/warn-heredoc-doubled-backslash.py` names an offending line (ai-config#1923, #3362).
+Detail, environment measurements, and cases: [`shared/coding/heredoc-backslash-collapse.md`](shared/coding/heredoc-backslash-collapse.md).

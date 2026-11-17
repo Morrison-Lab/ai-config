@@ -101,14 +101,21 @@ without asking confirmation before every merge.
   After the instrument passes, run the base-currency check that
   [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule
   (the Do bullets beginning "for a direct merge") before the merge command,
-  by merge mode: the `git merge-base` form in a local session,
-  the compare endpoint's `behind_by` in a remote session without `git`,
+  by merge mode: the `git fetch` form in a local session,
+  the compare endpoint in a remote session without `git`,
   no merge at all from a session that can run neither until
   [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it
   into the instrument, and a stop on a base that requires a merge
   queue until [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)
   lands.
-  On a direct merge a stale merge-base means an update pinned to the
+  A head behind only by other PRs' content merges as it stands,
+  with no update,
+  once the instrument exits 0 with its base-drift check run,
+  GitHub reports the PR mergeable,
+  and the latest review names that head
+  ([#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)).
+  On a direct merge a conflict, a base-drift failure, or a base that
+  requires an up-to-date branch means an update pinned to the
   recorded head (`PUT .../pulls/<N>/update-branch` with
   `expected_head_sha`, or the MCP tool's `expectedHeadSha`; a `422`
   whose message names an expected-head mismatch (match on the substring `expected head sha`, since the live text carries a curly apostrophe and a trailing period that this ASCII rendering cannot show)
@@ -126,8 +133,8 @@ without asking confirmation before every merge.
   then a check immediately before the merge command that the live head
   is still that SHA, `baseRefName` is unchanged, and the base tip
   still equals the `<pinned-tip>` the currency check printed (recorded
-  before the gate reran), repeating the cycle when any moved during the
-  gate,
+  before the gate reran), rerunning the gate when any moved during it
+  and updating again only when the rerun calls for it,
   and `--match-head-commit "<pinned-sha>"` (or `expectedHeadSha` on the
   MCP merge tool) on the merge command itself, so the API refuses a
   push that lands after the read.
@@ -585,6 +592,11 @@ When MWC is enabled for a session:
 3. If an active `.mwc` marker exists for the current session, `no-unauthorized-merge.py` allows merge tool executions.
 4. `ai-session.sh disable-mwc` removes the `.mwc` marker file, restoring the strict prohibition immediately.
 
+**A grant the user types in plain English needs no command (ai-config#5612).**
+`no-unauthorized-merge.py` reads the transcript: the user's latest merge word (as `remind-plain-english-merge-word.py` defines it, never a coordinator's note) grants, and a later revocation withdraws it.
+So merge with the GitHub MCP tool right after the word and run no `ai-session.sh` step (Ezra, 2026-11-13: "stop asking for manual approvals");
+the marker below remains for a relayed grant.
+
 **The session id has to match on both sides, and that is the part that breaks.**
 The guard resolves which session it is running under from the hook payload's own
 `session_id` field, then the transcript filename stem, then `AI_SESSION_ID` /
@@ -711,8 +723,8 @@ They differ in exactly the way that matters here: the hook reads a **marker
 file**, so re-asking cannot move it, while the classifier reads the
 **conversation**, so re-stating intent can.
 So a denial that clears on a retry was, by that fact, probably not this guard.
-Check registration rather than assuming, per `CLAUDE.md`'s
-"Keep ai-config and repo checkouts fresh":
+Check registration rather than assuming, per
+[`keep-checkouts-fresh`](../../shared/workflow/keep-checkouts-fresh.md):
 
 ```bash
 python3 <ai-config-checkout>/scripts/install-hooks.py   # report only; --fix binds

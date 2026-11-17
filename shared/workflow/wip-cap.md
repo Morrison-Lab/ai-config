@@ -18,6 +18,8 @@ On 2026-11-09 the lds queue reached 676 runs while owners kept opening PRs behin
 - **Don't:** split one concern into extra PRs to get around the cap.
   That defeats `split-concerns` from the other side.
 
+The cap never stops filing: an issue filed and left unclaimed opens no PR ([`freezes-allow-filing`](freezes-allow-filing.md)).
+
 The cap is on open PRs, not on distinct concerns, so a mechanical split in the middle of a stack still counts.
 
 **The cap wins over the batch skills.**

@@ -93,7 +93,6 @@ Fails OPEN on any parse trouble or missing sibling, and fires at most once
 per distinct message.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -106,20 +105,14 @@ _AGENT_NOTICE_LIB = os.path.join(
 if _AGENT_NOTICE_LIB not in sys.path:
     sys.path.insert(0, _AGENT_NOTICE_LIB)
 from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+from sibling import load_sibling  # noqa: E402 -- ai-config#2018
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
 def _sibling(name):
-    """Import a hyphenated sibling module, or None if unavailable."""
-    path = os.path.join(HERE, name)
-    try:
-        spec = importlib.util.spec_from_file_location("_sib", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name)
 
 
 _unfiled = _sibling("no-unfiled-finding.py")
@@ -209,7 +202,8 @@ def main() -> int:
         "now (dupe-check with `gh issue list --state all --search`, then "
         "`gh issue create` / `mcp__github__issue_write`, labelled "
         "ai-authored and model:<id> per "
-        "shared/workflow/label-agent-filed-issues.md), or comment the new "
+        "shared/workflow/label-agent-filed-issues.md, and one of P1, P2 or "
+        "P3 per shared/workflow/issue-first.md), or comment the new "
         "evidence onto the issue that already covers it. If it is genuinely "
         "not yours to file -- out of scope for this repo -- say so instead "
         "of restating that it is unfiled.", "flag-unfiled-issue"))

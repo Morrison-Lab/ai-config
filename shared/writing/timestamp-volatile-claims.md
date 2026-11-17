@@ -285,7 +285,7 @@ above.)
 - The `check-info-quality` skill is the **detector** that finds
   already-stale claims after the fact; this rule prevents them at authoring
   time by making each volatile claim's vintage explicit.
-- `CLAUDE.md`'s "Timestamp recaps in local time" and the
+- `AGENTS.md`'s "Timestamp recaps in local time" and the
   convert-relative-dates-to-absolute memory rule timestamp *when you acted or
   spoke*; this rule timestamps *when a volatile fact was true* --- a different
   quantity that happens to share the "prefer absolute dates" mechanics.

@@ -42,8 +42,10 @@ its description does not use (ai-config#949).
 | `skills/check-dependency-updates/SKILL.md` | Audit dependency updates. |  |
 | `skills/check-history/SKILL.md` | Check closed PR history for issue. |  |
 | `skills/check-info-quality/SKILL.md` | Flag stale or misleading content. |  |
+| `skills/check-prose-claims/SKILL.md` | Check prose claims, read-only. |  |
 | `skills/check-rendered-refs/SKILL.md` | Find broken refs in render. |  |
 | `skills/checkpoint/SKILL.md` | Save mid-task snapshot. |  |
+| `skills/choose-thread/SKILL.md` | New or existing thread? |  |
 | `skills/chores/SKILL.md` | Handle chore and bump PRs. |  |
 | `skills/ciq/SKILL.md` | -> check-info-quality. |  |
 | `skills/claim-pr/SKILL.md` | Post claim comment on PR/issue. |  |
@@ -77,6 +79,7 @@ its description does not use (ai-config#949).
 | `skills/delegate-to-databricks/SKILL.md` | Dispatch sidecar work to Databricks-hosted LLMs. |  |
 | `skills/delegate-to-opencode/SKILL.md` | Delegate sidecar work to OpenCode or OpenRouter models. |  |
 | `skills/dependabot/SKILL.md` | -> chores. |  |
+| `skills/detect-hallucinations/SKILL.md` | Find fake references, read-only. |  |
 | `skills/detect-hypothetical-examples/SKILL.md` | Flag invented examples when real data exists. |  |
 | `skills/detect-informal-definitions/SKILL.md` | Detect informal definitions. |  |
 | `skills/di/SKILL.md` | -> defer-issue. |  |
@@ -86,7 +89,7 @@ its description does not use (ai-config#949).
 | `skills/do-as-you-think-best/SKILL.md` | -> daytb. |  |
 | `skills/do-it-for-me/SKILL.md` | Do the step yourself; retry blocks, then lift auto mode. |  |
 | `skills/done/SKILL.md` | -> wrap-up. |  |
-| `skills/draft-in-ezras-voice/SKILL.md` | Draft communications for Ezra in his own voice: announcements, emails, and comments sent under his name. |  |
+| `skills/draft-in-ezras-voice/SKILL.md` | Draft Ezra's announcements, emails and comments in his voice. |  |
 | `skills/drive/SKILL.md` | -> ardi. |  |
 | `skills/dta/SKILL.md` | -> delegate-to-agy. |  |
 | `skills/dtc/SKILL.md` | -> delegate-to-codex. |  |
@@ -100,7 +103,9 @@ its description does not use (ai-config#949).
 | `skills/ffr/SKILL.md` | -> fix-forward-references. |  |
 | `skills/find-ai-tells/SKILL.md` | Spot AI prose tells. |  |
 | `skills/find-duplicates/SKILL.md` | -> find-overlap. |  |
+| `skills/find-info-issues/SKILL.md` | Find stale or misleading text. |  |
 | `skills/find-overlap/SKILL.md` | Find overlapping skills or memory. |  |
+| `skills/find-reproducibility-gaps/SKILL.md` | Find reproducibility gaps, read-only. |  |
 | `skills/finish-wave/SKILL.md` | Finish the current wave; start no new one. |  |
 | `skills/first/SKILL.md` | Jump to head of task queue. |  |
 | `skills/fix-forward-references/SKILL.md` | Fix forward references in text. |  |
@@ -252,7 +257,7 @@ its description does not use (ai-config#949).
 | `shared/coding/errexit-is-not-uniform.md` | `set -e` does not apply everywhere, and the places it stops applying are not obvious. A failing command aborts the script in most positions, but bash suppres... |  |
 | `shared/coding/fact-check-code-logic.md` | When reviewing code that implements an algorithm, computation, math, or statistics, check whether it's *right* --- not just styled well. Use domain knowledge... |  |
 | `shared/coding/function-signature-style.md` | When an R function signature doesn't fit on one line, format the argument list with **single-indent** style: nothing after `function(`, each argument on its... |  |
-| `shared/coding/heredoc-backslash-collapse.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the mechanics, the repr... |  |
+| `shared/coding/heredoc-backslash-collapse.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps a short summary of the rule and links here for the pattern/anti-pattern pairs, the mec... |  |
 | `shared/coding/least-flexible-tool.md` | Use the least-flexible construct that does the job. When two constructs both work, prefer the one that can do less, because a narrower construct announces it... |  |
 | `shared/coding/loop-hygiene.md` | When a `for` loop really is the right construct --- see `least-flexible-tool` for when it is not --- three checks apply. Each is mechanical, greppable, and c... |  |
 | `shared/coding/one-function-per-file.md` | When adding a new function to a codebase, give it its own file rather than bundling it into a file that already holds other functions --- unless the function... |  |
@@ -270,6 +275,7 @@ its description does not use (ai-config#949).
 | `shared/principles/admitting-vs-branching-site.md` | When enabling a new condition, trigger, or input case, that condition must be handled at two distinct sites that must agree: |  |
 | `shared/principles/dead-code-is-tech-debt.md` | Dead code is not harmless surplus; it is active technical debt that accumulates carrying costs on every reader, coding agent, search tool, and test suite pas... |  |
 | `shared/principles/deterministic-tools.md` | **Automate everything.** Never do by hand any work that can be automated. |  |
+| `shared/principles/dont-copy-decompose.md` | When a second place needs something that already exists in another place, do not copy it. Factor the shared part into one reusable component, and have every... |  |
 | `shared/principles/dont-incur-technical-debt.md` | Don't incur technical debt. When the right way to do the work in front of you needs a change you have not made yet, make that change as part of the work, rat... |  |
 | `shared/principles/dont-reinvent-wheel.md` | Don't reinvent the wheel (DRW). Before writing custom code or implementing a new function or feature, always perform a research step to verify that it hasn't... |  |
 | `shared/principles/dont-take-my-word-for-it.md` | Give users the whole truth and nothing but the truth, including your full, honest opinions; never defer to the user's opinion when you disagree. Even when th... |  |
@@ -278,7 +284,7 @@ its description does not use (ai-config#949).
 | `shared/principles/no-cheap-fixes.md` | A fix is done when the rule behind the finding is met, not when the finding stops matching. Before applying any fix --- your own idea, a reviewer's suggestio... |  |
 | `shared/principles/no-gameable-rules.md` | No gameable rules. A rule, instruction, metric, hook condition, or checklist item has to target the outcome it actually cares about, so that no behaviour can... |  |
 | `shared/principles/no-llm-algorithmic-thinking.md` | Never use LLMs for algorithmic thinking --- use validated algorithmic software instead. When an operation is algorithmic --- counting, arithmetic, algebra, d... |  |
-| `shared/principles/or-means-and-or.md` | In instructions, requirements, prompts, checklists, and specifications, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated. Neve... |  |
+| `shared/principles/or-means-and-or.md` | In instructions, requirements, prompts, checklists, specifications, and issue descriptions, treat "or" as inclusive ("and/or") unless exclusive choice is exp... |  |
 | `shared/principles/prefer-optionality-over-removal.md` | Never remove existing functionality entirely when you can add optionality instead. When changing default behavior, addressing an edge-case bug, or refactorin... |  |
 | `shared/principles/prefer-systemic-solutions-over-one-off-fixes.md` | When addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches. Fix the underlying me... |  |
 | `shared/principles/proactively-suggest-alternatives.md` | When asked to accomplish a goal using a specific approach, suggest a better alternative if one exists. Do not treat the proposed mechanism as an immutable re... |  |
@@ -294,8 +300,10 @@ its description does not use (ai-config#949).
 | `shared/workflow/agent-teams.md` | Agent teams are a third way Claude Code parallelizes work, and the corpus's job is to know when to *recommend* one --- not to reach for it, because unlike th... |  |
 | `shared/workflow/algorithmatize-checks.md` | Never spend LLM reasoning on a check a deterministic algorithm can decide. Whenever a verification, measurement, or classification step is decidable by compu... |  |
 | `shared/workflow/always-reply.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
+| `shared/workflow/answer-briefly-link-the-record.md` | Ezra, 2026-11-12 (#5591): "when I ask you a question that we have a recorded answer for, give me a brief direct answer and refer me to our recorded answer fo... |  |
 | `shared/workflow/ardi.md` | Whenever you are working a PR/MR, run the full **ARDI** loop by default, without being asked: **A**ddress every flagged item, **R**ebut findings that are wro... |  |
 | `shared/workflow/ask-for-manual-approval.md` | Applies to every agent that runs under a permission classifier or approval mode. The measured case is Claude Code's auto mode. Codex approval modes, Gemini,... |  |
+| `shared/workflow/ask-when-instruction-contradicts-rule.md` | When the maintainer gives an instruction that seems to contradict a recorded rule or guideline, ask which of these it is, quoting the rule and linking where... |  |
 | `shared/workflow/assign-subagent-worktrees.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/automated-review-before-human.md` | Never ask a person to review work until its automated review is clean or deadlocked. That holds in every repository, project and forge (GitHub, GitLab, or an... |  |
 | `shared/workflow/avoid-false-dichotomies.md` | Avoid false dichotomies. When laying out alternatives --- in a question to the user, a design note, a PR description --- test whether they are actually exclu... |  |
@@ -312,6 +320,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/check-purpose-before-reusing.md` | Never take shortcuts, and never copy-paste or pattern-match blindly. Before reusing a structure --- a template, a working script, a neighbouring file's shape... |  |
 | `shared/workflow/check-sources-over-recall.md` | When a source can be checked, check it before answering. Sources include books, repositories, documentation, APIs and files. Cite what you read (file and pag... |  |
 | `shared/workflow/check-the-renders.md` | In a repo that publishes a website or a book, the deliverable is the rendered page. A `.qmd` or `.md` diff can be entirely correct while the published page i... |  |
+| `shared/workflow/check-thread-models.md` | Three rules from one exchange in a Claude project (Machine Learning course, 2026-11-12). The coordinator told Ezra that every thread had been moved off Fable... |  |
 | `shared/workflow/check-tools-before-saying-cant.md` | Before a reply says "I can't", "I'm unable to" or "only you can", check the tools you have, deferred ones included. |  |
 | `shared/workflow/checks-need-writer-and-reviewer-instructions.md` | Every algorithmic check has two companions: an instruction to the writer that prevents the defect, and an instruction to the reviewer agent that looks for it... |  |
 | `shared/workflow/choose-issue-or-discussion.md` | `issue-first` governs *whether* something is tracked before work starts. It does not settle *where*, and defaulting everything to the issue tracker misfiles... |  |
@@ -321,6 +330,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/cursor-cloud-instructions.md` | This repo has no compiled app or long-running service. The "product" is three things: a Quarto documentation website, a suite of Python validators/tests unde... |  |
 | `shared/workflow/default-to-action-grants.md` | Detail for `AGENTS.md`'s "Default to action without asking", moved here to keep `AGENTS.md` under Codex's byte cap. |  |
 | `shared/workflow/derive-dont-enumerate.md` | A brief that enumerates work items is a snapshot. Before dispatching work scoped to a list --- PR numbers, issue numbers, files, hosts --- ask whether that s... |  |
+| `shared/workflow/destructive-actions-catalog.md` | Ezra, 2026-11-11, after a session nearly deleted `lds` branches it had misread from a shallow clone: "search online for common failure patterns and build gua... |  |
 | `shared/workflow/disclose-agent-authorship.md` | Every comment an agent posts to a forge --- GitHub, GitLab, or any other --- says, in the body, that an agent posted it. |  |
 | `shared/workflow/dont-get-sidetracked.md` | Ezra (d-morrison), 2026-10-13 (ai-config#4488): when you have a primary task, don't get sidetracked, including by the user's input; if a tangential or irrele... |  |
 | `shared/workflow/efficient-pr-babysitting.md` | When babysitting a PR (subscribed to its activity, driving ARDI, watching CI), default to the cheapest tool call and the smallest push that actually answers... |  |
@@ -331,6 +341,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/fixtures-are-not-evidence.md` | A test fixture records what someone believed the real thing looks like. Reasoning from a fixture back to the real thing is circular, so a fixture -- or a tes... |  |
 | `shared/workflow/flag-practice-slippage.md` | Say so when a practice is slipping, not only when an artifact is wrong. |  |
 | `shared/workflow/flag-session-boundaries.md` | Proactively tell me --- don't wait to be asked --- when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP,... |  |
+| `shared/workflow/freezes-allow-filing.md` | Ezra, 2026-11-12: "a freeze shouldn't prevent you from filing issues" (ai-config#5574). |  |
 | `shared/workflow/fully-clean.md` | "Fully clean" is the terminal state the ARDI review loop drives toward. A GitHub PR is **fully clean** when **both** of these hold, verified via `python3 scr... |  |
 | `shared/workflow/gate-external-communication.md` | Before sending any outward communication to a repository, positively verify that the user is a member of that specific repository. |  |
 | `shared/workflow/github-relationships.md` | Ezra, 2026-11-03 (`cai:`, ai-config#4907): use GitHub's relationships field for **every** relationship among issues and PRs. Prose such as "Blocked by #N", "... |  |
@@ -341,12 +352,13 @@ its description does not use (ai-config#949).
 | `shared/workflow/hook-first-push.md` | ai-config#5117 took four pushes because scripts that decide each miss ran only in CI and review (2026-11-08). |  |
 | `shared/workflow/improve-your-subagents.md` | Part of an orchestrator's job is to find ways for its subagents to improve over time. Correcting each output as it arrives keeps the work moving and leaves t... |  |
 | `shared/workflow/incidents-dont-repeal-decisions.md` | When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse. Never just change the behav... |  |
+| `shared/workflow/irreversible.md` | An agent never takes an irreversible action without direct, explicit authorization from the human user (Ezra, 2026-11-11: "agents must never do anything irre... |  |
 | `shared/workflow/issue-first.md` | When starting a **new** piece of work, go **issue-first**: before branching, editing, or opening a PR, make sure a tracking issue exists. Search the tracker... |  |
 | `shared/workflow/iterative-editing.md` | Writing agents do not need to enforce all style guidelines on first draft. They should work iteratively: write a substantively-correct but stylistically loos... |  |
 | `shared/workflow/keep-agent-on-backlog.md` | Keep at least one agent working while any project repo has an open issue backlog. |  |
 | `shared/workflow/keep-checkouts-fresh.md` | In every session --- at session start, and again periodically during long sessions --- refresh the local state that goes stale as PRs merge elsewhere: |  |
 | `shared/workflow/lab-operating-rules.md` | These rules came out of the coordinator's work with Ezra. Each was kept only in project memory until ai-config#4698, where Ezra asked that everything learned... |  |
-| `shared/workflow/label-agent-filed-issues.md` | The rule lives in `issue-first`'s "Label an agent-filed issue with its authorship and its model" section. This fragment carries the mechanics. It is linked r... |  |
+| `shared/workflow/label-agent-filed-issues.md` | The rule lives in `issue-first`'s "Label an agent-filed issue with its authorship and its model" section. This fragment carries the mechanics. Each creating... |  |
 | `shared/workflow/learn-from-review-findings.md` | A reviewer's valid finding is a mistake that reached the reviewer, so treat every one you accept as a first-push miss to learn from --- not merely an item to... |  |
 | `shared/workflow/live-state-over-notes.md` | A note records what was true when someone wrote it. Quota, availability, runner state, outages, CI state and a PR's state change. Decide such a condition fro... |  |
 | `shared/workflow/manage-quota.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
@@ -373,7 +385,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/put-prs-in-ready-mode.md` | A Pull Request that is ready for review must be in ready mode, not left in draft. |  |
 | `shared/workflow/quotable-findings.md` | Drop any review finding you are about to post if it cannot quote the passage it is about. |  |
 | `shared/workflow/read-canonical-doc-before-starting.md` | When a repo's own `CLAUDE.md` (or an equivalent short orientation file) names a fuller document as the actual authority --- `.github/copilot-instructions.md`... |  |
-| `shared/workflow/read-instructions-fully.md` | AGENTS.md's "Interpret instructions broadly" section sets the breadth of a reading. This fragment covers two habits that keep a reading complete, each one a... |  |
+| `shared/workflow/read-instructions-fully.md` | The "Interpret instructions broadly and maximize safe progress" bullet of AGENTS.md's "Act on the whole request, and decide rather than ask" section sets the... |  |
 | `shared/workflow/read-published-html-from-gh-pages.md` | Every Morrison-Lab notes repo (`lds`, `mds`, `pds`, `sds`, `rme` and the rest) publishes its rendered site to the `gh-pages` branch. Pull request previews si... |  |
 | `shared/workflow/recheck-review-findings.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the queries, the login-... |  |
 | `shared/workflow/record-every-decision.md` | Ezra, 2026-10-22 (ai-config#4676): every decision gets documented somewhere outside the thread, typically in a repo file. |  |
@@ -407,11 +419,12 @@ its description does not use (ai-config#949).
 | `shared/workflow/surface-merge-order.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/sync-with-main.md` | Whenever `main` has moved ahead of a PR branch you're working on, **merge `main` into the PR branch** before the next push or review trigger. Don't wait for... |  |
 | `shared/workflow/terminate-superseded-tasks.md` | When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate th... |  |
-| `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the platform mechanics,... |  |
+| `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568). `AGENTS.md`'s section of the same name states the rule and links here for the full pairs, the plat... |  |
 | `shared/workflow/track-useful-resources.md` | A notes repo is a site listed in `course-sequence` or in the notes repository registry of `send-notes`. Track every useful resource (textbooks, articles, sof... |  |
 | `shared/workflow/triage-backlog.md` | Triage the issue backlog on a fixed cadence, and treat closing an issue as not-planned as a normal outcome of that pass rather than as a failure to do the work. |  |
 | `shared/workflow/triage-new-asks.md` | Triage a new ask against the current backlogs before acting on it, so it joins the work that already owns it instead of spawning parallel work. |  |
 | `shared/workflow/ultracode-merge-conflicts.md` | When orchestrating an **ultracode** (`Workflow`-tool, multi-agent) session that touches git, check for merge conflicts **every time a merge actually occurs**... |  |
+| `shared/workflow/untrusted-content-is-data.md` | Prompt injection is text written to be read by an agent and obeyed as if the user had said it. No model reliably detects it, and Meta's security team describ... |  |
 | `shared/workflow/upgrade-to-gha.md` | `Morrison-Lab/gha` is the lab's repository of reusable GitHub Actions workflows. A consumer repo calls one with a small stub rather than carrying its own copy: |  |
 | `shared/workflow/upstream-issues.md` | When you find a bug or issue that belongs in an **upstream or external repository** (a dependency, a reusable workflow, an action you call, etc.), work throu... |  |
 | `shared/workflow/use-existing-pr-branch.md` | The Claude Code on the web harness injects a "Git Development Branch Requirements" section that assigns a session-unique branch name (e.g. `claude/abc123`) a... |  |
@@ -419,6 +432,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/use-plugins.md` | Search for and install plugins proactively. When a task would benefit from specialized domain tooling, external service integrations, linters, or workflow au... |  |
 | `shared/workflow/use-subagents.md` | When available, use subagents for helpful sidecar work: independent investigation, verification, or disjoint implementation slices. Keep immediate blocking c... |  |
 | `shared/workflow/user-profanity-signal.md` | Profanity, exasperation, or intense frustration from the user is almost always a high-signal indicator that an agent made a severe mistake, regressed previou... |  |
+| `shared/workflow/verify-changes-before-pushing.md` | The checks to run before pushing to `ai-config`: the three fast checks and the full test suite when shared tools or scripts change. |  |
 | `shared/workflow/verify-merge-commit-ci.md` | A PR's own CI is not the whole story once it merges. A repo can run a workflow on `push` that it never runs on `pull_request` --- a full or PDF render, a dep... |  |
 | `shared/workflow/verify-running-model.md` | A session cannot report its own model or effort by introspection, so a claim such as "I am on Opus at high effort" is a guess until an instrument reads it. `... |  |
 | `shared/workflow/verify-the-right-artifact.md` | Before reporting a finding, name the artifact the claim is about, and confirm that is the one you read. |  |
@@ -437,7 +451,9 @@ its description does not use (ai-config#949).
 | `shared/writing/examples-are-scanned.md` | An illustrative example sits inside the document, so a mechanical check that scans the document may scan the example too. When the document's subject *is* a... |  |
 | `shared/writing/explain-analysis-choices.md` | Ezra's rule (2026-11-03, ai-config#4905): every time you make an arbitrary analysis choice, explain the decision in detail in the prose next to it. |  |
 | `shared/writing/fact-check-prose.md` | When reviewing prose in a PR/MR --- documentation, lecture notes, a README, any non-code narrative content --- assess it for **accuracy and clarity**, not ju... |  |
+| `shared/writing/file-formatting-and-links.md` | Formatting defaults for responses and documentation: GitHub-style markdown, liberal hyperlinks, links or backticks for files and symbols, linked PRs and issu... |  |
 | `shared/writing/forward-references.md` | A **forward reference** is any mention that points a reader ahead to content they haven't reached yet --- a phrase like "as discussed below", "in the followi... |  |
+| `shared/writing/graph-and-equation-defaults.md` | Defaults for analysis figures, visuals and display math: `ggplot2`, worded axes and plain-number ticks, a visual wherever one helps, one equation per display... |  |
 | `shared/writing/grouping-levels.md` | A grouping level must earn its place: introducing one costs the reader a level of nesting, and that cost is only repaid when the level actually separates som... |  |
 | `shared/writing/hyperlink-liberally.md` | Make it easy for readers to find more information by hyperlinking liberally. When writing documentation, guides, READMEs, rules, skills, memories, PR descrip... |  |
 | `shared/writing/hypothetical-examples.md` | A worked example that illustrates a definition or theorem with **invented, round-number quantities** --- "Suppose a binary covariate Z...", "If 20% of the ex... |  |

@@ -1404,5 +1404,161 @@ with tempfile.TemporaryDirectory() as tmp:
         ccc.main(common + ["--agents-md-cap", "200"]) == 0,
     )
 
+# --- --merge-result: measure what the merge would land now (ai-config#4234) --
+# The branch and main each stay under the AGENTS.md cap alone, and only
+# their merge goes over -- the 2026-10-02 case the issue records.
+
+
+def git_in(where, *a):
+    return subprocess.run(
+        ["git", "-c", "protocol.file.allow=always", *a],
+        cwd=where, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
+def init_repo(where):
+    git_in(where, "init", "-q", "-b", "main")
+    for key, value in [("core.autocrlf", "false"), ("user.email", "t@t.com"), ("user.name", "t")]:
+        git_in(where, "config", key, value)
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+
+    def git(*a):
+        return git_in(base, *a)
+
+    init_repo(base)
+    (base / "CLAUDE.md").write_text("intro\n", encoding="utf-8")
+    (base / "AGENTS.md").write_text("a" * 60 + "\n", encoding="utf-8")
+    (base / "notes.md").write_text("x\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "start")
+    git("checkout", "-qb", "branch")
+    (base / "AGENTS.md").write_text("a" * 60 + "\n" + "b" * 30 + "\n", encoding="utf-8")
+    git("commit", "-qam", "branch grows AGENTS.md")
+    git("checkout", "-q", "main")
+    (base / "AGENTS.md").write_text("c" * 30 + "\n" + "a" * 60 + "\n", encoding="utf-8")
+    git("commit", "-qam", "main grows AGENTS.md")
+    git("checkout", "-q", "branch")
+    common = ["--base", str(base), "--budget", "100000000", "--agents-md-cap", "110"]
+    check(
+        "--merge-result: the branch alone is under the AGENTS.md cap",
+        ccc.main(common) == 0,
+    )
+    check(
+        "--merge-result: the merge with main is over it, and exits 1",
+        ccc.main(common + ["--merge-result", "main"]) == 1 and git("status", "--porcelain") == "",
+    )
+    check(
+        "--merge-result does not combine with --baseline (exit 2)",
+        ccc.main(common + ["--merge-result", "main", "--baseline", "main"]) == 2,
+    )
+    check(
+        "--merge-result: an unknown ref exits 2, reported as unknown, not as a conflict",
+        ccc.main(common + ["--merge-result", "no-such-ref-xyz"]) == 2
+        and "does not name a commit" in ccc.merge_result_tree(base, "no-such-ref-xyz")[1],
+    )
+    git("checkout", "-q", "main")
+    (base / "notes.md").write_text("main side\n", encoding="utf-8")
+    git("commit", "-qam", "main edits notes")
+    git("checkout", "-q", "branch")
+    (base / "notes.md").write_text("branch side\n", encoding="utf-8")
+    git("commit", "-qam", "branch edits notes")
+    tree, why = ccc.merge_result_tree(base, "main")
+    check(
+        "--merge-result: a conflicting merge yields no tree, with a reason",
+        tree is None and "conflicts" in why,
+    )
+    check(
+        "--merge-result: a conflicting merge exits 2, not a marker-laden measurement",
+        ccc.main(common + ["--merge-result", "main"]) == 2,
+    )
+
+# --- --merge-result: every gate reads the merge tree, not the working tree ---
+# Main alone grows the root and a fragment: each gate fails only on the merge.
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+
+    git = lambda *a, cwd=None: git_in(cwd or base, *a)  # noqa: E731
+
+    sub = base / "subsrc"
+    sub.mkdir()
+    init_repo(sub)
+    (sub / "shared.md").write_text("from the submodule\n", encoding="utf-8")
+    git("add", "-A", cwd=sub)
+    git("commit", "-qm", "sub", cwd=sub)
+
+    repo = base / "repo"
+    repo.mkdir()
+    init_repo(repo)
+    (repo / "CLAUDE.md").write_text("@frag.md\n@.ai-config/shared.md\n", encoding="utf-8")
+    (repo / "frag.md").write_text("f\n", encoding="utf-8")
+    (repo / "notes.md").write_text("n\n", encoding="utf-8")
+    git("submodule", "add", "-q", str(sub), ".ai-config", cwd=repo)
+    git("add", "-A", cwd=repo)
+    git("commit", "-qm", "start", cwd=repo)
+    git("checkout", "-qb", "branch", cwd=repo)
+    (repo / "notes.md").write_text("branch\n", encoding="utf-8")
+    git("commit", "-qam", "branch edits notes", cwd=repo)
+    git("checkout", "-q", "main", cwd=repo)
+    (repo / "CLAUDE.md").write_text(
+        "@frag.md\n@.ai-config/shared.md\n" + "r" * 200 + "\n", encoding="utf-8"
+    )
+    (repo / "frag.md").write_text("f" * 300 + "\n", encoding="utf-8")
+    git("commit", "-qam", "main grows the root and the fragment", cwd=repo)
+    git("checkout", "-q", "branch", cwd=repo)
+    loose = ["--base", str(repo), "--budget", "100000000"]
+    merged = ["--merge-result", "main"]
+    gates = [
+        ("the root character cap", ["--root-char-cap", "150"]),
+        ("the fragment cap", ["--fragment-cap", "200"]),
+        ("the CLI total limit", ["--total-char-limit", "400", "--repo-margin", "1"]),
+        ("the byte budget under --strict", ["--budget", "400", "--strict"]),
+    ]
+    for name, flags in gates:
+        check(
+            f"--merge-result: {name} passes on the branch alone",
+            ccc.main(loose + flags) == 0,
+        )
+        check(
+            f"--merge-result: {name} fails on the merge with main",
+            ccc.main(loose + flags + merged) == 1,
+        )
+    check(
+        "--merge-result: a submodule import resolves through the merge tree's gitlink",
+        ccc.main(loose + merged) == 0,
+    )
+    git("checkout", "-qb", "bad-root", "main", cwd=repo)
+    (repo / "CLAUDE.md").write_bytes(b"@frag.md\n\xff\n")
+    git("commit", "-qam", "a root that is not UTF-8", cwd=repo)
+    git("checkout", "-qb", "bad-pin", "main", cwd=repo)
+    (sub / "shared.md").write_text("newer\n", encoding="utf-8")
+    git("commit", "-qam", "a commit the checkout never fetched", cwd=sub)
+    pin = git("rev-parse", "HEAD", cwd=sub)
+    git("update-index", "--cacheinfo", f"160000,{pin},.ai-config", cwd=repo)
+    git("commit", "-qm", "pin it", cwd=repo)
+    git("checkout", "-qb", "link", "main", cwd=repo)
+    (base / "big.md").write_text("g" * 200, encoding="utf-8")  # outside the repo
+    (repo / "GEMINI.md").symlink_to("../big.md")  # so AGENTS.md -> GEMINI.md -> ../big.md
+    (repo / "AGENTS.md").symlink_to("GEMINI.md")
+    git("add", "AGENTS.md", "GEMINI.md", cwd=repo)
+    git("commit", "-qm", "link", cwd=repo)
+    git("checkout", "-qb", "loop", "main", cwd=repo)
+    (repo / "AGENTS.md").symlink_to("AGENTS.md")
+    git("add", "AGENTS.md", cwd=repo)
+    git("commit", "-qm", "loop", cwd=repo)
+    git("checkout", "-q", "branch", cwd=repo)
+    check("--merge-result: a symlink chain out of the repo is sized by its target",
+          ccc.main(loose + ["--agents-md-cap", "100", "--merge-result", "link"]) == 1)
+    check("--merge-result: a symlink cycle reads as missing, not a crash",
+          ccc.main(loose + ["--agents-md-cap", "1", "--merge-result", "loop"]) == 0)
+    for name, ref in [("a non-UTF-8 root", "bad-root"), ("an unfetched submodule pin", "bad-pin")]:
+        check(
+            f"--merge-result: {name} in the merge exits 2, not a pass or a dangling import",
+            ccc.main(loose + ["--merge-result", ref]) == 2,
+        )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

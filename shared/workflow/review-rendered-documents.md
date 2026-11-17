@@ -65,3 +65,11 @@ Never substitute a text extraction, a CI artifact's existence, or a source read 
 - **Do:** treat an unviewable render as a blocker you report, not a step you skip.
 - **Don't:** call a document-producing PR ready, or merge it under `mwc` or any other grant, on green CI and a clean review alone, or without a referee read of the current render.
 - **Don't:** check only the pages the diff touched, or a render from an earlier commit.
+
+## Merging runs in a Word document
+
+The `docx` skill's `merge_runs.py` merges a field code's runs into one, which deletes or moves citations, cross-references and HYPERLINK fields while looking like your own edit ([ai-config#2918](https://github.com/Morrison-Lab/ai-config/issues/2918)).
+`hooks/no-field-unsafe-merge-runs.py` denies it; the adversarial reviewer's "Word field codes" item looks for it.
+
+- **Do:** merge runs with `scripts/docx-merge-runs-field-safe.py`, which takes the same arguments.
+- **Don't:** run the skill's `merge_runs.py` on a document you will deliver, even where its recipe says to.

@@ -67,6 +67,11 @@ def main() -> int:
     check("gh after a chain", bash(f"cd x && gh issue comment 5 --body '{link}'"))
     for prefix in ("GH_TOKEN=x ", "time ", "(", "echo $("):
         check(f"prefix {prefix!r}", bash(f"{prefix}gh pr comment 5 -b '{link}'"))
+    check("continued --title", bash(f"gh pr create --body a \\\n  --title '{link}'"))
+    check("continued --body", bash(f"gh pr create \\\n  --body '{link}'"))
+    check("-R before subcommand", bash(f"gh -R o/r pr comment 5 -b '{link}'"))
+    check("--repo= before subcommand", bash(f"gh --repo=o/r issue create -b '{link}'"))
+    check("heredoc body", bash(f"gh pr comment 5 --body \"$(cat <<'EOF'\n{link}\nEOF\n)\""))
     check("unbalanced quote fails open", not bash(f"gh pr comment 1 --body '{link}"))
     check("PR title", denied(link, tool="mcp__github__create_pull_request", key="title"))
     check("other tool ignored", not denied(link, tool="Write", key="content"))

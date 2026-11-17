@@ -32,7 +32,8 @@ TOOL = re.compile(
     r"|^mcp__github__(?:add_issue_comment|update_issue_comment|add_reply_to_pull_request_comment"
     r"|add_comment_to_pending_review|pull_request_review_write|issue_write"
     r"|create_pull_request|update_pull_request)$")
-GH_POST = re.compile(r"\bgh\s+(?:issue|pr)\s+(?:comment|create|edit|review)\b")
+GH_POST = re.compile(r"\bgh\s+(?:(?:-R|--repo)[=\s]\S+\s+)?(?:issue|pr)\s+"
+                     r"(?:comment|create|edit|review)\b")
 BODY_FLAGS = {"--body", "-b", "--title", "-t"}
 TEXT_KEYS = {"text", "body", "title", "question", "label", "consequence", "comment", "message"}
 FENCE = re.compile(r"^```.*?^```|^~~~.*?^~~~|`[^`\n]*`", re.S | re.M)
@@ -86,6 +87,7 @@ def gh_flag_values(tokens: list) -> list:
 
 def bash_text(command: str) -> str:
     """The --body and --title values of each gh issue/pr post; a --body-file is not read."""
+    command = command.replace("\\\n", " ")
     if not GH_POST.search(command):
         return ""
     lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|\n")
@@ -100,7 +102,7 @@ def bash_text(command: str) -> str:
         if token and set(token) <= set(";&|\n"):
             words = [w.lstrip("$(") for w in segment]
             starts = [i for i, w in enumerate(words) if w == "gh"
-                      and GH_POST.search(" ".join(words[i:i + 3]))]
+                      and GH_POST.match(" ".join(words[i:i + 5]))]
             if starts:
                 values += gh_flag_values(segment[starts[0]:])
             segment = []

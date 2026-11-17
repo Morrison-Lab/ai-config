@@ -32,6 +32,10 @@ def write(path, content):
     return {"tool_name": "Write", "tool_input": {"file_path": path, "content": content}}
 
 
+def bash(command, cwd):
+    return {"tool_name": "Bash", "cwd": cwd, "tool_input": {"command": command}}
+
+
 def denied(payload):
     p = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
     out = json.loads(p.stdout) if p.stdout else {}
@@ -84,6 +88,32 @@ def main():
             (write(os.path.join(lds, "x", "publish.yml"), WORKFLOW), False, "a copy within one repository"),
             ({"tool_name": "Edit", "tool_input": {"file_path": dst}}, False, "Edit is not judged"),
         ]
+        src = os.path.join(lds, ".github", "workflows", "publish.yml")
+        wf = os.path.join(mcsg, ".github", "workflows")
+        os.makedirs(wf, exist_ok=True)
+        cases += [(bash(cmd, cwd), block, label) for cmd, cwd, block, label in [
+            (f"cp {src} {dst}", tmp, True, "cp of a sibling repo's file to a new path"),
+            (f"cp {src} {wf}/", tmp, True, "cp into a directory"),
+            (f"cd {lds} && cp .github/workflows/publish.yml ../mcsg/x.yml", tmp, True, "cp after a cd"),
+            (f"(cd {mcsg}) && cp .github/workflows/publish.yml {wf}/", lds, True,
+             "a subshell's cd does not move the caller"),
+            (f"install -m 644 {src} {dst}", tmp, True, "install with a mode value"),
+            (f"cp -t {wf} {src}", tmp, True, "cp -t target directory"),
+            (f"rsync -av -e ssh {src} {dst}", tmp, True, "rsync with an option value"),
+            (f"bash -c 'cp {src} {dst}'", tmp, True, "a cp inside bash -c"),
+            (f"cd {lds} && bash -c 'cp .github/workflows/publish.yml ../mcsg/x.yml'", tmp, False,
+             "a relative path inside bash -c is not judged (documented)"),
+            (f"sudo cp {src} {dst}", tmp, True, "a cp behind sudo"),
+            (f"cp {src} {dst}  # decompose: allow port to mcsg", tmp, False, "the shell-comment marker passes"),
+            (f"cp {src} '{wf}/# decompose: allow x'", tmp, True, "the marker inside a quoted operand"),
+            (f"rsync -av {src} me@host:/srv/publish.yml", tmp, False, "a remote destination"),
+            (f"cp {src} {os.path.join(mcsg, 'old', 'publish.yml')}", tmp, False, "cp over an existing file"),
+            (f"cp {src} {os.path.join(lds, 'x.yml')}", tmp, False, "cp within one repository"),
+            (f"cp {os.path.join(mcsg, 'README')} {os.path.join(lds, 'R2')}", tmp, False, "a short file"),
+            (f"cp {src} $DEST/publish.yml", tmp, False, "a destination behind a variable"),
+            (f"install -d {src} {wf}/z", tmp, False, "install -d makes directories"),
+            ("cp .github/workflows/publish.yml x.yml", None, False, "a relative path with no cwd"),
+        ]]
         for payload, block, label in cases:
             rc, blocked = denied(json.dumps(payload))
             ok = rc == 0 and blocked == block

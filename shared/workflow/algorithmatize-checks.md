@@ -1620,6 +1620,8 @@ reach.
 That is invisible from either clause alone, because each is individually
 correct about the copy it names.
 
+- **Do:** after extracting a helper, run `python3 scripts/check-mutation-anchors.py`, which lists at once the stale anchors in tables unpacked into `old`/`find`/`anchor`/`edits` and fails on a `.replace` of those names outside a table unless `ALLOWED_SKIPS` names the file, whose anchors it never checks;
+  check those files and every other harness shape by hand until [#5742](https://github.com/Morrison-Lab/ai-config/issues/5742) covers them ([#5738](https://github.com/Morrison-Lab/ai-config/issues/5738)).
 - **Do:** re-run the mutation harness after extracting a helper, and read an
   anchor-uniqueness FATAL as the extraction reporting itself.
 - **Do:** merge colliding clauses and declare the union of their flips, rather

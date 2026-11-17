@@ -15,7 +15,8 @@ Bash: a `cp`, `rsync` or `install` (top level or inside `sh -c`) that copies a F
 of MIN_LINES or more from one repository to a NEW path in another is denied, unless
 the command carries `# decompose: allow <reason>` as a shell comment. Passes: a
 remote operand (`host:path`), an existing destination, `install -d`, a directory
-source, and a path behind `$VAR` or a backtick, which this scan cannot name.
+source, a path behind `$VAR` or a backtick, and a relative path inside `sh -c`
+(its working directory after an outer `cd` is not tracked), which this scan cannot name.
 Fails OPEN and SILENT on any parse trouble, and stops after TIME_BUDGET.
 """
 import json

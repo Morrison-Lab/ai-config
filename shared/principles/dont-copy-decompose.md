@@ -46,9 +46,9 @@ A move, or a copy that must stay a copy, passes with a line comment `decompose: 
 A shell copy passes with the same marker as a `#` comment on the command.
 
 The hook does not judge a `Write` or a shell copy over an existing file, since that changes a file rather than creating a copy, or a shell copy to a remote `host:path`, which is a deploy.
-It does not follow a directory copy (`cp -r`) or a path behind `$VAR`.
+It does not follow a directory copy (`cp -r`), a path behind `$VAR`, or a relative path inside `sh -c`.
 It does not compare a new file with files of other names or with its own repository, since a scan of every tracked file is slow on each `Write` and refuses boilerplate that ordinary files repeat, such as a config stub.
 It cannot see a copy of a design rather than of text, which shares no text.
-This prose rule and review (`.claude/agents/adversarial-reviewer.md`) cover all three.
+This prose rule and review (`.claude/agents/adversarial-reviewer.md`) cover what the hook skips.
 
 Related: [`dont-reinvent-wheel`](dont-reinvent-wheel.md) (look for the existing component first), [`prefer-systemic-solutions-over-one-off-fixes`](prefer-systemic-solutions-over-one-off-fixes.md), and the DRY entry in the [principles catalog](README.md#dry--dont-repeat-yourself).

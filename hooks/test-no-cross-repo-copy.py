@@ -101,6 +101,8 @@ def main():
             (f"cp -t {wf} {src}", tmp, True, "cp -t target directory"),
             (f"rsync -av -e ssh {src} {dst}", tmp, True, "rsync with an option value"),
             (f"bash -c 'cp {src} {dst}'", tmp, True, "a cp inside bash -c"),
+            (f"cd {lds} && bash -c 'cp .github/workflows/publish.yml ../mcsg/x.yml'", tmp, False,
+             "a relative path inside bash -c is not judged (documented)"),
             (f"sudo cp {src} {dst}", tmp, True, "a cp behind sudo"),
             (f"cp {src} {dst}  # decompose: allow port to mcsg", tmp, False, "the shell-comment marker passes"),
             (f"cp {src} '{wf}/# decompose: allow x'", tmp, True, "the marker inside a quoted operand"),

@@ -602,6 +602,8 @@ awk '...' NEWS.md              | wc -l               # after
 ```
 
 A merge must not increase the count.
+This sketch reads its baseline from `main` alone, so it charges the merge with any tight list your branch added.
+For a merge with two contributing sides, use the pair-set form in [`batch-merge-and-resolve`](batch-merge-and-resolve.md#the-instrument-lesson-which-is-the-transferable-part), which compares against both sides ([#1441](https://github.com/Morrison-Lab/ai-config/issues/1441)).
 That is an [`algorithmatize-checks`](algorithmatize-checks.md) instrument in
 the strict sense --- two integers decide it --- and it holds whoever authored
 the surrounding lines.

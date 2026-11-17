@@ -615,21 +615,35 @@ and owns it:
 > when a defect can be introduced by **deleting** a line, any instrument keyed
 > on added lines is unsound.
 
-Quoted rather than pointed at because the count-delta instrument below is
+Quoted rather than pointed at because the splice-delta instrument below is
 unreadable without it.
 
-The working instrument is a **count delta**: a merge must not increase the
-number of spliced bullets.
-The predicate itself is [`sync-with-main`](sync-with-main.md)'s own splice
-detector, reused unchanged; only the count-delta framing around it is new.
+The working instrument is a **splice delta**: a merge must not add a spliced bullet that neither side had.
+The predicate itself is [`sync-with-main`](sync-with-main.md)'s own splice detector, reused unchanged;
+only the delta framing around it is new.
 
 ```bash
-splices() { awk 'prev !~ /^[[:space:]]*$/ && /^[*+-] / {n++} {prev=$0} END{print n+0}' "$1"; }
-before="$(git show HEAD:path/to/file.md | splices /dev/stdin)"
+pairs() { awk 'prev !~ /^[[:space:]]*$/ && /^[*+-] / {print prev "\t" $0} {prev=$0}' "$1" | LC_ALL=C sort -u; }
+f=path/to/file.md
+side() { if [ -n "$(git ls-tree --name-only "$1" -- "$f")" ]; then git show "$1:$f" | pairs /dev/stdin; fi; }
+pre="$(git rev-parse HEAD)"
 git merge origin/main
-after="$(splices path/to/file.md)"
-[ "$after" -le "$before" ] || echo "merge introduced $((after - before)) splice(s)"
+if [ ! -f "$f" ]; then echo "CHECK NOT RUN: no such file: $f" >&2; else
+  new="$(LC_ALL=C comm -23 <(pairs "$f") <(cat <(side "$pre") <(side origin/main) | LC_ALL=C sort -u))"
+  [ -z "$new" ] || printf 'merge introduced splice(s):\n%s\n' "$new"
+fi
 ```
+
+Each splice is recorded as the pair of lines it joins, and the merge is charged only with pairs that appear on neither side.
+Both sides count, because a two-parent merge has two sides contributing bullets.
+A baseline read from your own side alone charges the merge with every tight list arriving from `main` ([#1441](https://github.com/Morrison-Lab/ai-config/issues/1441) measured it: ours 3, `main` 4, merged 4, so the one-sided form reported a splice that was [#1434](https://github.com/Morrison-Lab/ai-config/pull/1434)'s own Do/Don't pair).
+Comparing sets of pairs rather than counts is what keeps deletions from hiding a splice.
+Any count baseline, such as `max(ours, theirs, ours + theirs - base)`, is loosened by every item either side deletes, and a splice of that size then passes unseen.
+`side` prints nothing for a side the file is absent from, so a file new on one side is compared against the other side alone, while a bad ref still prints `git ls-tree`'s error instead of passing silently as an empty side.
+Reading the sides from `pre` and `origin/main` rather than from `HEAD^1` and `HEAD^2` makes the check work the same way on a merge commit, a fast-forward, and a `--squash`, since the merged side is read from the working tree.
+A mistyped path prints `CHECK NOT RUN` and nothing else, so silence means clean only when that line is absent too.
+On a merge stopped on a conflict, run the final `if` block again after resolving, because only then does the working tree hold the final merged file.
+The check's one blind spot is a splice whose two lines already form a splice on one side, such as a resolution that duplicates a tight pair.
 
 The delta form matters because the **absolute** count is unusable here.
 That predicate flags every second-and-later bullet of a deliberately tight list,
@@ -643,8 +657,7 @@ That is the general escape from a noisy predicate: a detector too imprecise to
 report a *level* can still be sound reporting a *change*, provided the same
 predicate runs on both sides.
 
-- **Do:** re-check version parity and run a splice-count delta after any merge
-  that git resolved without conflict.
+- **Do:** re-check version parity and run a splice delta after any merge that git resolved without conflict.
 - **Do:** write adversarial tests against the union of independently grown logic
   even when git auto-merges with zero conflicts.
 - **Do:** convert a noisy absolute-count check into a before/after delta rather
@@ -682,7 +695,7 @@ Here there is nothing in the tree to find.
 The evidence that anything is wrong is an absence, and the only artifact
 carrying it is the merge itself.
 
-The count-delta instrument above transfers unchanged, with the assertion count
+The delta idea behind the splice check above transfers, with the assertion count
 as the quantity: **a merge must not run fewer cases than either parent did.**
 Check out each of the three commits into a throwaway worktree and run the suite
 there, so the suite and the hook it drives always come from the same commit:
@@ -743,7 +756,7 @@ Note that `git show :<path>` reads stage 0, which holds *your* staged content
 once you have staged anything, so it is a record of what you did rather than of
 what git computed.
 
-**The conflict stages exist only for a CONFLICTED path, so the count-delta instrument above cannot read its inputs that way for a file git merged cleanly.**
+**The conflict stages exist only for a CONFLICTED path, so a count delta cannot read its inputs that way for a file git merged cleanly.**
 This is the trap the two sections meet in.
 The count delta is prescribed for exactly the silent, cleanly-resolved loss that has nothing red to point at, and the stage refs are the obvious place to get its three inputs --- but a path git resolved on its own has no stage 1, 2 or 3 at all.
 

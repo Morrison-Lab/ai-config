@@ -579,6 +579,12 @@ Step 1's "confirmed-working" result for `opencode-go/*` (2026-09-04) did not rep
 the cause (account, configuration, or version) was not determined.
 The alternative delegation CLIs were also unusable there: agy returned HTTP 429 "Individual quota reached", and gemini and cursor-agent were unauthenticated ([ai-config#4688](https://github.com/Morrison-Lab/ai-config/issues/4688)).
 
+On the lab's Linux workstation on 2026-11-16 (Remote Control session, opencode 1.18.34), `opencode` was not on the shell's `PATH`.
+The npm global install put it at `~/.npm-global/bin/opencode`, so prefix that directory onto `PATH` before reading `command not found` as no install.
+`opencode models` again listed no `opencode-go/*` ids, only eleven `opencode/*-free` ids.
+The recipe above, on `glm-5.3-flash-free` with a 19,996-byte attachment under `timeout 300`, returned a reasoned review of [gha#2065](https://github.com/Morrison-Lab/gha/pull/2065) with a `VERDICT:` line.
+Two of its six findings were false positives, disproved by running the claimed-missing command in the image.
+
 `opencode run` has no sandbox flag.
 `opencode run --help` on 2026-08-19 listed none, and permissions come from the `permission` block in the opencode config.
 `--auto` auto-approves everything not explicitly denied, and its own help calls it dangerous, so scope the config rather than reaching for that flag.

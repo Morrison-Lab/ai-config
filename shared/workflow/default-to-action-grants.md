@@ -85,7 +85,7 @@ Never ask whether to post the review, because the grant has answered that questi
 The durable fix is an `autoMode` `allow` entry that covers `gh pr comment` and MR notes.
 `scripts/wire-user-config.py` writes one for a cross-model verdict posted verbatim with the reviewer and model named ([ai-config#5752](https://github.com/Morrison-Lab/ai-config/issues/5752)).
 The entry goes in `~/.claude/settings.json`, never in a repository's settings.
-A cloud session reads no `~/.claude/settings.json`, and managed settings are not on this organization's plan, so for cloud sessions the same text goes in the project instructions as a standing approval (see [`use-existing-pr-branch`](use-existing-pr-branch.md), ai-config#5695).
+A cloud session reads no `~/.claude/settings.json`, and managed settings are not on this organization's plan, so for cloud sessions the same text goes in the Claude project's instructions (set in the app, not committed to any repository) as a standing approval (see [`use-existing-pr-branch`](use-existing-pr-branch.md), ai-config#5695).
 Tracked in [ai-config#4756](https://github.com/Morrison-Lab/ai-config/issues/4756).
 On [Morrison-Lab/ids#26](https://github.com/Morrison-Lab/ids/pull/26), a finished all-clear cross-model verdict stayed unposted until the owner wrote "post it".
 

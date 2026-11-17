@@ -14,8 +14,11 @@ is recognized as in no-merge-ask-in-post-message.py: its transcript says "You ar
 a Thread Session". The coordinator and other sessions are never blocked.
 
 Blocks (deny) text that says "merge queue" (or "merge-queue") unless the
-transcript shows something was enqueued: a `enable_pr_auto_merge` call, a
-`ccr/auto_merge` request, or `gh pr merge --auto`. The truthful report is that
+transcript shows something was enqueued: a `tool_use` block that calls
+`enable_pr_auto_merge`, or one whose input (a Bash command) requests
+`ccr/auto_merge` or runs `gh pr merge --auto`. Only `tool_use` blocks count, so
+the hook's own denial text, a doc a thread read, or a tool listing naming the
+tool cannot unlock it. The truthful report is that
 the final head was sent on and it waits on a merge in the runner. A negated or
 quoted mention is denied too, as in the sibling hook: the fix is one rewording.
 `ALLOW_MERGE_QUEUE_CLAIM=1` overrides. Fails open on any parse trouble.
@@ -30,7 +33,8 @@ TOOL = re.compile(
     r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|request_decision)$")
 THREAD_SESSION = "You are a Thread Session"
 CLAIM = re.compile(r"\bmerge[\s-]+queue\b", re.I)
-ENQUEUED = re.compile(r"enable_pr_auto_merge|ccr/auto_merge|gh\s+pr\s+merge\b[^\n\"]{0,80}--auto", re.I)
+ENQUEUED_TOOL = re.compile(r"enable_pr_auto_merge$")
+ENQUEUED_INPUT = re.compile(r"ccr/auto_merge|gh\s+pr\s+merge\b[^\n\"]{0,80}--auto", re.I)
 
 REASON = (
     '[hook: no-merge-queue-claim-in-post-message] This post says "{phrase}", but nothing in this '
@@ -49,6 +53,33 @@ def read_head(path, limit=3_000_000):
             return f.read(limit)
     except (OSError, TypeError, ValueError):
         return ""
+
+
+def tool_uses(node):
+    """Yield every `tool_use` block nested anywhere in a parsed transcript line."""
+    if isinstance(node, dict):
+        if node.get("type") == "tool_use":
+            yield node
+        for value in node.values():
+            yield from tool_uses(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from tool_uses(value)
+
+
+def enqueued(transcript: str) -> bool:
+    """True when some tool_use block in the JSONL transcript enqueued a PR."""
+    for line in transcript.splitlines():
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        for block in tool_uses(record):
+            if ENQUEUED_TOOL.search(str(block.get("name") or "")):
+                return True
+            if ENQUEUED_INPUT.search(json.dumps(block.get("input"))):
+                return True
+    return False
 
 
 def user_text(tool_input: dict) -> str:
@@ -70,8 +101,8 @@ def denial(payload: dict):
     m = CLAIM.search(user_text(tool_input))
     if not m:
         return None
-    transcript = read_head(payload.get("transcript_path"))
-    if THREAD_SESSION not in transcript[:200_000] or ENQUEUED.search(transcript):
+    path = payload.get("transcript_path")
+    if THREAD_SESSION not in read_head(path, 200_000) or enqueued(read_head(path)):
         return None
     return REASON.format(phrase=" ".join(m.group(0).split()))
 

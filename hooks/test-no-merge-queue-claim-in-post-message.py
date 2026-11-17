@@ -4,6 +4,7 @@
 Run: python3 hooks/test-no-merge-queue-claim-in-post-message.py
 """
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -28,8 +29,27 @@ def transcript(first_line, extra=""):
 
 THREAD = transcript("You are a Thread Session.")
 OTHER = transcript("You are the coordinator.")
-ENQUEUED = transcript("You are a Thread Session.", '{"name": "mcp__github__enable_pr_auto_merge"}\n')
-AUTO_CLI = transcript("You are a Thread Session.", "gh pr merge 12 --squash --auto\n")
+
+
+def tool_use_line(name, tool_input):
+    block = {"type": "tool_use", "id": "toolu_1", "name": name, "input": tool_input}
+    return json.dumps({"type": "assistant", "message": {"content": [block]}}) + "\n"
+
+
+def tool_result_line(text):
+    block = {"type": "tool_result", "tool_use_id": "toolu_1", "content": text}
+    return json.dumps({"type": "user", "message": {"content": [block]}}) + "\n"
+
+
+ENQUEUED = transcript("You are a Thread Session.",
+                      tool_use_line("mcp__github__enable_pr_auto_merge", {"pullNumber": 12}))
+AUTO_CLI = transcript("You are a Thread Session.",
+                      tool_use_line("Bash", {"command": "gh pr merge 12 --squash --auto"}))
+CCR_AUTO = transcript("You are a Thread Session.",
+                      tool_use_line("Bash", {"command": "gh api -X PUT repos/o/r/pulls/12/ccr/auto_merge"}))
+OWN_DENIAL = transcript("You are a Thread Session.", tool_result_line(hook.REASON))
+BARE_MENTION = transcript("You are a Thread Session.",
+                          '{"name": "mcp__github__enable_pr_auto_merge"}\ngh pr merge 12 --squash --auto\n')
 
 
 def denied(text, tool=POST, tpath=THREAD, env=None):
@@ -55,6 +75,11 @@ check("the denial names the true wording", "waits on a merge in the runner" in h
 check("coordinator is never blocked", not denied("It is in the merge queue.", tpath=OTHER))
 check("an enable_pr_auto_merge call lets it through", not denied("It is in the merge queue.", tpath=ENQUEUED))
 check("gh pr merge --auto lets it through", not denied("It is in the merge queue.", tpath=AUTO_CLI))
+check("a ccr/auto_merge request lets it through", not denied("It is in the merge queue.", tpath=CCR_AUTO))
+check("the hook's own earlier denial does not unlock a retry",
+      denied("It is in the merge queue.", tpath=OWN_DENIAL))
+check("a bare mention outside a tool_use block does not unlock it",
+      denied("It is in the merge queue.", tpath=BARE_MENTION))
 check("text without the phrase passes", not denied("Final head sent on; it waits on a merge in the runner."))
 check("a different tool is ignored", not denied("merge queue", tool="Bash"))
 check("override env lets it through", not denied("merge queue", env="1"))

@@ -170,9 +170,11 @@ Two routing consequences:
 - **Don't:** read an empty `openrouter/*` listing as OpenRouter being unreachable --- an unreferenced provider is inactive, and one config entry activates the whole roster.
 - **Don't:** send data-triggered work to `openrouter/*`, `opencode-go/*`, `opencode/*`, or Ollama Cloud --- free or subscription pricing is a billing fact, and bytes still leave the machine.
 
-## Cloud sessions: OpenCode Go over HTTP, no key needed
+## Cloud sessions: OpenCode Go over HTTP, keyless where the proxy holds the key
 
 A claude.ai cloud session has no `opencode` CLI preinstalled (`npm i -g opencode-ai` installs one), but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
+That holds only in an environment that allows `opencode.ai` and has the credential saved;
+on 2026-11-17 the Default environment had neither, as the note on the key below records.
 A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there.
 Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve.
 Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 ("Insufficient account funds" on 2026-11-05).
@@ -312,9 +314,11 @@ In a claude.ai cloud session (as observed on 2026-10-13), HTTP requests made via
 Always invoke `curl` in shell commands rather than Python HTTP libraries when calling the OpenCode Go API in cloud sessions.
 
 **The key is not saved in the Default cloud environment (as observed on 2026-11-17).**
-`opencode.ai` was refused by the proxy there (`connect_rejected`, 403) until the user approved adding it to Default's allowed hosts.
+`opencode.ai` was refused by the proxy there until the user approved adding it to Default's allowed hosts: `curl` printed `CONNECT tunnel failed, response 403`, and the proxy's failure note said `connect_rejected`.
 No OpenCode Go API key is saved on that environment, so the keyless `curl` route above still cannot run from a Default cloud session.
-Read the "Cloud sessions" section's "no key needed" claim as holding only where the proxy injects the credential, and probe with one `curl` before planning a cross-model review around it.
+
+- **Do:** probe with one `curl` to `opencode.ai` before planning a cross-model review in a cloud session, and read the "no key needed" claim as holding only where the proxy injects the credential.
+- **Don't:** count on that claim in an environment where you have not seen the probe succeed.
 
 **Per-model 502 upstream errors and fallback loop:**
 Both `glm-5.3` and `deepseek-v4-pro` can intermittently return `502 upstream request failed` (as observed on 2026-10-13) even on short diffs (e.g. 1 KB), while `kimi-k3` answers.

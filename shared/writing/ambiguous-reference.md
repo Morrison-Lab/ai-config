@@ -231,20 +231,13 @@ before the insertion.
   after the insertion point describe only the old case.
 - **Don't:** check only the inserted lines; the defect is in the unchanged
   line below them.
-- **Do:** when merging two bullets that each describe an incident, keep each
-  incident's sentences together and name each incident again where the second
-  one starts.
-- **Don't:** splice a later incident into the middle of an earlier incident's
-  bullet; the earlier incident's "then" and "those two merges" then point at
-  the wrong incident.
+- **Do:** when merging two bullets that each describe an incident, keep each incident's sentences together and name each incident again where the second one starts.
+- **Don't:** splice a later incident into the middle of an earlier incident's bullet;
+  the earlier incident's "then" and "those two merges" then point at the wrong incident.
 
-(`Morrison-Lab/ai-config#5650`, 2026-11-14, cross-harness review on
-`83d1b71`: an inserted `opened`-event case ended "the next human-actor push
-heals it", and the unchanged next sentence, "The check stays red with no new
-run at all", then read as contradicting it.
-Session of 2026-11-17, merging two Reason bullets in
-`shared/workflow/standing-habits-from-ezra.md`: the splice above made "then"
-and "those two merges" point at the wrong incident, caught by a reviewer.)
+(`Morrison-Lab/ai-config#5650`, 2026-11-14, cross-harness review on `83d1b71`: an inserted `opened`-event case ended "the next human-actor push heals it", and the unchanged next sentence, "The check stays red with no new run at all", then read as contradicting it.)
+
+([ai-config#5425](https://github.com/Morrison-Lab/ai-config/pull/5425), 2026-11-17, adversarial review: merging two Reason bullets in `shared/workflow/standing-habits-from-ezra.md` spliced the 2026-11-11 incident into the middle of the 2026-10-30 one, so "then" and "those two merges" pointed at the wrong incident.)
 
 ## Relationship to neighbouring rules
 

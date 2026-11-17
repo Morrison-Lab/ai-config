@@ -276,19 +276,15 @@ long copy actually supports.
 
 - **Do:** re-read a bullet, heading, or summary sentence against the passage
   it condenses, treating the short copy as an unverified claim.
+  This holds when two bullets are merged into one: compare the merged bullet with each source clause.
+  ([ai-config#5425](https://github.com/Morrison-Lab/ai-config/pull/5425), 2026-11-17: in a merged Reason bullet, "the coordinator clarified the gate" became "the coordinator added the bullet", a different fact, and a reviewer caught it.)
 - **Do:** re-read the bullets *after* correcting the prose above them --- a
   bullet written before the correction is not covered by having made it.
-- **Do:** treat a sentence adjacent to a measurement as unverified unless the
-  measurement is about *that sentence*, not merely nearby.
-- **Don't:** count re-checking your measurements as having checked what you
-  wrote about them -- that pass cannot reach the condensed copy.
-- **Don't:** read "both are from this turn" as exempting a restatement from
-  re-verification; the source's freshness says nothing about the copy.
-- **Do:** re-check a merged bullet's paraphrase of each source clause.
-  (2026-11-17: merging two Reason bullets in
-  `shared/workflow/standing-habits-from-ezra.md`, "the coordinator clarified
-  the gate" became "the coordinator added the bullet", a different fact, and a
-  reviewer caught it.)
+- **Do:** treat a sentence adjacent to a measurement as unverified unless the measurement is about *that sentence*, not merely nearby.
+- **Don't:** count re-checking your measurements as having checked what you wrote about them -- that pass cannot reach the condensed copy.
+- **Don't:** read "both are from this turn" as exempting a restatement from re-verification;
+  the source's freshness says nothing about the copy.
+- **Don't:** treat a merged bullet as verified because each bullet it came from was verified.
 
 ## A command written into documentation is a condensation of the code that builds it
 

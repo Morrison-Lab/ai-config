@@ -221,23 +221,13 @@ def _scan(command, start):
     if cmds is None:
         return [], False
     ignore_cd = _SIB._unreachable_cd(command)
-    cds = {(0,): start}
-
-    def cd_of(scope):
-        while scope not in cds:
-            scope = scope[:-1]
-        return cds[scope]
-
+    # The shared per-subshell walk (scripts/lib/shellcmd.py's walk_dirs,
+    # ai-config#1731); `env -C dir ...` runs elsewhere and is skipped.
     hits, adds, moved = [], {}, False  # adds: target_dir -> [whole, paths]
-    for scope, argv in cmds:
-        if _SIB._env_chdir(argv):
-            continue
-        env, rest = _SIB._strip_env(argv)
-        cd = cd_of(scope)
+    for argv, env, rest, cd in _SIB._walk_dirs(cmds, start, ignore_cd=ignore_cd,
+                                               skip=_SIB._env_chdir):
         if rest and rest[0] in ("cd", "pushd", "popd"):
             moved = True
-            if not ignore_cd:
-                cds[scope] = _SIB._move(rest, cd)
             continue
         inv = _SIB._git_invocation(rest)
         if inv is None or _SIB._redirects_git(env):

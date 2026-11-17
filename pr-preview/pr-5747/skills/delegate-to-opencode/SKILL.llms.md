@@ -387,6 +387,10 @@ A local bound sits below the provider’s. On a Linux desktop whose home directo
 - **Do:** run one `opencode run` at a time per user, looping over models one after another.
 - **Don’t:** read `database is locked` as a model or provider failure. It is a local collision, and the same run alone is the retry.
 
+The same day, a review prompt of about 18 KB (brief plus a whole PR diff, [gha#2074](https://github.com/Morrison-Lab/gha/pull/2074)) got no answer from any free model. `glm-5.3-flash-free`, `deepseek-v4.1-flash-free`, `beam-free` and `iceman-free` each ran to its timeout of 300 to 600 s with no events, even under `--format json`. `nemotron-3.5-lightning-free` ended with `step_finish` reason `length`, 32,000 reasoning tokens and no output. A 20 KB prompt for another PR had worked on `glm-5.3-flash-free` the day before, so size alone does not predict it. Cutting the diff to the action and its scripts (about 10 KB, tests and docs left out) got `glm-5.3-flash-free` to return a reasoned verdict in about 6 minutes.
+
+- **Do:** when every free model stalls on a whole diff, send the core files alone and say in the review which files were left out.
+
 ### 4. Detect failure
 
 With no `-o` capture file, key on the exit status and on empty stdout. Then check something codex’s step 4 does not have to: a small model’s usual failure is a **fluent wrong answer** rather than an error, so output validation matters more here than exhaustion detection does. Re-run only the items that actually failed.

@@ -625,11 +625,27 @@ detector, reused unchanged; only the count-delta framing around it is new.
 
 ```bash
 splices() { awk 'prev !~ /^[[:space:]]*$/ && /^[*+-] / {n++} {prev=$0} END{print n+0}' "$1"; }
-before="$(git show HEAD:path/to/file.md | splices /dev/stdin)"
+f=path/to/file.md
+count() { git show "$1:$f" 2>/dev/null | splices /dev/stdin; }
+pre="$(git rev-parse HEAD)"
 git merge origin/main
-after="$(splices path/to/file.md)"
-[ "$after" -le "$before" ] || echo "merge introduced $((after - before)) splice(s)"
+ours="$(count "$pre")"
+theirs="$(count origin/main)"
+base="$(count "$(git merge-base "$pre" origin/main)")"
+expected=$(( ours + theirs - base ))
+[ "$ours" -gt "$expected" ] && expected="$ours"
+[ "$theirs" -gt "$expected" ] && expected="$theirs"
+after="$(splices "$f")"
+[ "$after" -le "$expected" ] || echo "merge introduced $((after - expected)) splice(s)"
 ```
+
+The baseline is three-way, because a two-parent merge has two sides contributing bullets.
+A baseline read from your own side alone counts every tight list arriving from `main` as a splice the merge made ([#1441](https://github.com/Morrison-Lab/ai-config/issues/1441) measured it: ours 3, `main` 4, merged 4, so the one-sided form reported a splice that was [#1434](https://github.com/Morrison-Lab/ai-config/pull/1434)'s own Do/Don't pair).
+`ours + theirs - base` is the count a merge with no splice produces when both sides add, and the two clamp lines cover the case that sum undercounts: both sides deleting the same item.
+Reading the sides from `pre` and `origin/main` rather than from `HEAD^1` and `HEAD^2` makes the check work the same way on a merge commit, a fast-forward, and a `--squash`, since `after` reads the working tree.
+On a merge stopped on a conflict, run the lines from `ours=` down again after resolving, because only then does the working tree hold the final merged file.
+The bound is one-directional.
+A resolution that drops tight-list items, or a clamp after both sides deleted the same item, leaves room under `expected` that a splice of the same size fills unseen, so a clean result means no net increase, not a proof that nothing was spliced.
 
 The delta form matters because the **absolute** count is unusable here.
 That predicate flags every second-and-later bullet of a deliberately tight list,

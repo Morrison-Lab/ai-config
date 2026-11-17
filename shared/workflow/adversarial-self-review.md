@@ -153,6 +153,16 @@ This section is the exception that the other "required for merging" statements i
 
 Anyone who wants the cross-model verdict anyway can still ask for it: the waiver removes a requirement and forbids nothing.
 
+Case (2026-11-17, a `gia` run in a claude.ai cloud session):
+the agent merged [ai-config#5747](https://github.com/Morrison-Lab/ai-config/pull/5747) under `mwc` after probing only the reviewer CLIs
+(`command -v agy`, `codex`, `gemini`, `cursor-agent` exit 1; `opencode` exit 127) and called that the waiver.
+It had not tried the cloud route, the `curl` POST to `https://opencode.ai/zen/go/v1/chat/completions` in [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md).
+Tried afterward, it returned 401 "OpenCode Go requires an API key", so the waiver held, but only after the merge, and no waiver note had been posted first.
+
+- **Do:** before merging under this waiver, try every route, including the cloud `curl` to the OpenCode Go endpoint, and post the PR note that the review was waived and why.
+  Only then merge.
+- **Don't:** read "every CLI is absent" as "no reviewer can run" in a cloud session, where the reviewer route is an HTTP call rather than a CLI.
+
 
 The merge-side rules live with the gate they serve:
 

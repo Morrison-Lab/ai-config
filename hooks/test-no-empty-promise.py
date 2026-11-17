@@ -243,6 +243,55 @@ def dispatch(prompt):
 
 
 # (events, should_block, label)
+# ai-config#1962: only a write whose own TARGET is a rule surface discharges.
+# (command, should_block, label): True rows were false DISCHARGES before the
+# fix; False rows are real writes that must keep discharging.
+_RULE = "Going forward I'll always check this before replying."
+WRITE_TARGET_CASES = [([say(_RULE), bash(c)], b, l) for c, b, l in (
+    ("cat CLAUDE.md | tee /tmp/x", True, "rule-surface read piped to tee elsewhere"),
+    ("cat shared/workflow/ardi.md | tee /tmp/x", True, "fragment read piped to tee elsewhere"),
+    ("cat CLAUDE.md > /tmp/copy", True, "rule-surface read redirected to /tmp"),
+    ("grep x CLAUDE.md | tee /tmp/hits", True, "grep of a rule surface teed elsewhere"),
+    ("cat shared/workflow/ardi.md 2>/dev/null > /tmp/out", True, "stderr-silenced read redirected elsewhere"),
+    ("cat CLAUDE.md && git add notes.txt", True, "staging a NON-rule-surface"),
+    ("sed -n 1,5p CLAUDE.md > /tmp/x", True, "sed without -i is a read"),
+    ('echo "unbalanced > CLAUDE.md', True, "unparseable command (loud direction)"),
+    ("tee -a /tmp/x < shared/workflow/a.md", True, "input redirect FROM a rule surface"),
+    ("git commit -m 'update memories/x.md'", True, "commit MESSAGE naming a rule surface"),
+    ("git commit -am 'fix CLAUDE.md'", True, "-am's message naming a rule surface"),
+    ("git commit -F msg-about-CLAUDE.md", True, "commit -F file naming a rule surface"),
+    ("git apply --check hooks/x.py.patch", True, "git apply --check only reads"),
+    ("sed -i 's|CLAUDE.md|AGENTS.md|' /tmp/x.txt", True, "sed SCRIPT naming a rule surface"),
+    ("sed -i -e 's|CLAUDE.md|x|' -e 's/a/b/' /tmp/x.txt", True, "sed -e scripts naming a rule surface"),
+    ("prettier --write --config shared/x.md /tmp/y.js", True, "--config VALUE beside --write"),
+    ("sudo -u root cat CLAUDE.md", True, "wrapped READ of a rule surface"),
+    ("time grep tee CLAUDE.md", True, "wrapped program's ARG named tee"),
+    ("sudo -n grep tee CLAUDE.md", True, "no-value sudo flag keeps the program"),
+    ("time -p grep tee CLAUDE.md", True, "no-value time flag keeps the program"),
+    ("sudo -u tee cat CLAUDE.md", True, "wrapper option VALUE named tee"),
+    ("sed -i -- 's|CLAUDE.md|x|' /tmp/x", True, "sed script after --"),
+    ("echo 'the rule' >> CLAUDE.md", False, "append INTO a rule surface"),
+    ("printf x>shared/workflow/fully-clean.md", False, "redirect glued to its target"),
+    ("cat /tmp/note | tee -a memories/preferences.md", False, "tee INTO a rule surface"),
+    ('bash -c "echo x >> memories/preferences.md"', False, "write inside a shell's -c"),
+    ("cat CLAUDE.md > /tmp/copy; echo y > shared/workflow/a.md", False, "real write later in the line"),
+    ("git -C /repo add hooks/no-empty-promise.py && git commit -m x", False, "git -C dir add rule surface"),
+    ("cat <<'EOF' > memories/foo.md\nbody\nEOF", False, "heredoc opener BEFORE > rule surface"),
+    ("cat <<EOF >> CLAUDE.md\nbody\nEOF", False, "heredoc opener BEFORE >> rule surface"),
+    ("git apply hooks/x.py.patch", False, "git apply that applies"),
+    ("git commit -mtest shared/workflow/fully-clean.md", False, "glued -m value leaves the pathspec"),
+    ("git commit -m x -- CLAUDE.md", False, "pathspec after --"),
+    ("sed -i -e 's/a/b/' CLAUDE.md", False, "sed -i -e script rule-surface file"),
+    ("sed -Ei 's/a/b/' shared/workflow/fully-clean.md", False, "sed -Ei is in place"),
+    ("sed --regexp-extended -i 's/a/b/' CLAUDE.md", False, "unlisted long option is not -e"),
+    ("prettier --config /tmp/c.json --write shared/workflow/x.md", False, "--write rule-surface operand"),
+    ("sudo -u root tee CLAUDE.md", False, "sudo -u root tee rule surface"),
+    ("nice -n 5 tee -a CLAUDE.md", False, "nice -n 5 tee rule surface"),
+    ("timeout 60 bash -c 'echo x >> CLAUDE.md'", False, "timeout 60 bash -c write"),
+    ("timeout 5 tee CLAUDE.md", False, "timeout 5 tee rule surface"),
+)]
+
+
 CASES = [
     # Promises with nothing behind them.
     ([say("Going forward, I'll run the checker before reporting status.")],
@@ -762,9 +811,9 @@ CASES = [
       bash("python3 -B -u hooks/monitor-open-prs.py --monitor")],
      False, "several interpreter flags before the script still discharge"),
 
-    # --- ai-config#1966. `BASH_WRITE` decides what counts as a durable
-    # write, so a false match there is a false DISCHARGE -- the silent
-    # direction. `\b` sits between a name and a following `-`, so `--write\b`
+    # --- ai-config#1966. `_shell_writes_rule_surface` decides what counts as
+    # a durable write, so a false match there is a false DISCHARGE -- the
+    # silent direction. `\b` sits between a name and a following `-`, so `--write\b`
     # matched curl's `--write-out` and `git\s+(?:add|commit|...)\b` matched
     # `git commit-tree`. Both directions are pinned, because the defect was
     # precisely that a real write and these were indistinguishable.
@@ -817,7 +866,7 @@ CASES = [
       bash("mkdir -p skills/new-guard")],
      False, "`mkdir` still discharges"),
     # `memories/notes` deliberately does NOT work here, and that is
-    # MECHANISM_PATH rather than BASH_WRITE: each of its alternatives demands
+    # MECHANISM_PATH, not `_shell_writes_rule_surface`: each alternative needs
     # a FILE, so a bare directory cannot discharge a promise. Pinned so the
     # `mkdir` case above is not read as the guard failing.
     ([say("Going forward I'll always check this before replying."),
@@ -843,6 +892,8 @@ CASES = [
     ([say("Going forward I'll always check this before replying."),
       bash("git add--interactive shared/workflow/fully-clean.md")],
      True, "`git add--interactive` is excluded with the rest of the group"),
+
+    *WRITE_TARGET_CASES,
 
     # Antigravity transcript format: GENERIC tool result vs invoke_subagent dispatches (ai-config#4635)
     ([{"source": "MODEL", "type": "GENERIC", "content": "Going forward I will always check this before replying."}],

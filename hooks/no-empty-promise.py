@@ -507,65 +507,177 @@ WRITE_TOOLS = {
     "write_to_file", "replace_file_content", "edit_file", "strreplace", "create_file",
 }
 
-# What makes a shell command a write rather than a read.
-BASH_WRITE = re.compile(
-    # A redirect, but NOT `2>`/`&>` (an fd-prefixed stderr redirect) and not
-    # one aimed at /dev/null -- `cat shared/x.md 2>/dev/null` is a read.
-    r"(?<![0-9&])>>?\s*(?!/dev/null)[^\s&|]"
-    # `(?![\w-])` rather than `\b` after a command or flag NAME, for the same
-    # reason `_NOT_PATH_END` exists above: `\b` sits between `write` and `-`,
-    # so `--write\b` matched `curl -s --write-out '%{http_code}' <url>`, a
-    # pure HTTP status check that writes nothing (ai-config#1966). A false
-    # match here is a false DISCHARGE, which is the silent direction.
-    #
-    # `git\s+(?:add|commit|...)\b` likewise matched `git commit-tree` and
-    # `git commit-graph write`. Both of those genuinely write git objects, so
-    # the old classification was not wrong -- it was right by accident, and
-    # the next reader could not tell the coincidence from the intent. Neither
-    # writes a rule surface, which is the question this pattern is asking.
-    #
-    # The guard covers the whole group rather than `commit` alone, because
-    # `commit` is not the only member with a hyphenated sibling:
-    # `git --list-cmds=main,others` reports `add--interactive` as well
-    # (checked 2026-08-22 against git 2.x). That one is the deprecated
-    # backend for `git add -i`, superseded by the builtin, and it is
-    # interactive -- so it is deliberately excluded here rather than special
-    # cased. Excluding it costs a false POSITIVE (a genuine staging that no
-    # longer discharges), which is the loud direction and clearable in one
-    # command via this guard's own block message. `apply`, `mv`, and `rm`
-    # have no hyphenated siblings today, and the group guard means a future
-    # one cannot reopen this.
-    r"|\bgit\s+(?:add|commit|apply|mv|rm)(?![\w-])"
-    r"|--write(?![\w-])"
-    # `tee` and `mkdir` take the full path pair rather than the hyphen guard;
-    # `sed -i` keeps a plain `\b`. See the note under this pattern for why the
-    # three differ.
-    r"|" + _NOT_PATH + r"tee" + _NOT_PATH_END +
-    r"|" + _NOT_PATH + r"mkdir" + _NOT_PATH_END +
-    r"|\bsed\s+-i\b",
-    re.I,
-)
-# `tee` and `mkdir` get the full `_NOT_PATH` pair rather than the `(?![\w-])`
-# guard used above, because the two guards answer different questions. The
-# hyphen guard separates a command from a hyphenated SIBLING; the path pair
-# separates a command from a PATH that happens to contain the word. Neither
-# has a hyphenated sibling, which is what an earlier version of this comment
-# said -- and that justified the wrong axis, since `\btee\b` matched inside
-# `cat shared/workflow/tee-notes.md`, a READ that discharged a promise
-# (review finding on ai-config#1968). No such path exists in this repo today
-# (`git ls-files` finds none as of 2026-08-22), so this was latent rather
-# than firing; it is fixed here because the pattern was wrong in exactly the
-# way the rest of this diff is about.
-#
-# `sed\s+-i` deliberately keeps its plain `\b`, and it is NOT an oversight.
-# The whitespace makes a path form impossible, so `_NOT_PATH` would buy
-# nothing -- and `_NOT_PATH_END` would actively break `sed -i.bak`, whose
-# `.bak` is exactly the `\.\w` shape that pair exists to reject.
-# `mv`/`cp` and a bare `patch` are deliberately absent. `cp shared/x.md /tmp/`
-# copies OUT of a rule surface and writes nothing to it, and the destination is
-# not decidable from a substring match -- so they discharged reads. Losing the
-# rare genuine `cp` INTO a rule surface costs a false positive, which this
-# guard's own block message tells the author how to clear in one command.
+# A shell write TO A RULE SURFACE (ai-config#1962): per simple command, a
+# write's own OPERAND, never an option's value -- a redirect target, a git
+# add|commit|mv|rm pathspec or applied patch, a tee/mkdir/sed -i file, or a
+# `--write` operand. Residuals are loud (no discharge): cp/mv/patch, `commit
+# -am`, an unlisted value option, a variable path, unparseable shell.
+try:
+    from shellcmd import (COMMAND_WRAPPERS, ENV_ASSIGNMENT, SHELL_KEYWORDS,
+                          git_subcommand, simple_commands)
+except ImportError as _exc:  # broken install: say so, and discharge nothing
+    print(f"no-empty-promise: no scripts/lib/shellcmd.py ({_exc})",
+          file=sys.stderr)
+    simple_commands = None
+
+_REDIRECT_OUT = re.compile(r"^&?>>?\|?$")
+_REDIRECT_IN = re.compile(r"^<{1,3}$")
+_GIT_WRITES = {"add", "commit", "mv", "rm", "apply"}
+_GIT_APPLY_READS = {"--check", "--stat", "--numstat", "--summary"}
+# Options taking the NEXT token as a value; a glued form is one token already.
+_GIT_VALUE_SHORT = set("mFCct")
+_GIT_VALUE_LONG = set("--message --file --reuse-message --reedit-message "
+                      "--template --author --date --fixup --squash --cleanup "
+                      "--trailer --pathspec-from-file --directory --exclude "
+                      "--include".split())
+# Each wrapper's value-taking options, from its --help (bash `help` for exec;
+# doas's man page). A wrapper absent here (time, command, nohup) takes none.
+_WRAPPER_VALUE_OPTS = {w: set(o.split()) for w, o in (
+    ("sudo", "-C -D -g -h -p -R -r -t -T -U -u"), ("nice", "-n"),
+    ("timeout", "-k -s"), ("env", "-u -C -S"), ("stdbuf", "-i -o -e"),
+    ("ionice", "-c -n -p -P -u"), ("doas", "-u -C"), ("exec", "-a"))}
+_is_rule_surface = MECHANISM_PATH.search
+
+
+def _split_redirects(argv):
+    """(operands, out-targets); a tagless `<<` never swallows a redirect."""
+    operands, targets, index = [], [], 0
+    while index < len(argv):
+        token = argv[index]
+        nxt = argv[index + 1] if index + 1 < len(argv) else None
+        if _REDIRECT_OUT.match(token):
+            targets.extend([nxt] if nxt is not None else [])
+            index += 2
+        elif _REDIRECT_IN.match(token):
+            redirect = nxt is not None and bool(
+                _REDIRECT_OUT.match(nxt) or _REDIRECT_IN.match(nxt))
+            index += 1 if nxt is None or redirect else 2
+        else:
+            operands.append(token)
+            index += 1
+    return operands, targets
+
+
+def _short_value_is_next(token):
+    """`-am msg` reads ahead; `-mtest` carries its value glued."""
+    for position, letter in enumerate(token[1:], start=2):
+        if letter in _GIT_VALUE_SHORT:
+            return position == len(token)
+    return False
+
+
+def _git_writes_rule_surface(subcommand, rest):
+    if subcommand not in _GIT_WRITES or (
+            subcommand == "apply" and _GIT_APPLY_READS & set(rest)
+            and "--apply" not in rest):
+        return False
+    index, after_dashdash = 0, False
+    while index < len(rest):
+        token = rest[index]
+        index += 1
+        if after_dashdash or not token.startswith("-") or token == "-":
+            if _is_rule_surface(token):
+                return True
+        elif token == "--":
+            after_dashdash = True
+        elif token in _GIT_VALUE_LONG or (not token.startswith("--")
+                                          and _short_value_is_next(token)):
+            index += 1  # skip the option's value
+    return False
+
+
+def _resolve_program(operands):
+    """(program, args) past assignments, keywords, and each wrapper's own
+    options; the first other token is the program (`time grep tee x`)."""
+    index = 0
+    while index < len(operands):
+        token, name = operands[index], os.path.basename(operands[index])
+        index, takes = index + 1, _WRAPPER_VALUE_OPTS.get(name, ())
+        if name in COMMAND_WRAPPERS:
+            while index < len(operands) and operands[index].startswith("-"):
+                index += 1 + (operands[index] in takes)
+            index += name == "timeout"  # its duration
+        elif not (ENV_ASSIGNMENT.match(token) or token in SHELL_KEYWORDS):
+            return name, operands[index:]
+    return None
+
+
+def _sed_files(args):
+    """(in_place, files): in a cluster `i` takes the rest as a suffix and
+    `e`/`f`/`l` a value; with no `-e`/`-f` the first operand is the script."""
+    in_place, has_script, files, index = False, False, [], 0
+    while index < len(args):
+        token = args[index]
+        index += 1
+        name = token.split("=", 1)[0]
+        if token == "--":
+            rest = args[index:]  # `--` ends options, not the script operand
+            return in_place, files + (rest if has_script else rest[1:])
+        if name == "--in-place":
+            in_place = True
+        elif name in ("--expression", "--file", "--line-length"):
+            has_script = has_script or name != "--line-length"
+            index += 0 if "=" in token else 1
+        elif token.startswith("--"):
+            continue  # another long option (`--regexp-extended`)
+        elif token.startswith("-") and token != "-":
+            for position, letter in enumerate(token[1:], start=2):
+                if letter == "i":
+                    in_place = True
+                    break
+                if letter in "efl":
+                    has_script = has_script or letter != "l"
+                    index += 0 if token[position:] else 1
+                    break
+        elif has_script:
+            files.append(token)
+        else:
+            has_script = True  # the script operand
+    return in_place, files
+
+
+def _write_flag_operands(args):
+    """Operands, assuming every option but `--write` takes a value."""
+    return [token for index, token in enumerate(args)
+            if not token.startswith("-")
+            and not (index and args[index - 1].startswith("-")
+                     and "=" not in args[index - 1]
+                     and args[index - 1] != "--write")]
+
+
+def _argv_writes_rule_surface(argv, depth):
+    operands, targets = _split_redirects(argv)
+    if any(_is_rule_surface(t) for t in targets):
+        return True
+    git = git_subcommand(operands)
+    if git is not None:
+        return _git_writes_rule_surface(git[0], git[1])
+    resolved = _resolve_program(operands)
+    if resolved is None:
+        return False
+    program, args = resolved
+    if _SHELL.match(program):
+        # A shell's `-c` argument is a nested command line: re-test it.
+        return any(_DASH_C_FLAG.match(token)
+                   and _shell_writes_rule_surface(args[index + 1], depth + 1)
+                   for index, token in enumerate(args[:-1]))
+    if program in ("tee", "mkdir"):
+        return any(_is_rule_surface(a) for a in args if not a.startswith("-"))
+    if program == "sed":
+        in_place, files = _sed_files(args)
+        return in_place and any(_is_rule_surface(f) for f in files)
+    return ("--write" in args
+            and any(_is_rule_surface(a) for a in _write_flag_operands(args)))
+
+
+def _shell_writes_rule_surface(command, depth=0):
+    """True when some simple command in COMMAND writes to a rule surface."""
+    if simple_commands is None or depth > 2 or not _is_rule_surface(command):
+        return False
+    argvs = simple_commands(command)
+    if argvs is None:
+        return False  # unparseable: do not discharge
+    return any(_argv_writes_rule_surface(argv, depth) for argv in argvs)
 
 
 def records(path):
@@ -783,8 +895,8 @@ def discharges(name, inp):
     still matching bare nouns, so it is not reintroduced here.
 
     What a delegated build discharges on instead is the parent's own next
-    act: staging or committing the artifact (`git add hooks/x.py`) is a
-    `bash` write against a rule surface and discharges normally, and that
+    act: staging the artifact (`git add hooks/x.py`), or committing with a
+    pathspec naming it, is a `bash` write to a rule surface, and that
     is how such work actually ends. A turn that dispatches a build, makes
     a promise, and stops before touching the result is the residual false
     positive -- deliberate, named, and one command from clearing.
@@ -828,8 +940,9 @@ def discharges(name, inp):
         cmd = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
         if FILING_CMD.search(cmd):
             return "durable"
-        # A shell write needs BOTH a rule surface and something that writes to
-        # it, so `cat shared/workflow/ardi.md` reads as the read it is.
+        # A shell write needs a write verb whose own TARGET is a rule
+        # surface, so `cat shared/workflow/ardi.md` reads as the read it is
+        # and `cat CLAUDE.md | tee /tmp/x` does too (ai-config#1962).
         #
         # This runs BEFORE the poller test, and the order is load-bearing
         # rather than stylistic. The three poller scripts live under `hooks/`,
@@ -842,7 +955,7 @@ def discharges(name, inp):
         #
         # Durable is the stronger claim, so when a command is both a write and
         # a mention of the poller, the write wins.
-        if MECHANISM_PATH.search(cmd) and BASH_WRITE.search(cmd):
+        if _shell_writes_rule_surface(cmd):
             return "durable"
         if _poller_executed(cmd):
             return "scheduled"

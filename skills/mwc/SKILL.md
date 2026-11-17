@@ -656,6 +656,9 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
      Never proceed to the merge command before this verdict is clean, except under [the waiver](../../shared/workflow/adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run) when no qualifying reviewer can run (every route tried once, error recorded in the PR).
    - **Verify base currency and pre-merge pins**:
      Run the base-currency check that [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule before the merge command.
+     For a PR whose head is older than the newest merges on `main`, also run the superseded check from [`ardia`](../ardia/SKILL.md)'s "Superseded" state: grep `origin/main` for the PR's distinctive added lines, and read what merged since for a line the diff now makes false.
+     **Do:** close a superseded PR and name the superseding PRs.
+     **Don't:** merge a PR because its head is clean.
    - **Merge**:
      `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`,
      the pin being the `headRefOid` recorded before the instrument ran;

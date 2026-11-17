@@ -284,6 +284,11 @@ long copy actually supports.
   wrote about them -- that pass cannot reach the condensed copy.
 - **Don't:** read "both are from this turn" as exempting a restatement from
   re-verification; the source's freshness says nothing about the copy.
+- **Do:** re-check a merged bullet's paraphrase of each source clause.
+  (2026-11-17: merging two Reason bullets in
+  `shared/workflow/standing-habits-from-ezra.md`, "the coordinator clarified
+  the gate" became "the coordinator added the bullet", a different fact, and a
+  reviewer caught it.)
 
 ## A command written into documentation is a condensation of the code that builds it
 

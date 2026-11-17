@@ -311,6 +311,11 @@ Until that is measured, keep streaming as the first try for a per-PR payload, an
 In a claude.ai cloud session (as observed on 2026-10-13), HTTP requests made via Python's `urllib` (or `requests`) to `https://opencode.ai/zen/go/v1/chat/completions` fail with `403 Forbidden` from the cloud agent proxy, while `curl` with the identical body and headers returns `200 OK`.
 Always invoke `curl` in shell commands rather than Python HTTP libraries when calling the OpenCode Go API in cloud sessions.
 
+**The key is not saved in the Default cloud environment (as observed on 2026-11-17).**
+`opencode.ai` was refused by the proxy there (`connect_rejected`, 403) until the user approved adding it to Default's allowed hosts.
+No OpenCode Go API key is saved on that environment, so the keyless `curl` route above still cannot run from a Default cloud session.
+Read the "Cloud sessions" section's "no key needed" claim as holding only where the proxy injects the credential, and probe with one `curl` before planning a cross-model review around it.
+
 **Per-model 502 upstream errors and fallback loop:**
 Both `glm-5.3` and `deepseek-v4-pro` can intermittently return `502 upstream request failed` (as observed on 2026-10-13) even on short diffs (e.g. 1 KB), while `kimi-k3` answers.
 When dispatching a review in a cloud session, implement a fallback loop over candidate models (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`) so a single model's transient 502 does not block the review:

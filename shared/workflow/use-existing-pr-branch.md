@@ -46,9 +46,10 @@ Once the blocked actions are done, end the manual stretch (see that fragment's "
 The durable fix is an `autoMode` block (`environment` and `allow` entries) in `~/.claude/settings.json` or in managed settings.
 The classifier ignores `autoMode` in a repository's `.claude/settings.json` and `.claude/settings.local.json`,
 so committing it to a repository does nothing.
-A cloud session reads no `~/.claude/settings.json` either, so for cloud sessions managed settings are the only durable route.
+A cloud session reads no `~/.claude/settings.json` either, and managed settings need a Team or Enterprise plan, which this organization does not have (ai-config#5695).
+So for cloud sessions the durable route is a standing approval in the project instructions that names the action and its limits: a second `claude/*` branch push went through that way on 2026-11-16 ([ai-config#5695](https://github.com/Morrison-Lab/ai-config/issues/5695#issuecomment-6908208452)).
 A push of a second `claude/*` branch is the commonest case: the harness prompt's "Push to no other branch without explicit permission" is a boundary the classifier reads ([permission modes](https://code.claude.com/docs/en/permission-modes), "Boundaries you state in conversation").
-`scripts/wire-user-config.py` writes `BRANCH_PUSH_AUTO_MODE_RULE` into `~/.claude/settings.json` on every machine `bootstrap.sh` runs on, and the same text belongs in the organization's managed settings for cloud sessions (ai-config#5682).
+`scripts/wire-user-config.py` writes `BRANCH_PUSH_AUTO_MODE_RULE` into `~/.claude/settings.json` on every machine `bootstrap.sh` runs on, and the same approval belongs in the project instructions for cloud sessions (ai-config#5682, ai-config#5695).
 The docs say an `allow` entry overrides a `soft_deny` rule, and do not say whether it outweighs a boundary stated in the prompt, so treat the rule as unverified until a second-branch push goes through without a typed approval.
 For a single denial, `/permissions` has a **Recently denied** tab that can mark the call for retry.
 

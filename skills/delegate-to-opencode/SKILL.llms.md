@@ -93,9 +93,9 @@ Two routing consequences:
 
 - **Don’t:** send data-triggered work to `openrouter/*`, `opencode-go/*`, `opencode/*`, or Ollama Cloud — free or subscription pricing is a billing fact, and bytes still leave the machine.
 
-## Cloud sessions: OpenCode Go over HTTP, no key needed
+## Cloud sessions: OpenCode Go over HTTP, keyless where the proxy holds the key
 
-A claude.ai cloud session has no `opencode` CLI preinstalled (`npm i -g opencode-ai` installs one), but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09). A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there. Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve. Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 (“Insufficient account funds” on 2026-11-05).
+A claude.ai cloud session has no `opencode` CLI preinstalled (`npm i -g opencode-ai` installs one), but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09). That holds only in an environment that allows `opencode.ai` and has the credential saved; on 2026-11-17 the Default environment had neither, as the note on the key below records. A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there. Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve. Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 (“Insufficient account funds” on 2026-11-05).
 
 - `/chat/completions`: `glm-5.3`, `glm-5.3-flash`, `kimi-k3`, `deepseek-v4-pro`, and others. Use this endpoint in a cloud session. `qwen3.8-max` is documented under `/messages`, yet it returned a normal reply here on 2026-10-09, so it is usable on this endpoint.
 
@@ -186,6 +186,11 @@ for line in sys.stdin:
 No per-PR payload was sent streamed that day, so these attempts do not show which mode suits per-PR prompts better. Until that is measured, keep streaming as the first try for a per-PR payload, and fall back to a non-streaming send when the stream returns no `delta.content`.
 
 **Python `urllib` returns 403 Forbidden; always use `curl`.** In a claude.ai cloud session (as observed on 2026-10-13), HTTP requests made via Python’s `urllib` (or `requests`) to `https://opencode.ai/zen/go/v1/chat/completions` fail with `403 Forbidden` from the cloud agent proxy, while `curl` with the identical body and headers returns `200 OK`. Always invoke `curl` in shell commands rather than Python HTTP libraries when calling the OpenCode Go API in cloud sessions.
+
+**The key is not saved in the Default cloud environment (as observed on 2026-11-17).** `opencode.ai` was refused by the proxy there until the user approved adding it to Default’s allowed hosts: `curl` printed `CONNECT tunnel failed, response 403`, and the proxy’s failure note said `connect_rejected`. No OpenCode Go API key is saved on that environment, so the keyless `curl` route above still cannot run from a Default cloud session.
+
+- **Do:** probe with one `curl` to `opencode.ai` before planning a cross-model review in a cloud session, and read the “no key needed” claim as holding only where the proxy injects the credential.
+- **Don’t:** count on that claim in an environment where you have not seen the probe succeed.
 
 **Per-model 502 upstream errors and fallback loop:** Both `glm-5.3` and `deepseek-v4-pro` can intermittently return `502 upstream request failed` (as observed on 2026-10-13) even on short diffs (e.g. 1 KB), while `kimi-k3` answers. When dispatching a review in a cloud session, implement a fallback loop over candidate models (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`) so a single model’s transient 502 does not block the review:
 

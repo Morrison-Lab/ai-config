@@ -34,6 +34,12 @@ atexit.register(lambda: [shutil.rmtree(p, ignore_errors=True)
                          for p in _SCRATCH])
 SHELLCMD_LIB = os.path.join(
     os.path.dirname(os.path.dirname(HOOK)), "scripts", "lib")
+# A mutation edit `(LIB, find, replace)` targets scripts/lib/shellcmd.py
+# rather than the hook: the per-subshell directory walk this hook relies on
+# lives there (ai-config#1731), so its clauses are reverted in a mutated copy
+# of the library that the mutant hook imports instead.
+LIB = "shellcmd"
+_lib_path = SHELLCMD_LIB  # the library directory the hook under test imports
 
 
 def _run(cwd, *args):
@@ -517,7 +523,7 @@ def verdict(hook_path, repo, command, want_text=False):
             os.symlink(repo, link)
         command = command.replace("{link}", link)
     command = command.replace("{repo}", repo)
-    env = {**os.environ, "PYTHONPATH": SHELLCMD_LIB}
+    env = {**os.environ, "PYTHONPATH": _lib_path}
     payload = {"tool_name": "Bash"}
     tool_input = {}
     # `@name ` prefixes shape the payload rather than the command.
@@ -587,6 +593,9 @@ if not os.path.isfile(HOOK):
              "'silent' on every case")
 with open(HOOK, encoding="utf-8") as handle:
     SOURCE = handle.read()
+LIB_FILE = os.path.join(SHELLCMD_LIB, "shellcmd.py")
+with open(LIB_FILE, encoding="utf-8") as handle:
+    LIB_SOURCE = handle.read()
 
 EXPECTED = {c[0]: "WARN" for c in SHOULD_WARN}
 EXPECTED.update({c[0]: "silent" for c in SHOULD_STAY_SILENT})
@@ -910,14 +919,16 @@ MUTATIONS = {
     ),
     "M_unknown_stays_unknown": (
         "an unknown directory plus a relative move stays unknown",
-        [("    if target is None or (cur is None and not os.path.isabs(target)):",
+        [(LIB, "    if target is None or (cur is None and not os.path.isabs(target)):",
           "    if target is None:")],
         {"S42"},
     ),
     "M_pushd_popd": (
         "`pushd` and `popd` move the directory like `cd`",
         [('        if rest and rest[0] in ("cd", "pushd", "popd"):',
-          '        if rest and rest[0] in ("cd",):')],
+          '        if rest and rest[0] in ("cd",):'),
+         (LIB, '        if rest and rest[0] in ("cd", "pushd", "popd") and not ignore_cd:',
+          '        if rest and rest[0] in ("cd",) and not ignore_cd:')],
         {"W43", "S40", "S41"},
     ),
     "M_add_update_long": (
@@ -985,12 +996,12 @@ MUTATIONS = {
     ),
     "M_env_chdir_silent": (
         "`env -C dir` / `env --chdir=dir` go silent",
-        [("        if _env_chdir(argv):", "        if False:")],
+        [("skip=_env_chdir)", "skip=None)")],
         {"S62", "S63"},
     ),
     "M_cd_keyword": (
         "a pipeline cd after `then`/`do`/... is still a pipeline cd",
-        [("    while words and words[0] in _LEAD_KEYWORDS:",
+        [(LIB, "    while words and words[0] in _LEAD_KEYWORDS:",
           "    while False:")],
         {"W65"},
     ),
@@ -1033,7 +1044,7 @@ MUTATIONS = {
     ),
     "M_cd_tracking": (
         "an earlier `cd <dir>` retargets the repository",
-        [("            cds[scope] = _move(rest, cd)", "            pass")],
+        [(LIB, "            dirs[scope] = move(rest, cur)", "            pass")],
         # S17/S18 are silent only because the `cd` goes somewhere that is not
         # a repository or cannot be named; S26/S27/S41/S42 because the
         # directory is unknown; S30/S31/S40 because the move into the (clean)
@@ -1044,15 +1055,15 @@ MUTATIONS = {
     "M_cd_unknown_directory": (
         "a move the resolver cannot name makes the directory unknown, not "
         "unchanged",
-        [("            cds[scope] = _move(rest, cd)",
-          "            cds[scope] = _move(rest, cd) or cd")],
+        [(LIB, "            dirs[scope] = move(rest, cur)",
+          "            dirs[scope] = move(rest, cur) or cur")],
         # S27 is not here: a bare `cd` goes home, which the resolver names.
         {"S18", "S26", "S41", "S42"},
     ),
     "M_subshell_cd_scoped": (
         "a cd inside a subshell stays inside it",
-        [("            cds[scope] = _move(rest, cd)",
-          "            cds[(0,)] = _move(rest, cd)")],
+        [(LIB, "            dirs[scope] = move(rest, cur)",
+          "            dirs[(0,)] = move(rest, cur)")],
         {"W34"},
     ),
     "M_payload_cwd": (
@@ -1067,7 +1078,7 @@ MUTATIONS = {
     ),
     "M_lead_words": (
         "env assignments and lead words are skipped",
-        [("        env, rest = _strip_env(argv)", "        env, rest = [], argv")],
+        [(LIB, "        env, rest = strip_env(argv)", "        env, rest = [], argv")],
         {"W11", "W32", "W33", "S31"},  # S31: `{ cd mod; }` needs `{` stripped
     ),
     "M_env_redirect_silent": (
@@ -1145,7 +1156,7 @@ MUTATIONS = {
     ),
     "M_redirect_is_not_a_job": (
         "`2>&1` and `&>` are redirections, not background jobs",
-        [('    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f',
+        [(LIB, '    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f',
           "    pass")],
         {"S58"},
     ),
@@ -1209,19 +1220,29 @@ print("\nmutation tests (revert one clause, see which cases flip):")
 mutation_wrong = 0
 with tempfile.TemporaryDirectory() as tmp:
     for clause, (statement, edits, expected_flips) in MUTATIONS.items():
-        mutated = SOURCE
-        for find, replace in edits:
-            if mutated.count(find) != 1:
+        texts = {"hook": SOURCE, LIB: LIB_SOURCE}
+        files = {"hook": HOOK, LIB: LIB_FILE}
+        for edit in edits:
+            target, find, replace = edit if len(edit) == 3 else ("hook", *edit)
+            if texts[target].count(find) != 1:
                 sys.exit(f"FATAL: clause {clause}'s anchor is not present "
-                         f"exactly once in {HOOK} (found "
-                         f"{mutated.count(find)}); the mutation harness is "
-                         f"measuring nothing.\n---\n{find}\n---")
-            mutated = mutated.replace(find, replace)
+                         f"exactly once in {files[target]} (found "
+                         f"{texts[target].count(find)}); the mutation harness "
+                         f"is measuring nothing.\n---\n{find}\n---")
+            texts[target] = texts[target].replace(find, replace)
         path = os.path.join(tmp, f"mutant-{clause}.py")
         with open(path, "w", encoding="utf-8") as handle:
-            handle.write(mutated)
+            handle.write(texts["hook"])
+        _lib_path = SHELLCMD_LIB
+        if texts[LIB] != LIB_SOURCE:
+            _lib_path = os.path.join(tmp, f"lib-{clause}")
+            shutil.copytree(SHELLCMD_LIB, _lib_path)
+            with open(os.path.join(_lib_path, "shellcmd.py"), "w",
+                      encoding="utf-8") as handle:
+                handle.write(texts[LIB])
         flipped = {cid for cid, (builder, command) in CASES.items()
                    if build_and_verdict(path, builder, command) != EXPECTED[cid]}
+        _lib_path = SHELLCMD_LIB
         # A mutant that lets status write the index refreshes the stat data
         # of a shared fixture, which would hide its stat-dirty file from
         # every later clause: rebuild those two.

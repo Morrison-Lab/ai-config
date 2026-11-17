@@ -13,8 +13,7 @@ Moving or renaming code in a hook or in `scripts/lib` breaks files the touched h
 [#5735](https://github.com/Morrison-Lab/ai-config/pull/5735) went red twice that way (2026-11-17, [#5738](https://github.com/Morrison-Lab/ai-config/issues/5738)).
 Mutation clauses in the hook's test were anchored on the moved code, and a sibling hook that loads the changed one through `load_sibling` called a helper the refactor removed.
 
-- **Do:** run `python3 scripts/check-mutation-anchors.py` ([#5739](https://github.com/Morrison-Lab/ai-config/pull/5739)), which reports every mutation anchor that no longer resolves, in every `hooks/test-*.py`, in under a second.
-  A harness stops at the first bad anchor, and only after its slow cases, so fixing them one push at a time costs a CI round each.
+- **Do:** run `python3 scripts/check-mutation-anchors.py`, as [`algorithmatize-checks`](algorithmatize-checks.md) says for an extracted helper ([#5739](https://github.com/Morrison-Lab/ai-config/pull/5739)).
 - **Do:** run the full `python3 scripts/test_hooks.py`, not only the touched suites.
 - **Do:** grep `hooks/` and `scripts/` for the changed file's name, and check each `load_sibling(` importer for a name the refactor removed.
   In #5735, `grep -rln flag-commit-a-sweeps-submodule hooks/ scripts/` lists `hooks/no-commit-with-conflict-markers.py`, which called the removed `_strip_env`.

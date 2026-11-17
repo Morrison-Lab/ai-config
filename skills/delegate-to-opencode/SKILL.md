@@ -639,6 +639,7 @@ A 20 KB prompt for another PR had worked on `glm-5.3-flash-free` the day before,
 Cutting the diff to the action and its scripts (about 10 KB, tests and docs left out) got `glm-5.3-flash-free` to return a reasoned verdict in about 6 minutes.
 
 - **Do:** when every free model stalls on a whole diff, send the core files alone and say in the review which files were left out.
+- **Don't:** retry the same whole-diff prompt on another free model after a timeout, or read the silence as a model failure.
 
 ### 4. Detect failure
 

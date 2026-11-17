@@ -68,6 +68,11 @@ When you configure a repository, always give it a branch ruleset, and follow the
 - A template without an example gets one by its own pull request, modelled on the closest template that has one, before any repo is made from it.
   A repo with no template uses `examples/branch-rulesets/base.json`.
 - `hooks/require-ruleset-on-repo-create.py` enforces this at creation: it denies a `gh repo create` unless the same command chain also applies the ruleset, and denies `mcp__github__create_repository` (Morrison-Lab/answer-space shipped with none on 2026-11-17).
+  The [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#repositories-created-without-a-branch-ruleset) checklist looks for the same defect.
+
+- **Do:** create a repository and apply its ruleset in one command, `gh repo create <owner>/<name> ... && examples/branch-rulesets/apply-all.sh --apply <name>`, from a host with repo admin, then confirm `gh api repos/<owner>/<name>/rulesets` is not `[]`.
+- **Don't:** create the repository first and plan to protect it later.
+  Answer-space sat unprotected until Ezra asked why.
 - Apply it with the template's `apply-rulesets.sh` (idempotent by ruleset name), or audit and apply across the org with
   `examples/branch-rulesets/apply-all.sh` (a dry run unless `--apply`).
 - Naming repos on the command line restricts the run to those repos, so after an override run such as `mcs=qwt mcsg=grt --apply`, rerun `--apply` with no names, then a final dry run must show 0 `MISSING` (2026-10-22: 20 repos applied in two runs).

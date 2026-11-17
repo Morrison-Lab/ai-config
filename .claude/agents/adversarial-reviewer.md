@@ -349,3 +349,10 @@ On a transcript, brief or skill change that starts a subagent, thread or session
 On a message that hands new work to an existing thread, check that the transcript shows a reason a new thread would not do (the topic, the files or the context is already there), not a reflex to reuse the nearest thread.
 Read the transcript yourself; do not report the output of `hooks/require-model-choice.py` as your finding.
 See [`choose-thread`](../../skills/choose-thread/SKILL.md) and [`select-model`](../../skills/select-model/SKILL.md).
+
+## Repositories created without a branch ruleset
+
+On a transcript, script or skill change that creates a GitHub repository, check that the same step applies the branch ruleset (the template's own example, or `examples/branch-rulesets/base.json` for a repository with no template) and verifies that the ruleset list is non-empty afterwards.
+A repository left with an unprotected default branch takes direct pushes, force pushes and deletion until someone notices.
+Read the transcript yourself; do not report the output of `hooks/require-ruleset-on-repo-create.py` as your finding.
+See [`repo-templates`](../../shared/workflow/repo-templates.md#set-a-branch-ruleset-that-follows-the-templates-example).

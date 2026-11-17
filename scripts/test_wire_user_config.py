@@ -223,6 +223,7 @@ class WireUserConfig(unittest.TestCase):
         self.assertIn("todo  ", line(out, "Approvals"))
         self.run_main()
         allow = self.settings()["autoMode"]["allow"]
+        self.assertEqual(allow[:2], ["$defaults", have])
         for rule in wire.APPROVAL_SCOPE_AUTO_MODE_RULES:
             self.assertEqual(allow.count(rule), 1)
 

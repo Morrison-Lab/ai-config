@@ -9,7 +9,7 @@ same repository as its main checkout, and siblings are listed beside the main
 checkout. Not judged: Edit, MultiEdit and a Write over an existing file (they
 change a file rather than create a copy); vendored paths (EXEMPT_PATH), which a
 sync workflow should write; a thin caller of a `gha` reusable workflow, which
-is the decomposed form; a copy within one repo, which has no same-name signal.
+is the decomposed form; a copy within one repo, which is not compared (see the fragment).
 A line comment `decompose: allow <reason>` passes (`<!--` only in Markdown, where `#` is a heading).
 Fails OPEN and SILENT on any parse trouble, and stops after TIME_BUDGET.
 """

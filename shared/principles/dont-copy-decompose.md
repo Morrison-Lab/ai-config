@@ -44,7 +44,9 @@ Say which case applies in the issue or PR, as [`centralize-or-distribute`](../wo
 A move, or a copy that must stay a copy, passes with a line comment `decompose: allow <reason>` in the file's own comment syntax (`<!--` in Markdown), so review sees the reason.
 
 The hook does not yet see a copy made with `cp`, `rsync` or `install`, or a `Write` over an existing file ([ai-config#5709](https://github.com/Morrison-Lab/ai-config/issues/5709) tracks the shell copy).
-It cannot see a copy retyped under a new name, a copy made within one repository, or a copy of a design rather than of text.
-Those last three have no textual signal a hook could key on without refusing ordinary similar files, so this prose rule and review (`.claude/agents/adversarial-reviewer.md`) cover them.
+It does not compare a new file with files of other names or with its own repository, and it cannot see a copy of a design rather than of text.
+Those first two are choices: a scan of every tracked file would be slow on each `Write`, and would refuse boilerplate that ordinary files repeat, such as a licence or a config stub.
+A copied design leaves no shared text at all.
+So this prose rule and review (`.claude/agents/adversarial-reviewer.md`) cover all three.
 
 Related: [`dont-reinvent-wheel`](dont-reinvent-wheel.md) (look for the existing component first), [`prefer-systemic-solutions-over-one-off-fixes`](prefer-systemic-solutions-over-one-off-fixes.md), and the DRY entry in the [principles catalog](README.md#dry--dont-repeat-yourself).

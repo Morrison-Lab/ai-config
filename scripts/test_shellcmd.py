@@ -380,6 +380,55 @@ check("`pushd <dir>` moves like `cd`",
 check("an unexpanded variable target is indeterminate",
       shellcmd.resolve_cd_target(["cd", "$WT"], "/srv/repo"), None)
 
+# ------------------------------------------------- move_dir and walk_dirs
+#
+# WHERE DOES EACH COMMAND RUN? A hook that runs git on the user's behalf must
+# run it where the intercepted command would, not where the hook process
+# happens to stand (ai-config#1731). `walk_dirs` is the one walk every such
+# hook calls; these pin its subshell and unknown-directory rules.
+
+check("move_dir: a relative move from an unknown directory stays unknown",
+      shellcmd.move_dir(["cd", "sub"], None), None)
+check("move_dir: an absolute move from an unknown directory is named",
+      shellcmd.move_dir(["cd", "/srv/repo"], None), os.path.normpath("/srv/repo"))
+
+
+def _dirs(command, start=""):
+    """[(first word, directory it runs in)] for each command in `command`."""
+    cmds = shellcmd.simple_commands_with_scope(command)
+    return [(rest[0] if rest else "", cur)
+            for _argv, _env, rest, cur in shellcmd.walk_dirs(cmds, start)]
+
+
+check("walk_dirs: a `cd` moves the commands after it",
+      _dirs("cd sub && git add ."), [("cd", ""), ("git", "sub")])
+check("walk_dirs: a `cd` inside a subshell never reaches the parent",
+      _dirs("(cd sub && ls) && git add ."),
+      [("cd", ""), ("ls", "sub"), ("git", "")])
+check("walk_dirs: an unnamed target leaves the directory unknown",
+      _dirs('cd "$X" && git add -A'), [("cd", ""), ("git", None)])
+check("walk_dirs: an env prefix is stripped before reading `cd`",
+      _dirs("FOO=1 cd /srv/repo && git status"),
+      [("cd", ""), ("git", os.path.normpath("/srv/repo"))])
+check("walk_dirs: ignore_cd keeps every command in the start directory",
+      [cur for *_x, cur in shellcmd.walk_dirs(
+          shellcmd.simple_commands_with_scope("cd sub | cat; git add ."),
+          "", ignore_cd=True)],
+      ["", "", ""])
+check("walk_dirs: a skipped command is neither yielded nor moves",
+      [(rest[0], cur) for _a, _e, rest, cur in shellcmd.walk_dirs(
+          shellcmd.simple_commands_with_scope("env -C /x cd /y; git add ."),
+          "", skip=lambda argv: argv[0] == "env")],
+      [("git", "")])
+check("unreachable_cd: a `cd` in a pipeline stage never moves the shell",
+      shellcmd.unreachable_cd("cd sub | cat; git add ."), True)
+check("unreachable_cd: a backgrounded `cd` never moves the shell",
+      shellcmd.unreachable_cd("cd sub & git add ."), True)
+check("unreachable_cd: `cd x && cmd` does move the shell",
+      shellcmd.unreachable_cd("cd sub && git add ."), False)
+check("unreachable_cd: a quoted `| cat` is not a pipeline",
+      shellcmd.unreachable_cd("cd sub && echo 'a | b'"), False)
+
 # ------------------------------------------------- subshell nesting depth
 #
 # `simple_commands` FLATTENS `( ... )`, which is right for a caller asking

@@ -25,7 +25,7 @@ works out where the matched `git add` will run (M7, ai-config#1731): the
 payload's `cwd`, then each `cd`/`pushd`/`popd` before it in the same shell.
 Two kinds of case cover that. W5 and S10 run the hook with its process cwd in
 `<repo>/sub` and a bare `git add .`, a session already sitting in `sub/`.
-The `cd`-prefixed cases (W8-W12, S12-S14) put the directory change in the
+The `cd`-prefixed cases (W8-W12, S12-S15) put the directory change in the
 command itself, or in the payload's `cwd`, with the hook process launched
 somewhere else, so a hook that read its own process cwd would get them
 wrong.
@@ -267,6 +267,9 @@ SHOULD_STAY_SILENT = [
      "cross-worktree repro"),
     ("S14", explicit_path_repo, 'cd "$X" && git add -A', None,
      "M7: a `cd` to a directory the text does not name fails open"),
+    ("S15", cwd_scope_clean_sub_repo, "cd sub; cd nope; git add .", None,
+     "M7: the failed `cd nope` leaves the shell in sub/, so `.` is the "
+     "clean sub/, not the repo root"),
 ]
 
 
@@ -419,7 +422,7 @@ MUTATIONS = {
           "            untracked = [p for p in untracked\n"
           "                        if p == rel or p.startswith(prefix)]",
           "    if False:\n        pass")],
-        {"S10", "S12"},
+        {"S10", "S12", "S15"},
     ),
     "M7_status_dir": (
         "`git status` runs in the directory the `git add` runs in, not the "
@@ -440,16 +443,23 @@ MUTATIONS = {
     ),
     "M7_missing_dir": (
         "a `cd` to a missing directory leaves the add where it started",
-        [("        run_dir = base  # a failed",
-          "        return 0  # a failed")],
+        [("        return target if exists else cur",
+          "        return target")],
         {"W12"},
+    ),
+    "M7_failed_cd_keeps_dir": (
+        "a failed `cd` leaves the shell where it was just before that `cd`, "
+        "not where the command started",
+        [("        return target if exists else cur",
+          '        return target if exists else ""')],
+        {"S15"},
     ),
     "M7_scope_dir": (
         "the cwd-scope filter is relative to the `git add`'s directory, not "
         "the hook process's own (ai-config#1731)",
         [("        rel = _repo_relative_cwd(run_dir)",
           "        rel = _repo_relative_cwd(os.getcwd())")],
-        {"S12", "W9"},
+        {"S12", "S15", "W9"},
     ),
     "M_named_include_scopes": (
         "`-A` plus a specific non-`.` pathspec does NOT mean whole-repo scope",

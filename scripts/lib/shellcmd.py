@@ -735,7 +735,7 @@ def unreachable_cd(command):
     return False
 
 
-def walk_dirs(cmds, start, ignore_cd=False, skip=None):
+def walk_dirs(cmds, start, ignore_cd=False, skip=None, move=move_dir):
     """Yield `(argv, env, rest, cur_dir)` for each simple command in `cmds`.
 
     `cmds` is `simple_commands_with_scope` output, `start` the directory the
@@ -747,6 +747,9 @@ def walk_dirs(cmds, start, ignore_cd=False, skip=None):
     then moves its own scope, unless `ignore_cd` (a line whose `cd` runs in a
     forked pipeline stage or background job).
     A command for which `skip(argv)` is true is neither yielded nor moves.
+    `move(rest, cur)` computes each move; a caller that can see the
+    filesystem passes one that keeps `cur` when the target does not exist,
+    since a failed `cd` leaves the shell where it was.
     Moved from `hooks/flag-commit-a-sweeps-submodule.py` so every hook that
     needs "where does this command run" calls one walk (ai-config#1731).
     """
@@ -764,7 +767,7 @@ def walk_dirs(cmds, start, ignore_cd=False, skip=None):
         cur = dir_of(scope)
         yield argv, env, rest, cur
         if rest and rest[0] in ("cd", "pushd", "popd") and not ignore_cd:
-            dirs[scope] = move_dir(rest, cur)
+            dirs[scope] = move(rest, cur)
 
 
 # A SHELL specifically, which is a narrower question than "an interpreter".

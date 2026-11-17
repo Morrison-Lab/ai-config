@@ -73,8 +73,9 @@ README's "A hook that misfires is worse than a missing one".
       holding one is checked from its starting directory
       (`shellcmd.unreachable_cd`).
       A directory the text does not name (`cd -`, `cd "$X"`) fails open.
-      A named directory that does not exist is checked from the starting
-      directory instead: `cd nope; git add -A` runs the add there, and after
+      A `cd` to a named directory that does not exist leaves the directory
+      where it was before that `cd`, as bash's failed `cd` does:
+      `cd sub; cd nope; git add .` runs the add in `sub/`, and after
       `cd nope && git add -A` the over-warning is the safe direction.
       Before ai-config#1731 both calls ran in the hook process's own
       directory, so `cd <worktree> && git add -A` reported another
@@ -107,6 +108,7 @@ try:
     from shellcmd import simple_commands_with_scope as _simple_commands
     from shellcmd import walk_dirs as _walk_dirs
     from shellcmd import unreachable_cd as _unreachable_cd
+    from shellcmd import move_dir as _move_dir
 except Exception as _exc:  # broken install: degrade, never block
     print(f"flag-add-a-outside-pathspec: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); "
@@ -169,19 +171,31 @@ def _add_everything(args):
     return None
 
 
-def offending(command):
+def offending(command, base=None):
     """(matched_segment, scope, exclusions, directory) for the first "add
     everything" `git add` invocation in `command`, or None.
 
     `directory` is where that `git add` runs, relative to the directory the
     command starts in ("" for that directory itself), absolute after a
     `cd /abs`, or None when a `cd` before it goes somewhere the text does
-    not name (M7)."""
+    not name (M7).
+    `base` is that starting directory on disk; given it, a `cd` to a
+    directory that does not exist leaves the shell where it was, as bash's
+    failed `cd` does."""
     cmds = _simple_commands(command)
     if cmds is None or _walk_dirs is None:
         return None
+
+    def move(rest, cur):
+        target = _move_dir(rest, cur)
+        if base is None or target is None:
+            return target
+        exists = os.path.isdir(os.path.join(base, target))
+        return target if exists else cur
+
     ignore_cd = _unreachable_cd(command)
-    for argv, _env, _rest, cur in _walk_dirs(cmds, "", ignore_cd=ignore_cd):
+    for argv, _env, _rest, cur in _walk_dirs(cmds, "", ignore_cd=ignore_cd,
+                                             move=move):
         i = 0
         while i < len(argv) and (ASSIGNMENT.match(argv[i])
                                   or argv[i] in LEAD_WORDS):
@@ -329,8 +343,12 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
+    # M7: the directory the command starts in is the payload's, not this
+    # process's: tool_input.Cwd, then the payload's `cwd`, then ours.
+    base = next((c for c in (inp.get("Cwd"), payload.get("cwd"))
+                 if isinstance(c, str) and c), None) or os.getcwd()
     try:
-        hit = offending(command)
+        hit = offending(command, base)
     except Exception as exc:  # fail open on any parse trouble
         print(f"flag-add-a-outside-pathspec: could not parse command ({exc})",
               file=sys.stderr)
@@ -342,17 +360,11 @@ def main() -> int:
         return 0
 
     segment, scope, excludes, rel_dir = hit
-    # M7: the directory the command starts in is the payload's, not this
-    # process's: tool_input.Cwd, then the payload's `cwd`, then ours.
-    base = next((c for c in (inp.get("Cwd"), payload.get("cwd"))
-                 if isinstance(c, str) and c), None) or os.getcwd()
     if rel_dir is None:
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0  # the git add runs somewhere the text does not name
     run_dir = os.path.normpath(os.path.join(base, rel_dir))
-    if not os.path.isdir(run_dir):
-        run_dir = base  # a failed `cd` leaves the shell where it started
 
     sim_untracked = os.environ.get("SIMULATE_UNTRACKED")
     if sim_untracked is not None:

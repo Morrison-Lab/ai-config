@@ -1044,7 +1044,7 @@ MUTATIONS = {
     ),
     "M_cd_tracking": (
         "an earlier `cd <dir>` retargets the repository",
-        [(LIB, "            dirs[scope] = move_dir(rest, cur)", "            pass")],
+        [(LIB, "            dirs[scope] = move(rest, cur)", "            pass")],
         # S17/S18 are silent only because the `cd` goes somewhere that is not
         # a repository or cannot be named; S26/S27/S41/S42 because the
         # directory is unknown; S30/S31/S40 because the move into the (clean)
@@ -1055,15 +1055,15 @@ MUTATIONS = {
     "M_cd_unknown_directory": (
         "a move the resolver cannot name makes the directory unknown, not "
         "unchanged",
-        [(LIB, "            dirs[scope] = move_dir(rest, cur)",
-          "            dirs[scope] = move_dir(rest, cur) or cur")],
+        [(LIB, "            dirs[scope] = move(rest, cur)",
+          "            dirs[scope] = move(rest, cur) or cur")],
         # S27 is not here: a bare `cd` goes home, which the resolver names.
         {"S18", "S26", "S41", "S42"},
     ),
     "M_subshell_cd_scoped": (
         "a cd inside a subshell stays inside it",
-        [(LIB, "            dirs[scope] = move_dir(rest, cur)",
-          "            dirs[(0,)] = move_dir(rest, cur)")],
+        [(LIB, "            dirs[scope] = move(rest, cur)",
+          "            dirs[(0,)] = move(rest, cur)")],
         {"W34"},
     ),
     "M_payload_cwd": (

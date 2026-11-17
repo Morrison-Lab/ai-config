@@ -727,6 +727,16 @@ cookieconsent.run({
 </ul>
 <p>Capture stdout and gate on the exit status instead, per step 4.</p>
 <p><strong><code>MAXPAR</code> is the fifth, and it needs a provider-aware bound.</strong> Hosted providers enforce their own rate and concurrency limits. Start with the provider’s documented limit and reduce parallelism when responses report throttling.</p>
+<p>A local bound sits below the provider’s. On a Linux desktop whose home directory is on NFS, on 2026-11-17 (opencode 1.18.34), three <code>opencode run</code> processes started together under one user left two failing at once with <code>Error: Unexpected error</code> and <code>database is locked</code>, exit 1. The third ran on. opencode keeps its session state in the SQLite file <code>~/.local/share/opencode/opencode.db</code>, with <code>-wal</code> and <code>-shm</code> files beside it. There the file sat on that NFS home. So treat runs under one user’s home as serial unless measured otherwise.</p>
+<ul>
+<li><strong>Do:</strong> run one <code>opencode run</code> at a time per user, looping over models one after another.</li>
+<li><strong>Don’t:</strong> read <code>database is locked</code> as a model or provider failure. It is a local collision, and the same run alone is the retry.</li>
+</ul>
+<p>The same day, a review prompt of about 18 KB (brief plus a whole PR diff, <a href="https://github.com/Morrison-Lab/gha/pull/2074">gha#2074</a>) got no answer from any free model. <code>glm-5.3-flash-free</code>, <code>deepseek-v4.1-flash-free</code>, <code>beam-free</code> and <code>iceman-free</code> each ran to its timeout of 300 to 600 s with no events, even under <code>--format json</code>. <code>nemotron-3.5-lightning-free</code> ended with <code>step_finish</code> reason <code>length</code>, 32,000 reasoning tokens and no output. A 20 KB prompt for another PR had worked on <code>glm-5.3-flash-free</code> the day before, so size alone does not predict it. Cutting the diff to the action and its scripts (about 10 KB, tests and docs left out) got <code>glm-5.3-flash-free</code> to return a reasoned verdict in about 6 minutes.</p>
+<ul>
+<li><strong>Do:</strong> when every free model stalls on a whole diff, send the core files alone and say in the review which files were left out.</li>
+<li><strong>Don’t:</strong> retry the same whole-diff prompt on another free model after a timeout, or read the silence as a model failure.</li>
+</ul>
 </section>
 <section id="detect-failure" class="level3">
 <h3 class="anchored" data-anchor-id="detect-failure">4. Detect failure</h3>

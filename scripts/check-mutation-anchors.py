@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Report every mutation anchor in hooks/test-*.py that no longer resolves.
+"""Report stale mutation anchors in hooks/test-*.py tables named old/find/anchor/edits.
 
 Most harnesses `sys.exit` at their first bad anchor, after the slow cases
-(ai-config#5735, #5738); this reads every one statically.  A table is any
+(ai-config#5735, #5738); this reads those it recognises statically.  A table is any
 literal (MUTATIONS, MUTANTS, ...) a `for` loop reads into old/find/anchor or an
 `edits` list of (find, replace) or (LIBNAME, find, replace) for scripts/lib.
 An anchor must occur once (once or more if the loop only tests `not in`).

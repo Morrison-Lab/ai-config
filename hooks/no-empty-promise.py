@@ -507,65 +507,122 @@ WRITE_TOOLS = {
     "write_to_file", "replace_file_content", "edit_file", "strreplace", "create_file",
 }
 
-# What makes a shell command a write rather than a read.
-BASH_WRITE = re.compile(
-    # A redirect, but NOT `2>`/`&>` (an fd-prefixed stderr redirect) and not
-    # one aimed at /dev/null -- `cat shared/x.md 2>/dev/null` is a read.
-    r"(?<![0-9&])>>?\s*(?!/dev/null)[^\s&|]"
-    # `(?![\w-])` rather than `\b` after a command or flag NAME, for the same
-    # reason `_NOT_PATH_END` exists above: `\b` sits between `write` and `-`,
-    # so `--write\b` matched `curl -s --write-out '%{http_code}' <url>`, a
-    # pure HTTP status check that writes nothing (ai-config#1966). A false
-    # match here is a false DISCHARGE, which is the silent direction.
-    #
-    # `git\s+(?:add|commit|...)\b` likewise matched `git commit-tree` and
-    # `git commit-graph write`. Both of those genuinely write git objects, so
-    # the old classification was not wrong -- it was right by accident, and
-    # the next reader could not tell the coincidence from the intent. Neither
-    # writes a rule surface, which is the question this pattern is asking.
-    #
-    # The guard covers the whole group rather than `commit` alone, because
-    # `commit` is not the only member with a hyphenated sibling:
-    # `git --list-cmds=main,others` reports `add--interactive` as well
-    # (checked 2026-08-22 against git 2.x). That one is the deprecated
-    # backend for `git add -i`, superseded by the builtin, and it is
-    # interactive -- so it is deliberately excluded here rather than special
-    # cased. Excluding it costs a false POSITIVE (a genuine staging that no
-    # longer discharges), which is the loud direction and clearable in one
-    # command via this guard's own block message. `apply`, `mv`, and `rm`
-    # have no hyphenated siblings today, and the group guard means a future
-    # one cannot reopen this.
-    r"|\bgit\s+(?:add|commit|apply|mv|rm)(?![\w-])"
-    r"|--write(?![\w-])"
-    # `tee` and `mkdir` take the full path pair rather than the hyphen guard;
-    # `sed -i` keeps a plain `\b`. See the note under this pattern for why the
-    # three differ.
-    r"|" + _NOT_PATH + r"tee" + _NOT_PATH_END +
-    r"|" + _NOT_PATH + r"mkdir" + _NOT_PATH_END +
-    r"|\bsed\s+-i\b",
-    re.I,
-)
-# `tee` and `mkdir` get the full `_NOT_PATH` pair rather than the `(?![\w-])`
-# guard used above, because the two guards answer different questions. The
-# hyphen guard separates a command from a hyphenated SIBLING; the path pair
-# separates a command from a PATH that happens to contain the word. Neither
-# has a hyphenated sibling, which is what an earlier version of this comment
-# said -- and that justified the wrong axis, since `\btee\b` matched inside
-# `cat shared/workflow/tee-notes.md`, a READ that discharged a promise
-# (review finding on ai-config#1968). No such path exists in this repo today
-# (`git ls-files` finds none as of 2026-08-22), so this was latent rather
-# than firing; it is fixed here because the pattern was wrong in exactly the
-# way the rest of this diff is about.
+# What makes a shell command a write TO A RULE SURFACE, rather than a read of
+# one (ai-config#1962).
 #
-# `sed\s+-i` deliberately keeps its plain `\b`, and it is NOT an oversight.
-# The whitespace makes a path form impossible, so `_NOT_PATH` would buy
-# nothing -- and `_NOT_PATH_END` would actively break `sed -i.bak`, whose
-# `.bak` is exactly the `\.\w` shape that pair exists to reject.
-# `mv`/`cp` and a bare `patch` are deliberately absent. `cp shared/x.md /tmp/`
-# copies OUT of a rule surface and writes nothing to it, and the destination is
-# not decidable from a substring match -- so they discharged reads. Losing the
-# rare genuine `cp` INTO a rule surface costs a false positive, which this
-# guard's own block message tells the author how to clear in one command.
+# This used to be a whole-string conjunction: MECHANISM_PATH anywhere in the
+# command AND a write verb anywhere in it. Nothing related the two, so
+# `cat CLAUDE.md | tee /tmp/x` and `cat CLAUDE.md > /tmp/copy` -- a read of a
+# rule surface, copied somewhere irrelevant -- discharged as durable writes.
+# That is a false DISCHARGE, the silent direction this guard's docstring argues
+# against, and it is the same class `_poller_executed()` closed for the poller
+# path: the real question is grammatical ("is the rule surface the TARGET of
+# the write?"), not "do both substrings appear?".
+#
+# So the question is now asked per simple command, over the shared
+# `scripts/lib/shellcmd.py` tokenizer (dequoted tokens, heredoc bodies
+# blanked), and only of the write verb's own operands:
+#
+#   * a redirect (`>`, `>>`, `>|`, `&>`) whose TARGET is a rule surface;
+#   * `git add|commit|apply|mv|rm` naming a rule surface in the same simple
+#     command (a commit message naming one still counts, as before);
+#   * `tee`, `mkdir`, or `sed -i` with a rule-surface operand;
+#   * a `--write` flag with a rule-surface operand (a formatter in place).
+#
+# Matching whole TOKENS is also what keeps the earlier word-boundary findings
+# closed without a lookahead each: `curl --write-out` is not the token
+# `--write` (ai-config#1966), `git commit-tree`/`commit-graph` and
+# `git add--interactive` are not the subcommands listed (compared with `==`
+# through `git_subcommand`), `cat shared/workflow/tee-notes.md` has no `tee`
+# PROGRAM, and `sed -i.bak` is a token starting `-i`.
+#
+# `mv`/`cp` and a bare `patch` stay deliberately absent: `cp shared/x.md /tmp/`
+# copies OUT of a rule surface, and losing the rare genuine `cp` INTO one costs
+# a false positive, which this guard's own block message tells the author how
+# to clear in one command. The same holds for a write the tokenizer cannot
+# see -- an interpreter writing the file from inside a heredoc, a path built
+# from a variable, a wrapper's own options (`timeout 5 tee CLAUDE.md`, where
+# `strip_env` leaves `5` as the program), or a command `shlex` cannot parse:
+# each returns False, the
+# loud direction, for the reason `_poller_executed()` gives above.
+try:
+    from shellcmd import git_subcommand, simple_commands, strip_env
+except ImportError as _exc:  # broken install: say so, and discharge nothing
+    print(f"no-empty-promise: cannot load scripts/lib/shellcmd.py ({_exc}); "
+          f"no shell command will discharge a promise as a durable write",
+          file=sys.stderr)
+    git_subcommand = simple_commands = strip_env = None
+
+_REDIRECT_OUT = re.compile(r"^&?>>?\|?$")
+_REDIRECT_IN = re.compile(r"^<{1,3}$")
+_GIT_WRITE_SUBCOMMANDS = {"add", "commit", "apply", "mv", "rm"}
+_SED_IN_PLACE = re.compile(r"^(?:-[A-Za-z]*i|--in-place(?:=|$))")
+
+
+def _is_rule_surface(token):
+    return bool(MECHANISM_PATH.search(token))
+
+
+def _split_redirects(argv):
+    """(operands, redirect-out targets) for one simple command's argv.
+
+    `shlex` in punctuation mode emits `>` and `<` as their own tokens, so a
+    redirect and its target are two adjacent tokens. A heredoc opener arrives
+    as a bare `<<` with its tag blanked along with the body, so a redirect
+    with no following token is simply dropped.
+    """
+    operands, targets, index = [], [], 0
+    while index < len(argv):
+        token = argv[index]
+        if _REDIRECT_OUT.match(token) or _REDIRECT_IN.match(token):
+            if index + 1 < len(argv) and _REDIRECT_OUT.match(token):
+                targets.append(argv[index + 1])
+            index += 2
+            continue
+        operands.append(token)
+        index += 1
+    return operands, targets
+
+
+def _argv_writes_rule_surface(argv, depth):
+    operands, targets = _split_redirects(argv)
+    if any(_is_rule_surface(t) for t in targets):
+        return True
+    git = git_subcommand(operands)
+    if git is not None:
+        subcommand, rest, _env = git
+        return (subcommand in _GIT_WRITE_SUBCOMMANDS
+                and any(_is_rule_surface(t) for t in rest))
+    _env, rest = strip_env(operands)
+    if not rest:
+        return False
+    program, args = os.path.basename(rest[0]), rest[1:]
+    paths = [a for a in args if not a.startswith("-") and _is_rule_surface(a)]
+    if _SHELL.match(program):
+        # A shell's `-c` argument is a nested command line, so re-test it on
+        # its own terms, as `_poller_executed()` does.
+        for index, token in enumerate(args[:-1]):
+            if (_DASH_C_FLAG.match(token)
+                    and _shell_writes_rule_surface(args[index + 1], depth + 1)):
+                return True
+        return False
+    if program in ("tee", "mkdir"):
+        return bool(paths)
+    if program == "sed":
+        return bool(paths) and any(_SED_IN_PLACE.match(a) for a in args)
+    return "--write" in args and bool(paths)
+
+
+def _shell_writes_rule_surface(command, depth=0):
+    """True when some simple command in COMMAND writes to a rule surface."""
+    if simple_commands is None or depth > 2:
+        return False
+    if not _is_rule_surface(command):
+        return False  # cheap exit: no rule surface named anywhere
+    argvs = simple_commands(command)
+    if argvs is None:
+        return False  # unparseable: do not discharge
+    return any(_argv_writes_rule_surface(argv, depth) for argv in argvs)
 
 
 def records(path):
@@ -828,8 +885,9 @@ def discharges(name, inp):
         cmd = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
         if FILING_CMD.search(cmd):
             return "durable"
-        # A shell write needs BOTH a rule surface and something that writes to
-        # it, so `cat shared/workflow/ardi.md` reads as the read it is.
+        # A shell write needs a write verb whose own TARGET is a rule
+        # surface, so `cat shared/workflow/ardi.md` reads as the read it is
+        # and `cat CLAUDE.md | tee /tmp/x` does too (ai-config#1962).
         #
         # This runs BEFORE the poller test, and the order is load-bearing
         # rather than stylistic. The three poller scripts live under `hooks/`,
@@ -842,7 +900,7 @@ def discharges(name, inp):
         #
         # Durable is the stronger claim, so when a command is both a write and
         # a mention of the poller, the write wins.
-        if MECHANISM_PATH.search(cmd) and BASH_WRITE.search(cmd):
+        if _shell_writes_rule_surface(cmd):
             return "durable"
         if _poller_executed(cmd):
             return "scheduled"

@@ -2,7 +2,7 @@
 type: regex
 target: trace
 flags: im
-pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?:reusable\s+workflow|composite\s+action|decompos|factor)'
+pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?:reusable\s+workflow|composite\s+action|decompos|\bfactor\s+(?:out|the|it))'
 ---
 
 `shared/principles/dont-copy-decompose.md` says to factor a setup a second repository needs into one component that every user calls (Ezra, 2026-11-16).

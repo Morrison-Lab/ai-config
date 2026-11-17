@@ -13,7 +13,10 @@ It applies within a repository and across repositories.
 State the choice in the issue or PR, with the reason in a sentence.
 Centralizing means one copy that other places link to, include, or call.
 Distributing means a copy in each place that uses it.
-Neither is the default: a copy that is never reconciled drifts, and a shared copy adds a dependency and a release step.
+For something that already exists in one place and is now needed in another, centralizing is the default ([`dont-copy-decompose`](../principles/dont-copy-decompose.md), Ezra, 2026-11-16).
+Moving content and copying a thin caller of a shared component are not copies in this sense.
+Distribute only when the copies must differ in a way no input can express, and say so.
+For new work with no existing copy, choose either way, since a copy that is never reconciled drifts, and a shared copy adds a dependency and a release step.
 
 - **Do:** before copying a file, a workflow, a script, or a passage into a second place, name where the single copy could live, and say in the issue or PR which you chose and why.
 - **Do:** when you find an existing duplicate, file an issue for centralizing it, as [gha#1796](https://github.com/Morrison-Lab/gha/issues/1796), [gha#1797](https://github.com/Morrison-Lab/gha/issues/1797), [gha#1798](https://github.com/Morrison-Lab/gha/issues/1798) and [gha#1799](https://github.com/Morrison-Lab/gha/issues/1799) did.

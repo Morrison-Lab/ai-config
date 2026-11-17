@@ -185,6 +185,8 @@ it does not relax because the action lives in a consumer repo instead.
 A sibling repo of the same shape almost certainly already has this worked out.
 `Morrison-Lab/mln`'s `.github/` is a private-repo Quarto-site example carrying the whole baseline set plus `check-equation-renders.yml`, `check-new-line-breaks.yml`, `check-ai-tells.yml`, and the Quarto preview/publish chain;
 a private R-package repo would instead start from `Morrison-Lab/gha`'s own `examples/` stubs or from `Morrison-Lab/qwt`/`rpt` template repos (see `Morrison-Lab/gha`'s own CLAUDE.md, "Test changes against a template repo").
+A caller stub is already the decomposed form, so copying one is not the copy [`dont-copy-decompose`](../principles/dont-copy-decompose.md) forbids;
+a sibling workflow that runs its own steps instead of calling gha is a setup to decompose into gha first.
 Copy the caller stubs wholesale and then adapt only what is genuinely repo-specific --- the `claude-bot.yml` header comment naming the repo's own visibility posture, a `review-workflow-file:` value, any `install-quarto`/`setup-r` flags the new repo's content actually needs.
 Do not copy blind: a caller file carries prose that describes the repo it came from, and leaving that prose unedited in the new repo is a smaller version of the same problem [`check-the-renders`](check-the-renders.md) names for a stale claim about a different artifact.
 

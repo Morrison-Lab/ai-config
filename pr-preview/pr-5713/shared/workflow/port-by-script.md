@@ -4,6 +4,7 @@ When content moves from one repository to another, copy the source files with a 
 Keep the ids, wording and citations.
 Edit only what the target repository's style rules require.
 Write generatively only for content that has nothing to port.
+A port moves content, so the source is removed or stops being canonical, which is why it is not the copy [`dont-copy-decompose`](../principles/dont-copy-decompose.md) forbids.
 
 ## Why
 

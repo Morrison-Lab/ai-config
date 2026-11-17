@@ -2309,6 +2309,41 @@ def transcript_merge_grant(payload: dict | None = None) -> bool:
     return granted
 
 
+def transcript_named_grant(payload: dict | None, target: str | None, number: int | None) -> bool:
+    """Whether the user typed a merge instruction naming this PR (ai-config#5703).
+
+    "merge PR 113" or "merge csci201 PRs 28, 24 and 25" grants exactly those
+    numbers. When the instruction names a repository, the merge's `target`
+    (`owner/repo`) must be that repository; an unknown target then denies.
+    An instruction that names no repository ("merge PR 113") matches that
+    number in any repository, as the typed blanket grant already matches
+    every PR. A later revocation clears every named grant before it, as for
+    the session-wide grant.
+    """
+    if number is None:
+        return False
+    path = (payload or {}).get("transcript_path") or (payload or {}).get("transcriptPath")
+    if not isinstance(path, str) or not path.strip() or not os.path.isfile(path.strip()):
+        return False
+    detector = _load_merge_word_detector()
+    if detector is None or not hasattr(detector, "named_merge_grants"):
+        return False
+    granted = set()
+    try:
+        for prompt in _user_prompts(path.strip()):
+            if detector.revokes(prompt):
+                granted = set()
+            else:
+                granted |= detector.named_merge_grants(prompt)
+    except Exception as exc:
+        # Fails closed, but not silently: a detector bug would otherwise look
+        # like a grant that never applies.
+        print(f"no-unauthorized-merge: named-grant read failed ({exc})", file=sys.stderr)
+        return False
+    repo = target.split("/")[-1].lower() if target else None
+    return any(n == number and (r is None or r == repo) for r, n in granted)
+
+
 def check_mwc_active(payload: dict | None = None) -> bool:
     if transcript_merge_grant(payload):
         return True
@@ -2443,6 +2478,12 @@ def offending(command: str, payload: dict | None = None):
             continue
         if check_mwc_active(payload):
             continue  # Allowed via active MWC session grant
+        # A typed "merge PR N" grants that PR (ai-config#5703); not --auto,
+        # which merges whatever the PR holds once checks pass.
+        if not re.search(r"(?:^|\s)--auto\b", inert_command[start:end]) and transcript_named_grant(
+                payload, granted_merge_target(masked_command[start:end], inert_command[start:end]),
+                merge_pr_number(inert_command[start:end])):
+            continue
         if standing_grant_target(masked_command[start:end], inert_command[start:end]):
             continue  # Allowed via the standing per-repository grant
         if standing_infra_grant(masked_command[start:end], inert_command[start:end]):
@@ -2484,6 +2525,16 @@ def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
             return None
 
     pull_num = tool_input.get("pull_number") or tool_input.get("pullNumber") or tool_input.get("number") or ""
+    # A typed "merge PR N" grants that PR through the merge tool only, not
+    # auto-merge (ai-config#5703).
+    if (tool_name.lower().endswith("merge_pull_request")
+            and str(pull_num).strip().isdigit()
+            and transcript_named_grant(
+                payload,
+                f"{owner.strip()}/{repo.strip()}" if isinstance(owner, str) and isinstance(repo, str)
+                and owner.strip() and repo.strip() else None,
+                int(str(pull_num).strip()))):
+        return None
     mcp_sha = tool_input.get("expectedHeadSha") or tool_input.get("expected_head_sha") or ""
     # The infra-PR grant covers the merge tool only: enabling auto-merge
     # merges whatever the PR holds when checks pass, not what it holds now.

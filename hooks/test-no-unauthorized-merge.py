@@ -2030,14 +2030,14 @@ _TG_CASES = [
 ]
 
 
-def _tg_verdict(records):
+def _tg_verdict(records, merge=_TG_MERGE):
     env = {k: v for k, v in os.environ.items() if k not in ("AI_SESSION_ID", "CLAUDE_SESSION_ID")}
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "transcript-grant-test.jsonl")
         with open(path, "w", encoding="utf-8") as fh:
             for rec in records:
                 fh.write(json.dumps(rec) + "\n")
-        payload = {"tool_name": _TG_MERGE[0], "tool_input": _TG_MERGE[1], "transcript_path": path}
+        payload = {"tool_name": merge[0], "tool_input": merge[1], "transcript_path": path}
         p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                            capture_output=True, text=True, env=env, cwd=tmp)
     if p.returncode != 0:
@@ -2048,6 +2048,52 @@ def _tg_verdict(records):
 print("transcript merge grant:")
 for _desc, _records, _want in _TG_CASES:
     _got = _tg_verdict(_records)
+    check(_got == _want)
+    print(f"  {_got:<6} {_desc}")
+
+
+# A typed merge instruction that names its PRs grants those PRs only
+# (ai-config#5703: "merge PR 113" was refused; #5723: "merge csci201 PRs
+# 28, 24, 25, 26 and 27").
+def _ng_mcp(number, repo="csci201", tool="mcp__github__merge_pull_request"):
+    return (tool, {"owner": "Morrison-Lab", "repo": repo, "pullNumber": number})
+
+
+def _ng_bash(command):
+    return ("Bash", {"command": command})
+
+
+_NG_LIST = [_tg_user("merge csci201 PRs 28, 24, 25, 26 and 27")]
+_NG_CASES = [
+    ("'merge PR 113' grants #113", [_tg_user("merge PR 113")], _ng_mcp(113, "mcsg"), "allow"),
+    ("a repo-less 'merge PR 113' matches #113 in another repo (documented scope)",
+     [_tg_user("merge PR 113")], _ng_mcp(113, "csci201"), "allow"),
+    ("'merge PR 113' does not grant #114", [_tg_user("merge PR 113")], _ng_mcp(114, "mcsg"), "BLOCK"),
+    ("a listed PR is granted", _NG_LIST, _ng_mcp(24), "allow"),
+    ("the last listed PR is granted", _NG_LIST, _ng_mcp(27), "allow"),
+    ("an unlisted PR is not", _NG_LIST, _ng_mcp(29), "BLOCK"),
+    ("a named repo binds the grant", _NG_LIST, _ng_mcp(24, "mcsg"), "BLOCK"),
+    ("'merge mcsg#113' grants it", [_tg_user("merge mcsg#113")], _ng_mcp(113, "mcsg"), "allow"),
+    ("auto-merge is not granted", [_tg_user("merge PR 113")],
+     _ng_mcp(113, "mcsg", "mcp__github__enable_pr_auto_merge"), "BLOCK"),
+    ("a question is not a grant", [_tg_user("should I merge PR 113?")], _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("a negation is not a grant", [_tg_user("don't merge PR 113")], _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("a later revocation clears it", [_tg_user("merge PR 113"), _tg_user("hold off")],
+     _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("assistant text is not a grant", [_tg_assistant("merge PR 113")], _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("a principal wake grants it", [_tg_user(_TG_WAKE.format("merge PR 113"))],
+     _ng_mcp(113, "mcsg"), "allow"),
+    ("a Bash merge of the named PR", [_tg_user("merge PR 113")],
+     _ng_bash("gh pr merge 113 -R Morrison-Lab/mcsg --squash"), "allow"),
+    ("a Bash merge of another PR", [_tg_user("merge PR 113")],
+     _ng_bash("gh pr merge 114 -R Morrison-Lab/mcsg --squash"), "BLOCK"),
+    ("a Bash --auto merge", [_tg_user("merge PR 113")],
+     _ng_bash("gh pr merge 113 -R Morrison-Lab/mcsg --squash --auto"), "BLOCK"),
+    ("a repo-named grant, Bash target unknown", _NG_LIST, _ng_bash("gh pr merge 24 --squash"), "BLOCK"),
+]
+print("named-PR merge grant:")
+for _desc, _records, _merge, _want in _NG_CASES:
+    _got = _tg_verdict(_records, _merge)
     check(_got == _want)
     print(f"  {_got:<6} {_desc}")
 

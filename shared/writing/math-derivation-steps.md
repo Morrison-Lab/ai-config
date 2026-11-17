@@ -105,6 +105,35 @@ of gap a reader skims past --- the same reason
 warns against accepting a plausible reading at face value instead of
 verifying it.
 
+### Reviewing: audit the whole derivation, not only the symbol asked about
+
+When someone asks about one symbol in an equation,
+read the whole result and its proof before you answer.
+For every expectation, variance or probability, check three things:
+
+- what is random and what is fixed;
+- what the operator conditions on, and whether the statement says so;
+- whether each definition that the statement links,
+  such as an expected prediction error or a risk,
+  treats the same quantities as random.
+
+Then check that each step takes only constants out of the operator,
+and that each vanishing cross term cites the independence or zero mean that kills it.
+
+- **Do:** answer the symbol question, and also report any step that takes a random quantity out of an expectation,
+  or any conditioning that the statement leaves unstated.
+- **Don't:** check only the notation of the symbol you were asked about and call the equation fine.
+
+Case: on 2026-11-17 Ezra asked whether a term in an lds error decomposition
+should be $\hat\mu$ rather than $\hat y$
+([lds#2763](https://github.com/Morrison-Lab/lds/issues/2763)).
+The first answer checked only the notation.
+Ezra then pointed to the proof, which takes $(\hat y - \mu(x))^2$ out of an expectation
+that the linked definition averages over training sets, where $\hat y$ is random.
+No hook can catch this,
+because whether a quantity is random under an operator depends on what it means,
+not on a pattern in the text.
+
 ## Keep each equation simple: decompose its internal structure
 
 The rules above govern what happens *between* two displayed lines.

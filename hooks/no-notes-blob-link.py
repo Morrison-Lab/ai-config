@@ -73,16 +73,36 @@ def strings(value, key=None):
             yield from strings(v, key)
 
 
+def gh_flag_values(tokens: list) -> list:
+    """The --body/--title values in one gh command's tokens, in any of its spellings."""
+    values = [t for prev, t in zip([""] + tokens, tokens) if prev in BODY_FLAGS]
+    for t in tokens:
+        if t.startswith("--") and t.split("=", 1)[0] in BODY_FLAGS and "=" in t:
+            values.append(t.split("=", 1)[1])
+        elif t[:2] in BODY_FLAGS and len(t) > 2 and not t.startswith("--"):
+            values.append(t[2:])
+    return values
+
+
 def bash_text(command: str) -> str:
-    """The --body and --title values of a gh issue/pr post; a --body-file is not read."""
+    """The --body and --title values of each gh issue/pr post; a --body-file is not read."""
     if not GH_POST.search(command):
         return ""
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|\n")
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
     try:
-        tokens = shlex.split(command)
+        tokens = list(lexer)
     except ValueError:
         return ""
-    values = [t for prev, t in zip([""] + tokens, tokens) if prev in BODY_FLAGS]
-    values += [t.split("=", 1)[1] for t in tokens if t.split("=", 1)[0] in BODY_FLAGS and "=" in t]
+    values, segment = [], []
+    for token in tokens + [";"]:
+        if token and set(token) <= set(";&|\n"):
+            if segment[:1] == ["gh"] and GH_POST.search(" ".join(segment[:3])):
+                values += gh_flag_values(segment)
+            segment = []
+        else:
+            segment.append(token)
     return "\n".join(values)
 
 

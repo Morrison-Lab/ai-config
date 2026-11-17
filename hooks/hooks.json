@@ -646,6 +646,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unrequested-sweep-pr.py\"",
+            "timeout": 10,
+            "script": "no-unrequested-sweep-pr.py",
+            "why": "ai-config#5773. Ezra, 2026-11-17: \"how did a sweep get started without my authorization?\" after a spelling-check thread opened about 25 unrequested fix PRs, none titled \"sweep\". DENIES a PR creation once 3 PRs were opened since the user's latest message, unless a message the user wrote (not a coordinator note) asks for a sweep. See shared/workflow/no-sweeps-by-default.md. Fails open on a missing transcript."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-with-failing-notes-checks.py\"",
             "timeout": 120,
             "script": "no-push-with-failing-notes-checks.py",
@@ -1373,6 +1380,13 @@
             "timeout": 10,
             "script": "warn-sweep-pr-without-ask.py",
             "why": "The MCP half of the Bash entry (ai-config#4829): a remote session has no `gh`, so mcp__github__create_pull_request with \"sweep\" in the title is how it opens a sweep PR. Same script, same warn-only behaviour."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unrequested-sweep-pr.py\"",
+            "timeout": 10,
+            "script": "no-unrequested-sweep-pr.py",
+            "why": "The MCP half of the Bash entry (ai-config#5773): a remote session opens PRs with mcp__github__create_pull_request. Same script, same deny."
           }
         ]
       },

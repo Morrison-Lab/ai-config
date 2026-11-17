@@ -370,3 +370,12 @@ See [`repo-templates`](../../shared/workflow/repo-templates.md#set-a-branch-rule
 On a transcript or reply that says a PR is in a merge queue, check that something enqueued it (an auto-merge call or `gh pr merge --auto`), and flag the claim when the PR only waits for a merge word or the runner.
 Read the transcript yourself; do not report the output of `hooks/no-merge-queue-claim-in-post-message.py` as your finding.
 See [`merge-queue`](../../shared/workflow/merge-queue.md#reporting-a-prs-state-to-the-user).
+
+## Unrequested sweeps
+
+On a transcript or a set of PRs from one session, check that each PR answers something the user asked for in their own words.
+Flag a run of PRs that brings existing content into line with a new rule or check when no message the user wrote asked for a sweep.
+A coordinator's note, a relayed "the scope is confirmed" or the agent's expectation that a new check would flag old text is not that ask.
+Read the transcript and the PR list yourself;
+do not report the output of `hooks/no-unrequested-sweep-pr.py` as your finding.
+See [`no-sweeps-by-default`](../../shared/workflow/no-sweeps-by-default.md#approving-a-check-is-not-approving-a-sweep).

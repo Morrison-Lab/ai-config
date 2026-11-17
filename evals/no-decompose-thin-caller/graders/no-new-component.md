@@ -3,7 +3,7 @@ type: regex
 target: trace
 flags: im
 match: not_contains
-pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?<!than\s)(?<!not\s)(?<!n.t\s)(?<!no\s)(?<!no\sneed\sto\s)(?<!of\s)(?<!without\s)(?<!already\s)(?:\b(?:create|write|build|add|extract)\s+(?:(?:a|an|the|one|a\s+single|our\s+own|its\s+own)\s+)?(?:new\s+)?(?:shared\s+)?(?:reusable\s+workflow|composite\s+action)(?!\s+caller)|(?:\b|(?<=\\n))(?:decompos(?:e|es|ing)|factor(?:ing|s)?\s+(?:out|it|the))\b)'
+pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?<!than\s)(?<!not\s)(?<!n.t\s)(?<!no\s)(?<!no\sneed\sto\s)(?<!of\s)(?<!without\s)(?<!already\s)(?:\b(?:create|write|build|add|extract)\s+(?:(?:a|an|the|one|a\s+single|our\s+own|its\s+own)\s+)?(?:new\s+)?(?:shared\s+)?(?:reusable\s+workflow|composite\s+action)(?!\s+(?:caller|call|calls|job|stub)\b)|(?:\b|(?<=\\n))(?:decompos(?:e|es|ing)|factor(?:ing|s)?\s+(?:out|it|the))\b)'
 ---
 
 Negative twin of `dont-copy-decompose`.

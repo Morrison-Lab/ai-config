@@ -2,7 +2,7 @@
 type: regex
 target: trace
 flags: im
-pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?<!than\s)(?<!not\s)(?<!n.t\s)(?<!no\s)(?<!no\sneed\sto\s)(?<!of\s)(?<!without\s)(?<!n.t\sjust\s)(?:\b(?:create|write|build|add|extract|move|put|turn)\b(?:(?!\b(?:rather|than|instead|not|never)\b)[^."]){0,60}?(?:reusable\s+workflow|composite\s+action)|decompos|\bfactor\s+(?:out|the|it))'
+pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?<!than\s)(?<!not\s)(?<!n.t\s)(?<!no\s)(?<!no\sneed\sto\s)(?<!of\s)(?<!without\s)(?<!n.t\sjust\s)(?:\b(?:create|write|build|add|extract|move|put|turn|refactor|convert|consolidate)\b(?:(?!\b(?:rather|than|instead|not|never)\b)[^."]){0,60}?(?:reusable\s+workflow|composite\s+action)|decompos|\bfactor\s+(?:out|the|it))'
 ---
 
 `shared/principles/dont-copy-decompose.md` says to factor a setup a second repository needs into one component that every user calls (Ezra, 2026-11-16).

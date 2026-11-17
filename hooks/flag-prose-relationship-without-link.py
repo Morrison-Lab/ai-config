@@ -8,6 +8,8 @@ with such a body and makes no relationship call at or after it, block the stop
 once so the agent records it (parent/sub-issue, blocked-by/blocking).
 
 Code spans and fences are ignored, so a body that quotes the phrase is fine.
+A PR body may say "Part of #N" (or child of, sub-issue of, parent): no relationship
+call exists for a PR, so only issue bodies and the blocked/stacked cues are flagged.
 Fails open on any error.
 """
 from __future__ import annotations
@@ -37,15 +39,31 @@ CUE = re.compile(
     re.I,
 )
 CODE = re.compile(r"```.*?```|`[^`\n]*`", re.S)
+# Cues that need a parent/child link. A PR cannot be a sub-issue (REST 422), and a
+# `Closes` keyword would close a multi-PR issue early, so "Part of #N" in a PR body
+# is a sidebar link GitHub already shows and has no relationship call to write.
+PARENT_CUE = re.compile(r"^(?:sub-?issue\s+of|child\s+of|part\s+of|parent)", re.I)
+PR_TOOL = re.compile(r"create_pull_request|update_pull_request")
+PR_CMD = re.compile(r"\bgh\s+pr\s+(?:create|edit)\b")
 
 
-def body_of(name: str, inp: dict) -> str | None:
-    """The body text of an issue/PR write call, else None."""
+def body_of(name: str, inp: dict) -> tuple[str, bool] | None:
+    """(body text, whether it belongs to a PR) of an issue/PR write call, else None."""
     if WRITE_TOOL.search(name or ""):
-        return str(inp.get("body") or "")
+        return str(inp.get("body") or ""), bool(PR_TOOL.search(name or ""))
     cmd = str(inp.get("command") or "")
     if WRITE_CMD.search(cmd):
-        return cmd
+        return cmd, bool(PR_CMD.search(cmd))
+    return None
+
+
+def first_cue(body: str, is_pr: bool) -> str | None:
+    """The first cue phrase in body that has a relationship call to write."""
+    for hit in CUE.finditer(CODE.sub("", body)):
+        phrase = hit.group(0).strip()
+        if is_pr and PARENT_CUE.match(phrase):
+            continue
+        return phrase
     return None
 
 
@@ -73,11 +91,9 @@ def scan(path: str):
                 if LINK.search(blob):
                     pending = None
                     continue
-                body = body_of(b.get("name") or "", inp)
-                if body is not None and pending is None:
-                    hit = CUE.search(CODE.sub("", body))
-                    if hit:
-                        pending = hit.group(0).strip()
+                written = body_of(b.get("name") or "", inp)
+                if written is not None and pending is None:
+                    pending = first_cue(*written)
     return pending
 
 
@@ -94,7 +110,8 @@ def main() -> int:
         f"An issue or PR body this turn says \"{phrase}\" in prose, and no relationship call followed. "
         "Record it in GitHub's relationships field (REST, not GraphQL): sub-issue via `sub_issue_write` "
         "or `POST .../issues/<parent>/sub_issues`, blocked-by via `gh issue edit --add-blocked-by` or "
-        "`POST .../issues/<n>/dependencies/blocked_by`; a PR closing an issue needs a `Closes #N` keyword. "
+        "`POST .../issues/<n>/dependencies/blocked_by`; a PR closing an issue needs a `Closes #N` keyword "
+        "(\"Part of #N\" in a PR body needs no call). "
         "See shared/workflow/github-relationships.md.",
         "flag-prose-relationship-without-link",
     ))

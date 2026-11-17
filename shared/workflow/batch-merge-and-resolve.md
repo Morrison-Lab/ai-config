@@ -615,7 +615,7 @@ and owns it:
 > when a defect can be introduced by **deleting** a line, any instrument keyed
 > on added lines is unsound.
 
-Quoted rather than pointed at because the count-delta instrument below is
+Quoted rather than pointed at because the splice-delta instrument below is
 unreadable without it.
 
 The working instrument is a **splice delta**: a merge must not add a spliced bullet that neither side had.
@@ -628,9 +628,10 @@ f=path/to/file.md
 side() { if [ -n "$(git ls-tree --name-only "$1" -- "$f")" ]; then git show "$1:$f" | pairs /dev/stdin; fi; }
 pre="$(git rev-parse HEAD)"
 git merge origin/main
-[ -f "$f" ] || echo "no such file: $f" >&2
-new="$(LC_ALL=C comm -23 <(pairs "$f") <(cat <(side "$pre") <(side origin/main) | LC_ALL=C sort -u))"
-[ -z "$new" ] || printf 'merge introduced splice(s):\n%s\n' "$new"
+if [ ! -f "$f" ]; then echo "CHECK NOT RUN: no such file: $f" >&2; else
+  new="$(LC_ALL=C comm -23 <(pairs "$f") <(cat <(side "$pre") <(side origin/main) | LC_ALL=C sort -u))"
+  [ -z "$new" ] || printf 'merge introduced splice(s):\n%s\n' "$new"
+fi
 ```
 
 Each splice is recorded as the pair of lines it joins, and the merge is charged only with pairs that appear on neither side.
@@ -640,7 +641,8 @@ Comparing sets of pairs rather than counts is what keeps deletions from hiding a
 Any count baseline, such as `max(ours, theirs, ours + theirs - base)`, is loosened by every item either side deletes, and a splice of that size then passes unseen.
 `side` prints nothing for a side the file is absent from, so a file new on one side is compared against the other side alone, while a bad ref still prints `git ls-tree`'s error instead of passing silently as an empty side.
 Reading the sides from `pre` and `origin/main` rather than from `HEAD^1` and `HEAD^2` makes the check work the same way on a merge commit, a fast-forward, and a `--squash`, since the merged side is read from the working tree.
-On a merge stopped on a conflict, run the last two lines again after resolving, because only then does the working tree hold the final merged file.
+A mistyped path prints `CHECK NOT RUN` and nothing else, so silence means clean only when that line is absent too.
+On a merge stopped on a conflict, run the final `if` block again after resolving, because only then does the working tree hold the final merged file.
 The check's one blind spot is a splice whose two lines already form a splice on one side, such as a resolution that duplicates a tight pair.
 
 The delta form matters because the **absolute** count is unusable here.
@@ -693,7 +695,7 @@ Here there is nothing in the tree to find.
 The evidence that anything is wrong is an absence, and the only artifact
 carrying it is the merge itself.
 
-The count-delta instrument above transfers unchanged, with the assertion count
+The delta idea behind the splice check above transfers, with the assertion count
 as the quantity: **a merge must not run fewer cases than either parent did.**
 Check out each of the three commits into a throwaway worktree and run the suite
 there, so the suite and the hook it drives always come from the same commit:

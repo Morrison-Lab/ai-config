@@ -1160,3 +1160,8 @@ It has two concrete consequences worth keeping straight:
   - **Don't:** reach for an empty commit or a close-and-reopen to kick CI, and don't read "all required contexts green" without confirming each one actually reported on the current head.
   ([Morrison-Lab/qbt#80](https://github.com/Morrison-Lab/qbt/pull/80), 2026-09-27: `check-spelling.yaml` and `check-non-standard-chars.yml` both declare `branches: [main]`.
   While the PR was stacked neither reported, and the base-sync merge push took `check / check-chars` from *not reported* to green.)
+
+- **In a cloud session, `gh api --paginate` fails on page 2 of the check-runs endpoint.**
+  GitHub's `Link` header points page 2 at `repositories/<id>/...`, and the agent proxy refuses numeric-ID repository paths with 403 (2026-11-14, gha main after [Morrison-Lab/gha#2004](https://github.com/Morrison-Lab/gha/pull/2004)).
+  **Do:** page by hand, `repos/<owner>/<repo>/commits/<sha>/check-runs?per_page=100&page=N`, until a page returns fewer than 100 runs.
+  **Don't:** read a `--paginate` total as complete when its output also carries the 403 message.

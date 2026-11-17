@@ -103,6 +103,12 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   See [`course-sequence`](course-sequence.md).
 - **Do not answer graded work in student-facing notes.**
   Check the grading repository before writing a solution, and use a different example when an exercise is graded.
+- **Never name a private repository or its paths on a student-facing page, not even in an HTML comment.**
+  Pandoc copies an HTML comment into the rendered HTML, so the published page source carries it.
+  Keep such a note in an unrendered file beside the page's subfiles, such as a `README.md`.
+  Measured on Morrison-Lab/mcs#168 (2026-11-13): a comment that named the grading repository and the quiz's path shipped on the public page, fixed in Morrison-Lab/mcs#169.
+  - **Do:** write "the graded week-1 quiz" in the comment, or move the note to an unrendered README.
+  - **Don't:** write the private repository's `owner/name` or file path in a `<!-- -->` comment on a page.
 
 ## Prose
 

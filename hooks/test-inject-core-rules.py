@@ -26,7 +26,11 @@ contract:
      since Cursor reads that AGENTS.md itself; elsewhere it still injects.
  10. This repository's real AGENTS.md under a long plugin-cache path stays
      within Claude Code's 10,000-character cap, so all of it reaches the
-     model rather than a 2,000-character preview.
+     model rather than a 2,000-character preview, and its index lists a
+     composed section's rule names as bullet leads.
+ 11. On a made-up AGENTS.md, the index lists each top-level bold bullet lead
+     under its heading, and leaves out a bullet before the first heading,
+     Do/Don't bullets (straight or curly apostrophe), and nested bullets.
 """
 import json
 import os
@@ -150,5 +154,20 @@ with tempfile.TemporaryDirectory() as tmp:
     ctx = context(run(deep, consumer))
     assert len(ctx) < 10_000, len(ctx)
     assert "section index omitted" not in ctx, "index no longer fits the cap"
+    # Composed sections keep each rule's name in the index as a bullet lead.
+    assert "  - Put PRs in ready mode when they are ready for review\n" in ctx, ctx
+    assert "  - Do\n" not in ctx and "  - Don't\n" not in ctx, ctx
 
-print("ok: inject-core-rules.py, 10 cases")
+    # 11. Index leads: a bullet before the first heading and Do/Don't
+    #     bullets stay out; a lead that only starts with "Don't" stays in.
+    curly = "Don" + chr(0x2019) + "t:"
+    leads = make_root(tmp / "leads", agents=(
+        "# AGENTS.md\n\n- **Preamble bullet** text\n\n"
+        "## Composed\n\n- **Rule A:** text\n- **Do:** x\n- **Don't:** y\n"
+        f"- **{curly}** z\n- **Don't call X** w\n  - **Nested** v\n"))
+    ctx = context(run(leads, consumer))
+    assert "- Composed\n  - Rule A\n  - Don't call X\n" in ctx, ctx
+    for absent in ("Preamble", "Nested", "  - Do\n", "  - Don't\n", curly):
+        assert absent not in ctx, (absent, ctx)
+
+print("ok: inject-core-rules.py, 11 cases")

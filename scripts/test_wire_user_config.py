@@ -102,7 +102,8 @@ class WireUserConfig(unittest.TestCase):
         self.write_settings(original)
         _, out = self.run_main()
         self.assertTrue(line(out, "Claude Code").split()[2] == "ok", out)
-        self.assertEqual(self.settings(), original)
+        self.assertEqual(self.settings()["enabledPlugins"], original["enabledPlugins"])
+        self.assertNotIn("extraKnownMarketplaces", self.settings())
 
     def test_other_marketplace_copy_counts_as_enabled(self):
         self.write_settings({"enabledPlugins": {"ai-config@ai-config": True}})
@@ -148,7 +149,80 @@ class WireUserConfig(unittest.TestCase):
         (self.home / ".claude/plugins/synced/org_x/ai-config").mkdir(parents=True)
         _, out = self.run_main()
         self.assertIn("account plugin sync", line(out, "Claude Code"))
+        self.assertNotIn("enabledPlugins", self.settings())
+
+    def test_run_cancel_is_allowed_and_idempotent(self):
+        self.run_main()
+        s = self.settings()
+        self.assertEqual(s["permissions"]["allow"], [wire.CANCEL_PERMISSION])
+        self.assertEqual(s["autoMode"]["allow"],
+                         ["$defaults", wire.CANCEL_AUTO_MODE_RULE,
+                          wire.BRANCH_PUSH_AUTO_MODE_RULE])
+        _, out = self.run_main("--check")
+        self.assertIn("ok    ", line(out, "Run cancel"))
+        self.assertIn("ok    ", line(out, "Branch push"))
+        self.run_main()
+        self.assertEqual(self.settings(), s)
+
+    def test_run_cancel_keeps_existing_rules(self):
+        self.write_settings({"permissions": {"allow": ["Bash(ls)"]},
+                             "autoMode": {"allow": ["mine"],
+                                          "environment": ["env"]}})
+        self.run_main()
+        s = self.settings()
+        self.assertEqual(s["permissions"]["allow"], ["Bash(ls)", wire.CANCEL_PERMISSION])
+        # An array without "$defaults" is the user's choice; it gains no "$defaults".
+        self.assertEqual(s["autoMode"]["allow"], ["mine", wire.CANCEL_AUTO_MODE_RULE,
+                                                  wire.BRANCH_PUSH_AUTO_MODE_RULE])
+        self.assertEqual(s["autoMode"]["environment"], ["env"])
+
+    def test_branch_push_check_reports_todo_and_writes_nothing(self):
+        self.write_settings({"autoMode": {"allow": ["$defaults"]}})
+        _, out = self.run_main("--check")
+        self.assertIn("todo  ", line(out, "Branch push"))
+        self.assertEqual(self.settings()["autoMode"]["allow"], ["$defaults"])
+
+    def test_branch_push_rule_excludes_force_default_branch_and_large_prs(self):
+        rule = wire.BRANCH_PUSH_AUTO_MODE_RULE
+        self.assertIn("`claude/`", rule)
+        self.assertIn("every destination ref starts with `claude/`", rule)
+        for excluded in ("--force", "--force-with-lease", "`main`", "`gh-pages`",
+                         "`--all`", "`--mirror`", "`--prune`", "`--delete`",
+                         "empty-source refspec", "deleting branches",
+                         "pushing tags", "ALLOW_LARGE_PR=1"):
+            self.assertIn(excluded, rule.split("does not cover", 1)[1])
+
+    def test_branch_push_is_left_to_managed_settings_in_a_remote_container(self):
+        os.environ["CLAUDE_CODE_REMOTE"] = "true"
+        try:
+            _, out = self.run_main()
+        finally:
+            del os.environ["CLAUDE_CODE_REMOTE"]
+        self.assertIn("ok    remote container", line(out, "Branch push"))
         self.assertFalse((self.home / ".claude/settings.json").exists())
+
+    def test_branch_push_non_object_automode_is_reported(self):
+        self.write_settings({"autoMode": ["x"]})
+        _, out = self.run_main()
+        self.assertIn("`autoMode` is not a JSON object", line(out, "Branch push"))
+        self.assertEqual(self.settings()["autoMode"], ["x"])
+
+    def test_branch_push_malformed_allow_is_reported(self):
+        self.write_settings({"autoMode": {"allow": "x"}})
+        _, out = self.run_main()
+        self.assertIn("is not a JSON array", line(out, "Branch push"))
+        self.assertEqual(self.settings()["autoMode"], {"allow": "x"})
+
+    def test_run_cancel_rule_covers_cancelling_only(self):
+        rule = wire.CANCEL_AUTO_MODE_RULE
+        self.assertIn("cancel", rule)
+        self.assertIn("re-running, deleting runs or logs, and dispatching", rule)
+
+    def test_run_cancel_malformed_allow_is_reported(self):
+        self.write_settings({"autoMode": {"allow": "x"}})
+        _, out = self.run_main()
+        self.assertIn("is not a JSON array", line(out, "Run cancel"))
+        self.assertEqual(self.settings()["autoMode"], {"allow": "x"})
 
     def test_non_plugin_hook_install_blocks_double_registration(self):
         self.write_settings({"hooks": {"UserPromptSubmit": [{"hooks": [

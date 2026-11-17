@@ -1,6 +1,40 @@
 Don't wait for `/clear` or the end of a task to run `ums` (Update Memories and Skills).
 As soon as a learning worth saving shows up during a session --- a corrected mistake, a new preference, a tool quirk, a workflow gap --- run UMS right then, interleaved with the main work, rather than batching it for a wrap-up step at the end.
 
+**Noticing or admitting a mistake triggers the pass at once, without waiting for the user to correct it.**
+The moment I notice, or say, that I got something wrong ("that one's on me"), the pass runs in that same turn, before sending the reply that admits it.
+(Ezra, 2026-11-12, Machine Learning course project: the coordinator admitted that it had missed threads while moving every thread to another model, and ran no pass;
+Ezra: "you should have run UMS as soon as you realized this".)
+
+In a Claude project the admission goes out through a reply tool (`post_message`), not as assistant text,
+and the admission hooks read only assistant text until 2026-11-12, so nothing fired when that rule was broken the same day.
+They now read reply-tool text, and `hooks/remind-ums-after-error.py` also blocks the turn's end once when no pass ran in that turn, so the pass happens before the turn ends rather than after the user asks.
+
+- **Do:** run the pass in the turn that notices the mistake, and say in the reply what it recorded.
+- **Don't:** admit the mistake in a reply and leave the pass for the user to ask for.
+
+**A tool call that returns an error triggers the pass too.**
+A malformed command, a wrong flag, a refused form or a rejected query is fixed by the retry and then forgotten, so the next session writes it wrong again.
+Once the revised call works, record what caused the error and the form that works.
+(Ezra, 2026-11-13, [ai-config#5630](https://github.com/Morrison-Lab/ai-config/issues/5630): "any time you format a command incorrectly and need to revise it, run ums?", then "in other words, any time a command produces an error?".)
+`hooks/remind-ums-on-trigger-events.py` injects the reminder on the call after any error result, once per error, and counts every error in a batch of parallel calls.
+Expected results that are not mistakes (a grep with no match, a false `test`, a `diff` that finds differences) are exempt through its `EXPECTED_ERRORS` list, which it matches against the command's last stage, so `cd r && grep x f` is exempt too.
+A call marked with an `EXPECT_FAIL=1` prefix or a trailing `# expect-fail` comment is exempt, and so is a call the user declined.
+
+- **Do:** after a failed call, retry it, then record the cause and the working form.
+- **Don't:** treat a retry that works as the end of the matter.
+
+**A failed CI check triggers the pass too.**
+The goal is that every CI workflow passes, or skips where appropriate, on the first push.
+So when a check fails, record why the first push missed it and what local check would have caught it.
+Ezra wrote the goal in [ai-config#1100](https://github.com/Morrison-Lab/ai-config/issues/1100): "our goal is that all CI workflows pass (or skip, if appropriate) on the first push;
+no failures".
+The same hook injects the reminder on the call after a result whose JSON shows a check run, job or workflow run whose newest run of that name ended `failure`, `timed_out` or `startup_failure`.
+It fires once per set of failed check names.
+
+- **Do:** when a check fails, find its cause, then record what local check would have caught it before the push.
+- **Don't:** fix the failure and push again with no note of why the first push missed it.
+
 Still run UMS before `/clear` too, as a final catch-all for anything accumulated since the last proactive pass --- but treat that as a backstop, not the trigger to wait for.
 
 **In a multi-PR/multi-issue session (GII-style), treat each PR merge as a concrete proactive-UMS checkpoint, not just "whenever a learning happens to surface."**
@@ -281,7 +315,7 @@ See [`run-ums-proactively.cases.md`](run-ums-proactively.cases.md), "Stale recor
 
 Resolving a project thread removes its message box, so a learning not banked before the call has no later turn in which to be banked.
 The same holds when a thread reports its work done.
-"Run UMS before every pause" already covers this, but nothing ran it: the `post-merge` and `wrap-up` skills include a UMS pass, and no event invoked them.
+`AGENTS.md`'s "Leave every pause honest and resumable" ("Run UMS before every pause") already covers this, but nothing ran it: the `post-merge` and `wrap-up` skills include a UMS pass, and no event invoked them.
 
 Two mechanisms now do, both in `hooks/require-ums-before-resolve.py` (ai-config#4480):
 
@@ -321,7 +355,7 @@ Each is recorded in its global home, and also in project memory where the sessio
    a revert made through the GitHub UI or by moving files by hand stays a rule.
 6. **The context is compacted, or the session ends.**
    After compaction the hook reminds the session to run the pass over what the summary still shows.
-   A session that ends has no later turn, so the pass belongs before the last reply, per "Run UMS before every pause".
+   A session that ends has no later turn, so the pass belongs before the last reply, per `AGENTS.md`'s "Leave every pause honest and resumable" ("Run UMS before every pause").
 
 - **Do:** treat each of these as the moment to run `ums`, in the turn it happens.
 - **Don't:** wait for a review or a merge to bank a learning that already has a name.

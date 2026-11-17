@@ -382,7 +382,7 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "_posted by codex (ai agent)": "Codex",
     "_posted by opencode (ai agent)": "OpenCode",
     # Deliberately NOT here: the Claude Code disclosure footer
-    # (`_Posted by Claude Code (AI agent) ...`).  CLAUDE.md's
+    # (`_Posted by Claude Code (AI agent) ...`).  AGENTS.md's
     # "Every comment you post to a forge says an agent posted it" mandates that
     # footer on EVERY agent-posted comment -- claims, status updates, replies,
     # and the in-chat-feedback paraphrases -- not on reviews only.  Admitting it
@@ -1012,12 +1012,13 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
             # A passing conclusion hides warning and notice annotations
             # (ai-config#4892). Reading them is part of "clean": fix each, or
             # say in the PR why it is a false positive, then pass the run id
-            # to --annotations-read.
+            # to --annotations-read. The PR comment is enforced below
+            # (ai-config#4893).
             issues.append(
                 f"Check run '{name}'{where} passed but carries "
                 f"{cr['annotations_count']} annotation(s) not yet read: run "
                 f"`gh api repos/{repo}/check-runs/{cr.get('id')}/annotations` "
-                "(for many runs, scripts/summarize-pr-annotations.sh), "
+                f"(for many runs, `{BATCH_READ_CMD.format(repo=repo, sha=sha)}`), "
                 "fix each or report it as a false positive in the PR, then "
                 f"rerun with `--annotations-read {cr.get('id')}`")
         elif conclusion not in ("success", "neutral", "skipped"):
@@ -1040,7 +1041,82 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")
 
+    unread = sum("annotation(s) not yet read" in i for i in issues)
+    if unread > UNREAD_RUNS_BUDGET_THRESHOLD:
+        issues.append(_core_budget_note(unread, repo, sha))
+    marked_read = [
+        cr for cr in check_runs
+        if cr.get("status") == "completed"
+        and cr.get("conclusion") in ("success", "neutral", "skipped")
+        and cr.get("annotations_count")
+        and ("all" in _ANNOTATIONS_READ or cr.get("id") in _ANNOTATIONS_READ)]
+    if marked_read and not _has_disposition_comment(pr):
+        issues.append(_missing_disposition_issue(len(marked_read), sha))
     return all(i.startswith("NOTE: ") for i in issues), issues
+
+
+# The marker a disposition comment opens with (ai-config#4893).
+DISPOSITION_MARKER = "Annotation dispositions for head"
+
+
+def _has_disposition_comment(pr) -> bool:
+    """True when a PR comment records the head's annotation dispositions.
+
+    `--annotations-read` alone is the agent's word that it read the
+    annotations; nothing showed what it concluded. On Morrison-Lab/mds#770 a
+    `check-restated-results` warning was judged a false positive and merged
+    with the reason written nowhere (ai-config#4893). The comment must name
+    this head (its first 7 characters) after the marker, and must be newer
+    than the head commit, so a disposition of an earlier head never counts.
+    """
+    sha7 = (pr.head_sha or "")[:7].lower()
+    head_date = pr.commit_date or ""
+    # Fail closed: without the head's date, no comment can be shown newer.
+    if not sha7 or not head_date:
+        return False
+    opening = f"{DISPOSITION_MARKER} {sha7}"
+    for comment in pr.get_comments():
+        # The comment must BEGIN with the marker and this head: a quote of it
+        # inside some other comment (a review, this checker's own message) is
+        # no record. Leading blank lines are allowed.
+        body = (comment.body or "").lstrip()
+        if not body.lower().startswith(opening.lower()):
+            continue
+        # ISO 8601 UTC timestamps from one API compare correctly as strings;
+        # "newer" is strict, so a comment stamped with the head's own second
+        # does not count.
+        if (comment.created_at or "") <= head_date:
+            continue
+        return True
+    return False
+
+
+def _missing_disposition_issue(count: int, sha: str) -> str:
+    return (
+        f"{count} passing run(s) with annotations were marked read by "
+        "--annotations-read, but no PR comment newer than the head commit "
+        "records what was done about them: post a comment beginning "
+        f"`{DISPOSITION_MARKER} {sha[:7]}:` that names each warning or "
+        "failure annotation as fixed or as a false positive, with the reason, "
+        "and may group routine notices, then rerun (ai-config#4893)")
+
+
+# Above this many unread annotation runs, name the shared core budget (ai-config#5045).
+UNREAD_RUNS_BUDGET_THRESHOLD = 5
+BATCH_READ_CMD = "scripts/batch-read-annotations.py --repo {repo} --sha {sha}"
+
+
+def _core_budget_note(unread: int, repo: str, sha: str) -> str:
+    """A NOTE with the core budget from GET /rate_limit (free); a failed read is stated."""
+    try:
+        core = json.loads(fetch(["gh", "api", "rate_limit"]))["resources"]["core"]
+        reset = datetime.fromtimestamp(core["reset"], tz=timezone.utc)
+        budget = f"has {core['remaining']} request(s) left until {reset.strftime('%H:%M UTC')}"
+    except (RuntimeError, PayloadError, ValueError, KeyError, TypeError) as exc:
+        budget = f"could not be read ({type(exc).__name__}: {exc})"
+    return (f"NOTE: {unread} run(s) carry unread annotations, and the GitHub core budget every "
+            f"agent shares {budget}; read them with `{BATCH_READ_CMD.format(repo=repo, sha=sha)}`, "
+            "not one call per run (ai-config#5045)")
 
 
 WORKFLOW_DIR = ".github/workflows/"
@@ -1209,8 +1285,9 @@ def check_required_checks(pr) -> Tuple[bool, List[str]]:
 
 
 def check_maintainer_feedback(pr) -> Tuple[bool, List[str]]:
-    """Fail when a maintainer comment, review or inline comment is newer than
-    the head commit: the merge hook denies the same state (ai-config#4611)."""
+    """Fail when a maintainer comment, review or inline comment has no later
+    agent reply: the merge hook denies the same state (ai-config#4611,
+    ai-config#5577)."""
     pr_data = dict(getattr(pr, "_data", {}) or {})
     inline_note = ""
     try:
@@ -1221,9 +1298,9 @@ def check_maintainer_feedback(pr) -> Tuple[bool, List[str]]:
         inline_note = " (inline comments not in the payload, so not checked)"
     unread = unread_maintainer_feedback(pr_data)
     if not unread:
-        print(f"✓ No maintainer feedback is newer than the head commit{inline_note}.")
+        print(f"✓ No maintainer feedback is unanswered by an agent reply{inline_note}.")
         return True, []
-    return False, [f"Maintainer feedback newer than the last push: {item}" for item in unread]
+    return False, [f"Maintainer feedback no agent reply has answered: {item}" for item in unread]
 
 
 def check_review_threads(pr) -> Tuple[bool, List[str]]:
@@ -2505,8 +2582,8 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 #
 # Known residuals: a finding stated with no contrast ("None. The lexer is
 # broken.") and a contrast in the next paragraph ("None.\n\nBut X leaks."),
-# tracked in ai-config#5389; and a contrast more than 60 characters after the
-# negation, which callers cut off (ai-config#5401).
+# tracked in ai-config#5389; and a contrast more than NEGATION_SUFFIX_CAP
+# characters after the negation, which _negation_suffix() cuts off.
 _BLOCK_START = r"[ \t]*(?:#|>|[-*+][ \t]|\d+[.)][ \t])"
 _SENTENCE_CHAR = (
     r"(?:(?!(?<!\b[A-Za-z])(?<!\b(?:vs|cf|al))(?<!\b[Ff]ig)[.!?](?:\s|$))"
@@ -2599,6 +2676,29 @@ FINDING_HEADING_NEGATION_SUFFIX = re.compile(
     + r")",
     re.IGNORECASE,
 )
+
+# How far past a negation the suffix regexes may read (ai-config#5401). A
+# fixed 60-character slice cut "None in the parser module, the lexer module
+# or any of their many unit tests, but the lexer leaks." before its "but";
+# the paragraph is the natural bound, and the cap keeps a paragraph of many
+# negated headings linear.
+NEGATION_SUFFIX_CAP = 2000
+_PARAGRAPH_BREAK = re.compile(r"\r?\n[ \t]*\r?\n")
+_SUFFIX_LEAD = re.compile(r"[\s*_:.\-]*")
+
+
+def _negation_suffix(text: str, start: int) -> str:
+    """Return text[start:] cut at the end of the paragraph that follows.
+
+    Leading whitespace and markup are skipped first, so a heading separated
+    from its "None." by a blank line keeps that line. The cut is at the next
+    paragraph break, or NEGATION_SUFFIX_CAP characters on, whichever is first.
+    """
+    body_start = _SUFFIX_LEAD.match(text, start).end()
+    limit = body_start + NEGATION_SUFFIX_CAP
+    brk = _PARAGRAPH_BREAK.search(text, body_start, limit)
+    end = brk.start() if brk else min(len(text), limit)
+    return text[start:end]
 
 # Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:
 # it would let an incidental "looks ready" in a later chatty comment discharge a
@@ -3486,7 +3586,7 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
                 if _is_exempt_findings_heading(scan, match.start(), match.end()):
                     continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
-                suffix = scan[match.end():match.end() + 60]
+                suffix = _negation_suffix(scan, match.end())
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
             return "not-clean"
@@ -3575,10 +3675,14 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
 
 _FINDINGS_TRAILER_SUFFIX = re.compile(
     r"^\s*(?:"
-    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
-    r"[:.\-(]*\s*(?:non-blocking\b|nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    r"(?:[*_:.\-]+\s*)?"
+    + _SAFE_NEGATION
+    + r"|"
+    r"(?:[:.\-(]+\s*)?(?:non-blocking\b"
+    + _CONTRAST_GUARD
+    + r"|"
+    + _RISKY_NEGATION
+    + r"))",
     re.IGNORECASE,
 )
 
@@ -3594,7 +3698,10 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     of body. The FIRST non-empty line must match the
     _FINDINGS_TRAILER_SUFFIX allowlist -- the same trigger the old 60-char
     suffix shortcut keyed on, made line-anchored -- and everything after it
-    must clear the item veto.
+    must clear the item veto. The allowlist match is tried on that line
+    joined to the rest of its paragraph (cut by _negation_suffix()), so the
+    #2359 contrast guard sees a hard-wrapped contrast in the line's own
+    sentence or opening the next one.
 
     A resolving line reached only AFTER other content (verification prose,
     alert blocks, items) never exempts: an untagged prose finding is
@@ -3604,8 +3711,8 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     mirror direction shares the residual: untagged PLAIN PROSE after a
     resolving first line is also indistinguishable and is not vetoed --
     including finding prose packed onto the SAME physical line as the
-    resolving word, whether in the body or in a heading trailer -- the
-    same exposure the 60-char shortcut always had.
+    resolving word, whether in the body or in a heading trailer, unless
+    it carries a #2359 contrast (ai-config#5389 tracks the rest).
 
     No wider than the shortcut except one vetted way, still gated by the
     item veto: no 60-char cap on where the resolving line starts. The
@@ -3640,7 +3747,16 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = lead + [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    if not _FINDINGS_TRAILER_SUFFIX.search(lines[0]):
+    # The first line is tested together with the rest of its paragraph, so
+    # the #2359 contrast guard sees a hard-wrapped "No issues\nHowever, X".
+    if lead:
+        after_first = section
+    else:
+        raw_lines = section.splitlines(keepends=True)
+        first = next(i for i, ln in enumerate(raw_lines) if ln.strip())
+        after_first = "".join(raw_lines[first + 1:])
+    probe = _negation_suffix(lines[0] + "\n" + after_first, 0)
+    if not _FINDINGS_TRAILER_SUFFIX.search(probe):
         return False
     return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
 
@@ -3727,7 +3843,7 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
             if pat == _FINDINGS_HEADING_PATTERN:
-                # The section-resolution check REPLACES the 60-char suffix
+                # The section-resolution check REPLACES the negation-suffix
                 # shortcut for this heading: the shortcut read "No new
                 # issues." directly under the heading as resolving the whole
                 # section, even when finding items followed it (ai-config
@@ -3741,7 +3857,7 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             elif pat in FINDING_HEADING_PATTERNS:
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
-                suffix = scan_body[match.end():match.end() + 60]
+                suffix = _negation_suffix(scan_body, match.end())
                 if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                     if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                         continue

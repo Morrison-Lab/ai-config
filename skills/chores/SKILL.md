@@ -220,9 +220,10 @@ On a base that requires a merge queue, stop and report the bump as blocked: the 
 Otherwise run the base-currency check from [`fully-clean`](../../shared/workflow/fully-clean.md)'s stale-base rule (the Do bullets beginning "for a direct merge"), since a green head can still break the base when the base gained a check after the head's CI ran.
 That check's one-liner prints the tested base tip.
 Record the printed literal as `TIP` the same way.
-Immediately before the merge command, require the live head to equal `$PINNED`, the live base name to equal `$BASE`, the live title to equal `$TITLE`, and the live base tip to equal `$TIP`, and restart from the currency check if the tip moved or from step 2 if anything else did.
+Immediately before the merge command, require the live head to equal `$PINNED`, the live base name to equal `$BASE`, the live title to equal `$TITLE`, and the live base tip to equal `$TIP`, and if the tip moved, rerun `check-pr-fully-clean.py` and re-read GitHub's mergeable state (the moved base can add a gate or a conflict), or restart from step 2 if anything else did.
 A regenerated head that already contains the base would otherwise pass a currency check with CI never read for it.
-When that check finds the base stale, the bot-bump recovery is to update the branch pinned to `$PINNED`,
+A base that moved only by content is merged as it stands ([#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)).
+When the checker's base-drift check fails, or GitHub reports the PR `dirty` or `behind`, the bot-bump recovery is to update the branch pinned to `$PINNED`,
 wait until `headRefOid` differs from `$PINNED`, with a deadline of a few minutes (expiry is a failed update: stop and report it rather than restarting),
 and then start again from the top of step 2: re-record `$PINNED` and `$BASE`, re-classify the bump, and rerun the CI and conflict checks against the new pin (review stays skipped on bot PRs).
 The first different SHA is not necessarily the update's result, since Dependabot or another writer can replace the head in the same window, so re-classification is what keeps the merge pinned to a head this skill has actually judged.

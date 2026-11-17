@@ -79,7 +79,11 @@ verdict -- a review that covered several tips in one pass. Every line found
 after the verdict counts, and a push is covered when what it ships matches
 ANY of them, not only the first (ai-config#3945). Each is still resolved and
 compared exactly as a single fingerprint always was; widening the count
-widens nothing about how strict one comparison is.
+widens nothing about how strict one comparison is here. With two or more
+verdicts, the per-commit map in `_verdict_map_covers` (ai-config#4006) decides
+first, except after a trailing unparsed report or for a subagent's parent
+fallback (ai-config#5498); the map skips a clean report with an unresolvable
+fingerprint the latest-verdict check refuses, so an earlier clean verdict counts.
 
 CONSEQUENCES FOR HOW THE REVIEWER IS DISPATCHED
 ------------------------------------------------
@@ -620,7 +624,7 @@ DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 # lives in it: a push under this entry could weaken a guard with no LOCAL
 # self-review at all. What still stands between such a push and `main` is
 # the ordinary GitHub-side gate: a feature-branch push is a pull request,
-# and this repo's own CLAUDE.md scopes its standing `mwc` merge grant to a
+# and this repo's shared/workflow/strict-merge-policy.md scopes its standing `mwc` merge grant to a
 # PR that is fully clean -- CI green and every review finding addressed --
 # so the automated reviewer (or a human) still reads the diff before it
 # merges. This entry removes the PRE-push check on ai-config pushes, not
@@ -707,14 +711,23 @@ CONFIG_LIKE_INDETERMINATE_FLAGS = (
 # to decide whether to report the broken installation and deny a command
 # whose text looks like a push (ai-config#2981).
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); its sibling hook will not load", file=sys.stderr)
+    load_sibling = None
+
+
 def _load_sibling():
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-unreviewed-pr.py")
-    spec = importlib.util.spec_from_file_location("no_unreviewed_pr", path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    """Import `no-unreviewed-pr.py` (scripts/lib/sibling.py); raises if it cannot load."""
+    if load_sibling is None:
+        raise ImportError("scripts/lib/sibling.py is not importable")
+    return load_sibling(__file__, "no-unreviewed-pr.py", "no_unreviewed_pr", required=True)
 
 
 try:
@@ -2572,6 +2585,7 @@ def _unparsed_report_shas(text: str) -> list[str] | None:
 
 def read_latest_review_with_unparsed(
     transcript_path: str, _known_task_ids: frozenset[str] | None = None,
+    history: list[tuple[str, list[str]]] | None = None,
 ) -> tuple[str | None, list[str], bool, bool, list[str]]:
     """Return `(verdict, reviewed_commits, saw_reviewer_call,
     saw_unparsed_later, unparsed_later_shas)` from the transcript.
@@ -2601,6 +2615,13 @@ def read_latest_review_with_unparsed(
     hand-back delivery, where the dispatch's own result carries no report at
     all, only a pointer to a sibling subagent transcript (ai-config#3945,
     `_handback_report_text`).
+
+    `history`, when given, receives every admitted `(verdict, shas)` in
+    transcript order, so a caller can key verdicts by commit (ai-config#4006).
+    An unparsed report naming a commit enters it as `"unparsed"`, blocking like
+    `needs_work` the commits it names; as the LAST report it blocks every
+    push that ships a commit, since it may supersede any earlier verdict
+    (`saw_unparsed_later`).
     """
     reviewer_call_ids: set[str] = set()
     reviewer_task_ids: set[str] = set()
@@ -2619,11 +2640,15 @@ def read_latest_review_with_unparsed(
         found, shas = parse_report_all(text)
         if found:
             verdict, reviewed_commits = found, shas
+            if history is not None:
+                history.append((found, shas))
             saw_unparsed_later = False
             unparsed_later_shas = []
             return True
         cand_shas = _unparsed_report_shas(text)
         if cand_shas is not None:
+            if history is not None:
+                history.append(("unparsed", cand_shas))  # blocks, like needs_work
             saw_unparsed_later = True
             unparsed_later_shas = cand_shas
         return False
@@ -2850,7 +2875,10 @@ def read_latest_review_with_unparsed(
                             saw_reviewer_call = True
 
     if unresolved_handback:
-        return read_latest_review_with_unparsed(transcript_path, frozenset(reviewer_task_ids))
+        if history is not None:
+            history.clear()  # the second pass re-reads every verdict, so none is replayed twice
+        return read_latest_review_with_unparsed(
+            transcript_path, frozenset(reviewer_task_ids), history)
     return verdict, reviewed_commits, saw_reviewer_call, saw_unparsed_later, unparsed_later_shas
 
 
@@ -2889,14 +2917,131 @@ def _opencode_transcript_fallback(session_id) -> str:
     return os.path.join(base, "transcripts", f"{raw}.jsonl")
 
 
+_VERDICT_WORDS = {"clean": "clean report", "needs_work": "blocking verdict",
+                  "unparsed": "report with an unparsed verdict line"}
+
+
+def _verdict_map_covers(history: list[tuple[str, list[str]]],
+                        directory: str | None, argv: list[str],
+                        env: list[str]) -> tuple[str, ...]:
+    """(pass, block) from the LATEST verdict naming each shipped commit
+    (ai-config#4006, #4237); ("", "") leaves the decision, and its message,
+    to the caller's latest-verdict checks; after an error, a third string
+    says why, for the caller to add to its refusal.
+
+    The map is keyed by commit, so a verdict for another branch or another
+    repository no longer erases this one's. A blocking verdict (an unparsed
+    report counts as one) blocks every shipped commit it names or is an
+    ancestor of, unless a clean verdict for that commit came later: a stacked
+    branch ships its base's flagged code. A blocking verdict on a descendant
+    does not block its reviewed ancestor, although its diff included the
+    ancestor's code: #4006 keys verdicts by exact commit and accepts that.
+    A blocking verdict with ANY fingerprint that does not resolve here, or
+    with none, vetoes every clean verdict before it, since a foreign fingerprint
+    cannot be told from a fabricated one; so does a clean report with no
+    fingerprint. A clean report with a fingerprint that does not resolve here
+    binds nothing and is skipped, which is what lets a review of another
+    repository leave this one's verdict standing. A refusal names the first
+    blocked commit, or else each one no verdict covers and its veto. Any doubt
+    (an unknown payload, a ref deletion) returns ("", ""); a timeout or a
+    git error returns ("", "", note).
+    """
+    if len(history) < 2:
+        return "", ""  # one verdict: the map and the caller's checks agree
+    try:
+        commits, _why = shipped_commits(directory, argv, env)
+        if not commits:
+            return "", ""
+        latest: dict[str, tuple[str, int]] = {}
+        vetoed: dict[str, str] = {}  # commit -> what wiped its verdict
+        unbound_note = ""  # the latest report that bound nothing here
+        voided: dict[str, int] = {}  # commit -> seq of a clean report voided for it
+        resolved_cache: dict[str, str | None] = {}
+        for seq, (found, shas) in enumerate(history):
+            for sha in shas:
+                if sha not in resolved_cache:
+                    # exit 1 is "no such commit"; any other git failure defers
+                    resolved_cache[sha] = (_run_git(
+                        directory, env, "rev-parse", "--verify", "--quiet",
+                        f"{sha}^{{commit}}", unreadable_raises=True) or "").lower() or None
+            hits = [resolved_cache[s] for s in shas if resolved_cache[s]]
+            if not hits:
+                unbound_note = (
+                    f"The latest report binding no commit here was a {_VERDICT_WORDS[found]} "
+                    + (f"naming {shas[0][:12]}, which does not resolve here; if it reviewed "
+                       "this repository, the reviewer must run `git rev-parse HEAD` and "
+                       "copy the 40-character output verbatim." if shas else
+                       "with no Reviewed-Commit line; the reviewer must state "
+                       "`Reviewed-Commit: <full sha>`."))
+            if found == "clean" and len(hits) < len(shas):
+                for hit in hits:  # an unresolvable fingerprint voids a clean report
+                    voided[hit] = seq
+                    vetoed[hit] = ("a clean report naming it also named a commit that does "
+                                   "not resolve here; review one repository per report, "
+                                   "and copy each Reviewed-Commit verbatim")
+                continue
+            if not hits or len(hits) < len(shas):
+                cause = (f"a later {_VERDICT_WORDS[found]} with no Reviewed-Commit line"
+                         if not shas else f"a later {_VERDICT_WORDS[found]} naming a "
+                         "commit that does not resolve here")
+                cause += " vetoed its clean verdict" + ("" if found == "clean" else
+                                                        "; address its findings")
+                vetoed.update({c: cause for c, (f, _) in latest.items() if f == "clean"})
+                # an unbound report vetoes every clean verdict before it
+                latest = {c: v for c, v in latest.items() if v[0] != "clean"}
+            for hit in hits:
+                latest[hit] = (found, seq)
+        for c in sorted(commits):
+            found, since = latest.get(c, ("", -1))
+            void = (f"\nA later clean report naming it was voided: {vetoed[c]}."
+                    if voided.get(c, -1) > since else "")
+            if found == "unparsed":
+                return "", (f"The latest reviewer report naming {c[:12]} has a verdict "
+                            f"line this guard cannot parse; it accepts {ACCEPTED_VERDICT_PHRASES}.\n"
+                            "Re-dispatch the reviewer." + void)
+            if found == "needs_work":
+                return "", (f"The latest adversarial self-review naming {c[:12]} returned "
+                            "a blocking verdict.\nAddress, rebut, or defer every finding, "
+                            "commit, and re-dispatch the reviewer." + void)
+            for sha, (f, seq) in latest.items():
+                if f != "clean" and seq > since and _run_git(
+                        directory, env, "merge-base", "--is-ancestor", sha, c,
+                        unreadable_raises=True) is not None:
+                    what = ("code a review flagged" if f == "needs_work" else
+                            "code whose review this guard cannot read (it accepts "
+                            f"{ACCEPTED_VERDICT_PHRASES})")
+                    own = ("A later" if since >= 0 else f"No verdict covers {c[:12]}"
+                           + (f" ({vetoed[c]})" if c in vetoed else "") + ", and a")
+                    return "", (f"{own} {_VERDICT_WORDS[f]} names {sha[:12]}, an ancestor of "
+                                f"{c[:12]}, so this push ships {what}.\n"
+                                "Address it, then re-dispatch the reviewer against what you push.")
+        missing = sorted(c for c in commits if c not in latest)
+        if not missing:
+            return ("Clean adversarial self-review verified at "
+                    f"{', '.join(sorted(commits))} (latest verdict naming each)."), ""
+        return "", ("No verdict covers " + "; ".join(
+            c[:12] + (f" ({vetoed[c]})" if c in vetoed else "") for c in missing)
+            + f", but this push would ship {'them' if len(missing) > 1 else 'it'}."
+            "\nA push ships commits, so whatever no "
+            "verdict covers -- a later commit, a `main` merge, a rebase, or a branch "
+            "other than the reviewed one -- is unreviewed. Re-dispatch the reviewer "
+            "against what you are actually pushing."
+            + (f"\n{unbound_note}" if unbound_note else ""))
+    except Exception as exc:  # the caller's stricter checks still decide, noting why
+        return "", "", (f"\n(The per-commit verdict check could not run ({exc}), so "
+                        "this refusal comes from the latest verdict alone.)")
+
+
 def verify_review(transcript_path: str, directory: str | None,
-                  argv: list[str], env: list[str]) -> tuple[bool, str]:
-    """(is_clean, reason) -- is there a clean verdict for what this push ships?"""
+                  argv: list[str], env: list[str], per_commit: bool = True) -> tuple[bool, str]:
+    """(is_clean, reason) -- is there a clean verdict for what this push ships?
+    `per_commit=False` skips the map, so a parent's older verdicts cannot outvote a subagent."""
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commits: list[str] = []
     saw_unparsed_later = False
     unparsed_later_shas: list[str] = []
+    history: list[tuple[str, list[str]]] = []
 
     # `transcript_path and` stays here, unlike the two conjuncts removed below,
     # and the difference is not cosmetic. Those two restated a fact a preceding
@@ -2924,7 +3069,7 @@ def verify_review(transcript_path: str, directory: str | None,
                 saw_reviewer_call,
                 saw_unparsed_later,
                 unparsed_later_shas,
-            ) = read_latest_review_with_unparsed(transcript_path)
+            ) = read_latest_review_with_unparsed(transcript_path, None, history)
         except Exception as e:
             return False, f"Failed reading transcript: {e}"
 
@@ -2986,6 +3131,14 @@ def verify_review(transcript_path: str, directory: str | None,
             f"which carries no verdict, and an errored result carries none either.{unparsed_hint}"
         )
 
+    if not saw_unparsed_later and per_commit:
+        mapped, map_block, *map_note = _verdict_map_covers(history, directory, argv, env)
+        unparsed_hint += "".join(map_note)
+        if mapped:
+            return True, mapped
+        if map_block:
+            return False, map_block
+
     if verdict == "needs_work":
         return False, (
             "The latest adversarial self-review returned a blocking verdict.\n"
@@ -3007,7 +3160,8 @@ def verify_review(transcript_path: str, directory: str | None,
     # when the push ships ANY of them, but a fabricated or corrupted line
     # anywhere in that list is still refused outright rather than silently
     # dropped -- the same fail-fast posture a single fingerprint already had,
-    # extended rather than loosened by there being more than one.
+    # extended rather than loosened by there being more than one. (The
+    # per-commit map above skips such a report instead; ai-config#4006.)
     resolved_commits: list[str] = []
     for candidate in reviewed_commits:
         try:
@@ -3312,7 +3466,7 @@ def main() -> int:
                 is_clean, reason = verify_review(sub_path, directory, argv, env)
                 if not is_clean:
                     parent_clean, _ = verify_review(
-                        transcript_path, directory, argv, env
+                        transcript_path, directory, argv, env, per_commit=False
                     )
                     if parent_clean:
                         is_clean = True

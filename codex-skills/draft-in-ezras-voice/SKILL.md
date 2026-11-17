@@ -1,6 +1,6 @@
 ---
 name: "draft-in-ezras-voice"
-description: "Draft communications for Ezra in his own voice: announcements, emails, and comments sent under his name."
+description: "Draft Ezra's announcements, emails and comments in his voice."
 ---
 
 # draft-in-ezras-voice (Codex wrapper)

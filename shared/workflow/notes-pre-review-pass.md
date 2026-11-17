@@ -70,6 +70,7 @@ mds#422 (2026-10-19) stripped `@def-` links and added `<!-- check-term-links: al
 ## Read the psw chapters before editing a page
 
 `hooks/require-psw-rules.py` ([ai-config#5166](https://github.com/Morrison-Lab/ai-config/issues/5166)) denies a write to a notes `.qmd` page until the transcript shows a read of psw's `defining-terms`, `conciseness` and `grammar/relative-pronouns` chapters.
+An exercise or solution file, in any directory, also needs a read of psw's `teaching` chapter, which holds the exercise rules ([ai-config#5632](https://github.com/Morrison-Lab/ai-config/issues/5632)).
 The reviewer's matching item is in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md).
 
 - **Do:** read those three chapters before the first edit of a page, so the rules shape the draft.

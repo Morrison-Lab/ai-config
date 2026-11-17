@@ -650,6 +650,60 @@ def test_changed_list_handoff():
                 os.environ["RLV_CHANGED_FILES"] = old
 
 
+def test_bash_needs_a_shell_that_sees_this_checkout():
+    """bash() keeps only a shell that sees the checkout's own paths (ai-config#3724).
+
+    Every stand-in here runs on any runner: a Python interpreter fails the
+    probe as the WSL launcher with no distribution does, and the real bash
+    run with the path moved under /mnt shows the probe depends on the path,
+    which is what a WSL launcher with a distribution would see.
+    """
+    findbash = sys.modules["findbash"]
+    saved = (rlv._BASH, os.environ.get("AI_SESSION_BASH"), findbash.CANDIDATES,
+             findbash.shutil.which)
+    try:
+        os.environ["AI_SESSION_BASH"] = sys.executable
+        rlv._BASH = None
+        chosen = rlv.bash()
+        check("a shell that fails the probe is passed over", chosen != sys.executable)
+
+        probes = []
+        real_probe = rlv.probe_bash
+        rlv.probe_bash = lambda args: probes.append(args) or chosen
+        try:
+            rlv._BASH = None
+            rlv.bash()
+        finally:
+            rlv.probe_bash = real_probe
+        args = list(probes[0])
+        check("the probe is handed this checkout's own script path",
+              args[-1] == Path(rlv.__file__).resolve().as_posix())
+        seen = subprocess.run([chosen, *args], capture_output=True).returncode
+        args[-1] = "/mnt/x" + args[-1]
+        moved = subprocess.run([chosen, *args], capture_output=True).returncode
+        check("the probe passes on this checkout's own path", seen == 0)
+        check("the probe fails when the checkout sits elsewhere", moved != 0)
+
+        findbash.CANDIDATES = ()
+        findbash.shutil.which = lambda name: None
+        rlv._BASH = None
+        try:
+            rlv.bash()
+            message = None
+        except SystemExit as exc:
+            message = str(exc.code)
+        check("no usable bash stops the run with an error",
+              message is not None and "AI_SESSION_BASH" in message)
+    finally:
+        rlv._BASH = saved[0]
+        if saved[1] is None:
+            os.environ.pop("AI_SESSION_BASH", None)
+        else:
+            os.environ["AI_SESSION_BASH"] = saved[1]
+        findbash.CANDIDATES = saved[2]
+        findbash.shutil.which = saved[3]
+
+
 def main():
     print('running test_changed_list_handoff()', flush=True)
     test_changed_list_handoff()
@@ -687,6 +741,8 @@ def main():
     test_live_workflow_derives_every_python_test_suite()
     print('running test_equivalents_table_covers_all_uses_jobs()', flush=True)
     test_equivalents_table_covers_all_uses_jobs()
+    print('running test_bash_needs_a_shell_that_sees_this_checkout()', flush=True)
+    test_bash_needs_a_shell_that_sees_this_checkout()
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

@@ -147,6 +147,7 @@ it, one sentence each, and take the variant whose likelier error is the cheaper
 one.
 Where the helper runs upstream of the thing that would have caught the miss,
 the false negative is usually unrecoverable, which settles it.
+`hooks/no-thread-model-claim-without-get-session.py` first copied its siblings' inline-code masking, so a claim naming `claude-opus-5-5` in code font passed unseen (ai-config#5547, caught by a Flash review, 2026-11-12).
 
 - **Do:** state what a false positive and a false negative each cost the NEW
   consumer, and choose the variant from that comparison.
@@ -665,3 +666,11 @@ The real condition is semantic equivalence between two mechanisms, which no tran
 - **Do:** treat "I already read a file in this directory" as evidence about layout only.
 - **Don't:** let following a template closely stand in for asking whether something here already solves the substantive problem.
 - **Don't:** reach for the most structurally similar sibling as the authority on mechanism --- similarity of shape is uncorrelated with which file solved your problem.
+
+## Loosening a check changes every caller that restarts from it
+
+A sentence such as "restart from the currency check if the tip moved" reuses the check by name, so it keeps the name's old meaning after the check stops testing something.
+[ai-config#5676](https://github.com/Morrison-Lab/ai-config/pull/5676) dropped the merge-base test from the currency check, and `chores` still restarted only that check when the base moved, so a moved base could add a gate unseen until an independent review caught it (2026-11-15).
+
+- **Do:** when a check stops testing something, grep every caller that reruns or restarts from it, and point each at the gate that now carries the test.
+- **Don't:** edit the check's own text and assume its callers still mean what they meant.

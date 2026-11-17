@@ -84,7 +84,6 @@ Command parsing is `flag-commit-a-sweeps-submodule.py`'s, loaded by path,
 over `scripts/lib/shellcmd.py`, so an echoed, grepped or heredoc-quoted
 `git commit` is inert.
 """
-import importlib.util
 import json
 import os
 import re
@@ -93,22 +92,25 @@ import sys
 import time
 
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
+
+
 def _load_sibling():
     """`flag-commit-a-sweeps-submodule.py`, whose command-line parsing this
-    hook shares. Loaded by path because the filename is not an identifier."""
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                        "flag-commit-a-sweeps-submodule.py")
-    if not os.path.isfile(path):
+    hook shares, or None (scripts/lib/sibling.py)."""
+    if load_sibling is None:
         return None
-    spec = importlib.util.spec_from_file_location(
-        "flag_commit_a_sweeps_submodule", path)
-    if spec is None or spec.loader is None:
-        return None
-    module = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(module)
-    except Exception:
-        return None
+    module = load_sibling(__file__, "flag-commit-a-sweeps-submodule.py",
+                          "flag_commit_a_sweeps_submodule")
     if getattr(module, "_simple_commands", None) is None:
         return None  # its shared parser failed to load
     return module
@@ -117,7 +119,7 @@ def _load_sibling():
 _SIB = _load_sibling()
 if _SIB is None:
     print("no-commit-with-conflict-markers: cannot load "
-          "flag-commit-a-sweeps-submodule.py; inert", file=sys.stderr)
+          "flag-commit-a-sweeps-submodule.py; inert, not gating", file=sys.stderr)
 
 # Subcommands whose `--continue` makes a commit from the index.
 _CONTINUES = {"merge", "rebase", "cherry-pick", "revert", "am"}

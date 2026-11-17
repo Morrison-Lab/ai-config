@@ -669,6 +669,32 @@ for given, want in (
 check("native_path leaves /c/... alone off Windows",
       shellcmd.native_path("/c/Users/x", False), "/c/Users/x")
 
+# A `#` inside a word starts no comment; one after a blank does.
+for given, want in (
+    ("echo x#y; chmod -R u+w /etc", [["echo", "x#y"], ["chmod", "-R", "u+w", "/etc"]]),
+    ("sed -i s#a#b#g f && ls", [["sed", "-i", "s#a#b#g", "f"], ["ls"]]),
+    ("echo $# ${#A}; ls", [["echo", "$#", "${#A}"], ["ls"]]),
+    ("echo x # cd /etc\nls", [["echo", "x"], ["ls"]]),
+    ("echo a\\ #b; ls", [["echo", "a #b"], ["ls"]]),
+    ("(echo x)#y\nls", [["echo", "x"], ["ls"]]),
+):
+    check(f"simple_commands({given!r})", shellcmd.simple_commands(given), want)
+
+# The `)` closing a `$(` or `$((` ends no word, so a `#` after it is kept.
+for given, want in (
+    ("echo $(x)#y; ls", "echo $(x)#y; ls"),
+    ("echo $((1))#y; ls", "echo $((1))#y; ls"),
+    ("echo $(a $(b))#y; ls", "echo $(a $(b))#y; ls"),
+    ("diff <(ls)#x; ls", "diff <(ls)#x; ls"),
+    ("tee >(cat)#x; ls", "tee >(cat)#x; ls"),
+    ("a=(x y)#z; ls", "a=(x y)#z; ls"),
+    ("echo $(x) #y\nls", "echo $(x) \nls"),
+    ("(echo x)#y\nls", "(echo x)\nls"),
+    ("echo a\\ #b", "echo a\\ #b"),
+    ("echo \\ #b; ls", "echo \\ #b; ls"),
+):
+    check(f"_comment_free({given!r})", shellcmd._comment_free(given), want)
+
 # Push-detector parity (ai-config#1920). no-clobbering-push and
 # no-unreviewed-pr each decide whether an argv is a `git push`, and a guard
 # that misses one stays silent. One corpus, three readers, one answer.

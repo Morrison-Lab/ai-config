@@ -59,14 +59,10 @@ with the thing predicted is worse than none.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import sys
-from pathlib import Path
 
-HOOK_DIR = Path(__file__).resolve().parent
-SIBLING = HOOK_DIR / "no-unreviewed-pr.py"
 
 NOTE = """This reviewer request is NOT the last command in this Bash call, so its success \
 cannot be attributed and `no-unreviewed-pr.py` will NOT treat it as discharging \
@@ -89,14 +85,23 @@ still says no successful request was made, the request did not fail -- it was \
 not attributable. Re-running it in the same shape will not help."""
 
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); its sibling hook will not load", file=sys.stderr)
+    load_sibling = None
+
+
 def _load_sibling():
-    """Import `no-unreviewed-pr.py` by path; its name is not importable."""
-    spec = importlib.util.spec_from_file_location("_no_unreviewed_pr", SIBLING)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load {SIBLING}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """Import `no-unreviewed-pr.py` (scripts/lib/sibling.py); raises if it cannot load."""
+    if load_sibling is None:
+        raise ImportError("scripts/lib/sibling.py is not importable")
+    return load_sibling(__file__, "no-unreviewed-pr.py", "_no_unreviewed_pr", required=True)
 
 
 def _read_payload() -> tuple[dict, bool]:

@@ -8,6 +8,9 @@ do them in minimal batches", and "every PR should be as small and focused as it 
 - A PR solves its stated task completely and nothing else.
 - A PR changes at most 10 files and 300 lines (added plus deleted).
   Generated, lock, `_freeze/`, image and data paths are not counted.
+  A committed generator output counts until the repo's `.gitattributes` marks it `linguist-generated`;
+  then neither the push hook nor gha's `check-pr-size` counts it, and GitHub folds it in review
+  ([ai-config#5288](https://github.com/Morrison-Lab/ai-config/issues/5288), [gha#1959](https://github.com/Morrison-Lab/gha/issues/1959)).
   The lines of a newly added `_fig-*` subfile are not counted either, but the file still counts toward the 10
   ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928), Ezra "daytb", 2026-11-04):
   figure code in two languages made one decision into three PRs.
@@ -41,6 +44,8 @@ that issue tracks both.
 - **Do:** after a split, open each file a part cites at `origin/main` and confirm the cited rule is there.
   A citation checked against the unsplit branch can point at text that only an unmerged sibling PR adds
   ([ai-config#5369](https://github.com/Morrison-Lab/ai-config/pull/5369)).
+- **Do:** plan a rule change and the hook that enforces it as two PRs from the start.
+  [ai-config#5676](https://github.com/Morrison-Lab/ai-config/pull/5676) carried both, reached 11 files and 310 lines, and had to drop the hook into a follow-up after its first push (2026-11-14).
 - **Don't:** leave the size check to the push.
 - **Don't:** run `git checkout <commit> -- <file>` to carry a change onto a newer base.
   It carries the whole old file, so it silently reverts what `main` changed since the branch point

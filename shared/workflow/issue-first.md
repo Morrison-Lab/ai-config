@@ -17,6 +17,8 @@ The issue is the durable record of intent, scope, and "done" criteria --- it giv
 Skip only when the task is already tracked by an open issue.
 A closed match is not a skip: surface it and confirm before re-doing the work.
 
+A freeze on new work never stops filing: file the issue and leave it unclaimed ([`freezes-allow-filing`](freezes-allow-filing.md)).
+
 ## `/defer-issue` files and stops; `/st` files and starts
 
 Ezra approved this mapping (2026-10-17):

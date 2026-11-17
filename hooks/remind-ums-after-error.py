@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UserPromptSubmit reminder: an admitted error owes a UMS pass.
+"""UserPromptSubmit reminder, and once-per-turn Stop block: an admitted error owes a UMS pass.
 
 CLAUDE.md's "Run UMS proactively" section makes discovering you were wrong a
 trigger in its own right. It is the trigger with no artifact: nothing merges,
@@ -7,8 +7,8 @@ no check turns green, and the correction *feels* like the completion when it
 is only the input. So the pass is skipped, and the same class of error recurs
 within hours.
 
-WHY THIS INJECTS RATHER THAN BLOCKS
------------------------------------
+WHY THE PROMPT-TIME REGISTRATION INJECTS RATHER THAN BLOCKS
+-----------------------------------------------------------
 The obvious shape here is a `Stop` hook that blocks the outgoing message,
 copying `no-offer-to-file.py`. That shape is wrong for this rule, and the
 distinction is the whole reason this file exists.
@@ -22,8 +22,9 @@ between the model and the user -- silently remove the very signal that would
 have surfaced the mistake. Admitting must always be free and immediate; it is
 the RECORDING that has to follow.
 
-So this fires on the next prompt instead, and only ever adds context. There is
-no code path here that can suppress, delay, or alter a message.
+So the UserPromptSubmit registration only ever adds context. No code path
+here can suppress, delay, or alter a message; the Stop registration described
+below blocks only the END of a turn whose admission was already delivered.
 
 MECHANISM
 ---------
@@ -32,6 +33,21 @@ stdout on exit 0 is added to Claude's context. `inject-local-time.sh` already
 proves that path works in this harness. Deliberately NOT using a `Stop` hook's
 `additionalContext`, which is documented for `UserPromptSubmit` rather than
 for `Stop`, and was not verified here.
+
+A SECOND, STOP-TIME REGISTRATION (2026-11-12)
+--------------------------------------------
+A project coordinator said "I was wrong on two counts" through `post_message`
+and ran no pass; the user's next message asked why. The scan read only `text`
+blocks, so reply-tool text (scripts/lib/tool_names.py) is now scanned too, and
+the hook is also registered on Stop (AI_CONFIG_STOP=1). The admission is
+already delivered when Stop runs, so blocking the stop suppresses nothing. It
+blocks once per turn, never while `stop_hook_active` is set, and a Stop with
+that flag exits before the sentinel, so it does not use up the one block.
+
+A thread often runs the pass, then reports the mistake: UMS work earlier in the
+same turn discharges an admission that names a file the turn wrote (a keyword
+does not: "I have not run UMS yet" has one). Shell redirects, `tee` and GitHub
+MCP writes into a UMS path count; `sed -i`, `cp` and `mv` do not.
 
 It stays silent when the pass already happened: a memory/skills/shared write, a
 UMS-mentioning subagent dispatch, or a `ums` invocation recorded LATER in the
@@ -62,6 +78,24 @@ import os
 import re
 import sys
 import tempfile
+
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from tool_names import reply_text
+except Exception:  # broken install: read assistant text blocks only
+    def reply_text(name, inp):  # noqa: D103
+        return ""
+try:
+    from agent_notice import stop_notice
+except Exception:
+    stop_notice = None
+try:
+    from transcript_meta import is_real_user_turn
+except Exception:  # broken install: no same-turn discharge
+    def is_real_user_turn(entry):  # noqa: D103
+        return False
 
 # Typographic apostrophe, spelled as an escape rather than embedding the
 # glyph, so this file stays pure ASCII per
@@ -326,6 +360,32 @@ def visible_prose(text):
     return TICKED.sub(" ", text)
 
 
+# A redirect or `tee` into a UMS path. Quoted strings other than the target
+# are blanked first, and `->`, `=>`, `<>`, `>>` arrows are not redirects.
+SHELL_UMS_WRITE = re.compile(
+    r"(?:(?<![-=<>])>>?|\btee\b(?:\s+(?:-a|--append))?)\s*[\"']?[^\s\"'|;&<>]*"
+    r"(?:memories?/|MEMORY\.md|CLAUDE\.md|skills/|shared/)",
+    re.I,
+)
+_QUOTED_ARG = re.compile(
+    r"((?<![-=<>])>>?\s*|\btee\s+(?:(?:-a|--append)\s+)?)?(\"[^\"]*\"|'[^']*')")
+
+
+def shell_writes_ums_path(command):
+    """True when `command` redirects or tees into a memory, skill or shared path."""
+    bare = _QUOTED_ARG.sub(lambda m: m.group(0) if m.group(1) else " ", command)
+    return bool(SHELL_UMS_WRITE.search(bare))
+# A memory, skill or shared path named in a shell command, so its file name
+# can be matched against the reply that reports the pass.
+SHELL_UMS_TARGET = re.compile(r"[\w./~-]*(?:memories?/|skills/|shared/)[\w./-]+")
+
+
+def _names(paths):
+    """File names of the UMS paths among `paths`."""
+    return {os.path.basename(p.rstrip("/")) for p in paths if p and UMS_PATH.search(p)}
+GITHUB_FILE_WRITES = ("mcp__github__create_or_update_file", "mcp__github__push_files")
+
+
 def records(path):
     with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
@@ -336,8 +396,15 @@ def records(path):
 
 
 def scan(path):
-    """Return (admission_text, admitted_at, recorded_at)."""
+    """Return (admission_text, admitted_at, recorded_at).
+
+    `recorded_at` is raised to `admitted_at` when UMS work happened earlier in
+    the admission's own turn, so a pass followed by the reply that reports the
+    mistake counts as discharged.
+    """
     admit_txt, admit_at, ums_at = None, -1, -1
+    user_at, admit_turn, cites_pass = -1, -1, False
+    turn_names = set()  # file names of UMS writes since the last real user turn
 
     for i, m in enumerate(records(path)):
         # A subagent's own turns are not my outgoing message.
@@ -359,11 +426,20 @@ def scan(path):
 
         is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant"
         blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+        if is_real_user_turn(m):
+            user_at = i
+            turn_names = set()
+            continue
         if isinstance(blocks, list):
             for b in blocks:
                 if isinstance(b, dict):
                     if b.get("type") == "tool_use":
                         tool_calls.append((b.get("name") or "", b.get("input") or {}))
+                        # A project thread replies only through a reply tool,
+                        # so its admission lives in the tool input.
+                        said = reply_text(b.get("name"), b.get("input"))
+                        if said:
+                            text_blocks.append(said)
                     elif b.get("type") == "text" and is_assistant:
                         text_blocks.append(b.get("text") or "")
         elif isinstance(blocks, str) and is_assistant:
@@ -396,15 +472,30 @@ def scan(path):
             hit = ADMISSION.search(visible_prose(raw_text))
             if hit:
                 admit_txt, admit_at = hit.group(0).strip(), i
+                admit_turn = user_at
+                # Earlier same-turn work discharges only an admission whose
+                # own text says it was recorded, so a second, different
+                # mistake admitted after the pass still owes one.
+                cites_pass = any(n and n in raw_text for n in turn_names)
 
         for name, inp in tool_calls:
             if not isinstance(inp, dict):
                 continue
             blob = ""
+            if name in GITHUB_FILE_WRITES:
+                paths = [str(inp.get("path") or "")]
+                files = inp.get("files")
+                if isinstance(files, list):
+                    paths += [str(f.get("path") or "") for f in files if isinstance(f, dict)]
+                if any(UMS_PATH.search(p) for p in paths):
+                    ums_at = i
+                    turn_names |= _names(paths)
+                continue
             if name in ("Write", "Edit", "NotebookEdit", "write", "edit", "write_to_file", "replace_file_content"):
                 blob = str(inp.get("file_path") or inp.get("path") or inp.get("TargetFile") or inp.get("target_file") or "")
                 if UMS_PATH.search(blob):
                     ums_at = i
+                    turn_names |= _names([blob])
                 continue
             if name in ("Task", "Agent", "invoke_subagent"):
                 ums_parts = [
@@ -431,15 +522,28 @@ def scan(path):
                 blob = " ".join(ums_parts)
             elif name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
                 blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
+                if shell_writes_ums_path(blob):
+                    ums_at = i
+                    turn_names |= _names(SHELL_UMS_TARGET.findall(blob))
             elif name == "Skill":
                 blob = str(inp.get("skill", ""))
             if blob and UMS_WORD.search(blob):
                 ums_at = i
 
+        if cites_pass and admit_at >= 0 and admit_turn < ums_at < admit_at:
+            ums_at = admit_at
+
     return admit_txt, admit_at, ums_at
 
 
 def main() -> int:
+    # The reminder quotes the admission from the transcript, so a curly quote
+    # there made a cp1252 console write byte 0x92, which a UTF-8 reader cannot
+    # decode (ai-config#1288). Read stdin and write stdout as UTF-8 whatever
+    # the console says; nothing here writes quoted text to stderr.
+    for stream in (sys.stdin, sys.stdout):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     try:
         payload = json.load(sys.stdin)
     except Exception:
@@ -463,13 +567,19 @@ def main() -> int:
     # it, two sessions producing the same admission share one sentinel in
     # /tmp, and the second session's reminder is suppressed for as long as
     # that /tmp survives.
-    key = hashlib.sha256(f"{path}:{admit_txt}".encode()).hexdigest()[:16]
+    # The mode is in the key: the UserPromptSubmit and Stop registrations each
+    # owe their own firing, as in no-mistake-without-a-hook.py.
+    mode = os.getenv("AI_CONFIG_STOP") or ""
+    if mode == "1" and payload.get("stop_hook_active"):
+        # Leave the sentinel unused, so the next plain Stop still blocks once.
+        return 0
+    key = hashlib.sha256(f"{path}:{admit_txt}:{mode}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-ums-after-error-{key}")
     if not _sentinel_gate(sentinel, admit_at):
         return 0
 
-    print(
-        "UMS reminder: an earlier turn in this session admitted an error "
+    message = (
+        "UMS reminder: this session admitted an error "
         f'("{admit_txt}"), and no memory, skill, or shared-fragment write has '
         "been recorded since.\n"
         "CLAUDE.md ('Run UMS proactively') makes discovering you were wrong a "
@@ -482,9 +592,21 @@ def main() -> int:
         "If this reminder is a false positive (you were correcting someone "
         "else's claim, quoting the rule, or writing a hypothetical such as "
         "'even if I misread it'), disregard it and carry on. Writing about the "
-        "misfire will not re-fire it: this fires once per distinct phrase per "
-        "session, and a phrase wrapped in backticks is not matched at all."
+        "misfire will not re-fire it: the same phrase within a few transcript "
+        "records does not fire again, and a phrase wrapped in backticks is "
+        "not matched at all."
     )
+    if mode == "1":
+        # Stop: the admission has already been delivered, so blocking the
+        # stop suppresses nothing; it only keeps the turn open for the pass.
+        # Without this the reminder waited for the user's NEXT prompt, which
+        # in a project thread is the user asking why no pass ran.
+        if stop_notice is not None:
+            print(stop_notice(payload, message, "remind-ums-after-error"))
+        else:
+            print(json.dumps({"decision": "block", "reason": message}))  # stop_hook_active checked above
+    else:
+        print(message)
     return 0
 
 

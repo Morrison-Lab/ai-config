@@ -8,7 +8,8 @@ gha's `check-pr-size` (gha#1188); this hook stops the push before CI is spent.
 
 Measures the branch against the merge base with the remote default branch:
 files changed and added plus deleted lines, not counting generated, lock,
-image and data paths, and not counting the lines of a newly added `_fig-*`
+image and data paths, nor a path `.gitattributes` marks `linguist-generated`
+(a committed generator output, ai-config#5288), and not counting the lines of a newly added `_fig-*`
 subfile (it still counts as a file), and not counting a pure rename (no line
 changed). Over 10 files or 300 lines the push is denied.
 
@@ -60,6 +61,23 @@ def new_path(name):
     return re.sub(r"/{2,}", "/", name.split(" => ")[-1])
 
 
+def generated(cwd, paths):
+    """The paths among `paths` that `.gitattributes` marks `linguist-generated`.
+
+    A repo marks its committed generator outputs once, and GitHub folds them in
+    review as well (ai-config#5288).
+    """
+    if not paths:
+        return set()
+    p = subprocess.run(["git", "check-attr", "-z", "--stdin", "linguist-generated"],
+                       cwd=cwd, input="\0".join(paths) + "\0",
+                       capture_output=True, text=True, timeout=15)
+    if p.returncode != 0:
+        return set()
+    f = p.stdout.split("\0")
+    return {f[i] for i in range(0, len(f) - 2, 3) if f[i + 2] in ("set", "true")}
+
+
 def measure(cwd, base):
     mb = git(cwd, "merge-base", base, "HEAD")
     if not mb:
@@ -69,13 +87,13 @@ def measure(cwd, base):
         return None
     added = git(cwd, "diff", "--name-only", "--diff-filter=A", "-M", mb, "HEAD")
     added = set((added or "").splitlines())
+    rows = [r.split("\t", 2) for r in out.splitlines()]
+    rows = [r for r in rows if len(r) == 3]
+    gen = generated(cwd, [new_path(r[2]) for r in rows])
     files = lines = 0
-    for row in out.splitlines():
-        parts = row.split("\t", 2)
-        if len(parts) != 3:
-            continue
+    for parts in rows:
         path = new_path(parts[2])
-        if any(re.fullmatch(p, path) for p in IGNORE):
+        if path in gen or any(re.fullmatch(p, path) for p in IGNORE):
             continue
         # A pure rename (no line changed) is content-identical (ai-config#5128).
         if " => " in parts[2] and parts[:2] == ["0", "0"]:

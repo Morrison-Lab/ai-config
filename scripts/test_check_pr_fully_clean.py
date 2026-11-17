@@ -89,12 +89,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.lib.pull_request import PullRequest, Review
 
 original_check_ci_runs = checker.check_ci_runs
-def wrapped_check_ci_runs(sha, repo, *args, **kwargs):
+def wrapped_check_ci_runs(sha, repo, *args, comments=None, commit_date="", **kwargs):
     pr = PullRequest.__new__(PullRequest)
     pr.pr_num = "123"
     pr.repo = repo
     pr._fetcher = checker.run_cmd
-    pr._data = {"headRefOid": sha}
+    pr._data = {"headRefOid": sha, "comments": comments or [],
+                "commits": [{"committedDate": commit_date}] if commit_date else []}
     pr._check_runs = None
     return original_check_ci_runs(pr)
 
@@ -1514,7 +1515,7 @@ def main() -> int:
     # Verification prose in a later sentence of the same paragraph stays
     # clean: only the negation's own sentence and the opening of the next
     # one are read for a contrast.
-    for _heading in ("## Nits", "### Issues"):
+    for _heading in ("### Findings", "## Nits", "### Issues"):
         for _tail in (
             "None.\nChecked the parser and tests; they still pass.",
             "None.\nI only reviewed the changed files.",
@@ -1610,10 +1611,39 @@ def main() -> int:
         "At the same time", "Having said that", "Whereas", "All the same",
         "With that said", "Then again", "Albeit",
     )):
+        for _heading in ("## Nits", "### Findings"):
+            check(
+                f"{_heading} + {_tail!r} is a finding (#2359, #5402)",
+                checker._unresolved_finding_pattern(
+                    _heading + "\n\n" + _tail + "\n"
+                ) is not None,
+            )
+    # The `### Findings` heading also resolves through a heading trailer and
+    # a hard-wrapped first line; both share the guard (#5402).
+    for _label, _body in (
+        ("CRLF hard-wrapped 'However'",
+         "### Findings\n\nNo issues\r\nHowever, X is broken.\r\n"),
+        ("heading trailer 'none, but'",
+         "### Findings: none, but X leaks.\n\nMore text.\n"),
+        ("heading trailer then a next-line 'However'",
+         "### Findings: None\nHowever, the leak.\n"),
+        ("'0-day'", "### Findings\n\n0-day exploit possible\n"),
+    ):
         check(
-            f"## Nits + {_tail!r} is a finding (#2359)",
-            checker._unresolved_finding_pattern("## Nits\n\n" + _tail + "\n")
-            is not None,
+            f"### Findings + {_label} is a finding (#5402)",
+            checker._unresolved_finding_pattern(_body) is not None,
+        )
+    for _label, _body in (
+        ("'None.'", "### Findings\n\nNone.\n"),
+        ("'0 findings.'", "### Findings\n\n0 findings.\n"),
+        ("trailer 'none'", "### Findings: none\n\nSee the thread, but fine.\n"),
+        ("'None.' then a 'but' paragraph",
+         "### Findings\n\nNone.\n\nI checked the thread, but it is fine.\n"),
+        ("'- None.' bullet", "### Findings\n\n- None.\n"),
+    ):
+        check(
+            f"### Findings + {_label} stays clean (#5402 control)",
+            checker._unresolved_finding_pattern(_body) is None,
         )
     # Long whitespace runs must not make the guard quadratic: before the
     # bounded openers, 20,000 spaces took about 6 s and " -" * 10,000 9 s.
@@ -1624,6 +1654,61 @@ def main() -> int:
         checker.FINDING_HEADING_NEGATION_SUFFIX.match(_text)
     check("whitespace runs after a negation scan in under 2 s (#2359)",
           time.monotonic() - _t0 < 2.0)
+    # _negation_suffix bounds each match's scan (ai-config#5401): it keeps the
+    # blank line between a heading and its "None.", stops at the next
+    # paragraph break, and caps a paragraph with no break.
+    check(
+        "_negation_suffix keeps a heading's blank line and stops at the next break",
+        checker._negation_suffix("## Nits\n\nNone.\n\nNext.", 7) == "\n\nNone.",
+    )
+    check(
+        "_negation_suffix stops at a CRLF paragraph break",
+        checker._negation_suffix("## Nits\r\n\r\nNone.\r\n\r\nNext.", 7)
+        == "\r\n\r\nNone.",
+    )
+    check(
+        "_negation_suffix caps a paragraph with no break",
+        len(checker._negation_suffix("x" + "y" * 5000, 1))
+        == checker.NEGATION_SUFFIX_CAP,
+    )
+    # A contrast past the old 60-character slice is now seen, on the
+    # `## Nits` path and the `Needs more work` path alike (#5401).
+    _late = ("None in the parser module, the lexer module or any of their many"
+             " unit tests, but the lexer leaks.")
+    check(
+        "## Nits + a contrast past 60 characters is a finding (#5401)",
+        checker._unresolved_finding_pattern("## Nits\n\n" + _late + "\n")
+        is not None,
+    )
+    check(
+        "classify_verdict: 'Needs more work:' + a late contrast stays not-clean (#5401)",
+        checker.classify_verdict("### Verdict\nNeeds more work: " + _late + "\n")
+        == "not-clean",
+    )
+    # Pin the cap residual (ai-config#5389): a contrast inside the cap is
+    # seen, one beyond it is not. Moving the cap must move this test.
+    _pad = "x " * ((checker.NEGATION_SUFFIX_CAP - 200) // 2)
+    check(
+        "a contrast inside NEGATION_SUFFIX_CAP is seen (#5401)",
+        checker._unresolved_finding_pattern(
+            "## Nits\n\nNone in " + _pad + "but the login flow is broken.\n"
+        ) is not None,
+    )
+    _pad = "x " * (checker.NEGATION_SUFFIX_CAP // 2 + 100)
+    check(
+        "a contrast beyond NEGATION_SUFFIX_CAP is a known residual (#5389)",
+        checker._unresolved_finding_pattern(
+            "## Nits\n\nNone in " + _pad + "but the login flow is broken.\n"
+        ) is None,
+    )
+    # Many negated headings in one long paragraph must stay linear: an
+    # unbounded suffix took 4.5 s on a 62 KB body, the capped one 0.5 s.
+    _t0 = time.monotonic()
+    checker._unresolved_finding_pattern("### Issues: None\nall good here\n" * 4000)
+    check(
+        "a 124 KB paragraph of negated headings is scanned in under 6 s (#5401)",
+        time.monotonic() - _t0 < 6.0,
+    )
     unbolded_nwn = "### Verdict\nNeeds more work\n\nNone are blocked.\n"
     check(
         "classify_verdict: unbolded next-paragraph 'None are blocked.' does NOT blank not-clean verdict (#3937)",
@@ -10469,15 +10554,79 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         check("passing run with annotations fails check_ci_runs and names the read command",
               not ann_ok and len(ann_issues) == 1
               and "check-runs/77/annotations" in ann_issues[0])
+        # ai-config#4893: marking runs read is not enough; a PR comment newer
+        # than the head commit must record the dispositions.
+        head_date = "2026-11-12T22:00:00Z"
+        dispo = [{"body": "Annotation dispositions for head sha1234:\n- lint: false positive",
+                  "createdAt": "2026-11-12T22:05:00Z", "author": {"login": "a"}}]
         checker._ANNOTATIONS_READ.add(77)
-        read_ok, read_issues = checker.check_ci_runs("sha123", TEST_REPO)
-        checker._ANNOTATIONS_READ.discard(77)
-        check("--annotations-read ids clear the annotation finding",
+        bare_ok, bare_issues = checker.check_ci_runs("sha1234abc", TEST_REPO)
+        check("--annotations-read without a disposition comment still fails (ai-config#4893)",
+              not bare_ok and len(bare_issues) == 1
+              and "Annotation dispositions for head sha1234" in bare_issues[0])
+        read_ok, read_issues = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=dispo, commit_date=head_date)
+        check("--annotations-read ids plus a disposition comment clear the finding",
               read_ok and read_issues == [])
+        stale = [dict(dispo[0], createdAt="2026-11-12T21:00:00Z")]
+        stale_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=stale, commit_date=head_date)
+        check("a disposition comment older than the head commit does not count", not stale_ok)
+        other = [dict(dispo[0], body="Annotation dispositions for head 0000000: ok")]
+        other_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=other, commit_date=head_date)
+        check("a disposition comment for another head does not count", not other_ok)
+        quoted = [dict(dispo[0], body="The checker asks for `Annotation dispositions for head sha1234:`")]
+        quoted_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=quoted, commit_date=head_date)
+        check("a comment that only quotes the marker mid-text does not count", not quoted_ok)
+        same = [dict(dispo[0], createdAt=head_date)]
+        same_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=same, commit_date=head_date)
+        check("a disposition comment stamped with the head's own time does not count", not same_ok)
+        undated_ok, _ = checker.check_ci_runs("sha1234abc", TEST_REPO, comments=dispo)
+        check("with no head commit date, no disposition comment counts (fail closed)", not undated_ok)
+        glued = [dict(dispo[0], body="Annotation dispositions for headsha1234: ok")]
+        glued_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=glued, commit_date=head_date)
+        check("the sha must follow the marker after one space", not glued_ok)
+        checker._ANNOTATIONS_READ.discard(77)
         checker._ANNOTATIONS_READ.add("all")
-        all_ok, _ = checker.check_ci_runs("sha123", TEST_REPO)
+        all_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=dispo, commit_date=head_date)
         checker._ANNOTATIONS_READ.discard("all")
-        check("--annotations-read all clears every annotation finding", all_ok)
+        check("--annotations-read all plus a disposition comment clears every annotation finding",
+              all_ok)
+        none_ok, none_issues = checker.check_ci_runs("sha1234abc", TEST_REPO)
+        check("with nothing marked read, no disposition finding is added",
+              not none_ok and not any("ai-config#4893" in i for i in none_issues))
+
+    # ai-config#5045: above the threshold, name the shared core budget and the
+    # batched read, from GET /rate_limit (free).
+    def budget_issues(n, core):
+        def route(cmd):
+            if cmd == ["gh", "api", "rate_limit"]:
+                if core is None:
+                    raise RuntimeError("HTTP 403")
+                return json.dumps({"resources": {"core": core}})
+            return json.dumps({"check_runs": [
+                {"id": 100 + i, "name": f"job{i}", "status": "completed",
+                 "conclusion": "success", "output": {"annotations_count": 1}}
+                for i in range(n)]}) if "check-runs" in " ".join(cmd) else "{}"
+        with patch.object(checker, "run_cmd", side_effect=route):
+            return checker.check_ci_runs("sha123", TEST_REPO)[1]
+
+    limit = checker.UNREAD_RUNS_BUDGET_THRESHOLD
+    core = {"remaining": 1234, "reset": 1767225600}  # 2026-01-01 00:00 UTC
+    many = budget_issues(limit + 1, core)
+    check("above the threshold, a budget NOTE names remaining, reset and the batched command",
+          many[-1].startswith("NOTE: ") and "1234 request(s) left until 00:00 UTC" in many[-1]
+          and "batch-read-annotations.py --repo" in many[-1] and "--sha sha123" in many[-1]
+          and all("batch-read-annotations.py" in i for i in many))
+    check("at the threshold, no budget NOTE",
+          not any("core budget" in i for i in budget_issues(limit, core)))
+    check("a failed /rate_limit read is stated in the NOTE, not dropped",
+          "could not be read (RuntimeError: HTTP 403)" in budget_issues(limit + 1, None)[-1])
 
     parsed = checker.parse_args(
         ["1", "--annotations-read", "5", "--annotations-read", "6,7"])

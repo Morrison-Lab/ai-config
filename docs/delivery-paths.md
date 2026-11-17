@@ -6,7 +6,7 @@ A leftover is never a supported path, even where it is the only one, as for open
 At worst it runs older code than `main`, and nothing in a guard's output says which copy fired ([#3094](https://github.com/Morrison-Lab/ai-config/issues/3094), [#3590](https://github.com/Morrison-Lab/ai-config/issues/3590)).
 The README's section for each harness carries the setup steps.
 
-Status as of 2026-11-11.
+Status as of 2026-11-12.
 
 ## The supported path for each session kind
 
@@ -38,7 +38,7 @@ Status as of 2026-11-11.
   [#5280](https://github.com/Morrison-Lab/ai-config/issues/5280) measured this with lds's render-toolchain hook.
   A repository hook that installs the plugin, such as rme's `install-ai-config.sh`, has the same limit, so the supported cloud path is the Setup script, which runs however many repositories a session opens, and such a hook is only its fallback.
   The Setup script runs once per container, and `refresh-stale-plugin-pin-cloud.py` keeps the plugin current in the sessions that reuse the container.
-- **The claude.ai account plugin sync has failed since 2026-09-02** ([#3948](https://github.com/Morrison-Lab/ai-config/issues/3948)).
+- **The claude.ai account plugin sync failed from 2026-09-02 until a manual Sync on 2026-11-12** ([#3948](https://github.com/Morrison-Lab/ai-config/issues/3948)).
   The cloud path does not depend on it, because the Setup script installs from the marketplace.
   Skills uploaded to claude.ai do not reach Claude Code at all.
 - **Codex runs no `SessionStart` hook**, since `codex-hooks.json` routes only `UserPromptSubmit`, `PreToolUse` and `Stop`, so `inject-core-rules.py` never runs there.
@@ -54,7 +54,8 @@ Status as of 2026-11-11.
 ## Leftover paths
 
 Each of these either delivered ai-config before the current path did or duplicates it, and still runs where it was installed.
-Step 3 of #5309 retires them, with a script that reports before it deletes.
+[`scripts/retire-leftover-paths.py`](../scripts/retire-leftover-paths.py) lists the ones on a machine (step 3 of #5309), and with `--retire` then moves each provable leftover into `~/.claude/ai-config-leftovers/` and removes the leftover hook entries from `~/.claude/settings.json`, keeping a copy of the old file.
+It leaves to a person a copy or link it cannot trace to ai-config, a skill that only shares a name, a copy of `shared/`, `memories/` in any form, and an ai-config plugin install outside user scope, for which it names the `claude plugin uninstall` command to run, or says to remove the record by hand.
 
 | Leftover | What it does now | Tracking |
 | --- | --- | --- |

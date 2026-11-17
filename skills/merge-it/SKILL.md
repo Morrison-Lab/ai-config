@@ -94,16 +94,17 @@ A reviewer that ran and returned not-clean is not unavailable.
 
 - Before the merge command, run the base-currency check that `fully-clean.md` states in its stale-base rule
   (the Do bullets beginning "for a direct merge"), by merge mode.
-  In a local session, fetch the PR's configured base and `refs/pull/<N>/head` from the `-R` repository
-  and confirm the merge-base is the base tip.
-  In a remote session without `git`, read `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"` (the base name encoded as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`)
-  and require `behind_by` of 0, recording `base_commit.sha` as `<pinned-tip>` for the pre-merge recheck of the same endpoint, which requires `behind_by` of 0 again and `base_commit.sha` equal to that pin.
+  In a local session, fetch the PR's configured base and `refs/pull/<N>/head` from the `-R` repository and record the base tip.
+  In a remote session without `git`, read `gh api "repos/<owner>/<repo>/compare/<base-encoded>...<head-sha>"` (the base name encoded as one path segment, `jq -rn --arg b "<base>" '$b|@uri'`) recording `base_commit.sha` as `<pinned-tip>` for the pre-merge recheck of the same endpoint, which requires `base_commit.sha` equal to that pin.
+  A head that is behind only by other PRs' content is merged as it stands, without an update ([#5675](https://github.com/Morrison-Lab/ai-config/issues/5675);
+  the content-only rule in `fully-clean.md`): the checker exits 0 with its base-drift check run (drift only as a `NOTE`), GitHub reports the PR mergeable, and the latest review names that head.
   Where neither is available, do not merge until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) supplies the tool.
   On a base that requires a merge queue, stop and report: the queue form of this gate is [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) and is out of scope until it lands.
   It is a manual step until [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982) wires it into `check-pr-fully-clean.py` for GitHub;
   the GitLab path is instrumented by `check-mr-fully-clean.py`,
-  and on a repository that does not require an up-to-date branch GitHub would otherwise permit the stale merge, which is why the manual check stays required there.
-  When it fails on a direct merge, update the branch pinned to the recorded head.
+  The manual step pins the head, the base name and the base tip, so the merge is tied to the tip the checker's base-drift check read;
+  that drift check, not a zero `behind_by`, decides whether the branch needs the base.
+  Update the branch, pinned to the recorded head, only on a conflict, a base-drift failure from the checker, or a base that requires an up-to-date branch (`mergeable_state` `behind`).
   Locally: `gh api -X PUT "repos/<owner>/<repo>/pulls/<N>/update-branch" -f expected_head_sha="<pinned-sha>"`.
   Remotely: `update_pull_request_branch` with `expectedHeadSha`.
   A `422` whose message names an expected-head mismatch is the another-writer signal only when the live `headRefOid` has actually changed from `<pinned-sha>` --- re-read it and compare before settling ownership, since a correctly-lengthed but wrong-content SHA (guessed or padded from an abbreviation instead of read in full) produces the byte-identical message with no other writer involved.

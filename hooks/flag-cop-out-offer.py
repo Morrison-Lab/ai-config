@@ -38,7 +38,6 @@ Fires once per distinct message (sentinel keyed by content hash).
 Fails OPEN.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -51,6 +50,7 @@ _AGENT_NOTICE_LIB = os.path.join(
 if _AGENT_NOTICE_LIB not in sys.path:
     sys.path.insert(0, _AGENT_NOTICE_LIB)
 from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+from sibling import load_sibling  # noqa: E402 -- ai-config#2018
 from transcript_meta import is_real_user_turn as _is_user_turn  # noqa: E402 -- ai-config#4983
 
 # Matched against the LAST few lines of the reply only.
@@ -155,14 +155,8 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 
 
 def _sibling(name):
-    """Import a hyphenated sibling module, or None if unavailable."""
-    try:
-        spec = importlib.util.spec_from_file_location("_sib_" + name.replace("-", "_"), os.path.join(HERE, name))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name)
 
 
 # Evidence that an issue was filed or linked in the same turn: reuse the

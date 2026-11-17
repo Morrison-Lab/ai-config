@@ -41,6 +41,8 @@ The marker lives in the repository's git common directory, so it is per repo che
   the marker goes stale after 1800 s, so a long queue needs it repeatedly.
 - **Do:** pass the full 40-character `expectedHeadSha`.
   The gate prints only 8; read the rest from the payload JSON (`headRefOid`).
+- **Don't:** pin the head with the MCP tool's `sha` parameter instead.
+  The hook reads only `expectedHeadSha`, so a call carrying the full SHA in `sha` was still refused (ai-config#5636, 2026-11-14).
 - **Do:** locate the script with `ls -d ~/.claude/plugins/cache/Morrison-Lab/ai-config/*/skills/session-lock/scripts/ai-session.sh`.
   `build-pr-payload.py` and `check-pr-fully-clean.py` are under `scripts/` in the same plugin directory.
 - **Do:** pass `--id <transcript uuid>` to `enable-mwc` itself, and not only to `check-mwc`.
@@ -139,7 +141,7 @@ Learned on [ai-config#5023](https://github.com/Morrison-Lab/ai-config/pull/5023)
 - Start a Remote Control session on the Mac (`start_remote_control`, read-only brief) to run `agy` on `gh pr diff N -R O/R`.
   Ask for it in parallel with the fully-clean checker, not after, because Ezra must approve the card.
 - Run `check-pr-fully-clean.py` as its own Bash call, with no `&&` and no pipe.
-  Pass `--annotations-read=all` after `-R` only once you have read every listed annotation and posted an "Annotations reviewed" comment.
+  Pass `--annotations-read=all` after `-R` only once you have read every listed annotation and posted a comment beginning `Annotation dispositions for head <sha7>:`, which the checker requires (ai-config#4893).
   The merge hook does not credit a compound or piped run.
 - `validate` runs twice on one head (pull_request and push events), and the checker blocks until both finish.
 

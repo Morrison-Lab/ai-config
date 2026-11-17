@@ -1,6 +1,7 @@
 Every self-review is an **adversarial review by a separate subagent**.
 Whenever this corpus calls for reviewing your own work --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass a clean verdict does not discharge --- dispatch it to a reviewer with its own context and an adversarial brief, and take its findings as findings.
 The authoring session never reviews its own diff inline.
+`hooks/no-push-without-self-review.py` gates the pre-push case on Claude Code.
 
 [`self-review-fallback`](self-review-fallback.md) governs *when* a self-review is owed and to what standard.
 This governs *who performs it*, which that fragment left to the author by default.
@@ -80,6 +81,14 @@ What is added: a merge additionally requires
 the author-dispatched cross-model, cross-harness reviewer's
 100% all-clear adversarial verdict at the shipping head.
 
+The gate is this rule, not the hook that enforces it.
+A session's hooks load at its start, and a cloud session's SessionStart refresh can then install a newer plugin snapshot, so until a restart the running merge hooks may be older and weaker than the installed ones.
+On 2026-11-13 the running `warn-merge-without-cross-harness-review.py` only warned while the installed copy denied, and Morrison-Lab/mds#748 merged with no non-Claude read ([ai-config#5603](https://github.com/Morrison-Lab/ai-config/issues/5603)).
+`hooks/block-merge-from-stale-plugin.py` now runs the installed snapshot's merge hooks when the running one is stale, but a snapshot that predates it cannot.
+
+- **Do:** run the cross-harness read on the shipping head before every merge, whether the hook denies, warns, or stays silent.
+- **Don't:** read a merge-gate warning, or a merge call the hooks let through, as evidence the gate is met.
+
 In a cloud session (e.g. claude.ai) where no external CLI tools are installed,
 OpenCode Go over HTTP serves as the cross-harness reviewer (see [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)).
 When Go and its free ids are exhausted, that skill's "Ollama Cloud when Go is exhausted" route (`curl` to `api.ollama.com`) comes after them, and after `agy` on a device when the session can reach one.
@@ -126,6 +135,9 @@ This section is the exception that the other "required for merging" statements i
   A probe that decides a route is enough for that route (`opencode run -m <model> "ok"` under `timeout 60`, or a `curl` to the endpoint), and keep the output.
   A quota error reroutes to the next route first and counts as unrunnable only once every route has failed.
   After that single pass, do not retry in a loop or ask again: a retry loop is not a review.
+  `hooks/warn-merge-without-cross-harness-review.py` denies a merge until the transcript shows, after the last push, a reviewer call or this pass:
+  each reviewer CLI attempted as a review, with any result, or shown absent by `command -v <cli>` or `which <cli>` run alone and unredirected (exit 1), and `opencode` attempted through its CLI or the OpenCode Go `curl` ([ai-config#5290](https://github.com/Morrison-Lab/ai-config/issues/5290)).
+  An attempt is a review form (`codex exec`, `opencode run`, or a `-p`/`--print` flag), never `--version` or a housekeeping subcommand ([ai-config#5383](https://github.com/Morrison-Lab/ai-config/issues/5383)).
 - **Unavailable is not "not-clean".**
   A reviewer that ran and returned Needs-more-work, or left an unresolved finding, still blocks until a re-dispatch returns all-clear.
   The waiver covers only a reviewer that could not produce any verdict.

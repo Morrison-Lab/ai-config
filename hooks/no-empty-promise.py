@@ -92,7 +92,6 @@ owe, such as scheduling a timer or other PR-watcher to trigger the next step
 of the ardi loop when it is time".
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -105,6 +104,15 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 _LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
+
+# The shared sibling loader (ai-config#2018). A broken install that lacks it
+# loads no sibling, and the hook runs without it; say so on stderr.
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
 try:
     from transcript_meta import is_skill_load_meta
 except Exception as _exc:  # broken install: degrade, do not fail open silently
@@ -119,14 +127,7 @@ except Exception as _exc:  # broken install: degrade, do not fail open silently
 
 def _sibling(name):
     """Import a hyphenated sibling module, or None if unavailable."""
-    path = os.path.join(HERE, name)
-    try:
-        spec = importlib.util.spec_from_file_location("_sib", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+    return load_sibling(__file__, name) if load_sibling else None
 
 
 _ums = _sibling("remind-ums-after-error.py")
@@ -135,6 +136,18 @@ _ums = _sibling("remind-ums-after-error.py")
 # cannot drift. The fallback exists only so this hook degrades to silence
 # instead of crashing when the sibling is missing.
 visible_prose = getattr(_ums, "visible_prose", None)
+
+# Projects threads reply through `mcp__hearthbot__post_message` tool calls, not
+# assistant text blocks, so a reader of text blocks alone never sees the reply
+# a promise is made in (ai-config#5050, #5075). Reuse the sibling that already
+# reads that reply shape rather than copying its regex, so the two cannot drift.
+_announce = _sibling("no-announced-start-without-starting.py")
+_post_message_text = getattr(_announce, "_post_message_text", None)
+_is_work_call = getattr(_announce, "_is_work_call", None)
+if _post_message_text is None or _is_work_call is None:
+    print("no-empty-promise: cannot load _post_message_text/_is_work_call from "
+          "no-announced-start-without-starting.py; post_message replies go "
+          "unscanned", file=sys.stderr)
 
 # A first-person commitment about a CLASS of future occasions. Each
 # alternative pairs a first-person modal with a generalizer, because "I'll
@@ -638,6 +651,9 @@ def scan(path):
 
         tool_calls = []
         text_blocks = []
+        # Whether a call other than the reply itself followed: a post_message
+        # call is the announcement, not the work starting.
+        work_called = False
 
         if kind == "assistant" or m.get("role") == "assistant":
             if isinstance(blocks, list):
@@ -647,6 +663,11 @@ def scan(path):
                             text_blocks.append(b.get("text") or "")
                         elif b.get("type") == "tool_use":
                             tool_calls.append((b.get("name") or "", b.get("input") or {}, b.get("id")))
+                            posted = _post_message_text(b) if _post_message_text else None
+                            if posted:
+                                text_blocks.append(posted)
+                            if _is_work_call is None or _is_work_call(b):
+                                work_called = True
             elif isinstance(blocks, str):
                 text_blocks.append(blocks)
 
@@ -673,6 +694,7 @@ def scan(path):
                             targs = {"command": targs}
                     tid = tc.get("id") or str(id(tc))
                     tool_calls.append((tname, targs if isinstance(targs, dict) else {}, tid))
+                    work_called = True
 
         for raw in text_blocks:
             if not raw.strip():
@@ -691,7 +713,7 @@ def scan(path):
             if hit:
                 announce_txt = hit.group(0).strip()
 
-        if tool_calls:
+        if work_called:
             # Work followed the announcement, so it was not left unstarted.
             announce_txt = None
 

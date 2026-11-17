@@ -30,6 +30,13 @@ except Exception as _exc:  # broken install; fail open and say so
           f"({_exc}); not tracking the shell's directory", file=sys.stderr)
     native_path = resolve_cd_target = simple_commands_with_scope = strip_env = None
 
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"no-unshipped-commit: cannot load scripts/lib/sibling.py "
+          f"({_exc}); no-push-without-self-review.py will not load", file=sys.stderr)
+    load_sibling = None
+
 # `(?![\w-])`, not `\b`. A word boundary sits happily between `commit` and
 # `-`, because `-` is a non-word character -- so `git\s+commit\b` matched
 # `git commit-tree`, plumbing that writes a commit object and moves no ref.
@@ -882,22 +889,11 @@ def _load_review_guard():
     if _REVIEW_GUARD_LOADED:
         return _REVIEW_GUARD
     _REVIEW_GUARD_LOADED = True
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-push-without-self-review.py")
-    if not os.path.isfile(path):
+    if load_sibling is None:
         return None
-    try:
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("no_push_without_self_review", path)
-        if spec is None or spec.loader is None:
-            return None
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        _REVIEW_GUARD = module
-        return module
-    except Exception as exc:
-        print(f"no-unshipped-commit: cannot load no-push-without-self-review.py ({exc})",
-              file=sys.stderr)
-        return None
+    _REVIEW_GUARD = load_sibling(__file__, "no-push-without-self-review.py",
+                                 "no_push_without_self_review")
+    return _REVIEW_GUARD
 
 
 def _rev_parse(cwd, rev="HEAD"):

@@ -19,7 +19,6 @@ The reader is imported from ``no-offer-to-file.py`` so project-thread reply
 payloads, Antigravity transcripts, and code-fence stripping stay consistent.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -30,15 +29,20 @@ import tempfile
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
+_LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
+
+
 def _sibling(name):
-    """Import a hyphenated hook sibling, returning ``None`` on failure."""
-    try:
-        spec = importlib.util.spec_from_file_location("_sibling", os.path.join(HERE, name))
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
-    except Exception:
-        return None
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name, "_sibling") if load_sibling else None
 
 
 _offer = _sibling("no-offer-to-file.py")

@@ -132,6 +132,33 @@ def main():
         git(d, "add", "-A")
         git(d, "commit", "-qm", message)
 
+    def merge_main(d, names):
+        """Advance origin/main by a commit adding `names`, then merge it into feature."""
+        git(d, "switch", "-q", "main")
+        add_files(d, names, "main moves on")
+        git(d, "update-ref", "refs/remotes/origin/main", "HEAD")
+        git(d, "switch", "-q", "feature")
+        git(d, "merge", "-q", "--no-edit", "origin/main")
+
+    # Pushed over the cap, then main (20 new files) merged in: the PR diff is
+    # unchanged, but origin/feature..HEAD holds all of main's files (#5721).
+    synced = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    push_tip(synced)
+    merge_main(synced, [f"m{i}.qmd" for i in range(20)])
+    # The same merge, then a commit that grows the PR diff over the cap.
+    synced_grown = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    push_tip(synced_grown)
+    merge_main(synced_grown, [f"m{i}.qmd" for i in range(20)])
+    add_files(synced_grown, [f"g{i}.qmd" for i in range(11)], "more")
+    # Rebased onto a moved main: the commits are new, the PR diff is not.
+    rebased = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    push_tip(rebased)
+    git(rebased, "switch", "-q", "main")
+    add_files(rebased, [f"m{i}.qmd" for i in range(20)], "main moves on")
+    git(rebased, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(rebased, "switch", "-q", "feature")
+    git(rebased, "rebase", "-q", "origin/main")
+
     # A branch pushed over the cap, then a small fix on top of it.
     pushed = make_repo({f"f{i}.qmd": 1 for i in range(12)})
     push_tip(pushed)
@@ -160,6 +187,12 @@ def main():
         ("a registration file's lines still count", run("git push", big_readme), True),
         ("changelog fragments not naming the capability still count",
          run("git push", other_fragments), True),
+        ("a merge from main that leaves an over-cap PR diff unchanged passes (#5721)",
+         run("git push", synced), False),
+        ("a merge from main plus an over-cap addition is denied",
+         run("git push", synced_grown), True),
+        ("a rebase that leaves the PR diff unchanged passes",
+         run("git push --force-with-lease", rebased), False),
         ("a stale tracking ref does not stand in for the server's tip",
          run("git push", stale), True),
         ("an open PR labelled size-exempt passes",

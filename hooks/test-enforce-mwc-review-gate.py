@@ -291,7 +291,8 @@ def main():
     import tempfile
 
     def transcript_with(*records):
-        fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+        fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
+                                         encoding="utf-8")
         for rec in records:
             fh.write(json.dumps(rec) + "\n")
         fh.close()

@@ -1063,6 +1063,13 @@
             "timeout": 10,
             "script": "no-truncated-bar-axis.py",
             "why": "ai-config#5614. 2026-11-12: a slide session built matplotlib bar charts for a .pptx with the y-axis starting well above zero, so a one-point gap in coverage looked large, and added a speaker-note caution instead of fixing the axis; shared/writing/visuals-everywhere.md already asked for zero when it matters and was read as covering Quarto and R only. DENIES a Write/Edit/MultiEdit of a code file (judged on the file after the edit) or a Bash command whose text draws a bar chart (matplotlib, ggplot2, plotly, python-pptx) and sets its value axis to a literal lower limit above zero. A comment 'axis-zero: allow <reason>' exempts it. Computed limits and dot or line plots are not judged; the prose rule covers them. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-cross-repo-copy.py\"",
+            "timeout": 10,
+            "script": "no-cross-repo-copy.py",
+            "why": "Ezra, 2026-11-16: \"don't copy; decompose\" (ai-config#5709). A session proposed copying lds and mlg's cluster render setup into mcsg instead of factoring it into one reusable component. DENIES a Write of a new file whose content mostly repeats (15+ shared lines, 70%+ of its lines over 3 characters) a same-named file in a sibling repository, or a Bash cp, rsync or install that copies a file of 15+ lines from one repository to a new path in another, a repository being identified by its common git dir so a linked worktree is not another repository. Vendored paths, a thin caller of a gha reusable workflow, a remote or existing destination, and a '# decompose: allow <reason>' comment pass. Fails open on any parse trouble."
           }
         ]
       },
@@ -1403,7 +1410,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-cross-repo-copy.py\"",
             "timeout": 10,
             "script": "no-cross-repo-copy.py",
-            "why": "Ezra, 2026-11-16: \"don't copy; decompose\" (ai-config#5709). A session proposed copying lds and mlg's cluster render setup into mcsg instead of factoring it into one reusable component. DENIES a Write of a new file whose content mostly repeats (15+ shared lines, 70%+ of its lines over 3 characters) a same-named file in a sibling repository, a repository being identified by its common git dir so a linked worktree is not another repository. Vendored paths, a thin caller of a gha reusable workflow, and a '# decompose: allow <reason>' comment pass. Fails open on any parse trouble."
+            "why": "Ezra, 2026-11-16: \"don't copy; decompose\" (ai-config#5709). A session proposed copying lds and mlg's cluster render setup into mcsg instead of factoring it into one reusable component. DENIES a Write of a new file whose content mostly repeats (15+ shared lines, 70%+ of its lines over 3 characters) a same-named file in a sibling repository, or a Bash cp, rsync or install that copies a file of 15+ lines from one repository to a new path in another, a repository being identified by its common git dir so a linked worktree is not another repository. Vendored paths, a thin caller of a gha reusable workflow, a remote or existing destination, and a '# decompose: allow <reason>' comment pass. Fails open on any parse trouble."
           }
         ]
       },

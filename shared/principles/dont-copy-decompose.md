@@ -41,9 +41,12 @@ Say which case applies in the issue or PR, as [`centralize-or-distribute`](../wo
 ## Mechanism
 
 `hooks/no-cross-repo-copy.py` denies a `Write` of a new file whose content mostly repeats a same-named file in a sibling repository.
+It also denies a `cp`, `rsync` or `install` command, including one inside `sh -c`, that copies a file of 15 or more lines from one repository to a new path in another.
 A move, or a copy that must stay a copy, passes with a line comment `decompose: allow <reason>` in the file's own comment syntax (`<!--` in Markdown), so review sees the reason.
+A shell copy passes with the same marker as a `#` comment on the command.
 
-The hook does not yet see a copy made with `cp`, `rsync` or `install`, or a `Write` over an existing file ([ai-config#5709](https://github.com/Morrison-Lab/ai-config/issues/5709) tracks the shell copy).
+The hook does not judge a `Write` or a shell copy over an existing file, since that changes a file rather than creating a copy, or a shell copy to a remote `host:path`, which is a deploy.
+It does not follow a directory copy (`cp -r`) or a path behind `$VAR`.
 It does not compare a new file with files of other names or with its own repository, since a scan of every tracked file is slow on each `Write` and refuses boilerplate that ordinary files repeat, such as a config stub.
 It cannot see a copy of a design rather than of text, which shares no text.
 This prose rule and review (`.claude/agents/adversarial-reviewer.md`) cover all three.

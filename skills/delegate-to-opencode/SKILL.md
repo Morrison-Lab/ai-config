@@ -212,7 +212,6 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   Streaming fixed it: send `"stream": true` with `curl -N`, `"reasoning_effort": "low"` and `"max_tokens": 60000`, and read the answer from the SSE `delta.content` fields.
   With 24000 tokens the model spent the whole budget on reasoning and stopped with `finish_reason: length`.
   `glm-5.3` streams its reasoning under `delta.reasoning`, and on one 190-line review it was still reasoning when a 570 s `--max-time` ran out.
-  From 2026-11-17 02:59 UTC the Go route refused a request with no `x-opencode-session` header (`MissingSessionID`), so send `-H "x-opencode-session: <any id>"`, such as `review-<PR>-$(date +%s)`.
 
   Check `/models` for the current free ids and try them before relying on this route.
 - **Make the request with `curl` itself if it is to satisfy the merge gate.**

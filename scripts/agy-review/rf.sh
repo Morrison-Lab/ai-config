@@ -5,7 +5,7 @@
 # It posts the first read that is a real review: a verdict as last line, no agy error, not a plan.
 d=$(cd "$(dirname "$0")" && pwd); cd "$d"
 slug=$1; pr=$2; extra=$3
-tail_note=" Do not write a plan, do not create artifacts, do not ask questions or request approval: answer in one pass with the review itself. List every finding, wording and style nits included, each in at most 3 lines with the quoted passage. Keep the answer under 3000 characters. The last line must be exactly VERDICT: FINDINGS if you list any finding at all, or exactly VERDICT: CLEAN if there is none (then say only that nothing was found)."
+tail_note=" Do not write a plan, do not create artifacts, do not ask questions or request approval: answer in one pass with the review itself. List every finding, wording and style nits included, each in at most 3 lines with the quoted passage. Keep the answer under 3000 characters. The last line must be exactly VERDICT: FINDINGS if you list any finding at all, or exactly VERDICT: CLEAN if there is none (then write no Findings heading and say only that nothing was found)."
 f="out-${slug//\//_}-$pr.txt"
 real_read() {
   grep -q '^VERDICT: ' "$f" || return 1

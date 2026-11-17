@@ -247,7 +247,7 @@ curl -s https://opencode.ai/zen/go/v1/chat/completions \
 **Non-streaming requests fail for review-sized or substantial prompts.**
 Measured in a claude.ai cloud session on 2026-10-12, a non-streaming request with a ~22 KB diff failed: `glm-5.3` returned HTTP 502 after about 30 seconds, and `deepseek-v4-pro` returned an empty body with `upstream request failed` (while a `PONG` smoke test on the same endpoint returned 200 in 1.8 seconds).
 The roughly 30-second gateway cutoff requires streaming for anything longer than a trivial prompt.
-A 2026-11-17 measurement (below) saw non-streaming requests complete after more than 120 seconds, so the cutoff is not constant, but streaming stays the default.
+A 2026-11-17 measurement (below) saw a non-streaming request complete after more than 120 seconds, so the cutoff is not constant, but streaming stays the default.
 
 **Always stream review-sized prompts and assemble `delta.content` chunks.**
 Add `"stream": true` to the payload, pass a generous `--max-time` (e.g. 600 or 900 seconds), and pipe into `scripts/parse-sse.py` (or an inline Python extractor):
@@ -284,13 +284,13 @@ for line in sys.stdin:
 
 **Model reliability for large prompts in cloud sessions:**
 - `deepseek-v4-pro`: Verified reliable on 2026-10-12 with `"stream": true` on review-sized prompts, returning complete reviews over several minutes.
-  On 2026-11-17 a streamed ~25 KB prompt combining five PRs returned nothing (see below).
+  On 2026-11-17 a streamed ~25 KB prompt combining five PRs returned no `delta.content` (see below).
 - `glm-5.3`: Unreliable on large prompts even when streaming.
   In testing, it sent ~4.8 MB of deltas in 290 seconds with no `delta.content` before timing out, or returned `upstream request failed`.
   Prefer `deepseek-v4-pro` for review-sized or multi-KB prompts, but see the 2026-11-17 measurement below, where `kimi-k3` succeeded more often.
 
 **From a 2026-11-17 measurement in a claude.ai cloud session, the recommendation is to send one payload per PR, one at a time, through the model fallback loop, and to retry later when every model fails.**
-This measurement qualifies the `deepseek-v4-pro` preference above: on that day no model handled the combined prompt, and each handled a per-PR prompt only some of the time.
+This measurement qualifies the `deepseek-v4-pro` preference above: on that day no model handled the combined prompt, and only `kimi-k3` and `deepseek-v4-pro` are recorded handling a per-PR prompt, and each only some of the time.
 The attempts, in order:
 
 1. A streamed ~25 KB review prompt (five PRs' diffs in one payload) returned no `delta.content` from `deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max` or `glm-5.3`, and a non-streaming `kimi-k3` retry of the same payload returned the bare body `upstream request failed`.
@@ -300,6 +300,7 @@ The attempts, in order:
    The third failed on every model, then succeeded on `kimi-k3` about 20 minutes later.
 
 No per-PR payload was sent streamed that day, so these attempts do not show which mode suits per-PR prompts better.
+Until that is measured, keep streaming as the first try for a per-PR payload, and fall back to a non-streaming send when the stream returns no `delta.content`.
 
 **Python `urllib` returns 403 Forbidden; always use `curl`.**
 In a claude.ai cloud session (as observed on 2026-10-13), HTTP requests made via Python's `urllib` (or `requests`) to `https://opencode.ai/zen/go/v1/chat/completions` fail with `403 Forbidden` from the cloud agent proxy, while `curl` with the identical body and headers returns `200 OK`.

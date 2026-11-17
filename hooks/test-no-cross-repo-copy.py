@@ -40,8 +40,8 @@ def denied(payload):
 
 def main():
     fails = 0
-    with tempfile.TemporaryDirectory() as base:
-        lds, mcsg = os.path.join(base, "lds"), os.path.join(base, "mcsg")
+    with tempfile.TemporaryDirectory() as tmp:  # checkouts under vendor/: only in-repo paths are exempt
+        lds, mcsg = os.path.join(tmp, "vendor", "lds"), os.path.join(tmp, "vendor", "mcsg")
         for repo in (lds, mcsg):
             git("init", "-q", "-b", "main", repo)
         put(os.path.join(lds, ".github", "workflows", "publish.yml"), WORKFLOW)

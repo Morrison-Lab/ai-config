@@ -2066,6 +2066,8 @@ def _ng_bash(command):
 _NG_LIST = [_tg_user("merge csci201 PRs 28, 24, 25, 26 and 27")]
 _NG_CASES = [
     ("'merge PR 113' grants #113", [_tg_user("merge PR 113")], _ng_mcp(113, "mcsg"), "allow"),
+    ("a repo-less 'merge PR 113' matches #113 in another repo (documented scope)",
+     [_tg_user("merge PR 113")], _ng_mcp(113, "csci201"), "allow"),
     ("'merge PR 113' does not grant #114", [_tg_user("merge PR 113")], _ng_mcp(114, "mcsg"), "BLOCK"),
     ("a listed PR is granted", _NG_LIST, _ng_mcp(24), "allow"),
     ("the last listed PR is granted", _NG_LIST, _ng_mcp(27), "allow"),

@@ -2314,9 +2314,11 @@ def transcript_named_grant(payload: dict | None, target: str | None, number: int
 
     "merge PR 113" or "merge csci201 PRs 28, 24 and 25" grants exactly those
     numbers. When the instruction names a repository, the merge's `target`
-    (`owner/repo`) must be that repository; an unknown target then denies. A
-    later revocation clears every named grant before it, as for the
-    session-wide grant.
+    (`owner/repo`) must be that repository; an unknown target then denies.
+    An instruction that names no repository ("merge PR 113") matches that
+    number in any repository, as the typed blanket grant already matches
+    every PR. A later revocation clears every named grant before it, as for
+    the session-wide grant.
     """
     if number is None:
         return False
@@ -2333,7 +2335,10 @@ def transcript_named_grant(payload: dict | None, target: str | None, number: int
                 granted = set()
             else:
                 granted |= detector.named_merge_grants(prompt)
-    except Exception:
+    except Exception as exc:
+        # Fails closed, but not silently: a detector bug would otherwise look
+        # like a grant that never applies.
+        print(f"no-unauthorized-merge: named-grant read failed ({exc})", file=sys.stderr)
         return False
     repo = target.split("/")[-1].lower() if target else None
     return any(n == number and (r is None or r == repo) for r, n in granted)
@@ -2530,7 +2535,7 @@ def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
                 and owner.strip() and repo.strip() else None,
                 int(str(pull_num).strip()))):
         return None
-    mcp_sha =tool_input.get("expectedHeadSha") or tool_input.get("expected_head_sha") or ""
+    mcp_sha = tool_input.get("expectedHeadSha") or tool_input.get("expected_head_sha") or ""
     # The infra-PR grant covers the merge tool only: enabling auto-merge
     # merges whatever the PR holds when checks pass, not what it holds now.
     if (tool_name.lower().endswith("merge_pull_request")

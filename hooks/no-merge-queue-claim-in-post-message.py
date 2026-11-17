@@ -15,7 +15,7 @@ a Thread Session". The coordinator and other sessions are never blocked.
 
 Blocks (deny) text that says "merge queue" (or "merge-queue") unless the
 transcript shows something was enqueued: a `tool_use` block that calls
-`enable_pr_auto_merge`, or one whose input (a Bash command) requests
+`enable_pr_auto_merge`, or a Bash `tool_use` whose `command` requests
 `ccr/auto_merge` or runs `gh pr merge --auto`. Only `tool_use` blocks count, so
 the hook's own denial text, a doc a thread read, or a tool listing naming the
 tool cannot unlock it. The truthful report is that
@@ -77,7 +77,10 @@ def enqueued(transcript: str) -> bool:
         for block in tool_uses(record):
             if ENQUEUED_TOOL.search(str(block.get("name") or "")):
                 return True
-            if ENQUEUED_INPUT.search(json.dumps(block.get("input"))):
+            # Only a command that ran counts: a post, an echo's argument in
+            # another tool, or a denied post's own input must not unlock it.
+            command = (block.get("input") or {}).get("command") if block.get("name") == "Bash" else None
+            if isinstance(command, str) and ENQUEUED_INPUT.search(command):
                 return True
     return False
 

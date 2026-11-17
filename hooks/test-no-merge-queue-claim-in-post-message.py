@@ -47,7 +47,9 @@ AUTO_CLI = transcript("You are a Thread Session.",
                       tool_use_line("Bash", {"command": "gh pr merge 12 --squash --auto"}))
 CCR_AUTO = transcript("You are a Thread Session.",
                       tool_use_line("Bash", {"command": "gh api -X PUT repos/o/r/pulls/12/ccr/auto_merge"}))
-OWN_DENIAL = transcript("You are a Thread Session.", tool_result_line(hook.REASON))
+POST_QUOTING = transcript("You are a Thread Session.",
+                          tool_use_line(POST, {"text": "Not enqueued: no gh pr merge 12 --auto ran."}))
+OWN_DENIAL =transcript("You are a Thread Session.", tool_result_line(hook.REASON))
 BARE_MENTION = transcript("You are a Thread Session.",
                           '{"name": "mcp__github__enable_pr_auto_merge"}\ngh pr merge 12 --squash --auto\n')
 
@@ -78,6 +80,8 @@ check("gh pr merge --auto lets it through", not denied("It is in the merge queue
 check("a ccr/auto_merge request lets it through", not denied("It is in the merge queue.", tpath=CCR_AUTO))
 check("the hook's own earlier denial does not unlock a retry",
       denied("It is in the merge queue.", tpath=OWN_DENIAL))
+check("a non-Bash tool_use quoting gh pr merge --auto does not unlock it",
+      denied("It is in the merge queue.", tpath=POST_QUOTING))
 check("a bare mention outside a tool_use block does not unlock it",
       denied("It is in the merge queue.", tpath=BARE_MENTION))
 check("text without the phrase passes", not denied("Final head sent on; it waits on a merge in the runner."))

@@ -713,16 +713,25 @@ def test_snapshot_steps_fetch_without_submodule_recursion():
           env["GIT_CONFIG_COUNT"] == "2" and env["GIT_CONFIG_KEY_0"] == "core.pager"
           and env["GIT_CONFIG_KEY_1"] == "fetch.recurseSubmodules"
           and env["GIT_CONFIG_VALUE_1"] == "false")
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        seen = {}
-        for in_snapshot in (True, False):
-            out = Path(tmp) / f"out-{in_snapshot}"
-            step = rlv.Step(name="probe", command="(git config --get fetch.recurseSubmodules"
-                            f" || echo unset) > {shlex.quote(out.as_posix())}")
-            rlv.run_step(step, Path(tmp), 30, in_snapshot=in_snapshot)
-            seen[in_snapshot] = out.read_text(encoding="utf-8").strip()
-    check("a snapshot step sees fetch.recurseSubmodules=false, and an in-place step does not",
-          seen == {True: "false", False: "unset"})
+    # When this suite itself runs as a snapshot step (the cross-platform
+    # workflow runs every validate step through this runner), it inherits
+    # the parent's GIT_CONFIG_* pairs, and the in-place probe would read the
+    # parent's `false`. Probe from a clean slate, then restore.
+    inherited = {k: os.environ.pop(k) for k in list(os.environ)
+                 if k == "GIT_CONFIG_COUNT" or k.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))}
+    try:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            seen = {}
+            for in_snapshot in (True, False):
+                out = Path(tmp) / f"out-{in_snapshot}"
+                step = rlv.Step(name="probe", command="(git config --get fetch.recurseSubmodules"
+                                f" || echo unset) > {shlex.quote(out.as_posix())}")
+                rlv.run_step(step, Path(tmp), 30, in_snapshot=in_snapshot)
+                seen[in_snapshot] = out.read_text(encoding="utf-8").strip()
+    finally:
+        os.environ.update(inherited)
+    check("a snapshot step sees fetch.recurseSubmodules=false, and an in-place step does not"
+          f" (saw {seen})", seen == {True: "false", False: "unset"})
 
 
 def main():

@@ -1223,6 +1223,14 @@ MUTATIONS = {
     ),
 }
 
+# Cases a mutation MAY also flip, depending on machine speed. Under
+# M_mode_160000 every one of W38's 5000 modified files reads as a gitlink, so
+# the hook runs one `git rev-parse` per path; a slow runner (the macOS
+# cross-platform job, ai-config#5494) spends the deadline, fails open and
+# goes silent, while a fast one finishes and still warns. The declared flip
+# (S21) must still happen either way.
+MAY_FLIP = {"M_mode_160000": {"W38"}}
+
 print("\nmutation tests (revert one clause, see which cases flip):")
 mutation_wrong = 0
 with tempfile.TemporaryDirectory() as tmp:
@@ -1255,7 +1263,7 @@ with tempfile.TemporaryDirectory() as tmp:
         # every later clause: rebuild those two.
         for stat_dirty in (filter_repo, index_hook_repo):
             _REPOS.pop(stat_dirty, None)
-        ok = flipped == expected_flips
+        ok = expected_flips <= flipped <= expected_flips | MAY_FLIP.get(clause, set())
         mutation_wrong += not ok
         if not flipped and expected_flips:
             note = "NOTHING FLIPPED -- this clause is untested"

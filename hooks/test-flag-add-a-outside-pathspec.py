@@ -20,14 +20,15 @@ just a JSON payload. `verdict()` builds one with `_repo()`, runs the hook with
 and tears it down.
 
 `cwd` matters here in a way it never does for a pure-text guard: this hook is
-`PreToolUse`, so it always sees the session's cwd BEFORE the command runs --
-a `cd sub && git add .` in one Bash call is checked from the ORIGINAL cwd,
-not from `sub/`, since none of the command has executed yet. So the
-cwd-scope cases below run the hook directly with `cwd=<repo>/sub` and a bare
-`git add .`, which is what a session already sitting in `sub/` (from an
-earlier Bash call) issuing this one would actually look like -- NOT a
-`cd ... &&`-prefixed command, which this hook cannot and does not simulate
-(a documented limitation, not a bug).
+`PreToolUse`, so it runs before any of the command has executed. It therefore
+works out where the matched `git add` will run (M7, ai-config#1731): the
+payload's `cwd`, then each `cd`/`pushd`/`popd` before it in the same shell.
+Two kinds of case cover that. W5 and S10 run the hook with its process cwd in
+`<repo>/sub` and a bare `git add .`, a session already sitting in `sub/`.
+The `cd`-prefixed cases (W8-W11, S12-S17) put the directory change in the
+command itself, or in the payload's `cwd`, with the hook process launched
+somewhere else, so a hook that read its own process cwd would get them
+wrong.
 
 The second half is the same MUTATION harness described in
 `shared/principles/fail-fast.md`'s "A guard whose condition ANDs several
@@ -212,6 +213,18 @@ SHOULD_WARN = [
     ("W7", explicit_path_repo, "env FOO=1 git add -A", None,
      "a lead word (`env`) and a VAR=value assignment are both skipped "
      "before matching the invocation"),
+    ("W8", clean_repo, "cd {dirty} && git add -A", None,
+     "M7: launched from a clean repo, a `cd` into a DIRTY one checks the "
+     "dirty one (ai-config#1731)"),
+    ("W9", cwd_scope_clean_sub_repo, "cd .. && git add .", "sub",
+     "M7: launched from a clean sub/, `cd ..` scopes `.` to the repo root, "
+     "where an untracked file sits"),
+    ("W10", clean_repo, "@payloadcwd={dirty} git add -A", None,
+     "M7: the payload's `cwd` (a dirty repo) is where the command starts, "
+     "not the hook process's own (clean) directory"),
+    ("W11", cwd_scope_clean_sub_repo, "cd sub | cat; git add .", None,
+     "M7: a `cd` in a pipeline stage runs in a forked shell, so the `.` "
+     "still means the repo root"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -241,11 +254,36 @@ SHOULD_STAY_SILENT = [
     ("S10", cwd_scope_clean_sub_repo, "git add .", "sub",
      "cwd-scoped `.`, run from a clean sub/, filters out the untracked file "
      "OUTSIDE it and finds nothing to warn about"),
+    ("S12", cwd_scope_clean_sub_repo, "cd sub && git add .", None,
+     "M7: the command's own `cd sub` sets the scope, so launched from the "
+     "repo root it still filters out the untracked file outside sub/ "
+     "(ai-config#1731)"),
+    ("S13", explicit_path_repo, "cd {clean} && git add -A", None,
+     "M7: launched from a dirty repo, a `cd` into ANOTHER, clean repository "
+     "checks that repository, not the launch directory -- the #1731 "
+     "cross-worktree repro"),
+    ("S14", explicit_path_repo, 'cd "$X" && git add -A', None,
+     "M7: a `cd` to a directory the text does not name fails open"),
+    ("S15", cwd_scope_clean_sub_repo, "cd sub; cd nope; git add .", None,
+     "M7: a `cd` into a directory that does not exist yet fails open "
+     "rather than guessing the repo root"),
+    ("S16", explicit_path_repo, "cd nope; git add -A", None,
+     "M7: the accepted trade-off -- a `cd` that will fail cannot be told "
+     "from one into a directory the command creates, so it fails open"),
+    ("S17", explicit_path_repo, "mkdir -p zz-new && cd zz-new && git add .",
+     None,
+     "M7: the add runs in the directory the command itself creates, not in "
+     "the dirty launch directory"),
 ]
 
 
 def verdict(hook_path, repo, command, subdir):
+    payload_cwd = None
+    if command.startswith("@payloadcwd="):  # shapes the payload, not the command
+        payload_cwd, _, command = command[len("@payloadcwd="):].partition(" ")
     payload = bash(command)
+    if payload_cwd:
+        payload["cwd"] = payload_cwd
     cwd = os.path.join(repo, subdir) if subdir else repo
     proc = subprocess.run(
         [sys.executable, hook_path], input=json.dumps(payload),
@@ -270,11 +308,22 @@ def verdict(hook_path, repo, command, subdir):
 
 
 def build_and_verdict(hook_path, builder, command, subdir):
+    """`{clean}` / `{dirty}` in `command` name a second repository built for
+    the case (clean, or with one untracked file), so a test can `cd` from the
+    launch repo into another one, or name it as the payload's `cwd`."""
     repo = _repo(builder)
+    others = {}
+    for key, other_builder in (("{clean}", clean_repo),
+                               ("{dirty}", explicit_path_repo)):
+        if key in command:
+            others[key] = _repo(other_builder)
+            command = command.replace(key, others[key])
     try:
         return verdict(hook_path, repo, command, subdir)
     finally:
         shutil.rmtree(repo, ignore_errors=True)
+        for other in others.values():
+            shutil.rmtree(other, ignore_errors=True)
 
 
 if not os.path.isfile(HOOK):
@@ -322,7 +371,7 @@ MUTATIONS = {
         "`-A`/`--all` with no including pathspec means whole-repo scope",
         [('    if has_all and not includes:\n        return "repo", excludes',
           "    if False:\n        return \"repo\", excludes")],
-        {"W1", "W2", "W4", "W6", "W7"},
+        {"W1", "W2", "W4", "W6", "W7", "W8", "W10"},
     ),
     "M3_bare_dot": (
         "a bare `.`/`./` including pathspec means cwd scope",
@@ -334,7 +383,7 @@ MUTATIONS = {
         # before ever reaching the cwd-scope filter S10 exists to check --
         # it stays silent either way, for a different reason. S10's own
         # positive control is M6_cwd_filter below, not this clause.
-        {"W3", "W5"},
+        {"W3", "W5", "W9", "W11"},
     ),
     "M4_update_only": (
         "`-u`/`--update` beats a bare `.` include -- never stages an "
@@ -371,13 +420,44 @@ MUTATIONS = {
     "M6_cwd_filter": (
         "cwd scope filters out untracked paths outside the current directory",
         [('    if scope == "cwd":\n'
-          "        rel = _repo_relative_cwd()\n"
+          "        rel = _repo_relative_cwd(run_dir)\n"
           '        if rel and rel != ".":\n'
           '            prefix = rel.rstrip("/") + "/"\n'
           "            untracked = [p for p in untracked\n"
           "                        if p == rel or p.startswith(prefix)]",
           "    if False:\n        pass")],
-        {"S10"},
+        {"S10", "S12"},
+    ),
+    "M7_status_dir": (
+        "`git status` runs in the directory the `git add` runs in, not the "
+        "hook process's own (ai-config#1731)",
+        [("        untracked = _untracked_files(run_dir)",
+          "        untracked = _untracked_files(None)")],
+        {"W8", "W10", "S13"},
+    ),
+    "M7_payload_cwd": (
+        "the payload's `cwd` is where the command starts (ai-config#1731)",
+        [('(inp.get("Cwd"), payload.get("cwd"))', "()")],
+        {"W10"},
+    ),
+    "M7_pipeline_cd": (
+        "a `cd` in a pipeline stage or background job moves nothing",
+        [("    ignore_cd = _unreachable_cd(command)", "    ignore_cd = False")],
+        {"W11"},
+    ),
+    "M7_missing_dir": (
+        "a `cd` to a directory that does not exist yet makes the directory "
+        "unknown, never the old one",
+        [("        return target if exists else None",
+          "        return target if exists else cur")],
+        {"S16", "S17"},
+    ),
+    "M7_scope_dir": (
+        "the cwd-scope filter is relative to the `git add`'s directory, not "
+        "the hook process's own (ai-config#1731)",
+        [("        rel = _repo_relative_cwd(run_dir)",
+          "        rel = _repo_relative_cwd(os.getcwd())")],
+        {"S12", "W9"},
     ),
     "M_named_include_scopes": (
         "`-A` plus a specific non-`.` pathspec does NOT mean whole-repo scope",

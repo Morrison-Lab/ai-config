@@ -64,6 +64,28 @@ README's "A hook that misfires is worse than a missing one".
   M6  scope is whole-repo for `-A`/`--all` with no including pathspec, and
       cwd-and-below (untracked paths not starting with `../`) for a bare `.`
       pathspec -- matching git's own scoping rules for `add`
+  M7  `git status` and `git rev-parse` run in the directory the matched
+      `git add` itself runs in: the payload's `cwd` (or `tool_input.Cwd`),
+      moved by every `cd`/`pushd`/`popd` before it in the same subshell, by
+      the shared `shellcmd.walk_dirs`.
+      A `cd` in a pipeline stage or a background job (`cd x | cat`,
+      `cd x &`) runs in a forked shell and moves nothing, so a command
+      holding one is checked from its starting directory
+      (`shellcmd.unreachable_cd`).
+      A directory the text does not name (`cd -`, `cd "$X"`) fails open.
+      A `cd` to a named directory that does not exist yet fails open too.
+      The hook runs before the command, so it cannot tell a `cd` that will
+      fail (`cd nope; git add -A`, which then adds in the old directory)
+      from one into a directory the command creates first
+      (`mkdir -p d && cd d && git add .`,
+      `git worktree add ../w && cd ../w && git add -A`).
+      Guessing the old directory would report another checkout's files,
+      the #1731 defect, so it does not guess.
+      Before ai-config#1731 both calls ran in the hook process's own
+      directory, so `cd <worktree> && git add -A` reported another
+      checkout's untracked files and could miss the real ones.
+      A `git -C <dir> add` is not matched at all (M2 reads `add` as the
+      word after `git`), which is the silent direction.
 
 Fails OPEN on any parse trouble, on `git status` failing or timing out, and
 outside a git repository -- consistent with every other guard in this
@@ -87,7 +109,10 @@ try:
         os.path.realpath(__file__))), "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import simple_commands as _simple_commands
+    from shellcmd import simple_commands_with_scope as _simple_commands
+    from shellcmd import walk_dirs as _walk_dirs
+    from shellcmd import unreachable_cd as _unreachable_cd
+    from shellcmd import move_dir as _move_dir
 except Exception as _exc:  # broken install: degrade, never block
     print(f"flag-add-a-outside-pathspec: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); "
@@ -96,6 +121,8 @@ except Exception as _exc:  # broken install: degrade, never block
     def _simple_commands(_cmd):
         """Parse nothing when the shared splitter is missing."""
         return None
+
+    _walk_dirs = None
 
 
 def _pathspec_value(token):
@@ -148,13 +175,32 @@ def _add_everything(args):
     return None
 
 
-def offending(command):
-    """(matched_segment, scope, exclusions) for the first "add everything"
-    `git add` invocation in `command`, or None."""
+def offending(command, base=None):
+    """(matched_segment, scope, exclusions, directory) for the first "add
+    everything" `git add` invocation in `command`, or None.
+
+    `directory` is where that `git add` runs, relative to the directory the
+    command starts in ("" for that directory itself), absolute after a
+    `cd /abs`, or None when a `cd` before it goes somewhere the text does
+    not name (M7).
+    `base` is that starting directory on disk; given it, a `cd` to a
+    directory that does not exist yet makes the directory unknown, since the
+    text alone cannot tell a `cd` that will fail from one into a directory an
+    earlier `mkdir` or `git worktree add` in the same command creates."""
     cmds = _simple_commands(command)
-    if cmds is None:
+    if cmds is None or _walk_dirs is None:
         return None
-    for argv in cmds:
+
+    def move(rest, cur):
+        target = _move_dir(rest, cur)
+        if base is None or target is None:
+            return target
+        exists = os.path.isdir(os.path.join(base, target))
+        return target if exists else None
+
+    ignore_cd = _unreachable_cd(command)
+    for argv, _env, _rest, cur in _walk_dirs(cmds, "", ignore_cd=ignore_cd,
+                                             move=move):
         i = 0
         while i < len(argv) and (ASSIGNMENT.match(argv[i])
                                   or argv[i] in LEAD_WORDS):
@@ -166,17 +212,18 @@ def offending(command):
         if result is None:
             continue
         scope, excludes = result
-        return " ".join(argv), scope, excludes
+        return " ".join(argv), scope, excludes, cur
     return None
 
 
-def _untracked_files():
-    """Every untracked path from `git status --porcelain=v1 -z`, or None if
-    `git status` cannot be run (not a repo, git missing, timeout)."""
+def _untracked_files(cwd):
+    """Every untracked path from `git status --porcelain=v1 -z` run in `cwd`,
+    or None if `git status` cannot be run (not a repo, git missing,
+    timeout)."""
     try:
         out = subprocess.run(
             ["git", "status", "--porcelain=v1", "-z"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, cwd=cwd,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -200,8 +247,8 @@ def _untracked_files():
     return untracked
 
 
-def _repo_relative_cwd():
-    """cwd's path relative to the repository's top level -- e.g. "sub" when
+def _repo_relative_cwd(cwd):
+    """`cwd`'s path relative to the repository's top level -- e.g. "sub" when
     invoked from `<repo>/sub`, or "." at the top level itself. None if this
     is not a git repository.
 
@@ -215,7 +262,7 @@ def _repo_relative_cwd():
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, cwd=cwd,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -225,7 +272,9 @@ def _repo_relative_cwd():
     if not toplevel:
         return None
     try:
-        return os.path.relpath(os.getcwd(), toplevel)
+        # git prints the resolved toplevel, so resolve `cwd` the same way
+        # before comparing, or a symlinked path reads as outside the repo.
+        return os.path.relpath(os.path.realpath(cwd), toplevel)
     except ValueError:
         return None  # e.g. different drives on Windows
 
@@ -299,8 +348,12 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
+    # M7: the directory the command starts in is the payload's, not this
+    # process's: tool_input.Cwd, then the payload's `cwd`, then ours.
+    base = next((c for c in (inp.get("Cwd"), payload.get("cwd"))
+                 if isinstance(c, str) and c), None) or os.getcwd()
     try:
-        hit = offending(command)
+        hit = offending(command, base)
     except Exception as exc:  # fail open on any parse trouble
         print(f"flag-add-a-outside-pathspec: could not parse command ({exc})",
               file=sys.stderr)
@@ -311,19 +364,25 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
-    segment, scope, excludes = hit
+    segment, scope, excludes, rel_dir = hit
+    if rel_dir is None:
+        if is_dry_run:
+            print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
+        return 0  # the git add runs somewhere the text does not name
+    run_dir = os.path.normpath(os.path.join(base, rel_dir))
+
     sim_untracked = os.environ.get("SIMULATE_UNTRACKED")
     if sim_untracked is not None:
         untracked = [u.strip() for u in sim_untracked.split(",") if u.strip()]
     else:
-        untracked = _untracked_files()
+        untracked = _untracked_files(run_dir)
     if untracked is None:
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0  # not a repo, git unreachable, or timed out -- fail open
 
     if scope == "cwd":
-        rel = _repo_relative_cwd()
+        rel = _repo_relative_cwd(run_dir)
         if rel and rel != ".":
             prefix = rel.rstrip("/") + "/"
             untracked = [p for p in untracked

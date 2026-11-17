@@ -218,8 +218,9 @@ if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
     from shellcmd import simple_commands_with_scope as _simple_commands
-    from shellcmd import resolve_cd_target as _resolve_cd_target
-    from shellcmd import strip_env as _strip_env
+    from shellcmd import move_dir as _move
+    from shellcmd import unreachable_cd as _unreachable_cd
+    from shellcmd import walk_dirs as _walk_dirs
     from shellcmd import shell_c_expansions as _shell_c_expansions
 except Exception as _exc:  # broken install: fail open, like every guard here
     print("flag-commit-a-sweeps-submodule: cannot load "
@@ -347,59 +348,6 @@ def add_kind(args):
     return ("add", paths) if paths else None
 
 
-def _move(rest, cur):
-    """The directory a `cd`, `pushd` or `popd` leaves the shell in, by the
-    shared resolver: None when it cannot be named (`cd -`, `popd`, `$VAR`,
-    a backtick), `~` expanded. `cur` is None while the directory is unknown,
-    and an unknown directory plus a relative move stays unknown."""
-    target = _resolve_cd_target(rest, cur)
-    if target is None or (cur is None and not os.path.isabs(target)):
-        return None
-    return target
-
-
-_LEAD_KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until",
-                  "time", "!"}
-
-
-def _starts_with_cd(piece):
-    """True if the pipeline stage `piece` is a cd, pushd or popd, after any
-    leading shell keywords (`then cd x`)."""
-    words = piece.split()
-    while words and words[0] in _LEAD_KEYWORDS:
-        words.pop(0)
-    return bool(words) and words[0] in ("cd", "pushd", "popd")
-
-
-
-_QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
-_SEGMENTS = re.compile(r"&&|\|\||[;\n(){}]")
-_PIPE_OR_JOB = re.compile(r"([|&])")
-
-
-def _unreachable_cd(command):
-    """True if a `cd`, `pushd` or `popd` in `command` runs in a subshell of
-    its own, so its directory never reaches the commands after it: a stage of
-    a pipeline (`cd /x | cat`, which bash forks) or a backgrounded one
-    (`cd /x &`). Read from the text with the quoted strings blanked; any such
-    form makes the hook ignore EVERY directory change in the command, which
-    checks the session directory instead (the warn side)."""
-    text = _QUOTED.sub(" ", command)
-    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f
-    for segment in _SEGMENTS.split(text):
-        parts = _PIPE_OR_JOB.split(segment)  # piece, op, piece, ...
-        stages = parts[0::2]
-        ops = parts[1::2]
-        for pos, piece in enumerate(stages):
-            if not _starts_with_cd(piece):
-                continue
-            if "|" in ops:
-                return True
-            if pos < len(ops) and ops[pos] == "&":
-                return True
-    return False
-
-
 def _env_chdir(argv):
     """True for `env -C dir ...` / `env --chdir=dir ...`, which the shared
     parser peels like any lead word although it changes the directory."""
@@ -424,26 +372,14 @@ def _scan(command, start):
     if cmds is None:
         return [], False
     ignore_cd = _unreachable_cd(command)
-    # Directory per subshell scope: a subshell starts from its parent's
-    # directory and a `cd` inside it never reaches the parent. A directory is
-    # None once a `cd` goes somewhere the text does not name.
-    cds = {(0,): start}
-
-    def cd_of(scope):
-        while scope not in cds:
-            scope = scope[:-1]
-        return cds[scope]
-
+    # The shared walk tracks the directory per subshell scope; it is None once
+    # a `cd` goes somewhere the text does not name. `env -C dir git ...` runs
+    # elsewhere, so it is skipped and the hook goes silent on it.
     hits, moved = [], False
-    for scope, argv in cmds:
-        if _env_chdir(argv):
-            continue  # `env -C dir git ...` runs elsewhere; go silent
-        env, rest = _strip_env(argv)
-        cd = cd_of(scope)
+    for argv, env, rest, cd in _walk_dirs(cmds, start, ignore_cd=ignore_cd,
+                                          skip=_env_chdir):
         if rest and rest[0] in ("cd", "pushd", "popd"):
             moved = True
-            if not ignore_cd:
-                cds[scope] = _move(rest, cd)
             continue
         inv = _git_invocation(rest)
         if inv is None or _redirects_git(env):

@@ -678,6 +678,98 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     return resolved
 
 
+def move_dir(rest, cur):
+    """The directory a `cd`, `pushd` or `popd` argv leaves the shell in.
+
+    `resolve_cd_target`, plus one rule a caller tracking a directory across
+    commands needs: `cur` is None while the directory is unknown, and an
+    unknown directory plus a relative move stays unknown.
+    Moved from `hooks/flag-commit-a-sweeps-submodule.py` (ai-config#1731).
+    """
+    target = resolve_cd_target(rest, cur)
+    if target is None or (cur is None and not os.path.isabs(target)):
+        return None
+    return target
+
+
+_LEAD_KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until",
+                  "time", "!"}
+
+
+def _starts_with_cd(piece):
+    """True if the pipeline stage `piece` is a cd, pushd or popd, after any
+    leading shell keywords (`then cd x`)."""
+    words = piece.split()
+    while words and words[0] in _LEAD_KEYWORDS:
+        words.pop(0)
+    return bool(words) and words[0] in ("cd", "pushd", "popd")
+
+
+_QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+_SEGMENTS = re.compile(r"&&|\|\||[;\n(){}]")
+_PIPE_OR_JOB = re.compile(r"([|&])")
+
+
+def unreachable_cd(command):
+    """True if a `cd`, `pushd` or `popd` in `command` runs in a subshell of
+    its own, so its directory never reaches the commands after it: a stage of
+    a pipeline (`cd /x | cat`, which bash forks) or a backgrounded one
+    (`cd /x &`). Read from the text with the quoted strings blanked.
+    A caller passes the result as `walk_dirs`'s `ignore_cd`, so any such form
+    makes it ignore EVERY directory change in the command and check the
+    starting directory instead (the warn side).
+    Moved from `hooks/flag-commit-a-sweeps-submodule.py` (ai-config#1731)."""
+    text = _QUOTED.sub(" ", command)
+    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f
+    for segment in _SEGMENTS.split(text):
+        parts = _PIPE_OR_JOB.split(segment)  # piece, op, piece, ...
+        stages = parts[0::2]
+        ops = parts[1::2]
+        for pos, piece in enumerate(stages):
+            if not _starts_with_cd(piece):
+                continue
+            if "|" in ops:
+                return True
+            if pos < len(ops) and ops[pos] == "&":
+                return True
+    return False
+
+
+def walk_dirs(cmds, start, ignore_cd=False, skip=None, move=move_dir):
+    """Yield `(argv, env, rest, cur_dir)` for each simple command in `cmds`.
+
+    `cmds` is `simple_commands_with_scope` output, `start` the directory the
+    line starts in (None when unknown), and `cur_dir` the directory the shell
+    stands in when that command runs.
+    Each subshell starts from its parent's directory, and a `cd` inside it
+    never reaches the parent.
+    A `cd`, `pushd` or `popd` is yielded with the directory it starts from,
+    then moves its own scope, unless `ignore_cd` (a line whose `cd` runs in a
+    forked pipeline stage or background job).
+    A command for which `skip(argv)` is true is neither yielded nor moves.
+    `move(rest, cur)` computes each move; a caller that can see the
+    filesystem passes one that keeps `cur` when the target does not exist,
+    since a failed `cd` leaves the shell where it was.
+    Moved from `hooks/flag-commit-a-sweeps-submodule.py` so every hook that
+    needs "where does this command run" calls one walk (ai-config#1731).
+    """
+    dirs = {(0,): start}
+
+    def dir_of(scope):
+        while scope not in dirs:
+            scope = scope[:-1]
+        return dirs[scope]
+
+    for scope, argv in cmds:
+        if skip is not None and skip(argv):
+            continue
+        env, rest = strip_env(argv)
+        cur = dir_of(scope)
+        yield argv, env, rest, cur
+        if rest and rest[0] in ("cd", "pushd", "popd") and not ignore_cd:
+            dirs[scope] = move(rest, cur)
+
+
 # A SHELL specifically, which is a narrower question than "an interpreter".
 # Only a shell's `-c` takes a nested COMMAND LINE. `python -c` takes Python
 # SOURCE, where `git push` is a syntax error rather than a push, so re-testing

@@ -114,15 +114,13 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   In a project thread with a coordinator, send the coordinator the head SHA and wait for the verdict.
   Where there is no coordinator, dispatch the reviewer yourself, as [`adversarial-self-review`](adversarial-self-review.md#cross-model-and-cross-harness-reviews-are-required-for-merging-and-the-harness-list-is-concrete) says.
   As of 2026-10-30, the reviewer is Gemini Flash through `agy`, because Argon is out of quota.
+- **Do:** count a verdict as the cross-harness one only when its PR comment names the model that produced it, and that model runs in a different harness from the one that wrote the change (for a Claude author, a model such as Gemini Flash).
 - **Do:** let local validation (`scripts/run-local-validation.py`) finish before the merge call.
 - **Don't:** treat the standing grant, a clean Claude review, or green CI as covering the cross-harness gate.
+- **Don't:** count a read from the author's own harness as cross-harness because a router or a subagent posted it, even when that read answers a cross-harness request.
 - **Don't:** merge while the local validation run is still going, or while a step it skipped is unexplained.
-- **Do:** count a verdict as the cross-harness one only when its PR comment names the non-Claude model that produced it, such as Gemini Flash.
-- **Don't:** count a Claude read as cross-harness because a router or a subagent posted it, even when it answers a cross-harness request.
-  This clarifies the gate above; it adds no new requirement.
-- **Reason:** gha#1906 and gha#1911 merged on 2026-11-11 on CLEAN verdicts the router had produced with its own Claude read, while Flash was unavailable.
-  The coordinator clarified the gate the same day.
 - **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read.
+  Then on 2026-11-11, [gha#1906](https://github.com/Morrison-Lab/gha/issues/1906) and [gha#1911](https://github.com/Morrison-Lab/gha/issues/1911) merged with CLEAN verdicts that the router had produced from its own Claude read while Flash was unavailable, and the coordinator added the model-naming bullet that day.
   The coordinator's rule also requires local validation to finish first.
   `hooks/warn-merge-without-cross-harness-review.py` only warned then, and the agent saw its note only with the merge result;
   that hook has denied such a merge since ai-config#5290.

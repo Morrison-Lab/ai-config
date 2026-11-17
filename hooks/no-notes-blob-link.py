@@ -98,8 +98,11 @@ def bash_text(command: str) -> str:
     values, segment = [], []
     for token in tokens + [";"]:
         if token and set(token) <= set(";&|\n"):
-            if segment[:1] == ["gh"] and GH_POST.search(" ".join(segment[:3])):
-                values += gh_flag_values(segment)
+            words = [w.lstrip("$(") for w in segment]
+            starts = [i for i, w in enumerate(words) if w == "gh"
+                      and GH_POST.search(" ".join(words[i:i + 3]))]
+            if starts:
+                values += gh_flag_values(segment[starts[0]:])
             segment = []
         else:
             segment.append(token)

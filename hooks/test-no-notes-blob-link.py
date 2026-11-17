@@ -65,6 +65,8 @@ def main() -> int:
     check("grep -b after gh ignored", not bash(f"gh pr comment 5 -b ok && grep -b '{link}' f"))
     check("attached -b value", bash(f"gh pr comment 5 -b'{link}'"))
     check("gh after a chain", bash(f"cd x && gh issue comment 5 --body '{link}'"))
+    for prefix in ("GH_TOKEN=x ", "time ", "(", "echo $("):
+        check(f"prefix {prefix!r}", bash(f"{prefix}gh pr comment 5 -b '{link}'"))
     check("unbalanced quote fails open", not bash(f"gh pr comment 1 --body '{link}"))
     check("PR title", denied(link, tool="mcp__github__create_pull_request", key="title"))
     check("other tool ignored", not denied(link, tool="Write", key="content"))

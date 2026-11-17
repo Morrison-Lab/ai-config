@@ -1202,6 +1202,10 @@ Leaving a companion function with a flat `for line in shell_c_expansions` scan p
 - **Do:** audit all helper functions in the hook and imported sibling modules that iterate `shell_c_expansions` when fixing expansion ordering defects.
 - **Don't:** assume `shell_c_expansions` returns strings in execution order.
 
+The same segment-scope rule covers flags: `no-unfetched-pr-state-claim.py` took `-R` from the first flag in the command and applied it to every `gh pr view` in a `;` chain, so the second read was filed under the wrong repo ([#5694](https://github.com/Morrison-Lab/ai-config/issues/5694)).
+**Do:** read `-R`, `cd` and similar scoping from the segment of the command they scope.
+**Don't:** apply the first flag found to every segment.
+
 ## A static shell guard's false-deny relaxation that needs discarded information fails open: revert it and fail closed
 
 A static guard that reads a Bash command before it runs (`hooks/no-recursive-chown-system-path.py`, ai-config#5333) has to choose, for a construct it cannot read exactly, between refusing too much and passing too much.

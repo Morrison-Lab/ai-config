@@ -26,6 +26,7 @@ BLOCK = [
      "ruleset write to another repo"),
     (C, "create with no name (interactive)"),
     (C + " -d 'a desc' Morrison-Lab/x", "value flag before the name"),
+    ("bash -c '" + C + " Morrison-Lab/x'", "create wrapped in bash -c"),
 ]
 
 ALLOW = [
@@ -37,6 +38,7 @@ ALLOW = [
     (C + " Morrison-Lab/x && gh api -X POST repos/Morrison-Lab/x/rulesets --input r.json",
      "direct ruleset POST"),
     (C + " --help", "help is not a create"),
+    ("bash -c '" + C + " Morrison-Lab/x && " + APPLY + " --apply x'", "bash -c with applier"),
     ("echo '" + C + " Morrison-Lab/x'", "quoted in echo"),
     ("grep -n '" + C + "' notes.md", "quoted in grep"),
     ("gh repo view Morrison-Lab/x", "other gh repo subcommand"),

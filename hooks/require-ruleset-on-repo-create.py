@@ -68,11 +68,11 @@ _LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
-    from shellcmd import simple_commands, strip_env
+    from shellcmd import simple_commands, strip_env, shell_c_expansions
 except Exception as _exc:  # broken install: degrade, never block every call
     print(f"require-ruleset-on-repo-create: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); no gate will run", file=sys.stderr)
-    simple_commands = strip_env = None
+    simple_commands = strip_env = shell_c_expansions = None
 
 SHELL_TOOLS = frozenset({"Bash", "bash", "PowerShell", "run_command",
                          "execute_command", "terminal", "shell"})
@@ -175,10 +175,14 @@ def check_bash(command):
     """Return a deny reason, or None."""
     if simple_commands is None or "repo" not in command or "create" not in command:
         return None
-    cmds = simple_commands(command)
-    if cmds is None:
-        return None
-    parsed = [_program(argv) for argv in cmds]
+    # A create wrapped in `bash -c '...'` is one opaque token to shlex, so
+    # every command line reachable through a shell's -c is parsed too
+    # (review on ai-config#5764). The discharge may sit in any of them.
+    parsed = []
+    for line in shell_c_expansions(command):
+        cmds = simple_commands(line)
+        if cmds:
+            parsed.extend(_program(argv) for argv in cmds)
     for prog, args in parsed:
         if prog != "gh":
             continue

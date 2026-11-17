@@ -1156,7 +1156,7 @@ MUTATIONS = {
     ),
     "M_redirect_is_not_a_job": (
         "`2>&1` and `&>` are redirections, not background jobs",
-        [('    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f',
+        [(LIB, '    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f',
           "    pass")],
         {"S58"},
     ),

@@ -349,3 +349,9 @@ On a transcript, brief or skill change that starts a subagent, thread or session
 On a message that hands new work to an existing thread, check that the transcript shows a reason a new thread would not do (the topic, the files or the context is already there), not a reflex to reuse the nearest thread.
 Read the transcript yourself; do not report the output of `hooks/require-model-choice.py` as your finding.
 See [`choose-thread`](../../skills/choose-thread/SKILL.md) and [`select-model`](../../skills/select-model/SKILL.md).
+
+## Merge-queue claims in thread replies
+
+On a transcript or reply that says a PR is in a merge queue, check that something enqueued it (an auto-merge call or `gh pr merge --auto`), and flag the claim when the PR only waits for a merge word or the runner.
+Read the transcript yourself; do not report the output of `hooks/no-merge-queue-claim-in-post-message.py` as your finding.
+See [`merge-queue`](../../shared/workflow/merge-queue.md#reporting-a-prs-state-to-the-user).

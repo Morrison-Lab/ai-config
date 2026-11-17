@@ -1908,6 +1908,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-merge-queue-claim-in-post-message.py\"'",
+            "timeout": 10,
+            "script": "no-merge-queue-claim-in-post-message.py",
+            "why": "ai-config#5754. 2026-11-17: owner threads for lds#2687 and lds#2685 told Ezra a content PR had 'gone into the merge queue' when it only waited for his mwc line, which reads as if GitHub auto-merge were on; a project-memory note had recommended the phrase as a way past no-merge-ask-in-post-message. Blocks (deny) a thread session's post_message, reply, update_message, edit_message or request_decision that says 'merge queue' unless the transcript shows an enqueue (enable_pr_auto_merge, an auto_merge request or gh pr merge --auto), and suggests 'final head sent on; it waits on a merge in the runner'. The coordinator and other sessions are never blocked. ALLOW_MERGE_QUEUE_CLAIM=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-bare-for-now-limit.py\"'",
             "timeout": 10,
             "script": "no-bare-for-now-limit.py",

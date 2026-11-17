@@ -160,3 +160,12 @@ This is prose because no mechanism enforces it yet, and the issue names the cand
 - **Do:** report a merge the wrapper refuses (a non-default base, or non-CI paths in a content repository), and list a PR's changed paths before calling it infra ([ai-config#5189](https://github.com/Morrison-Lab/ai-config/issues/5189)).
 - **Don't:** read annotations for a stale head.
 - **Don't:** bypass a refused merge, or turn a one-off ok into an unattended loop.
+
+## Reporting a PR's state to the user
+
+A thread reports "in the merge queue" only when something enqueued the PR (`enable_pr_auto_merge`, an auto-merge request or `gh pr merge --auto`).
+A PR that only waits for a merge word is not queued, and the phrase reads as if GitHub would land it by itself (ai-config#5754, 2026-11-17: lds#2687 and lds#2685).
+`hooks/no-merge-queue-claim-in-post-message.py` denies the claim.
+
+- **Do:** write "final head sent on; it waits on a merge in the runner".
+- **Don't:** write "it has gone into the merge queue" for a PR nothing enqueued.

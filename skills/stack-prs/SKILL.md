@@ -280,8 +280,9 @@ only the three-arm form tells you which one you are in.
   When the base PR adds a line and the dependent PR deletes it, the line is
   absent from the dependent's net diff, while `main` adds it relative to the
   old merge base, so the merge keeps it and reports no conflict.
-  On 2026-11-17 merging `main` into csci201#25 after its base csci201#24
-  squash-merged brought back a render exclusion that #25 existed to remove,
+  On 2026-11-17 merging `main` into
+  [csci201#25](https://github.com/Morrison-Lab/csci201/pull/25) after its base
+  [csci201#24](https://github.com/Morrison-Lab/csci201/pull/24) squash-merged brought back a render exclusion that #25 existed to remove,
   and only re-reading the diff against `main` caught it.
 - **Cannot tell** --- the remote-tracking ref is gone, so the test has nothing
   to compare.

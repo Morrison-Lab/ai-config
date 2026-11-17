@@ -790,6 +790,14 @@ labelled one until the failing artifact's own output is read.
 See [`metacognitive-monitoring.cases.md`](metacognitive-monitoring.cases.md),
 "A cause read off the step next to the one that failed".
 
+A hook's miss has its own version of this: the failing artifact is the hook's detector, and the tempting neighbour is the session's history (lost context after compaction).
+[ai-config#5723](https://github.com/Morrison-Lab/ai-config/issues/5723) blamed compaction for a merge-grant refusal.
+Running the hook's own detector, `merge_word()` in `hooks/remind-plain-english-merge-word.py`, on the verbatim wording ("merge csci201 PRs 28, 24, 25, 26 and 27") returned `None`.
+The wording was never recognized, so compaction was not the cause, and the miss was the same bug as [#5703](https://github.com/Morrison-Lab/ai-config/issues/5703), fixed in PR #5761.
+
+- **Do:** before attributing a hook's miss to lost context, run the hook's detector on the verbatim input.
+- **Don't:** design a persistence fix (a marker, a cache) for a miss that the detector itself produces.
+
 The same substitution happens to claims that are not about a failure's cause
 at all --- about what a plugin contains, where a file is read from, whether a
 mechanism runs --- where nothing frames a neighbour as a neighbour and this

@@ -63,6 +63,10 @@ SAME_REPO = [call("b1", command="gh api repos/Morrison-Lab/mcsg/pulls/52 --jq .s
              result("b1")]
 GHVIEW_URL = [call("b1", command="gh pr view https://github.com/Morrison-Lab/mcsg/pull/52"),
               result("b1")]
+# ai-config#5694: two reads in one call, each with its own -R flag.
+TWO_VIEWS = [call("b1", command="gh pr view 57 -R Morrison-Lab/dds --json state -q .state; "
+                                "gh pr view 27 -R Morrison-Lab/dlg --json state -q .state"),
+             result("b1")]
 GHVIEW_CUR = [call("b1", command="gh pr view --json state"), result("b1")]
 GREP_PULLS = [call("b1", command="grep repos/Morrison-Lab/mcsg/pulls/52 notes.md"), result("b1")]
 ORIGIN_LOG = [call("b1", command="git log --oneline origin/main -5"), result("b1")]
@@ -126,6 +130,12 @@ CASES = [
     ([USER] + OTHER_REPO, INCIDENT, True, "a fetch of another repo's #52 does not cover mcsg#52"),
     ([USER] + SAME_REPO, INCIDENT, False, "a fetch of mcsg#52 by repo covers mcsg#52"),
     ([USER] + GHVIEW_URL, INCIDENT, False, "gh pr view with a PR URL passes"),
+    ([USER] + TWO_VIEWS, "dlg#27 is waiting on your merge.", False,
+     "the second gh pr view in a chain counts under its own -R repo (#5694)"),
+    ([USER] + TWO_VIEWS, "dds#57 is waiting on your merge.", False,
+     "the first gh pr view in a chain still counts"),
+    ([USER] + TWO_VIEWS, "dds#27 is waiting on your merge.", True,
+     "the second view's number is not filed under the first view's repo"),
     ([USER] + GREP_PULLS, INCIDENT, True, "grep of a /pulls/52 string is not a fetch"),
     ([USER] + GHVIEW_CUR, "It's waiting on your merge.", False,
      "numberless gh pr view covers an unnumbered claim"),

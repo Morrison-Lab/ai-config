@@ -32,6 +32,11 @@ approval from Ezra although CI passed):
   `git ls-remote`) was already over the cap passes when the commits it adds
   are within the cap on their own: the earlier over-cap push was already
   approved, and a review fix on top of it should not need the approval again.
+* A push that leaves the PR diff (merge base to tip) the same as on the
+  server's tip passes, as after a merge from the base or a rebase
+  (ai-config#5721; 2026-11-17, a merge of main into gha#2065 was denied, and
+  the classifier then denied the override, so the branch could not sync).
+  The diffs are compared by `git patch-id --stable`.
 
 Escape hatch for a deliberate exception (a mechanical rename the maintainer
 asked for in one PR, a stacked branch whose base is not the default branch):
@@ -195,19 +200,65 @@ def pr_exempt(pr):
     return EXEMPT_LABEL in labels or bool(MECHANICAL.search(pr.get("body") or ""))
 
 
+def live_remote(cwd, branch):
+    """`origin/<branch>` when the tracking ref matches the server's tip, else None.
+
+    The tracking ref can be stale after a force push elsewhere, so the server's
+    tip must be the commit measured.
+    """
+    remote = f"origin/{branch}"
+    local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
+    if not local:
+        return None
+    live = git(cwd, "ls-remote", "--heads", "origin", branch)
+    if not live or live.split()[0] != local:
+        return None
+    return remote
+
+
+def pr_patch_id(cwd, base, tip):
+    """The stable patch id of `tip`'s PR diff against `base`, or None on error.
+
+    The PR diff runs from the merge base to the tip, as GitHub shows it. A
+    patch id ignores line numbers and whitespace, so a diff that only moved
+    because the base changed keeps its id. An empty diff has id "".
+    """
+    mb = git(cwd, "merge-base", base, tip)
+    if not mb:
+        return None
+    diff = subprocess.run(["git", "diff", "--binary", mb, tip], cwd=cwd,
+                          capture_output=True, timeout=15)
+    if diff.returncode != 0:
+        return None
+    pid = subprocess.run(["git", "patch-id", "--stable"], cwd=cwd, input=diff.stdout,
+                         capture_output=True, timeout=15)
+    if pid.returncode != 0:
+        return None
+    out = pid.stdout.decode("utf-8", "replace").split()
+    return out[0] if out else ""
+
+
+def pr_diff_unchanged(cwd, branch, base):
+    """True when the push leaves the PR diff as the server's tip already had it.
+
+    A merge from the base or a rebase changes the commits but not the diff a
+    reviewer sees, so it adds nothing to the PR's size (ai-config#5721). The
+    server's tip was already pushed, so its size was already allowed.
+    """
+    remote = live_remote(cwd, branch)
+    if not remote:
+        return False
+    old = pr_patch_id(cwd, base, remote)
+    return old is not None and old == pr_patch_id(cwd, base, "HEAD")
+
+
 def delta_within_cap(cwd, branch):
     """True when the pushed tip was already over the cap and the new commits are not.
 
     The remote branch must be an ancestor of HEAD, so a rewrite is measured whole.
     """
-    remote = f"origin/{branch}"
-    local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
-    if not local:
-        return False
-    # The tracking ref can be stale after a force push elsewhere, so the
-    # server's tip must be the commit measured.
-    live = git(cwd, "ls-remote", "--heads", "origin", branch)
-    if not live or live.split()[0] != local:
+    remote = live_remote(cwd, branch)
+    if not remote:
         return False
     if git(cwd, "merge-base", "--is-ancestor", remote, "HEAD") is None:
         return False
@@ -236,7 +287,7 @@ def decide(command, cwd):
     if result is None or not over_cap(result):
         return None
     files, lines = result
-    if delta_within_cap(where, branch):
+    if delta_within_cap(where, branch) or pr_diff_unchanged(where, branch, base):
         return None
     try:
         if pr_exempt(open_pr(where, branch)):
@@ -252,7 +303,8 @@ def decide(command, cwd):
         "push the first batch now. gha's check-pr-size fails the same PR in CI. "
         "This hook already passes what CI passes: an open PR labelled size-exempt or "
         "saying 'mechanical, content-identical', a new gha capability's registration "
-        "files, and a within-cap push on top of an already-pushed over-cap tip. If this "
+        "files, a within-cap push on top of an already-pushed over-cap tip, and a merge "
+        "from the base or a rebase that leaves the PR diff unchanged. If this "
         "is a stacked branch whose base is not the default branch, or a mechanical, "
         "content-identical PR (a move or split with no wording change; the PR body "
         "must say so), rerun with the prefix ALLOW_LARGE_PR=1 and state why."

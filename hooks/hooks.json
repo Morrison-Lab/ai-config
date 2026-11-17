@@ -1403,7 +1403,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-cross-repo-copy.py\"",
             "timeout": 10,
             "script": "no-cross-repo-copy.py",
-            "why": "Ezra, 2026-11-16: \"don't copy; decompose\" (ai-config#5709). A session proposed copying lds and mlg's cluster render setup into mcsg instead of factoring it into one reusable component. DENIES a Write of a new file whose content mostly repeats (15+ shared lines, 70%+ of the file) a same-named file in a sibling repository, a repository being identified by its common git dir so a linked worktree is not another repository. Vendored paths, a thin caller of a gha reusable workflow, and a '# decompose: allow <reason>' comment pass. Fails open on any parse trouble."
+            "why": "Ezra, 2026-11-16: \"don't copy; decompose\" (ai-config#5709). A session proposed copying lds and mlg's cluster render setup into mcsg instead of factoring it into one reusable component. DENIES a Write of a new file whose content mostly repeats (15+ shared lines, 70%+ of its lines over 3 characters) a same-named file in a sibling repository, a repository being identified by its common git dir so a linked worktree is not another repository. Vendored paths, a thin caller of a gha reusable workflow, and a '# decompose: allow <reason>' comment pass. Fails open on any parse trouble."
           }
         ]
       },

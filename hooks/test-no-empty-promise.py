@@ -266,6 +266,8 @@ WRITE_TARGET_CASES = [([say(_RULE), bash(c)], b, l) for c, b, l in (
     ("prettier --write --config shared/x.md /tmp/y.js", True, "--config VALUE beside --write"),
     ("sudo -u root cat CLAUDE.md", True, "wrapped READ of a rule surface"),
     ("time grep tee CLAUDE.md", True, "wrapped program's ARG named tee"),
+    ("sudo -n grep tee CLAUDE.md", True, "no-value sudo flag keeps the program"),
+    ("time -p grep tee CLAUDE.md", True, "no-value time flag keeps the program"),
     ("sudo -u tee cat CLAUDE.md", True, "wrapper option VALUE named tee"),
     ("sed -i -- 's|CLAUDE.md|x|' /tmp/x", True, "sed script after --"),
     ("echo 'the rule' >> CLAUDE.md", False, "append INTO a rule surface"),

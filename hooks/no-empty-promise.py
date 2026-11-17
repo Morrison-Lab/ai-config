@@ -507,15 +507,11 @@ WRITE_TOOLS = {
     "write_to_file", "replace_file_content", "edit_file", "strreplace", "create_file",
 }
 
-# A shell write TO A RULE SURFACE (ai-config#1962). A whole-string test read
-# `cat CLAUDE.md | tee /tmp/x` as durable: a false DISCHARGE. As with
-# `_poller_executed()`, ask per simple command, of the write's own OPERANDS and
-# never an option's value: a redirect target; a `git add|commit|mv|rm`
-# pathspec or an applying `git apply`'s patch; a file operand of `tee`,
-# `mkdir`, `sed -i`; an operand of a `--write` command. Whole tokens keep
-# #1966/#1968 closed. Residuals are all loud (no discharge): `cp`/`mv`/`patch`;
-# `git commit -am` with no pathspec; an unlisted value-taking option; a
-# variable path; an interpreter writing from a heredoc; unparseable shell.
+# A shell write TO A RULE SURFACE (ai-config#1962): per simple command, a
+# write's own OPERAND, never an option's value -- a redirect target, a git
+# add|commit|mv|rm pathspec or applied patch, a tee/mkdir/sed -i file, or a
+# `--write` operand. Residuals are loud (no discharge): cp/mv/patch, `commit
+# -am`, an unlisted value option, a variable path, unparseable shell.
 try:
     from shellcmd import (COMMAND_WRAPPERS, ENV_ASSIGNMENT, SHELL_KEYWORDS,
                           git_subcommand, simple_commands)
@@ -534,14 +530,17 @@ _GIT_VALUE_LONG = set("--message --file --reuse-message --reedit-message "
                       "--template --author --date --fixup --squash --cleanup "
                       "--trailer --pathspec-from-file --directory --exclude "
                       "--include".split())
-# Wrapper options taking a value (`sudo -u root`, `nice -n 5`, `timeout -s`).
-_WRAPPER_VALUE_OPTS = set("-u -g -n -c -p -C -D -h -r -t -U -s -k -S".split())
+# Each wrapper's value-taking options, from its --help (bash `help` for exec;
+# doas's man page). A wrapper absent here (time, command, nohup) takes none.
+_WRAPPER_VALUE_OPTS = {w: set(o.split()) for w, o in (
+    ("sudo", "-C -D -g -h -p -R -r -t -T -U -u"), ("nice", "-n"),
+    ("timeout", "-k -s"), ("env", "-u -C -S"), ("stdbuf", "-i -o -e"),
+    ("ionice", "-c -n -p -P -u"), ("doas", "-u -C"), ("exec", "-a"))}
 _is_rule_surface = MECHANISM_PATH.search
 
 
 def _split_redirects(argv):
-    """(operands, redirect-out targets). A heredoc `<<` arrives with its tag
-    blanked, so an input redirect never swallows a following redirect."""
+    """(operands, out-targets); a tagless `<<` never swallows a redirect."""
     operands, targets, index = [], [], 0
     while index < len(argv):
         token = argv[index]
@@ -593,10 +592,10 @@ def _resolve_program(operands):
     index = 0
     while index < len(operands):
         token, name = operands[index], os.path.basename(operands[index])
-        index += 1
+        index, takes = index + 1, _WRAPPER_VALUE_OPTS.get(name, ())
         if name in COMMAND_WRAPPERS:
             while index < len(operands) and operands[index].startswith("-"):
-                index += 2 if operands[index] in _WRAPPER_VALUE_OPTS else 1
+                index += 1 + (operands[index] in takes)
             index += name == "timeout"  # its duration
         elif not (ENV_ASSIGNMENT.match(token) or token in SHELL_KEYWORDS):
             return name, operands[index:]

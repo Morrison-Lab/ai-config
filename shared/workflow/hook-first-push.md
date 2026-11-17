@@ -25,7 +25,8 @@ Four more misses sent [#5615](https://github.com/Morrison-Lab/ai-config/pull/561
 - **Don't:** push a new hook, test, README row and rule section together without counting them.
 - **Do:** add the `README.md` hook-catalog row in the same commit as the hook (`check-hook-catalog.py`).
 - **Don't:** leave the row for the review round.
-- **Do:** give every algorithmic check both a writer rule and a reviewer instruction, then run `python3 scripts/check-check-has-instructions.py`.
+- **Do:** give every algorithmic check both a writer rule and a reviewer instruction, then commit and run `python3 scripts/check-check-has-instructions.py`.
+  It diffs `origin/main...HEAD`, so before the commit it reports "no check added" and passes ([#5707](https://github.com/Morrison-Lab/ai-config/pull/5707) went red in CI that way, 2026-11-16).
 - **Don't:** ship the writer rule alone.
 - **Do:** run `python3 scripts/check_regex_patterns.py` on a new regex and flatten any nested quantifier (a repeat inside a repeat).
 - **Don't:** leave a nested quantifier for CI to find.

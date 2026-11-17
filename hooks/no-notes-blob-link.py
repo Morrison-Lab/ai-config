@@ -14,13 +14,14 @@ SHA-pinned link (an open PR's undeployed content), an unrendered path
 (`tools/`, `.github/`, `outtakes/`, ...), a `#L<n>` or `?plain=1` source view,
 a URL in a code span or fence, and a line saying the content is not deployed
 yet or that it means the source lines, text or file (the writer states
-whether the deploy is current; no text shows it). Bash `gh` posts: ai-config#5706.
+whether the deploy is current; no text shows it). In Bash, only the --body/--title values of a gh issue/pr post are read (ai-config#5706).
 Writer rule: shared/writing/hyperlink-liberally.md; reviewer: adversarial-reviewer.
 `ALLOW_NOTES_BLOB_LINK=1` overrides. Fails open on any parse trouble.
 """
 import json
 import os
 import re
+import shlex
 import sys
 
 OVERRIDE = "ALLOW_NOTES_BLOB_LINK"
@@ -31,6 +32,9 @@ TOOL = re.compile(
     r"|^mcp__github__(?:add_issue_comment|update_issue_comment|add_reply_to_pull_request_comment"
     r"|add_comment_to_pending_review|pull_request_review_write|issue_write"
     r"|create_pull_request|update_pull_request)$")
+GH_POST = re.compile(r"\bgh\s+(?:(?:-R|--repo)[=\s]\S+\s+)?(?:issue|pr)\s+"
+                     r"(?:comment|create|edit|review)\b")
+BODY_FLAGS = {"--body", "-b", "--title", "-t"}
 TEXT_KEYS = {"text", "body", "title", "question", "label", "consequence", "comment", "message"}
 FENCE = re.compile(r"^```.*?^```|^~~~.*?^~~~|`[^`\n]*`", re.S | re.M)
 BLOB = re.compile(
@@ -68,6 +72,43 @@ def strings(value, key=None):
     elif isinstance(value, list):
         for v in value:
             yield from strings(v, key)
+
+
+def gh_flag_values(tokens: list) -> list:
+    """The --body/--title values in one gh command's tokens, in any of its spellings."""
+    values = [t for prev, t in zip([""] + tokens, tokens) if prev in BODY_FLAGS]
+    for t in tokens:
+        if t.startswith("--") and t.split("=", 1)[0] in BODY_FLAGS and "=" in t:
+            values.append(t.split("=", 1)[1])
+        elif t[:2] in BODY_FLAGS and len(t) > 2 and not t.startswith("--"):
+            values.append(t[2:])
+    return values
+
+
+def bash_text(command: str) -> str:
+    """The --body and --title values of each gh issue/pr post; a --body-file is not read."""
+    command = command.replace("\\\n", " ")
+    if not GH_POST.search(command):
+        return ""
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|\n")
+    lexer.whitespace = " \t\r"
+    lexer.whitespace_split = True
+    try:
+        tokens = list(lexer)
+    except ValueError:
+        return ""
+    values, segment = [], []
+    for token in tokens + [";"]:
+        if token and set(token) <= set(";&|\n"):
+            words = [w.lstrip("$(") for w in segment]
+            starts = [i for i, w in enumerate(words) if w == "gh"
+                      and GH_POST.match(" ".join(words[i:i + 5]))]
+            if starts:
+                values += gh_flag_values(segment[starts[0]:])
+            segment = []
+        else:
+            segment.append(token)
+    return "\n".join(values)
 
 
 def candidate_roots(repo: str) -> list:
@@ -153,9 +194,12 @@ def denial(payload: dict):
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return None
-    if not TOOL.search(tool):
+    if tool == "Bash":
+        text = bash_text(str(tool_input.get("command") or ""))
+    elif TOOL.search(tool):
+        text = "\n".join(strings(tool_input))
+    else:
         return None
-    text = "\n".join(strings(tool_input))
     hits = flagged(text)
     if not hits:
         return None

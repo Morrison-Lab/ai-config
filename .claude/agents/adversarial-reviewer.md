@@ -51,6 +51,8 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Tests covering new branches, error paths, and edge cases --- and whether a passing test would still pass if the code under it were broken.
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.
+   - A file, workflow or passage copied or retyped from another repository instead of factored into one component both call ([`dont-copy-decompose`](../../shared/principles/dont-copy-decompose.md)).
+     `hooks/no-cross-repo-copy.py` sees only a new file with the same name as the source, or one written by `cp`, `rsync` or `install`, so compare a new workflow or script against the setup the PR says it imitates.
    - Removed content: for each block the diff deletes from a page, find where it reappears (quote the added lines) or the reason the PR states.
      A removal with neither is a finding, whether or not the content-preservation check passed ([`reorganize-prose`](../../shared/writing/reorganize-prose.md#removed-content-lands-elsewhere-or-is-justified)).
    - A new algorithmic check (hook, `scripts/check-*.py`, gha workflow) added without a writer instruction and a reviewer instruction for the defect it catches, or one whose instruction only restates the check's name;

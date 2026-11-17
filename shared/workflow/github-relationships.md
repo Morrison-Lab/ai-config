@@ -11,6 +11,7 @@ Write the prose if it helps a reader, and make the relationship call as well.
 | Blocking | `gh issue edit <n> --add-blocking <m>`, or the same endpoint on the blocked issue |
 | PR closes issue | A closing keyword (`Closes #N`) in the PR body; REST has no other way to set the link |
 | Stacked PR | Blocked by the base PR (a PR is an issue there), and a `> [!IMPORTANT]` note in the body |
+| PR is part of an issue that other PRs also serve | "Part of #N" in the PR body: GitHub shows the reference in the issue's sidebar. No call exists: a PR cannot be a sub-issue, and `Closes` would close the issue early. The hook leaves this phrase alone in PR bodies and still flags it in issue bodies. |
 
 `<id>` is the numeric `id` from `GET /repos/{owner}/{repo}/issues/<n>`, not the issue number.
 Use the REST API, not GraphQL, which cloud sessions block.

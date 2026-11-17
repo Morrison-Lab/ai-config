@@ -58,6 +58,11 @@ Then apply:
 
 **Match the full SPDX id, not the `CC BY` prefix.** A Creative Commons license’s base letters look permissive while the suffix carries the restriction, so `CC-BY-4.0` and `CC-BY-NC-4.0` differ by exactly the clause that decides the answer. Read the whole identifier, and check `.claude-plugin/*.json`, `package.json`, or an equivalent manifest as a second source — a repo that declares its license in metadata as well as in `LICENSE` gives you a free cross-check.
 
+**Read a vendored copy’s license at its source, not in the copy.** A vendored extension or library often arrives without its `LICENSE` file, so a copy with no license in it says nothing about whether the source has one. Before writing that a dependency “publishes no license” (in a `LICENSE.md`, an issue or a PR), run the `gh api repos/<owner>/<repo>/license` query above on its upstream repository. On 2026-11-17 a csci201 `LICENSE.md` draft and its follow-up issue said `coatless-quarto/custom-callout` published no license, on the strength of the vendored copy alone. Its repository’s `LICENSE` is the GNU AGPL 3.0 ([csci201#32](https://github.com/Morrison-Lab/csci201/issues/32)).
+
+- **Do:** query the upstream repository’s license before describing a vendored dependency’s license.
+- **Don’t:** infer “no license” from a vendored copy that lacks a `LICENSE` file.
+
 When in doubt, treat it as “no license” and reimplement independently. A clean-room reimplementation of an *idea* is always allowed — copyright protects expression, not concepts.
 
 **Copying and using are separate questions, and only the first is what this gate decides.** A license that forbids vendoring a peer’s files into this repo may still permit installing and running that peer alongside it — which is often the better outcome anyway, since it needs no maintenance here. When the gate comes back read-only, check whether the peer ships as an installable plugin before concluding there is nothing to gain, and report both answers.

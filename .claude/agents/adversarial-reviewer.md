@@ -358,6 +358,13 @@ On a message that hands new work to an existing thread, check that the transcrip
 Read the transcript yourself; do not report the output of `hooks/require-model-choice.py` as your finding.
 See [`choose-thread`](../../skills/choose-thread/SKILL.md) and [`select-model`](../../skills/select-model/SKILL.md).
 
+## Repositories created without a branch ruleset
+
+On a transcript, script or skill change that creates a GitHub repository, check that the same step applies the branch ruleset (the template's own example, or `examples/branch-rulesets/base.json` for a repository with no template) and verifies that the ruleset list is non-empty afterwards.
+A repository left with an unprotected default branch takes direct pushes, force pushes and deletion until someone notices.
+Read the transcript yourself; do not report the output of `hooks/require-ruleset-on-repo-create.py` as your finding.
+See [`repo-templates`](../../shared/workflow/repo-templates.md#set-a-branch-ruleset-that-follows-the-templates-example).
+
 ## Merge-queue claims in thread replies
 
 On a transcript or reply that says a PR is in a merge queue, check that something enqueued it (an auto-merge call or `gh pr merge --auto`), and flag the claim when the PR only waits for a merge word or the runner.

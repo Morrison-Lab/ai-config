@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report stale mutation anchors in hooks/test-*.py tables named old/find/anchor/edits.
+"""Report stale mutation anchors in hooks/test-*.py tables unpacked into old/find/anchor/edits.
 
 Most harnesses `sys.exit` at their first bad anchor, after the slow cases
 (ai-config#5735, #5738); this reads those it recognises statically.  A table is any

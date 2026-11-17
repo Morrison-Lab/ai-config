@@ -1620,6 +1620,8 @@ reach.
 That is invisible from either clause alone, because each is individually
 correct about the copy it names.
 
+- **Do:** run `python3 scripts/check-mutation-anchors.py` after extracting a helper;
+  it lists every anchor that stopped resolving, in every harness, at once ([#5738](https://github.com/Morrison-Lab/ai-config/issues/5738)).
 - **Do:** re-run the mutation harness after extracting a helper, and read an
   anchor-uniqueness FATAL as the extraction reporting itself.
 - **Do:** merge colliding clauses and declare the union of their flips, rather

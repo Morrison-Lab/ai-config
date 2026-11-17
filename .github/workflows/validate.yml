@@ -119,6 +119,10 @@ jobs:
         run: python3 scripts/check-unpinned-git-fixtures.py
       - name: Run unpinned-git-fixtures tests
         run: python3 scripts/test_check_unpinned_git_fixtures.py
+      - name: Check hook mutation anchors
+        run: python3 scripts/check-mutation-anchors.py
+      - name: Run check-mutation-anchors tests
+        run: python3 scripts/test_check_mutation_anchors.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
       - name: Run check-validate-duration tests

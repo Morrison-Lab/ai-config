@@ -45,10 +45,13 @@ def make_repo(files, attrs=None):
     return d
 
 
-def run(command, cwd, raw=None):
+def run(command, cwd, raw=None, pr=None):
+    """Run the hook; `pr` is the open PR the API would return (None for none)."""
     payload = raw if raw is not None else json.dumps(
         {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": cwd})
-    p = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True)
+    env = {**os.environ, "NO_OVERSIZED_PR_PUSH_PR_JSON": json.dumps(pr)}
+    p = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True,
+                       text=True, env=env)
     denied = False
     if p.stdout.strip():
         denied = json.loads(p.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
@@ -98,7 +101,80 @@ def main():
     git(renames, "mv", "old", "new")
     git(renames, "commit", "-q", "-m", "move")
 
+    # gha#2082 shape: a new capability plus the registration lists gha CI requires.
+    capability = {"check-x/action.yml": 10, "check-x/check-x.py": 100,
+                  "check-x/tests/test_check_x.py": 80,
+                  ".github/workflows/check-x.yml": 20, "examples/check-x.yml": 10,
+                  "website/reference/check-x.qmd": 20, "website/_quarto.yml": 1,
+                  "README.md": 3, "CLAUDE.md": 2, "changelog.d/add-check-x.added.md": 2,
+                  ".github/workflows/_selftest.yml": 20, "check-x/README.md": 1}
+    new_cap = make_repo(capability)
+    no_workflow = make_repo({k: v for k, v in capability.items()
+                             if k != ".github/workflows/check-x.yml"})
+    big_cap = make_repo({**capability, "check-x/check-x.py": 400})
+    big_readme = make_repo({**capability, "README.md": 250})
+    other_fragments = make_repo({**capability, **{f"changelog.d/other-{i}.md": 1
+                                                  for i in range(8)}})
+
+    def push_tip(d):
+        """Publish the branch to a bare origin, as an earlier approved push did."""
+        bare = tempfile.mkdtemp()
+        git(bare, "init", "-q", "--bare", "-b", "main")
+        git(d, "remote", "add", "origin", bare)
+        git(d, "push", "-q", "origin", "feature")
+        git(d, "update-ref", "refs/remotes/origin/feature", "HEAD")
+        return bare
+
+    def add_files(d, names, message):
+        for name in names:
+            with open(os.path.join(d, name), "a", encoding="utf-8") as f:
+                f.write("x\n")
+        git(d, "add", "-A")
+        git(d, "commit", "-qm", message)
+
+    # A branch pushed over the cap, then a small fix on top of it.
+    pushed = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    push_tip(pushed)
+    add_files(pushed, ["f0.qmd"], "fix")
+    pushed_big = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    push_tip(pushed_big)
+    add_files(pushed_big, [f"g{i}.qmd" for i in range(11)], "more")
+    # Pushed under the cap, then pushed over it by a small commit.
+    crossing = make_repo({f"f{i}.qmd": 1 for i in range(10)})
+    push_tip(crossing)
+    add_files(crossing, ["f10.qmd"], "cross")
+    # The tracking ref says over-cap, but the server's branch is not that tip.
+    stale = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    stale_bare = push_tip(stale)
+    git(stale_bare, "update-ref", "refs/heads/feature",
+        subprocess.run(["git", "rev-parse", "HEAD~1"], cwd=stale, capture_output=True,
+                       text=True, check=True).stdout.strip())
+    add_files(stale, ["f0.qmd"], "fix")
+
     cases = [
+        ("a new gha capability's registration files are not counted (gha#2082)",
+         run("git push", new_cap), False),
+        ("registration files count without the new reusable workflow",
+         run("git push", no_workflow), True),
+        ("a new capability's own lines still count", run("git push", big_cap), True),
+        ("a registration file's lines still count", run("git push", big_readme), True),
+        ("changelog fragments not naming the capability still count",
+         run("git push", other_fragments), True),
+        ("a stale tracking ref does not stand in for the server's tip",
+         run("git push", stale), True),
+        ("an open PR labelled size-exempt passes",
+         run("git push", sweep, pr={"labels": [{"name": "size-exempt"}], "body": ""}), False),
+        ("an open PR saying mechanical, content-identical passes",
+         run("git push", sweep, pr={"labels": [], "body": "A mechanical, content-identical move."}),
+         False),
+        ("an open PR with neither exemption is still measured",
+         run("git push", sweep, pr={"labels": [{"name": "P1"}], "body": "A sweep."}), True),
+        ("a small fix on top of an already-pushed over-cap tip passes",
+         run("git push", pushed), False),
+        ("an over-cap addition on top of an over-cap tip is denied",
+         run("git push", pushed_big), True),
+        ("a small push that takes an under-cap tip over the cap is denied",
+         run("git push", crossing), True),
         ("12 pure renames are not counted", run("git push", renames), False),
         ("new figure subfiles' lines are free", run("git push", figs), False),
         ("new figure subfiles still count as files", run("git push", many_figs), True),

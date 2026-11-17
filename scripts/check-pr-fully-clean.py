@@ -4520,7 +4520,9 @@ _STATUS_OPEN_WORD_RE = re.compile(
 # A reply the status may supersede answers a finding in the agent's own
 # voice: it carries a disposition word.
 _REPLY_ANSWER_RE = re.compile(
-    r"\b(?:rebut\w*|defer(?:s|red|ring)?|declin(?:e|es|ed|ing))\b", re.IGNORECASE
+    r"\b(?:rebut\w*|defer(?:s|red|ring)?|declin(?:e|es|ed|ing)"
+    r"|fix(?:ed|es)|address(?:ed|es)|repl(?:y|ies)\s+to)\b",
+    re.IGNORECASE,
 )
 # A comment naming another reviewer may be relaying that reviewer's verdict,
 # which only that reviewer's own later clean can clear (ai-config#2274).
@@ -4580,7 +4582,9 @@ def _superseded_agent_replies(comments: List[dict], head_sha: str) -> set:
     missing): ...**") without matching a disposition shape, and then it
     vetoed the gate as the maintainer's verdict until the agent edited its
     own comment (ai-config#5283, gha#1826). A later status from the same
-    login that passes ``_is_head_clean_status`` supersedes it.
+    login that passes ``_is_head_clean_status`` supersedes it, and so does a
+    later clean from a review bot that names the current head: the reply
+    answered an earlier round, and the bot has since read the code.
 
     Only the agent's own replies are superseded: the comment must have the
     agent-reply shape, carry a disposition word, and name no other reviewer.
@@ -4591,6 +4595,14 @@ def _superseded_agent_replies(comments: List[dict], head_sha: str) -> set:
     review either, so it never counts toward quorum (#2308).
     """
     clean_at: Dict[str, datetime] = {}
+    # The latest clean that a review bot posted on the current head. An
+    # agent's reply that answers an earlier round predates it, so the bot's
+    # later read of the code is the verdict of record, and the reply's own
+    # words no longer veto (lds#2635, 2026-11-17: a reply quoting "Blocking
+    # line break" stood after Claude's clean on the head, and the only way
+    # out was a typed approval from Ezra).
+    bot_clean_at: Optional[datetime] = None
+    head = (head_sha or "").lower()
     for c in comments:
         body = c.get("body", "")
         login = (c.get("author") or {}).get("login", "")
@@ -4598,15 +4610,28 @@ def _superseded_agent_replies(comments: List[dict], head_sha: str) -> set:
         if login and at and _is_head_clean_status(body, login, head_sha):
             if login not in clean_at or at > clean_at[login]:
                 clean_at[login] = at
+        named = _named_review_head(body)
+        if (
+            at
+            and _is_bot_author(login)
+            and named
+            and head.startswith(named)
+            and classify_verdict(body, "", login) == "clean"
+            and (bot_clean_at is None or at > bot_clean_at)
+        ):
+            bot_clean_at = at
     superseded = set()
     for idx, c in enumerate(comments):
         body = c.get("body", "")
         login = (c.get("author") or {}).get("login", "")
         at = _comment_time(c)
+        cutoff = clean_at.get(login)
+        if bot_clean_at is not None and (cutoff is None or bot_clean_at > cutoff):
+            cutoff = bot_clean_at
         if (
-            login in clean_at
+            cutoff is not None
             and at is not None
-            and at < clean_at[login]
+            and at < cutoff
             and _has_agent_reply_shape(body)
             and _REPLY_ANSWER_RE.search(body)
             and not _RELAYED_REVIEWER_RE.search(body)

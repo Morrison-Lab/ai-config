@@ -678,6 +678,16 @@ A prose withdrawal ("the blocking concern is withdrawn") that fails the structur
 Measured again 2026-10-08 on `ai-config#4419`: an Antigravity `agy --print` review posted verbatim under `d-morrison` was skipped because its headings were numbered `### 2. Blocking Defects` and it lacked `Reviewed-Commit:`;
 ai-config#4425 updated `check-pr-fully-clean.py` to recognize numbered headings, the `Defects` family, and header commit references.)
 
+**An agent's reply to a review is cleared by the bot's next clean review of the head.**
+A reply that quotes a finding's label ("**Blocking line break** in `x.qmd`: fixed.") can read as a not-clean verdict under the maintainer's login.
+`check-pr-fully-clean.py` drops it once a review bot posts a clean review whose `review-data` names the current head after the reply, as long as the reply carries the disclosure footer, answers a review (fixed, addressed, rebutted, deferred, declined, "reply to") and names no other reviewer.
+Before that bot review the reply still blocks, so a reply stating an open defect is not lost ([ai-config#5748](https://github.com/Morrison-Lab/ai-config/issues/5748), lds#2635).
+
+- **Do:** after answering a review, let the next bot review of the new head clear the reply.
+  Post nothing else, and edit nothing.
+- **Don't:** edit your own reply or post a clean status under the maintainer's login to clear it.
+- **Reviewer:** flag a change to the checker that lets a reply be cleared by anything but a later bot clean naming the current head, or by a same-login head-clean status (ai-config#5283).
+
 This is a different question from how much two reviewers **agreeing** is worth,
 which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section
 settles: there, same-vendor agreement measures a shared blind spot, and a

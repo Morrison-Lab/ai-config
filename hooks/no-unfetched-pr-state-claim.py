@@ -229,16 +229,24 @@ def classify_call(block):
     if isinstance(cmd, str) and FORGE_CLIENT_RX.search(cmd) and not WRITE_CMD_RX.search(cmd):
         flag = REPO_FLAG_RX.search(cmd)
         repo = flag.group(1).lower() if flag else None
+
+        def own_repo(args):
+            # Each command in a chain names its own repo (ai-config#5694:
+            # `gh pr view 57 -R o/dds; gh pr view 27 -R o/dlg` read dlg#27,
+            # not dds#27); the first flag in the command is only a fallback.
+            own = REPO_FLAG_RX.search(args)
+            return own.group(1).lower() if own else repo
+
         for v in GH_VIEW_RX.finditer(cmd):
             args = REPO_FLAG_RX.sub(" ", v.group(2))
             nums = [next(g for g in a.groups() if g) for a in VIEW_ARG_RX.finditer(args)]
-            prs.update((repo, n) for n in (nums[:1] or ["*"]))
+            prs.update((own_repo(v.group(2)), n) for n in (nums[:1] or ["*"]))
         for a in API_ONE_RX.finditer(cmd):
             prs.add(((a.group(1) or "").lower() or None, a.group(2) or a.group(3)))
         for s in SCRIPT_RX.finditer(cmd):
-            n = re.search(r"\s#?(\d+)\b", s.group(1))
+            n = re.search(r"\s#?(\d+)\b", REPO_FLAG_RX.sub(" ", s.group(1)))
             if n:
-                prs.add((repo, n.group(1)))
+                prs.add((own_repo(s.group(1)), n.group(1)))
         if PR_LIST_CMD_RX.search(cmd):
             pr_list = True
     if isinstance(cmd, str) and not WRITE_CMD_RX.search(cmd) and WORK_CMD_RX.search(cmd):

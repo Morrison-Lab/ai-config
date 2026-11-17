@@ -287,10 +287,12 @@ for line in sys.stdin:
   In testing, it sent ~4.8 MB of deltas in 290 seconds with no `delta.content` before timing out, or returned `upstream request failed`.
   Prefer `deepseek-v4-pro` for review-sized or multi-KB prompts.
 
-**Measured 2026-11-17 in a claude.ai cloud session: split the diff, and send one request at a time.**
+**Measured 2026-11-17 in a claude.ai cloud session: one payload per PR, sent one at a time.**
+This measurement qualifies the `deepseek-v4-pro` preference above: on that day no model handled the combined prompt, and each handled a per-PR prompt only some of the time.
 A streamed ~25 KB review prompt (five PRs' diffs in one payload) returned no `delta.content` from `deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max` or `glm-5.3`, and a non-streaming `kimi-k3` retry of the same payload returned the bare body `upstream request failed`.
-Splitting it into one payload per PR (0.7 to 12 KB) worked: non-streaming `kimi-k3` returned a full review after more than 120 seconds, so the 30-second cutoff above did not apply to it.
-Four of those per-PR requests sent in parallel returned one review and three empty bodies, so send them serially, with the model fallback loop below.
+One payload per PR (0.7 to 12 KB) worked, non-streaming: `kimi-k3` returned four full reviews and `deepseek-v4-pro` one, some after more than 120 seconds, so the roughly 30-second gateway cutoff in "Non-streaming requests fail" above did not stop them.
+The same per-PR payload could still fail on every model and then succeed on a retry about 20 minutes later.
+The four per-PR requests not yet reviewed, sent in parallel, returned one review and three empty bodies, so send them serially, with the model fallback loop below.
 
 **Python `urllib` returns 403 Forbidden; always use `curl`.**
 In a claude.ai cloud session (as observed on 2026-10-13), HTTP requests made via Python's `urllib` (or `requests`) to `https://opencode.ai/zen/go/v1/chat/completions` fail with `403 Forbidden` from the cloud agent proxy, while `curl` with the identical body and headers returns `200 OK`.

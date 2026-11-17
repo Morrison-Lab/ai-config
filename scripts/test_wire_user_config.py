@@ -157,10 +157,12 @@ class WireUserConfig(unittest.TestCase):
         self.assertEqual(s["permissions"]["allow"], [wire.CANCEL_PERMISSION])
         self.assertEqual(s["autoMode"]["allow"],
                          ["$defaults", wire.CANCEL_AUTO_MODE_RULE,
-                          wire.BRANCH_PUSH_AUTO_MODE_RULE])
+                          wire.BRANCH_PUSH_AUTO_MODE_RULE,
+                          *wire.APPROVAL_SCOPE_AUTO_MODE_RULES])
         _, out = self.run_main("--check")
         self.assertIn("ok    ", line(out, "Run cancel"))
         self.assertIn("ok    ", line(out, "Branch push"))
+        self.assertIn("ok    ", line(out, "Approvals"))
         self.run_main()
         self.assertEqual(self.settings(), s)
 
@@ -173,7 +175,8 @@ class WireUserConfig(unittest.TestCase):
         self.assertEqual(s["permissions"]["allow"], ["Bash(ls)", wire.CANCEL_PERMISSION])
         # An array without "$defaults" is the user's choice; it gains no "$defaults".
         self.assertEqual(s["autoMode"]["allow"], ["mine", wire.CANCEL_AUTO_MODE_RULE,
-                                                  wire.BRANCH_PUSH_AUTO_MODE_RULE])
+                                                  wire.BRANCH_PUSH_AUTO_MODE_RULE,
+                                                  *wire.APPROVAL_SCOPE_AUTO_MODE_RULES])
         self.assertEqual(s["autoMode"]["environment"], ["env"])
 
     def test_branch_push_check_reports_todo_and_writes_nothing(self):
@@ -212,6 +215,51 @@ class WireUserConfig(unittest.TestCase):
         _, out = self.run_main()
         self.assertIn("is not a JSON array", line(out, "Branch push"))
         self.assertEqual(self.settings()["autoMode"], {"allow": "x"})
+
+    def test_approvals_add_only_the_missing_rules(self):
+        have = wire.VERDICT_POST_AUTO_MODE_RULE
+        self.write_settings({"autoMode": {"allow": ["$defaults", have]}})
+        _, out = self.run_main("--check")
+        self.assertIn("todo  ", line(out, "Approvals"))
+        self.run_main()
+        allow = self.settings()["autoMode"]["allow"]
+        for rule in wire.APPROVAL_SCOPE_AUTO_MODE_RULES:
+            self.assertEqual(allow.count(rule), 1)
+
+    def test_approvals_are_left_to_managed_settings_in_a_remote_container(self):
+        os.environ["CLAUDE_CODE_REMOTE"] = "true"
+        try:
+            _, out = self.run_main()
+        finally:
+            del os.environ["CLAUDE_CODE_REMOTE"]
+        self.assertIn("ok    remote container", line(out, "Approvals"))
+
+    def test_verdict_post_rule_covers_new_comments_only(self):
+        rule = wire.VERDICT_POST_AUTO_MODE_RULE
+        self.assertIn("verbatim", rule)
+        self.assertIn("names the reviewer and the model", rule)
+        self.assertIn("agent-disclosure footer", rule)
+        excluded = rule.split("does not cover", 1)[1]
+        for word in ("editing", "deleting", "approving", "merging"):
+            self.assertIn(word, excluded)
+
+    def test_change_set_rule_is_bounded_by_the_users_words(self):
+        rule = wire.CHANGE_SET_AUTO_MODE_RULE
+        self.assertIn("in their own words", rule)
+        excluded = rule.split("does not cover", 1)[1]
+        for phrase in ("outside that scope", "grades", "student records",
+                       "who can access", "a merge", "force push",
+                       "said not to do"):
+            self.assertIn(phrase, excluded)
+
+    def test_cited_user_rule_excludes_notes_paraphrases_and_quotes(self):
+        rule = wire.CITED_USER_AUTO_MODE_RULE
+        self.assertIn('`<cited author="user">`', rule)
+        self.assertIn("copied into a relay", rule)
+        excluded = rule.split("does not cover", 1)[1]
+        for phrase in ("sender's own note", "paraphrase", "PR comment",
+                       "tool result"):
+            self.assertIn(phrase, excluded)
 
     def test_run_cancel_rule_covers_cancelling_only(self):
         rule = wire.CANCEL_AUTO_MODE_RULE

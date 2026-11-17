@@ -83,6 +83,7 @@ Then switch or ask as `ask-for-manual-approval`'s "When to switch or ask" says.
 A managed-settings `permissions.deny` denial applies in every mode, so report that denial and do not ask to switch modes.
 Never ask whether to post the review, because the grant has answered that question.
 The durable fix is an `autoMode` `allow` entry that covers `gh pr comment` and MR notes.
+`scripts/wire-user-config.py` writes one for a cross-model verdict posted verbatim with the reviewer and model named ([ai-config#5752](https://github.com/Morrison-Lab/ai-config/issues/5752)).
 The entry goes in `~/.claude/settings.json` or in managed settings, never in a repository's settings.
 A cloud session reads no `~/.claude/settings.json`, so managed settings are the only durable route for cloud sessions (see [`use-existing-pr-branch`](use-existing-pr-branch.md)).
 Tracked in [ai-config#4756](https://github.com/Morrison-Lab/ai-config/issues/4756).

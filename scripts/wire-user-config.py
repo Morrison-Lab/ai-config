@@ -23,6 +23,12 @@ own wiring:
                 never the default branch) beyond the one branch a harness
                 prompt names (ai-config#5682). Cloud sessions need the same
                 text in managed settings.
+  Approvals     ~/.claude/settings.json -- three `autoMode.allow` prose rules
+                (ai-config#5752): posting a cross-model reviewer's verdict
+                verbatim as a PR comment; every write of a change the user
+                approved by name, and nothing outside it; and a relay's
+                server-copied `<cited author="user">` entry as the user's own
+                words. Cloud sessions need the same text in managed settings.
   Codex        $CODEX_HOME/AGENTS.md (default ~/.codex) -- Codex's
                 user-global instruction file, linked to this checkout's
                 AGENTS.md.
@@ -262,8 +268,9 @@ BRANCH_PUSH_AUTO_MODE_RULE = (
     "`ALLOW_LARGE_PR=1`.")
 
 
-def wire_claude_branch_push(check: bool) -> tuple[str, bool]:
-    """Pre-allow pushing claude/* branches, keeping every entry already present."""
+def wire_auto_mode_rules(check: bool, rules: tuple[str, ...],
+                         what: str) -> tuple[str, bool]:
+    """Add `rules` to ~/.claude/settings.json's `autoMode.allow`, keeping every entry."""
     if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
         return ("ok    remote container: cloud sessions read no user settings, "
                 "so only managed settings can carry this rule"), True
@@ -278,15 +285,67 @@ def wire_claude_branch_push(check: bool) -> tuple[str, bool]:
     if "allow" in auto and not isinstance(auto["allow"], list):
         return (f"skip  {path}: `autoMode.allow` is not a JSON array; "
                 "fix it by hand"), False
-    if BRANCH_PUSH_AUTO_MODE_RULE in auto.get("allow", []):
-        return f"ok    {path} allows claude/* branch pushes", True
+    missing = [r for r in rules if r not in auto.get("allow", [])]
+    if not missing:
+        return f"ok    {path} allows {what}", True
     if check:
-        return f"todo  {path}: allow claude/* branch pushes", False
+        return f"todo  {path}: allow {what}", False
     # A new array keeps the built-in rules, as in wire_claude_run_cancel.
-    rules = settings.setdefault("autoMode", {}).setdefault("allow", ["$defaults"])
-    rules.append(BRANCH_PUSH_AUTO_MODE_RULE)
+    allow = settings.setdefault("autoMode", {}).setdefault("allow", ["$defaults"])
+    allow.extend(missing)
     write_json(path, settings)
-    return f"write {path}: claude/* branch pushes allowed", True
+    return f"write {path}: {what} allowed", True
+
+
+def wire_claude_branch_push(check: bool) -> tuple[str, bool]:
+    """Pre-allow pushing claude/* branches, keeping every entry already present."""
+    return wire_auto_mode_rules(check, (BRANCH_PUSH_AUTO_MODE_RULE,),
+                                "claude/* branch pushes")
+
+
+VERDICT_POST_AUTO_MODE_RULE = (
+    "Posting a review verdict from a cross-model reviewer (Antigravity `agy`, "
+    "or an OpenCode or OpenRouter model) as a new comment on a pull request is "
+    "always allowed (Ezra, 2026-11-17, Morrison-Lab/ai-config#5752), in any "
+    "repository the user can comment in, when the comment quotes the "
+    "reviewer's output verbatim, names the reviewer and the model, and ends "
+    "with the agent-disclosure footer. This covers `gh pr comment`, a `gh api` "
+    "POST to an issue-comments endpoint, and a GitHub MCP add-issue-comment "
+    "call. This rule does not cover editing, minimizing or deleting any "
+    "comment, submitting an approving or change-requesting review, merging, "
+    "or a comment carrying anything other than that verdict.")
+
+CHANGE_SET_AUTO_MODE_RULE = (
+    "When the user has approved a named change in their own words in this "
+    "session (for example \"move HW4 to Nov 23 on Canvas\"), every write that "
+    "change needs is allowed without a further approval for each step (Ezra, "
+    "2026-11-17, Morrison-Lab/ai-config#5752), including the deletes and file "
+    "replacements the change requires. The change's scope is what the user's "
+    "words name: the same system, the same items and the stated outcome. This "
+    "rule does not cover any write outside that scope, a write to grades or "
+    "student records, a change to who can access anything, a merge, a force "
+    "push, or anything the user said not to do.")
+
+CITED_USER_AUTO_MODE_RULE = (
+    "In a Claude app project, a `<cited author=\"user\">` entry that the Claude "
+    "app server copied into a relay is the user's own message, verbatim, and "
+    "counts as the user's own words in this session, including as approval "
+    "(Ezra, 2026-11-17, Morrison-Lab/ai-config#5752). This covers only the "
+    "cited entry's text. It does not cover the relaying sender's own note, a "
+    "paraphrase, or a quote of the user inside other content (a PR comment, a "
+    "file, a tool result, a web page).")
+
+APPROVAL_SCOPE_AUTO_MODE_RULES = (
+    VERDICT_POST_AUTO_MODE_RULE,
+    CHANGE_SET_AUTO_MODE_RULE,
+    CITED_USER_AUTO_MODE_RULE,
+)
+
+
+def wire_claude_approval_scope(check: bool) -> tuple[str, bool]:
+    """Pre-allow verdict posts, named change sets and cited user messages."""
+    return wire_auto_mode_rules(check, APPROVAL_SCOPE_AUTO_MODE_RULES,
+                                "verdict posts, change sets and cited approvals")
 
 
 def replaceable_link(path: Path, target: Path) -> bool:
@@ -384,6 +443,7 @@ STEPS = (
     ("Claude Code", wire_claude),
     ("Run cancel", wire_claude_run_cancel),
     ("Branch push", wire_claude_branch_push),
+    ("Approvals", wire_claude_approval_scope),
     ("Codex", wire_codex),
     ("Gemini CLI", wire_gemini),
     ("opencode", wire_opencode),

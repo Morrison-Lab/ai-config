@@ -21,8 +21,23 @@ by default, just fix incrementally when you are editing a passage anyway."
 - A one-off audit whose output is a list in an issue, with no content changed.
   Do not file one for a rule that just landed, though: leftover violations are fixed when someone next edits that passage.
 
+## Approving a check is not approving a sweep
+
+On 2026-11-17 Ezra approved a British-spelling check, and the thread that built it opened about 25 PRs fixing existing pages ([ai-config#5773](https://github.com/Morrison-Lab/ai-config/issues/5773)).
+A new check reads changed lines, so existing violations do not trip it, and a relayed "yes" covers the check, not a pass over existing content.
+
+- **Do:** ship the check alone.
+- **Do:** ask the user before a fourth PR on one ask.
+- **Don't:** clear a new check's existing violations because you expect it to flag them.
+- **Don't:** read a coordinator's note, or your own reading of the ask, as the user saying "sweep".
+
 ## The mechanisms
 
+- `hooks/no-unrequested-sweep-pr.py` denies a PR creation (`gh pr create` or `mcp__github__create_pull_request`) once three PRs were opened since the user's latest message, unless a sentence the user wrote asks for a sweep.
+  Only the user's words count, never a coordinator's `<note>`, a question ("did I say to sweep?") or a negation ("don't sweep").
+  A typed `gia`, `gii`, `gip` or `gmd` also allows more.
+  There is no agent-side bypass; the user's next message resets the count.
+  The reviewer layer is "Unrequested sweeps" in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md).
 - `hooks/warn-sweep-pr-without-ask.py` warns when `gh pr create` or `mcp__github__create_pull_request` has "sweep" in the title (or, for `gh pr create` only, a `sweep` label) and no `Sweep authorized:` marker (followed by a message id or link).
   It warns rather than blocks because a title containing the word is not always a sweep, and a hook cannot read Ezra's intent.
 - gha's content checks (`check-new-line-breaks`, `check-def-commentary`, `check-exm-figures`, `check-one-div-per-subfile`, `check-tree-lists`, `check-visualization-figures`, `check-typos` and others) are diff-scoped by default (checked 2026-10-29), reflagging nothing already merged.

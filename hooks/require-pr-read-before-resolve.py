@@ -8,11 +8,15 @@ box, so a thread that owns an open PR must never be resolved.
 
 Rule, on `mcp__hearthbot__set_thread_resolved` with `resolved: true`:
 
-  1. DENY when no `list_threads` call with `include_pull_requests` set ran since
-     the last real user turn. This part is lexically decidable and always on.
+  1. DENY when no `list_threads` call with `include_pull_requests` set, and no
+     `list_prs` call (the thread-session equivalent), ran since the last real
+     user turn. This part is lexically decidable and always on.
   2. DENY when such a call ran and its result, in the row for the target thread
      (the `thread_id` argument, when the call carries one), shows an open or
      draft PR.
+     A `list_prs` read satisfies part 1 only: its rows carry no thread id, so
+     part 2 cannot run for a thread session, and nothing enforces that the
+     thread's own PRs are merged or closed.
 
 WHY PART 2 IS BEST-EFFORT
 -------------------------
@@ -40,6 +44,10 @@ if _LIB not in sys.path:
 
 RESOLVE_TOOL = "set_thread_resolved"
 LIST_TOOL = re.compile(r"^mcp__hearthbot__list_threads$")
+# A project thread's list_threads has no include_pull_requests argument (only the
+# project chat's does), so a thread reads PR state through list_prs instead.
+# list_prs rows carry no thread id, so that read satisfies part 1 only (ai-config#5812).
+LIST_PRS_TOOL = re.compile(r"^mcp__hearthbot__list_prs$")
 
 # A pull request marker that is not merged or closed, within one row's window.
 OPEN_PR = re.compile(
@@ -57,7 +65,8 @@ DENY_UNREAD = (
     "was resolved while its PR (lds#2623) was still open. Call list_threads with "
     "include_pull_requests (page state=done with every cursor, plus review_ready and "
     "blocked, for a sweep), then resolve only a thread whose row shows no open or draft "
-    "PR. ai-config#5806."
+    "PR. A project thread's list_threads has no such argument: call list_prs instead and "
+    "check that this thread's PRs are merged or closed. ai-config#5806, #5812."
 )
 DENY_OPEN = (
     "[hook: require-pr-read-before-resolve] The list_threads row for this thread shows an "
@@ -112,7 +121,9 @@ def list_reads_this_turn(path):
             for block in _blocks(entry):
                 if not isinstance(block, dict):
                     continue
-                if block.get("type") == "tool_use" and LIST_TOOL.match(str(block.get("name") or "")):
+                if block.get("type") == "tool_use" and LIST_PRS_TOOL.match(str(block.get("name") or "")):
+                    ran = True
+                elif block.get("type") == "tool_use" and LIST_TOOL.match(str(block.get("name") or "")):
                     args = block.get("input") or {}
                     if isinstance(args, dict) and args.get("include_pull_requests"):
                         ran = True

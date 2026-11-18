@@ -2867,7 +2867,7 @@ Round 3 split raw text on operators and read body text as new commands.
 Round 4 added a shell-level any-issue-write check that missed `timeout`, `xargs` and quoted `$(...)`.
 Round 5 used a loose text regex that over-matched PR titles.
 Round 6 used a constrained text regex with documented edges pinned by tests, and settled the design at 9fa5a89.
-Round 7 fixed one finding (an unescaped table pipe) and round 8 was clean.
+Round 7 (26bd41c) found one more defect, an unescaped table pipe, which the round 8 head (50bef4c) fixed, and round 8 was clean.
 Each design round fixed the last findings and opened new ones, because nobody had chosen the precision/recall trade-off.)
 
 - **Do:** before the first implementation of a heuristic parser, decide which error direction is acceptable ([warn-only or blocking](#a-warn-only-guards-two-error-directions-are-not-equally-expensive-a-blocking-guards-usually-are)) and name the edges, as [the stated bound](#three-spellings-of-one-class-means-the-deliverable-is-a-stated-bound-not-a-fourth-grammar) requires, then pin the edges with tests.

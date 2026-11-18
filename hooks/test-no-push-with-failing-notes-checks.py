@@ -42,7 +42,7 @@ jobs:
 """
 STUB = """import json, os, sys
 open(os.path.join(os.environ["STUB_LOG"], os.path.basename(__file__) + ".env"), "w", encoding="utf-8").write(
-    json.dumps({k: v for k, v in os.environ.items() if k.startswith(("TERM_LINKS_", "NLB_"))}))
+    json.dumps({k: v for k, v in os.environ.items() if k.startswith(("TERM_LINKS_", "NLB_", "CTR_"))}))
 code = int(open(".stub-exit", encoding="utf-8").read().strip()) if os.path.exists(".stub-exit") else 0
 if code:
     print("::error file=chapters/a.qmd,line=3::unlinked-first-use: model")
@@ -71,7 +71,8 @@ def make_repo(workflows):
 
 def stub_dir():
     g = tempfile.mkdtemp(prefix="npc-gha-")
-    for sub, name in (("check-term-links", "check-term-links.py"), ("check-new-line-breaks", "check-new-line-breaks.py")):
+    for sub, name in (("check-term-links", "check-term-links.py"), ("check-new-line-breaks", "check-new-line-breaks.py"),
+                      ("check-title-references", "check-title-references.py")):
         os.makedirs(os.path.join(g, sub))
         open(os.path.join(g, sub, name), "w", encoding="utf-8").write(STUB)
     return g
@@ -235,6 +236,46 @@ run("git push origin feat", explicit, 0, extra={"PUSH_CHECK_TERMS_ROOT": terms_r
 env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
 expect("T39 a literal terms-from overrides the default",
        env_tl.get("TERM_LINKS_TERMS_DIRS"), os.path.join(terms_root, "pds"))
+
+# lds#2793 (2026-11-18): check-title-references is warn-only in lds (`fail: false`), but
+# lds's annotation gate fails CI on its warnings, so the push was predicted clean and went red.
+CTR = """name: Check title references
+on:
+  pull_request:
+jobs:
+  check:
+    uses: Morrison-Lab/gha/.github/workflows/check-title-references.yml@v3
+    with:
+      fail: false
+      whole-tree: ${{ github.event_name == 'workflow_dispatch' }}
+      paths-ignore: '_extensions/**,**/outtakes/**'
+"""
+GATE = """name: Annotation gate
+on:
+  workflow_run:
+    workflows: [x]
+    types: [completed]
+jobs:
+  gate:
+    uses: Morrison-Lab/gha/.github/workflows/annotation-gate-run.yml@v3
+"""
+ungated = make_repo({"check-title-references.yml": CTR})
+verdict, _ = run("git push origin feat", ungated, 0)
+env_ctr = json.load(open(os.path.join(LOG, "check-title-references.py.env"), encoding="utf-8"))
+expect("T44 title-references runs with the repo's paths-ignore",
+       env_ctr.get("CTR_PATHS_IGNORE"), "_extensions/**,**/outtakes/**")
+expect("T45 without an annotation gate, fail: false is passed through", env_ctr.get("CTR_FAIL"), "false")
+gated = make_repo({"check-title-references.yml": CTR, "annotation-gate.yml": GATE})
+verdict, out = run("git push origin feat", gated, 0)
+env_ctr = json.load(open(os.path.join(LOG, "check-title-references.py.env"), encoding="utf-8"))
+expect("T46 an annotation gate makes a warn-only check blocking", env_ctr.get("CTR_FAIL"), "true")
+verdict, out = run("git push origin feat", gated, 1)
+expect("T47 a failing title-references check denies the push", verdict, "DENY")
+expect("T48 the deny names title-references",
+       "check-title-references failed" in out["hookSpecificOutput"]["permissionDecisionReason"], True)
+verdict, _ = run("git push origin feat", gated, 0, extra={"CTR_GLOBS": "*.nothing"})
+env_ctr = json.load(open(os.path.join(LOG, "check-title-references.py.env"), encoding="utf-8"))
+expect("T49 caller CTR_ variables do not leak into a check", env_ctr.get("CTR_GLOBS"), None)
 
 # A moved tag (gha slides v3) must reach the cache on the next push, inside the daily window.
 origin = tempfile.mkdtemp(prefix="npc-gha-origin-")

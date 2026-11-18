@@ -740,9 +740,14 @@ def test_steps_pin_signing_off():
                  if k == "GIT_CONFIG_COUNT" or k.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))}
     try:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            # A global config that signs, so only the pin can make this pass.
+            global_cfg = Path(tmp) / "gitconfig"
+            global_cfg.write_text("[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n",
+                                  encoding="utf-8")
             out = Path(tmp) / "out"
             step = rlv.Step(name="probe", command="(git config --get commit.gpgsign;"
-                            f" git config --get tag.gpgsign) > {shlex.quote(out.as_posix())}")
+                            f" git config --get tag.gpgsign) > {shlex.quote(out.as_posix())}",
+                            env={"GIT_CONFIG_GLOBAL": global_cfg.as_posix()})
             rlv.run_step(step, Path(tmp), 30, in_snapshot=True)
             seen = out.read_text(encoding="utf-8").split()
     finally:

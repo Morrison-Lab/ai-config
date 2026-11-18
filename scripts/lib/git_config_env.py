@@ -21,7 +21,9 @@ def disable_signing(env: Dict[str, str]) -> None:
     server that is intermittently unreachable, so a suite that commits in a
     temp fixture repo failed for a reason unrelated to the code under test
     (ai-config#5789). Test suites never assert on signatures, and a pair here
-    outranks repo-local config, so one place covers every suite that commits.
+    outranks repo-local config. The pin reaches only suites run through
+    scripts/test_hooks.py or a scripts/run-local-validation.py step; a suite
+    run directly still inherits the caller's global config.
     """
     add_git_config(env, "commit.gpgsign", "false")
     add_git_config(env, "tag.gpgsign", "false")

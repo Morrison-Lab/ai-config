@@ -883,6 +883,18 @@ that demoting a disclosure marker changes `_reviewer_identity()`, when the Claud
 that a non-conforming payload is rejected, when nothing validates it;
 and that the pre-push guard accepts two verdict phrasings, when it accepts three.)
 
+## Run the cross-model review on a prose PR too
+
+A cross-model review is evidence-backed for prose PRs, not only code.
+On 2026-11-18 (Morrison-Lab/ai-config, a GIA session) one found four prose defects that the Claude review bot and a Claude adversarial reviewer both missed:
+an unscoped "every attempt";
+the same PR cited as both success evidence and a waiver case;
+an ambiguous "that day";
+and one timestamp covering two events.
+
+- **Do:** dispatch the cross-model reviewer on a docs-only or prose-heavy PR before merge, exactly as for code.
+- **Don't:** skip it because two Claude reviews of the prose were already clean.
+
 ## Require detailed and holistic review passes
 
 Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:
@@ -1565,6 +1577,17 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 - **Don't:** rely on "all findings addressed in <sha>" inside the not-clean comment, or on later bot verdicts, to clear a not-clean you relayed.
 
 (Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)
+
+A cross-model relay (for example OpenCode kimi-k3) owes the same close, and it owes it from the first post.
+Use [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)'s full envelope, with the closing `### Verdict` heading and `Verdict: Clean` or `Verdict: Needs more work` line.
+A relay without it, one that also quotes a `### Findings` heading, made `check-pr-fully-clean.py` read the PR as not clean (Morrison-Lab/ai-config, 2026-11-18, a GIA session).
+The skill's claim that the envelope "admits by construction" is misleading and is tracked in [ai-config#5802](https://github.com/Morrison-Lab/ai-config/issues/5802).
+The remedy is to re-request the same model with your dispositions and post its new verdict.
+Editing the posted review to clear the gate is not a remedy: the auto-mode classifier denied that edit as undermining oversight, and it was right.
+
+- **Do:** post the full envelope, closing verdict block included, in the first relay of a cross-model review.
+- **Do:** re-request the same model with your dispositions when a posted relay reads not clean, and post its new verdict.
+- **Don't:** edit a posted review to make the gate pass.
 
 ## Post every independent review on the PR or MR it reviewed
 

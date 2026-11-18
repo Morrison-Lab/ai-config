@@ -388,6 +388,9 @@ Verdict: <Clean or Needs more work>
 _Posted by <Agent Name> (AI agent) --- not written by a human._
 ```
 
+Post the full envelope from the first relay, closing `### Verdict` block included, and never quote a `### Findings` heading outside it;
+a relay without it read as not clean (see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
+The "by construction" claim below is misleading and is tracked in [ai-config#5802](https://github.com/Morrison-Lab/ai-config/issues/5802).
 This ensures `check-pr-fully-clean.py` admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean comments (#4425).
 Never use Codex for this routing.
 

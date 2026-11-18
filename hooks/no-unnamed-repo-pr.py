@@ -18,7 +18,7 @@ import os
 import re
 import subprocess
 import sys
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"))
 from shellcmd import (COMMAND_WRAPPERS, ENV_ASSIGNMENT, SHELL_KEYWORDS, env_value,  # noqa: E402
@@ -74,8 +74,8 @@ API_VALUE_FLAGS = {"-X": "method", "--method": "method", "-f": "body", "-F": "bo
 
 
 def api_request(args):
-    """(endpoint, is_post, body texts) from the arguments after `gh api` or `glab api`."""
-    endpoint, method, texts, i = None, None, [], 0
+    """(endpoint, is_post, [(flag, value)] of body flags) from the arguments after `gh api` or `glab api`."""
+    endpoint, method, bodies, i = None, None, [], 0
     while i < len(args):
         arg = args[i]
         flag, val = (arg.split("=", 1) if arg.startswith("--") and "=" in arg else
@@ -86,33 +86,55 @@ def api_request(args):
             val, i = (args[i] if i < len(args) else ""), i + 1
         kind = API_VALUE_FLAGS.get(flag)
         method = val.upper() if kind == "method" else method
-        texts += [val] if kind == "body" else []
+        bodies += [(flag, val)] if kind == "body" else []
         endpoint = endpoint or (arg if not arg.startswith("-") else None)
-    return endpoint, (method == "POST" if method else bool(texts)), texts
+    return endpoint, (method == "POST" if method else bool(bodies)), bodies
 
 
-def api_creation(prog, cur):
+def api_parts(endpoint):
+    """Path segments of an API endpoint: query string, host and a leading `api/v3` or `api/v4` dropped."""
+    parts = urlsplit(endpoint or "").path.strip("/").split("/")
+    return parts[2:] if parts[:1] == ["api"] and parts[1:2] in (["v3"], ["v4"]) else parts
+
+
+def unreadable_body(bodies):
+    """True when a GraphQL body comes from a file, an `@file` field or a shell substitution."""
+    return any(flag == "--input" or "$(" in val or "`" in val
+               or (flag in ("-F", "--field") and val.partition("=")[2].startswith("@")) for flag, val in bodies)
+
+
+def api_creation(prog, cur, lead, elsewhere):
     """[(target key or None, label)] when `gh api`/`glab api` args in `prog` create a PR or MR.
 
     Error direction (ai-config#5784, algorithmatize-checks): fail open, as the rest of this hook does.
-    Deny only when the target resolves offline and is unnamed; an endpoint we cannot read (a numeric
-    GitLab project, a GraphQL node id, `--input` from a file) is a note, never a deny, and a request
+    Deny only when the target resolves offline and is unnamed. A target we cannot read (a numeric
+    GitLab project, a GraphQL node id, a GraphQL body from `--input`, `-F key=@file` or a `$(...)`
+    substitution, a repo variable set elsewhere in the line) is a note, never a deny, and a request
     that is not provably a POST (GET reads) passes silently.
     """
-    endpoint, post, texts = api_request(prog[2:])
-    parts = (endpoint or "").strip("/").split("/")
+    endpoint, post, bodies = api_request(prog[2:])
+    parts, var = api_parts(endpoint), REPO_ENV[prog[0]]
     label = f"`{prog[0]} api {endpoint}`"
-    if prog[0] == "gh" and endpoint == "graphql":
-        hit = any("createPullRequest" in t for t in texts)
+    if prog[0] == "gh" and parts == ["graphql"]:
+        hit = unreadable_body(bodies) or any("createPullRequest" in val for _, val in bodies)
         return [(None, "`gh api graphql` createPullRequest (the target is a repository node id)")] * hit
-    if not post:
+    gh_rest = prog[0] == "gh" and len(parts) == 4 and parts[0] == "repos" and parts[3] == "pulls"
+    glab_rest = prog[0] == "glab" and len(parts) == 3 and parts[0] == "projects" and parts[2] == "merge_requests"
+    if not post or not (gh_rest or glab_rest):
         return []
-    if prog[0] == "gh" and len(parts) == 4 and parts[0] == "repos" and parts[3] == "pulls":
-        placeholders = parts[1:3] == ["{owner}", "{repo}"]
-        return [(gh_target(cur) if placeholders else _key("/".join(parts[1:3])), label)]
-    if prog[0] == "glab" and len(parts) == 3 and parts[0] == "projects" and parts[2] == "merge_requests":
-        return [(_key(unquote(parts[1])) if "/" in unquote(parts[1]) else None, label)]
-    return []
+    named = parts[1:3] if gh_rest else unquote(parts[1]).split("/")
+    holes = [x in ("{owner}", "{repo}", ":id", ":fullpath") for x in (parts[1:3] if gh_rest else [parts[1]])]
+    if not any(holes):
+        return [(_key("/".join(named)) if len(named) > 1 else None, label)]
+    repo = env_value(lead, var)
+    if not repo and elsewhere:
+        return [(None, f"{label} ({var} set elsewhere in the line)")]
+    key = _key(repo or os.environ.get(var)) if (repo or os.environ.get(var)) else gh_target(cur)
+    if not key:
+        return [(None, label)]
+    own, name = key.split("/")
+    fill = {"{owner}": own, "{repo}": name, ":id": key, ":fullpath": key}
+    return [("/".join(fill.get(x, x) for x in (parts[1:3] if gh_rest else [parts[1]])).lower(), label)]
 
 
 def creations(command, start):
@@ -125,7 +147,7 @@ def creations(command, start):
         for argv, _env, _rest, cur in walk_dirs(cmds or [], start if depth == 0 else None):
             prog, lead = _program(argv)
             if prog and prog[1:2] == ["api"]:
-                found += api_creation(prog, cur)
+                found += api_creation(prog, cur, lead, any(t not in lead for t in assigns))
                 continue
             if not prog or prog[1:2] != [("pr", "mr")[prog[0] == "glab"]] or prog[2:3] not in (["create"], ["new"]):
                 continue

@@ -320,7 +320,8 @@ Earlier on 2026-11-18, before the key was saved, every attempt that reached the 
 Earlier still (as observed on 2026-11-17), the proxy refused `opencode.ai` until the user added it to Default's allowed hosts: `curl` printed `CONNECT tunnel failed, response 403`, and the proxy's failure note said `connect_rejected`.
 
 - **Do:** probe with one `curl` to `opencode.ai` before planning a cross-model review in a cloud session, and read the "no key needed" claim as holding only where the proxy injects the credential.
-- **Do:** run the cross-model review itself through that `curl` route, on the final head, before every [`mwc`](../mwc/SKILL.md) merge from a Default cloud session; a connectivity probe alone does not count.
+- **Do:** run the cross-model review itself through that `curl` route, on the final head, before every [`mwc`](../mwc/SKILL.md) merge from a Default cloud session;
+  a connectivity probe alone does not count.
 - **Don't:** count on that claim in an environment where you have not seen the probe succeed, or apply the waiver from this section's history alone.
 
 **Per-model 502 upstream errors and fallback loop:**

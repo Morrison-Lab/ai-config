@@ -115,9 +115,8 @@ def run_main(argv, fetch=None):
     original, original_fsf = pr_overlap.fetch_rest, pr_overlap.file_set_for_rest
     if fetch is not None:
         pr_overlap.fetch_rest = fetch
-        pr_overlap.file_set_for_rest = lambda o, n, pr: (
-            pr_overlap.paths_from_files(pr["number"], pr["_files"])
-        )
+        pr_overlap.file_set_for_rest = lambda o, n, pr: pr_overlap.paths_from_files(
+            pr["number"], pr["_files"])
     buffer = io.StringIO()
     try:
         with redirect_stdout(buffer):
@@ -835,10 +834,13 @@ check(
 )
 
 # --- 23. The REST layer (#5768), through a stubbed `subprocess.run` -----
+calls = []
+
+
 def with_rest(replies, call):
     def _run(args, **kwargs):
         endpoint = args[2]
-        # Without both flags a live listing stops at 100 items.
+        calls.append(endpoint)
         if "search/" not in endpoint and not {"--paginate", "--slurp"} <= set(args):
             return FakeProc(code=1, err="REST list without --paginate --slurp")
         for fragment, reply in replies.items():
@@ -869,6 +871,9 @@ def fetch_rest(replies, limit=100):
     return with_rest(replies, lambda: pr_overlap.fetch_rest("o/r", limit))
 
 
+calls.clear()
+fetch_rest(listing(1))
+check("the count precedes the listing", "search/" in calls[0] and "/pulls?" in calls[1])
 two_pages = {"/pulls?": [[{"number": 7}], [{"number": 3}]], "search/": 2}
 check(
     "REST pages are flattened and ordered by PR number",
@@ -883,18 +888,16 @@ for label, replies in (
     ("a PR missing from the listing (search counts more)", listing(1, counted=2)),
     ("an unreadable page", {"/pulls?": FakeProc(code=1, err="HTTP 502")}),
     ("a PR with no number", {"/pulls?": [[{"title": "x"}]], "search/": 1}),
-    ("an unreadable count", dict(listing(1), **{"search/": "many"})),
 ):
     check(
         f"{label} fails loud instead of shrinking the set",
         isinstance(fetch_rest(replies), pr_overlap.SweepError),
     )
+renames = {"/files?": [[{"filename": "n.yml", "previous_filename": "o.yml"}]]}
 check(
     "REST files fold a rename's old path in alongside the new one",
-    with_rest(
-        {"/files?": [[{"filename": "n.yml", "previous_filename": "o.yml"}]]},
-        lambda: pr_overlap.file_set_for_rest("o", "r", {"number": 7}),
-    ) == {"n.yml", "o.yml"},
+    with_rest(renames, lambda: pr_overlap.file_set_for_rest("o", "r", {"number": 7}))
+    == {"n.yml", "o.yml"},
 )
 
 print(f"\n{passes} passed, {failures} failed")

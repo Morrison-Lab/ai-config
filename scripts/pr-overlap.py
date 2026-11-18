@@ -110,7 +110,7 @@ FINDING_EXIT = 1
 # Maximum shared paths to print per colliding pair before eliding the rest.
 MAX_SHARED_SHOWN = 4
 
-# Unused since the REST port; removed in the follow-up to #5768.
+# Only backs the ignored --files-per-page; removed in the follow-up to #5768.
 FILES_PAGE = 100
 
 # GraphQL connection cap on `first:`. Requesting more is rejected outright,
@@ -330,8 +330,7 @@ def run_negative_control():
             f"  FAILED: enumeration found {len(collisions)} collisions, want 1"
         )
 
-    # The fetch layer is what breaks in practice, so the control also feeds
-    # the real guard a file list at the REST cap, which must be REJECTED.
+    # The fetch layer breaks in practice: feed it a list at the REST cap.
     try:
         paths_from_files(0, [{"filename": f"f{i}"} for i in range(REST_FILES_CAP)])
         ok = False
@@ -636,8 +635,7 @@ def fetch(repo, limit, page):
 
 
 def paths_from_files(number, files):
-    """Paths in a REST file list, plus each rename's old path (a sibling PR
-    still editing it collides with the rename)."""
+    """Paths in a REST file list, plus each rename's old path."""
     if len(files) >= REST_FILES_CAP:
         raise SweepError(
             f"#{number}: {len(files)} files reaches the REST cap of "
@@ -668,12 +666,20 @@ def file_set_for_rest(owner, name, pr):
 def fetch_rest(repo, limit):
     """Fetch every open PR for one repo, oldest first, keeping `limit`.
 
-    REST pages by offset, so a PR closing mid-sweep can drop another out of
-    the set; the count is checked against the search index's own total.
-    Fewer than counted raises. More is a PR opened since, which is harmless,
-    and index lag on a new PR only lowers the count, so it cannot false-alarm.
+    REST pages by offset, so a PR closing mid-listing shifts later ones up
+    and one is never read. The search total is taken BEFORE the listing so
+    that fetched < counted catches it; a PR opened meanwhile lands last
+    (direction=asc) and only enlarges the listing, and index lag on a new PR
+    only lowers the count, so neither false-alarms.
     """
     owner, name = split_repo(repo)
+    counted = run_gh(
+        [
+            "gh", "api", f"search/issues?q=repo:{repo}+is:pr+is:open&per_page=1",
+            "--jq", ".total_count",
+        ],
+        f"{repo} open-PR count",
+    ).strip()
     by_number = {}
     for pr in gh_rest(
         f"repos/{owner}/{name}/pulls?state=open&direction=asc&per_page=100",
@@ -682,16 +688,7 @@ def fetch_rest(repo, limit):
         if not isinstance(pr, dict) or pr.get("number") is None:
             raise SweepError(f"{repo}: a listed PR has no number; set incomplete")
         by_number.setdefault(pr["number"], pr)
-    counted = run_gh(
-        [
-            "gh", "api", f"search/issues?q=repo:{repo}+is:pr+is:open&per_page=1",
-            "--jq", ".total_count",
-        ],
-        f"{repo} open-PR count",
-    ).strip()
-    if not counted.isdigit():
-        raise SweepError(f"{repo}: unreadable open-PR count {counted!r}")
-    if len(by_number) < int(counted):
+    if not counted.isdigit() or len(by_number) < int(counted):
         raise SweepError(
             f"{repo}: fetched {len(by_number)} open PRs but the search index "
             f"counts {counted}; a PR may have been missed, re-run"
@@ -702,6 +699,7 @@ def fetch_rest(repo, limit):
     }
 
 
+# `page` is unused since the REST port; removed in the follow-up to #5768.
 def sweep(repo, limit, page, include_drafts):
     """Derive one repo's open-PR set and compare every pair of file sets."""
     owner, name, connection = fetch_rest(repo, limit)

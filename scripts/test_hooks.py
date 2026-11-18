@@ -49,7 +49,10 @@ import tempfile
 import threading
 from pathlib import Path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from git_config_env import disable_signing  # noqa: E402
+
+ROOT =os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
 
 # Per-suite deadline. The slowest suite is test-no-clobbering-push, and its
@@ -227,6 +230,9 @@ def run_one_suite(test_path, subject, timeout):
         PYTHONWARNINGS="error::SyntaxWarning,error:invalid escape sequence::",
     )
     env.pop("ANTIGRAVITY_AGENT", None)
+    # Fixture repos must not inherit a global commit.gpgsign=true whose
+    # signing server may be unreachable (ai-config#5789).
+    disable_signing(env)
     # A fresh temp directory per suite (ai-config#4805). Several hooks keep
     # once-per-turn sentinel files under the temp directory, so a sentinel
     # left by an earlier LOCAL run made a suite skip the output it asserts on

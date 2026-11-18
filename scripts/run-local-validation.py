@@ -99,6 +99,7 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from findbash import probe_bash  # noqa: E402
+from git_config_env import add_git_config, disable_signing  # noqa: E402
 
 _REQUIRES_CACHE = {}
 
@@ -475,17 +476,12 @@ def bash() -> str:
     return _BASH
 
 
-def add_git_config(env: Dict[str, str], key: str, value: str) -> None:
-    """Append one `-c key=value` to env through GIT_CONFIG_COUNT, keeping any pairs already set."""
-    count = int(env.get("GIT_CONFIG_COUNT") or 0)
-    env[f"GIT_CONFIG_KEY_{count}"] = key
-    env[f"GIT_CONFIG_VALUE_{count}"] = value
-    env["GIT_CONFIG_COUNT"] = str(count + 1)
-
-
 def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None,
              changed_listing: Optional[str] = None, in_snapshot: bool = False) -> int:
     env = dict(os.environ)
+    # Steps run suites that commit in temp fixture repos, which must not
+    # inherit a global commit.gpgsign=true (ai-config#5789).
+    disable_signing(env)
     # snapshot() links each populated submodule into its worktree as a
     # symlink, and git 2.50 and later refuse to recurse into a submodule
     # whose path is a symlink, so a step's `git fetch` died with rc 128

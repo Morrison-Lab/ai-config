@@ -734,7 +734,26 @@ def test_snapshot_steps_fetch_without_submodule_recursion():
           f" (saw {seen})", seen == {True: "false", False: "unset"})
 
 
+def test_steps_pin_signing_off():
+    """ai-config#5789: a step's git must not inherit a global commit.gpgsign=true."""
+    inherited = {k: os.environ.pop(k) for k in list(os.environ)
+                 if k == "GIT_CONFIG_COUNT" or k.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))}
+    try:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            out = Path(tmp) / "out"
+            step = rlv.Step(name="probe", command="(git config --get commit.gpgsign;"
+                            f" git config --get tag.gpgsign) > {shlex.quote(out.as_posix())}")
+            rlv.run_step(step, Path(tmp), 30, in_snapshot=True)
+            seen = out.read_text(encoding="utf-8").split()
+    finally:
+        os.environ.update(inherited)
+    check(f"a step sees commit.gpgsign=false and tag.gpgsign=false (saw {seen})",
+          seen == ["false", "false"])
+
+
 def main():
+    print('running test_steps_pin_signing_off()', flush=True)
+    test_steps_pin_signing_off()
     print('running test_snapshot_steps_fetch_without_submodule_recursion()', flush=True)
     test_snapshot_steps_fetch_without_submodule_recursion()
     print('running test_changed_list_handoff()', flush=True)

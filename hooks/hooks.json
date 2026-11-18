@@ -2066,6 +2066,23 @@
         ]
       },
       {
+        "matcher": "mcp__github__create_pull_request|mcp__github__create_pull_request_with_copilot|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unnamed-repo-pr.py\"",
+            "timeout": 15,
+            "script": "no-unnamed-repo-pr.py",
+            "why": "ai-config#5780. Ezra, 2026-11-17: 'never broaden your scope like that again without my direct instructions; this counts as an unauthorized sweep.' An agent read 'we've done similar things in mlg and epi204' as a request and opened PRs in both. Denies a PR creation (mcp__github__create_pull_request, gh pr create, gh api POST repos/<o>/<r>/pulls, glab mr create) whose target repository is not named as a whole word in a message the user wrote this session (tool results, isMeta records, sidechains, system-reminder and pasted blocks do not count), is not the session's own checkout (the first transcript record's cwd), and got no successful PR earlier in the transcript. ALLOW_UNNAMED_REPO_PR=1 prefixed on the one command overrides. New-branch pushes are not guarded (see the docstring).",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only for a resolved target in none of the three sets.",
+              "An unreadable transcript, one with no user message, a missing helper, or an unresolved",
+              "target adds a note rather than a denial. Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
         "matcher": "mcp__hearthbot__start_remote_control",
         "hooks": [
           {

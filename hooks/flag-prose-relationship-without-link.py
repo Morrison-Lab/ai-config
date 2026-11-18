@@ -13,13 +13,15 @@ boundary is `transcript_meta.is_real_user_turn`), never assistant reply text.
 A PR body is never flagged (ai-config#5442, #5772): GitHub rejects a PR on either
 end of a dependency link (422 "Source issue may only be an issue", measured on
 dependencies/blocked_by), so a PR body has nothing to record. The decision is
-offline: `create_pull_request`, `update_pull_request` and a `gh pr create|edit`
-invocation are PR bodies, each classified by its own invocation after the
-command text is segmented per invocation (see `gh_writes`). `issue_write` is treated as an issue body even
-for method=update on a PR's number, which cannot be told apart offline. An issue
-body naming a PR as its blocker is still flagged and cannot be recorded; the
-notice says to reword the cue or link the issue that PR closes (no network call
-here). A stacked PR is recorded by its base branch and the `> [!IMPORTANT]` alert.
+offline: `create_pull_request`, `update_pull_request` and a command with no
+`gh issue create|edit` invocation are never flagged (see `has_issue_write`).
+`issue_write` is treated as an issue body even for method=update on a PR's number,
+which cannot be told apart offline. An issue body naming a PR as its blocker is
+still flagged and cannot be recorded; the notice says to reword the cue or link
+the issue that PR closes (no network call). A stacked PR is recorded by its base
+branch and the `> [!IMPORTANT]` alert.
+Known edge: a command that chains an issue write with a PR write is scanned
+whole, so a cue in the PR body is flagged too. It blocks once per turn.
 Fails open on any error.
 """
 from __future__ import annotations
@@ -33,6 +35,7 @@ _LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 from agent_notice import stop_notice  # noqa: E402
+from shellcmd import nested_shell_commands, simple_commands, strip_env  # noqa: E402
 from transcript_meta import is_real_user_turn  # noqa: E402
 
 WRITE_TOOL = re.compile(r"issue_write|create_pull_request|update_pull_request")
@@ -52,48 +55,57 @@ CODE = re.compile(r"```.*?```|`[^`\n]*`", re.S)
 PR_TOOL = re.compile(r"create_pull_request|update_pull_request")
 
 
-# A candidate `gh` start: at a command position (line or command start, after a
-# shell operator, `$(`, or an opening quote as in `bash -c "gh ..."`), with an
-# optional path. The verb is read from the following tokens by `gh_verb`, since a
-# regex for gh's global flags would need a nested repetition.
-GH_START = re.compile(r"(?:^|[;&|(`\n\"']|\$\()[ \t]*(?:[\w./-]*/)?gh(?=[ \t])")
+# Programs that may precede `gh` (`command gh ...`, `sudo -u me gh ...`).
+GH_WRAPPERS = {"command", "sudo", "time", "nohup", "env", "exec", "nice", "timeout"}
 GH_VALUE_FLAGS = ("-R", "--repo", "--hostname")
+ISSUE_CMD = re.compile(r"\bgh\b[^\n]*?\bissue\s+(?:create|edit)\b")
 
 
-def gh_verb(rest: str) -> str | None:
-    """"issue" or "pr" when the text after `gh` is `[global flags] issue|pr create|edit`."""
-    toks = rest.split(None, 12)
-    i = 0
-    while i < len(toks) and toks[i].startswith("-"):
-        i += 2 if toks[i] in GH_VALUE_FLAGS else 1
-    if i + 1 < len(toks) and toks[i] in ("issue", "pr") and re.match(r"(?:create|edit)\b", toks[i + 1]):
-        return toks[i]
-    return None
+def _is_issue_write(argv: list[str]) -> bool:
+    """True when argv is `[wrappers] gh [global flags] issue create|edit`."""
+    _env, argv = strip_env(argv)
+    for i, tok in enumerate(argv[:8]):
+        if os.path.basename(tok) == "gh":
+            toks = argv[i + 1:]
+            j = 0
+            while j < len(toks) and toks[j].startswith("-"):
+                j += 2 if toks[j] in GH_VALUE_FLAGS else 1
+            return toks[j:j + 2] in (["issue", "create"], ["issue", "edit"])
+        prev = argv[i - 1] if i else ""
+        if not (tok in GH_WRAPPERS or tok.startswith("-") or prev.startswith("-")):
+            return False
+    return False
 
 
-def gh_writes(cmd: str) -> list[tuple[str, bool]]:
-    """(text, is_pr) for each `gh issue|pr create|edit` invocation in a command.
+def has_issue_write(cmd: str, depth: int = 0) -> bool:
+    """True when some invocation in the command is `gh issue create|edit`.
 
-    The raw text is segmented at each invocation start, not parsed with
-    `shellcmd`, because the parse blanks heredoc bodies (where a body written
-    with `--body "$(cat <<'EOF' ...)"` lives) and fails on an unterminated
-    quote. Each segment runs to the next invocation and is classified by its own
-    verb, so a chain mixing both kinds is split, and "gh pr edit" inside an
-    issue body mid-sentence is not a start. A heredoc line that itself begins
-    with `gh pr edit` would read as a start (a known edge).
+    Decided at shell level only (the question is which verbs run, not what the
+    bodies say): `shellcmd.simple_commands` splits the command, `strip_env`
+    peels env assignments and shell keywords, and the script argument of
+    `bash -c` is searched too. An unparseable command falls back to a text match.
     """
-    starts = [(m.start(), gh_verb(cmd[m.end():])) for m in GH_START.finditer(cmd)]
-    starts = [(pos, verb) for pos, verb in starts if verb]
-    ends = [pos for pos, _ in starts[1:]] + [len(cmd)]
-    return [(cmd[pos:end], verb == "pr") for (pos, verb), end in zip(starts, ends)]
+    cmds = simple_commands(cmd)
+    if cmds is None:
+        return bool(ISSUE_CMD.search(cmd))
+    for argv in cmds:
+        if depth < 3 and any(has_issue_write(c, depth + 1) for c in nested_shell_commands(argv)):
+            return True
+        if _is_issue_write(argv):
+            return True
+    return False
 
 
 def body_of(name: str, inp: dict) -> list[tuple[str, bool]]:
-    """(body text, whether it belongs to a PR) for each issue/PR write in a tool call."""
+    """(body text, whether it belongs to a PR) for each issue/PR write in a tool call.
+
+    A command with any issue write is scanned whole, heredocs included, as an
+    issue body; a command with only PR writes (or none) is never flagged.
+    """
     if WRITE_TOOL.search(name or ""):
         return [(str(inp.get("body") or ""), bool(PR_TOOL.search(name or "")))]
     cmd = str(inp.get("command") or "")
-    return gh_writes(cmd)
+    return [(cmd, False)] if has_issue_write(cmd) else []
 
 
 def first_cue(body: str, is_pr: bool) -> str | None:

@@ -1921,9 +1921,11 @@ def fetch_pr_view_rest(repo, number, cwd):
     `gh pr view`: url, author, reviews, statusCheckRollup, headRefOid,
     reviewRequests and commits. `statusCheckRollup` starts empty because
     `fetch_pr_data` fills it from the commit check-runs REST endpoint.
-    REST lists at most 250 commits, which is enough for the last commit's
-    date this gate reads. Any failed read denies, never reads as empty
-    (shared/principles/fail-fast.md).
+    REST lists a PR's commits oldest first and stops at 250, so on a longer
+    PR the last item is not the last commit and the gate's review-freshness
+    check, which reads `commits[-1]`, would compare against a stale date.
+    A list shorter than the PR's own commit count therefore denies. Any
+    failed read denies, never reads as empty (shared/principles/fail-fast.md).
     """
     pr, error = _gh_rest_json(f"repos/{repo}/pulls/{number}", cwd)
     if error:
@@ -1938,6 +1940,17 @@ def fetch_pr_view_rest(repo, number, cwd):
     )
     if error:
         return None, error
+    total_commits = pr.get("commits")
+    if isinstance(total_commits, int) and len(commits_raw) < total_commits:
+        return None, (
+            f"the commits list is truncated ({len(commits_raw)} of {total_commits}), "
+            "so the last commit's date cannot be read."
+        )
+    if not isinstance(total_commits, int) and len(commits_raw) >= 250:
+        return None, (
+            f"the commits list reached {len(commits_raw)} and the PR does not report "
+            "its commit count, so it may be truncated."
+        )
     return {
         "url": pr.get("html_url") or "",
         "author": {"login": (pr.get("user") or {}).get("login", "")},

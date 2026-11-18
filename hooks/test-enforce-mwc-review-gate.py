@@ -430,6 +430,36 @@ def main():
     check("A failed REST read after the fallback denies, not reads as empty",
           pr_data is None and "REST" in (err or "") and "HTTP 500" in (err or ""), str(err))
 
+    long_pr = dict(rest_pr, commits=300)
+    with patch.object(gate, "run_gh", fake_gh({
+        "repos/Morrison-Lab/ai-config/pulls/7": (0, json.dumps(long_pr), ""),
+    })):
+        pr_data, err = gate.fetch_pr_data(
+            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
+        )
+    check("A commits list shorter than the PR's commit count is refused as truncated",
+          pr_data is None and "truncated" in (err or "") and "1 of 300" in (err or ""), str(err))
+
+    counted_pr = dict(rest_pr, commits=1)
+    with patch.object(gate, "run_gh", fake_gh({
+        "repos/Morrison-Lab/ai-config/pulls/7": (0, json.dumps(counted_pr), ""),
+    })):
+        pr_data, err = gate.fetch_pr_data(
+            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
+        )
+    check("A commits list that matches the PR's commit count is accepted",
+          err is None and len((pr_data or {}).get("commits", [])) == 1, str(err))
+
+    capped = [rest_commit] * 250
+    with patch.object(gate, "run_gh", fake_gh({
+        "repos/Morrison-Lab/ai-config/pulls/7/commits?per_page=100": (0, json.dumps(capped), ""),
+    })):
+        pr_data, err = gate.fetch_pr_data(
+            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
+        )
+    check("A full 250-commit page with no reported commit count is refused",
+          pr_data is None and "may be truncated" in (err or ""), str(err))
+
     def other_failure(args, cwd):
         return SimpleNamespace(returncode=1, stdout="", stderr="GraphQL: Could not resolve to a PullRequest")
 

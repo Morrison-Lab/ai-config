@@ -115,11 +115,28 @@ CASES = [
     ("gh api graphql --input gives a note", "Bash", "gh api graphql --input mut.json", GO, "note"),
     ("gh api graphql -F query=@file gives a note", "Bash", "gh api graphql -F query=@mut.graphql", GO, "note"),
     ("gh api graphql substituted body gives a note", "Bash", 'gh api graphql -f query="$(cat mut.graphql)"', GO, "note"),
+    ("glab api --form implies POST", "Bash", "glab api projects/g%2Fmlg/merge_requests --form title=x", GO, "deny"),
+    ("glab api --output takes a value", "Bash", "glab api --output out.json projects/g%2Fmlg/merge_requests -X POST", GO, "deny"),
+    ("glab api --placeholder takes a value", "Bash", "glab api --placeholder x projects/g%2Fmlg/merge_requests -X POST", GO, "deny"),
+    ("glab api :namespace%2F:repo from home passes", "Bash", "glab api -X POST projects/:namespace%2F:repo/merge_requests", GO, "pass"),
+    ("glab api :namespace%2F:repo from another checkout is denied", "Bash",
+     "glab api -X POST projects/:namespace%2F:repo/merge_requests", GO, "deny", OTHER),
+    ("glab api an unknown placeholder gives a note", "Bash", "glab api -X POST projects/o%2F:nope/merge_requests", GO, "note"),
+    ("glab api GITLAB_REPO does not fill :fullpath", "Bash",
+     "GITLAB_REPO=g/mlg glab api -X POST projects/:fullpath/merge_requests", GO, "pass"),
+    ("gh api a double slash does not hide the endpoint", "Bash", "gh api -X POST repos/o/mlg//pulls", GO, "deny"),
+    ("gh api a leading double slash does not hide the endpoint", "Bash", "gh api -X POST //repos/o/mlg/pulls", GO, "deny"),
+    ("glab api a path-prefixed instance URL", "Bash",
+     "glab api -X POST https://git.example.com/gitlab/api/v4/projects/g%2Fmlg/merge_requests", GO, "deny"),
+    ("gh api the hook-environment GH_REPO fills the placeholders", "Bash", "gh api -X POST repos/{owner}/{repo}/pulls", GO, "deny"),
+    ("gh api an exported GH_REPO elsewhere gives a note", "Bash",
+     "export GH_REPO=o/mlg; gh api -X POST repos/{owner}/{repo}/pulls", GO, "note"),
     ("a missing transcript gives a note", MCP, "mlg", os.path.join(TMP, "none.jsonl"), "note"),
     ("no user message gives a note", MCP, "mlg", transcript({"type": "assistant", "message": {}}), "note"),
 ]
 for name, tool, inp, tpath, want, *cwd in CASES + [("the hook-environment grant", MCP, "mlg", GO, "pass")]:
-    CASE_ENV = {"ALLOW_UNNAMED_REPO_PR": "1"} if name == "the hook-environment grant" else {}
+    CASE_ENV = {"ALLOW_UNNAMED_REPO_PR": "1"} if name == "the hook-environment grant" else (
+        {"GH_REPO": "o/mlg"} if "hook-environment GH_REPO" in name else {})
     got = verdict(tool, inp, tpath, *cwd)
     failures += got != want
     print(("PASS: " if got == want else f"FAIL (got {got}, want {want}): ") + name)
@@ -131,9 +148,17 @@ MUTATIONS = [  # each must fail this suite; skipped inside a mutant run
     ("upstream not preferred", "(\"upstream\", \"github\", \"origin\")", "(\"origin\", \"upstream\", \"github\")"),
     ("attached-value split removed", "(arg[:2], arg[2:]) if arg[:2] in API_VALUE_FLAGS", "(arg[:2], arg[2:]) if False"),
     ("implied POST removed", "(method == \"POST\" if method else bool(bodies))", "(method == \"POST\")"),
-    ("placeholder resolution dropped", "    if not any(holes):", "    if True:"),
-    ("URL normalisation dropped", "urlsplit(endpoint or \"\").path", "(endpoint or \"\")"),
-    ("unreadable graphql body ignored", "hit = unreadable_body(bodies) or ", "hit = "),
+    ("placeholder resolution dropped", "    if not any(x in fills for x in elems):", "    if True:"),
+    ("URL normalisation dropped", "urlsplit(endpoint).path if url else", "endpoint if url else"),
+    ("unreadable graphql body ignored", "* unreadable_body(bodies)", "* False"),
+    ("hook-environment GH_REPO lookup dropped", 'os.environ.get("GH_REPO") if prog[0] == "gh" else None', "None"),
+    ("elsewhere note dropped", 'if prog[0] == "gh" and not repo and elsewhere:', "if False:"),
+    ("glab reads GITLAB_REPO", 'env_value(lead, "GH_REPO") if prog[0] == "gh" else None',
+     'env_value(lead, REPO_ENV[prog[0]])'),
+    ("empty segments kept", 'split("/") if x]\n    cut', 'split("/")]\n    cut'),
+    ("api prefix only at the start", "(url or cut[0] == 0)", "(cut[0] == 0)"),
+    ("glab --form not a body flag", '"--form": "body"', '"--form": ""'),
+    ("unknown placeholder passes", 'if any(x.startswith(":") and x not in fills for x in elems):', "if False:"),
     ("payload cwd is home", "gh_target(first_cwd or payload.get(\"cwd\"))", "gh_target(payload.get(\"cwd\"))"),
 ]
 if not os.environ.get("NURP_MUTANT"):

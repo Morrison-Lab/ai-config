@@ -69,7 +69,7 @@ def _program(argv):
 
 
 API_VALUE_FLAGS = {"-X": "method", "--method": "method", "-f": "body", "-F": "body", "--field": "body",
-                   "--raw-field": "body", "--input": "body", "-H": "", "--header": "", "-q": "", "--jq": "",
+                   "--raw-field": "body", "--input": "body", "--form": "body", "--output": "", "--placeholder": "", "-H": "", "--header": "", "-q": "", "--jq": "",
                    "-t": "", "--template": "", "--hostname": "", "--cache": "", "-p": "", "--preview": ""}
 
 
@@ -92,9 +92,11 @@ def api_request(args):
 
 
 def api_parts(endpoint):
-    """Path segments of an API endpoint: query string, host and a leading `api/v3` or `api/v4` dropped."""
-    parts = urlsplit(endpoint or "").path.strip("/").split("/")
-    return parts[2:] if parts[:1] == ["api"] and parts[1:2] in (["v3"], ["v4"]) else parts
+    """Path segments of an API endpoint, without query string, host, empty segments or an `api/v3|v4` prefix."""
+    url = "://" in (endpoint or "")
+    parts = [x for x in (urlsplit(endpoint).path if url else (endpoint or "").split("?", 1)[0]).split("/") if x]
+    cut = [i for i in range(len(parts) - 1) if parts[i] == "api" and parts[i + 1] in ("v3", "v4")]
+    return parts[cut[0] + 2:] if cut and (url or cut[0] == 0) else parts
 
 
 def unreadable_body(bodies):
@@ -113,28 +115,34 @@ def api_creation(prog, cur, lead, elsewhere):
     that is not provably a POST (GET reads) passes silently.
     """
     endpoint, post, bodies = api_request(prog[2:])
-    parts, var = api_parts(endpoint), REPO_ENV[prog[0]]
+    parts = api_parts(endpoint)
     label = f"`{prog[0]} api {endpoint}`"
     if prog[0] == "gh" and parts == ["graphql"]:
-        hit = unreadable_body(bodies) or any("createPullRequest" in val for _, val in bodies)
-        return [(None, "`gh api graphql` createPullRequest (the target is a repository node id)")] * hit
+        if any("createPullRequest" in val for _, val in bodies):
+            return [(None, "`gh api graphql` createPullRequest (the target is a repository node id)")]
+        return [(None, "`gh api graphql` (could not read the GraphQL body; it may create a PR)")] * unreadable_body(bodies)
     gh_rest = prog[0] == "gh" and len(parts) == 4 and parts[0] == "repos" and parts[3] == "pulls"
     glab_rest = prog[0] == "glab" and len(parts) == 3 and parts[0] == "projects" and parts[2] == "merge_requests"
     if not post or not (gh_rest or glab_rest):
         return []
-    named = parts[1:3] if gh_rest else unquote(parts[1]).split("/")
-    holes = [x in ("{owner}", "{repo}", ":id", ":fullpath") for x in (parts[1:3] if gh_rest else [parts[1]])]
-    if not any(holes):
-        return [(_key("/".join(named)) if len(named) > 1 else None, label)]
-    repo = env_value(lead, var)
-    if not repo and elsewhere:
-        return [(None, f"{label} ({var} set elsewhere in the line)")]
-    key = _key(repo or os.environ.get(var)) if (repo or os.environ.get(var)) else gh_target(cur)
+    elems = parts[1:3] if gh_rest else unquote(parts[1]).split("/")
+    fills = {"{owner}": 0, "{repo}": 1, ":namespace": 0, ":group": 0, ":user": 0, ":username": 0, ":repo": 1,
+             ":id": 2, ":fullpath": 2}
+    if any(x.startswith(":") and x not in fills for x in elems):
+        return [(None, f"{label} (an unknown placeholder)")]
+    if not any(x in fills for x in elems):
+        return [(_key("/".join(elems)) if len(elems) > 1 else None, label)]
+    # glab reads placeholders from the checkout's remote only, never from GITLAB_REPO (gitlab-org/cli docs).
+    repo = env_value(lead, "GH_REPO") if prog[0] == "gh" else None
+    if prog[0] == "gh" and not repo and elsewhere:
+        return [(None, f"{label} (GH_REPO set elsewhere in the line)")]
+    repo = repo or (os.environ.get("GH_REPO") if prog[0] == "gh" else None)
+    key = _key(repo) if repo else gh_target(cur)
     if not key:
         return [(None, label)]
     own, name = key.split("/")
-    fill = {"{owner}": own, "{repo}": name, ":id": key, ":fullpath": key}
-    return [("/".join(fill.get(x, x) for x in (parts[1:3] if gh_rest else [parts[1]])).lower(), label)]
+    values = (own, name, key)
+    return [("/".join(values[fills[x]] if x in fills else x for x in elems).lower(), label)]
 
 
 def creations(command, start):

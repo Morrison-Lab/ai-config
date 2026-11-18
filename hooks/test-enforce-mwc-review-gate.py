@@ -341,6 +341,7 @@ def main():
         "HTTP 403: GitHub GraphQL is not available from Claude Code sessions; "
         "use the REST API (gh api repos/{owner}/{repo}/...)."
     )
+    repo = "repos/Morrison-Lab/ai-config"
     rest_pr = {
         "html_url": "https://github.com/Morrison-Lab/ai-config/pull/7",
         "user": {"login": "someone"},
@@ -360,103 +361,74 @@ def main():
         "createdAt": "2026-11-18T01:05:00Z",
     }
 
+    def ok(body):
+        return (0, json.dumps(body), "")
+
     def fake_gh(overrides=None):
         """A `run_gh` stand-in: GraphQL refused, every REST path answers."""
         routes = {
-            "repos/Morrison-Lab/ai-config/pulls/7": (0, json.dumps(rest_pr), ""),
-            "repos/Morrison-Lab/ai-config/pulls/7/reviews?per_page=100": (0, json.dumps([rest_review]), ""),
-            "repos/Morrison-Lab/ai-config/pulls/7/commits?per_page=100": (0, json.dumps([rest_commit]), ""),
-            "repos/Morrison-Lab/ai-config/issues/7/comments": (0, json.dumps([rest_comment]), ""),
-            "repos/Morrison-Lab/ai-config/pulls/7/comments": (0, "[]", ""),
-            f"repos/Morrison-Lab/ai-config/commits/{HEAD}/check-runs": (0, "[]", ""),
-            "repos/Morrison-Lab/ai-config/pulls/7/ccr/review_threads?per_page=100": (0, "[]", ""),
+            f"{repo}/pulls/7": ok(rest_pr),
+            f"{repo}/pulls/7/reviews?per_page=100": ok([rest_review]),
+            f"{repo}/pulls/7/commits?per_page=100": ok([rest_commit]),
+            f"{repo}/issues/7/comments": ok([rest_comment]),
+            f"{repo}/pulls/7/comments": ok([]),
+            f"{repo}/commits/{HEAD}/check-runs": ok([]),
+            f"{repo}/pulls/7/ccr/review_threads?per_page=100": ok([]),
         }
         routes.update(overrides or {})
 
         def run(args, cwd):
-            if args[:2] == ["pr", "view"] or args[:2] == ["api", "graphql"]:
+            if args[:2] in (["pr", "view"], ["api", "graphql"]):
                 return SimpleNamespace(returncode=1, stdout="", stderr=graphql_refused)
             code, out, err = routes.get(args[1], (1, "", f"no route for {args[1]}"))
             return SimpleNamespace(returncode=code, stdout=out, stderr=err)
 
         return run
 
-    with patch.object(gate, "run_gh", fake_gh()):
-        pr_data, err = gate.fetch_pr_data(
-            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
-        )
+    def fetch(overrides=None):
+        with patch.object(gate, "run_gh", fake_gh(overrides)):
+            return gate.fetch_pr_data(
+                "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
+            )
+
+    threads = f"{repo}/pulls/7/ccr/review_threads?per_page=100"
+    pr_data, err = fetch()
+    pr_data = pr_data or {}
     check("GraphQL refused: fetch_pr_data falls back to REST with no error", err is None, str(err))
     check("REST fallback carries the head sha and url",
-          (pr_data or {}).get("headRefOid") == HEAD and "pull/7" in (pr_data or {}).get("url", ""))
+          pr_data.get("headRefOid") == HEAD and "pull/7" in pr_data.get("url", ""))
     check("REST fallback maps the author, review and last commit date",
-          (pr_data or {}).get("author", {}).get("login") == "someone"
-          and (pr_data or {}).get("reviews", [{}])[0].get("author", {}).get("login") == "rev"
-          and (pr_data or {}).get("commits", [{}])[-1].get("committedDate") == "2026-11-18T00:59:00Z")
+          pr_data.get("author", {}).get("login") == "someone"
+          and pr_data.get("reviews", [{}])[0].get("author", {}).get("login") == "rev"
+          and pr_data.get("commits", [{}])[-1].get("committedDate") == "2026-11-18T00:59:00Z")
     check("REST fallback maps review requests to logins and team slugs",
-          gate.extract_request_names((pr_data or {}).get("reviewRequests", []))
-          == ["reviewer1", "team-a"])
+          gate.extract_request_names(pr_data.get("reviewRequests", [])) == ["reviewer1", "team-a"])
     check("CCR fallback with no threads reads as no open threads",
-          (pr_data or {}).get("reviewThreads") == []
-          and gate.unresolved_review_threads(pr_data or {}) == [])
+          pr_data.get("reviewThreads") == [] and gate.unresolved_review_threads(pr_data) == [])
 
-    open_thread = [{"resolved": False, "outdated": False, "path": "a.md", "line": 3, "comment_ids": [1]},
-                   {"resolved": True, "outdated": False, "path": "b.md", "line": 4, "comment_ids": [2]}]
-    with patch.object(gate, "run_gh", fake_gh({
-        "repos/Morrison-Lab/ai-config/pulls/7/ccr/review_threads?per_page=100":
-            (0, json.dumps(open_thread), ""),
-    })):
-        pr_data, err = gate.fetch_pr_data(
-            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
-        )
+    two_threads = [{"resolved": False, "outdated": False, "path": "a.md", "line": 3},
+                   {"resolved": True, "outdated": False, "path": "b.md", "line": 4}]
+    pr_data, err = fetch({threads: ok(two_threads)})
     check("CCR fallback reports an unresolved thread as open",
           err is None and gate.unresolved_review_threads(pr_data) == ["a.md:3"], str(err))
 
-    with patch.object(gate, "run_gh", fake_gh({
-        "repos/Morrison-Lab/ai-config/pulls/7/ccr/review_threads?per_page=100":
-            (0, json.dumps([{"resolved": True, "outdated": False}] * 100), ""),
-    })):
-        pr_data, err = gate.fetch_pr_data(
-            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
-        )
+    pr_data, err = fetch({threads: ok([{"resolved": True, "outdated": False}] * 100)})
     check("CCR answer of 100 threads is refused as possibly truncated",
           pr_data is None and "truncated" in (err or ""), str(err))
 
-    with patch.object(gate, "run_gh", fake_gh({
-        "repos/Morrison-Lab/ai-config/pulls/7/reviews?per_page=100": (1, "", "HTTP 500"),
-    })):
-        pr_data, err = gate.fetch_pr_data(
-            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
-        )
+    pr_data, err = fetch({f"{repo}/pulls/7/reviews?per_page=100": (1, "", "HTTP 500")})
     check("A failed REST read after the fallback denies, not reads as empty",
           pr_data is None and "REST" in (err or "") and "HTTP 500" in (err or ""), str(err))
 
-    long_pr = dict(rest_pr, commits=300)
-    with patch.object(gate, "run_gh", fake_gh({
-        "repos/Morrison-Lab/ai-config/pulls/7": (0, json.dumps(long_pr), ""),
-    })):
-        pr_data, err = gate.fetch_pr_data(
-            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
-        )
+    pr_data, err = fetch({f"{repo}/pulls/7": ok(dict(rest_pr, commits=300))})
     check("A commits list shorter than the PR's commit count is refused as truncated",
-          pr_data is None and "truncated" in (err or "") and "1 of 300" in (err or ""), str(err))
+          pr_data is None and "1 of 300" in (err or ""), str(err))
 
-    counted_pr = dict(rest_pr, commits=1)
-    with patch.object(gate, "run_gh", fake_gh({
-        "repos/Morrison-Lab/ai-config/pulls/7": (0, json.dumps(counted_pr), ""),
-    })):
-        pr_data, err = gate.fetch_pr_data(
-            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
-        )
+    pr_data, err = fetch({f"{repo}/pulls/7": ok(dict(rest_pr, commits=1))})
     check("A commits list that matches the PR's commit count is accepted",
-          err is None and len((pr_data or {}).get("commits", [])) == 1, str(err))
+          err is None and len(pr_data.get("commits", [])) == 1, str(err))
 
-    capped = [rest_commit] * 250
-    with patch.object(gate, "run_gh", fake_gh({
-        "repos/Morrison-Lab/ai-config/pulls/7/commits?per_page=100": (0, json.dumps(capped), ""),
-    })):
-        pr_data, err = gate.fetch_pr_data(
-            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
-        )
+    pr_data, err = fetch({f"{repo}/pulls/7/commits?per_page=100": ok([rest_commit] * 250)})
     check("A full 250-commit page with no reported commit count is refused",
           pr_data is None and "may be truncated" in (err or ""), str(err))
 
@@ -489,9 +461,7 @@ def main():
           json.dumps(out)[:300])
 
     no_requests = dict(rest_pr, requested_reviewers=[], requested_teams=[])
-    with patch.object(gate, "run_gh", fake_gh({
-        "repos/Morrison-Lab/ai-config/pulls/7": (0, json.dumps(no_requests), ""),
-    })):
+    with patch.object(gate, "run_gh", fake_gh({f"{repo}/pulls/7": ok(no_requests)})):
         out = run_main(merge_payload)
     check("MCP merge of a clean PR is allowed end to end when GraphQL is refused",
           out.get("decision") == "allow", json.dumps(out)[:300])

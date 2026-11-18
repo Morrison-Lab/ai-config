@@ -1987,14 +1987,12 @@ def fetch_pr_view_rest(repo, number, cwd):
 
 
 def fetch_review_threads_ccr(repo, number, cwd):
-    """Review threads through the cloud proxy's CCR route, when GraphQL is refused.
+    """Review threads from the cloud proxy's CCR route, when GraphQL is refused.
 
-    `GET /repos/{o}/{r}/pulls/{n}/ccr/review_threads` answers a list of
-    `{resolved, outdated, path, line, comment_ids}` objects, mapped here onto
-    the `isResolved`/`isOutdated`/`path`/`line` fields the GraphQL query
-    returns. One request asks for 100 threads and the route is not known to
-    page, so an answer of 100 or more is refused as possibly truncated rather
-    than read as "no open threads" (scripts/build-pr-payload.py does the same).
+    Maps `{resolved, outdated, path, line}` onto the fields the GraphQL query
+    returns. The route is not known to page, so an answer of 100 or more
+    threads is refused as possibly truncated, not read as "no open threads"
+    (scripts/build-pr-payload.py does the same).
     """
     data, error = _gh_rest_json(
         f"repos/{repo}/pulls/{number}/ccr/review_threads?per_page=100", cwd

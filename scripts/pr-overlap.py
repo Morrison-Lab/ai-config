@@ -134,6 +134,11 @@ MAX_FILE_PAGES = 100
 # killed by whatever is calling it and reports nothing at all.
 MAX_PR_PAGES = 100
 
+# The REST files endpoint returns at most this many files per PR and gives no
+# signal that it stopped. A PR at the cap may have been cut short, so it is
+# underivable rather than examined (Part of #5768).
+REST_FILES_CAP = 3000
+
 # Printed on every run, including runs that find nothing. A zero here is the
 # case most likely to be misread, so the caveat cannot be conditional on
 # there being findings to caveat.
@@ -146,6 +151,7 @@ BOUNDARY_NOTE = (
     "all-clear."
 )
 
+# Unused since the REST port; removed in the follow-up to #5768.
 QUERY = """
 query($owner:String!, $name:String!, $first:Int!, $files:Int!, $after:String) {
   repository(owner:$owner, name:$name) {
@@ -166,6 +172,7 @@ query($owner:String!, $name:String!, $first:Int!, $files:Int!, $after:String) {
 }
 """
 
+# Unused since the REST port; removed in the follow-up to #5768.
 FILES_QUERY = """
 query($owner:String!, $name:String!, $number:Int!, $files:Int!, $after:String!) {
   repository(owner:$owner, name:$name) {
@@ -327,40 +334,25 @@ def run_negative_control():
 
     # The classifier is the half that does not break in practice; the fetch
     # layer is. So the control also drives the real completeness guard with
-    # a payload claiming more files than it returns, which must be REJECTED
-    # -- otherwise a short file set would silently read as a clean pair.
-    short_payload = {
-        "number": 0,
-        "files": {
-            "totalCount": 3,
-            "pageInfo": {"hasNextPage": False, "endCursor": None},
-            "nodes": [{"path": "a.md", "changeType": "MODIFIED"}],
-        },
-    }
+    # a file list at the endpoint's cap, which must be REJECTED -- otherwise
+    # a cut-short file set would silently read as a clean pair.
     try:
-        file_set_for("control", "control", short_payload, FILES_PAGE)
+        paths_from_files(0, [{"filename": f"f{i}"} for i in range(REST_FILES_CAP)])
         ok = False
         lines.append(
-            "  FAILED: a short file set (1 of 3 files) was accepted rather "
-            "than rejected as incomplete"
+            f"  FAILED: a file list at the {REST_FILES_CAP}-file cap was "
+            "accepted rather than rejected as possibly incomplete"
         )
     except SweepError:
         pass
 
-    complete_payload = {
-        "number": 0,
-        "files": {
-            "totalCount": 1,
-            "pageInfo": {"hasNextPage": False, "endCursor": None},
-            "nodes": [{"path": "a.md", "changeType": "MODIFIED"}],
-        },
-    }
     try:
-        if file_set_for("control", "control", complete_payload, FILES_PAGE) != {
-            "a.md"
-        }:
+        derived = paths_from_files(
+            0, [{"filename": "new.md", "previous_filename": "old.md"}]
+        )
+        if derived != {"new.md", "old.md"}:
             ok = False
-            lines.append("  FAILED: a complete file set was not derived intact")
+            lines.append("  FAILED: a rename did not fold in its old path")
     except SweepError as exc:
         ok = False
         lines.append(f"  FAILED: a complete file set was rejected ({exc})")
@@ -370,7 +362,7 @@ def run_negative_control():
         f"negative control: {verdict} "
         f"({len(CONTROL_CASES)} pair-classifier cases including a "
         "known-colliding one, a 3-pair enumeration, and the file-set "
-        "completeness guard in both directions; does not exercise `gh`)"
+        "cap guard and rename fold; does not exercise `gh`)"
     )
     return ok, [header] + lines
 
@@ -421,6 +413,7 @@ def run_gh(args, context):
     return proc.stdout
 
 
+# Unused since the REST port; removed in the follow-up to #5768.
 def gh_graphql(query, fields, context):
     """Run one GraphQL query, raising rather than returning an empty result."""
     stdout = run_gh(
@@ -438,6 +431,26 @@ def gh_graphql(query, fields, context):
     return data
 
 
+def gh_rest(endpoint, context):
+    """GET one REST list endpoint across every page, raising on any failure.
+
+    GraphQL is refused in Claude Code sessions, so the PR set and file sets
+    come from REST (Part of #5768). `--paginate --slurp` wraps each page in
+    one outer array, which stays parseable where bare `--paginate` output
+    (`][` between pages) does not. An unreadable page makes `gh` exit
+    non-zero, so no page is dropped silently: a missed overlap is worse than
+    a false one, hence a failed page fails the sweep.
+    """
+    stdout = run_gh(["gh", "api", endpoint, "--paginate", "--slurp"], context)
+    try:
+        pages = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise SweepError(f"gh returned unparseable JSON for {context}: {exc}")
+    if not isinstance(pages, list) or not all(isinstance(p, list) for p in pages):
+        raise SweepError(f"gh returned an unexpected shape for {context}")
+    return [item for page in pages for item in page]
+
+
 def split_repo(repo):
     """Split `owner/name`, failing loudly on anything else."""
     if repo.count("/") != 1 or not all(repo.split("/")):
@@ -445,6 +458,7 @@ def split_repo(repo):
     return repo.split("/", 1)
 
 
+# Unused since the REST port; removed in the follow-up to #5768.
 def previous_filenames(owner, name, number):
     """Pre-rename paths for a PR that renames files.
 
@@ -469,6 +483,7 @@ def previous_filenames(owner, name, number):
     return [line.strip() for line in stdout.splitlines() if line.strip()]
 
 
+# Unused since the REST port; removed in the follow-up to #5768.
 def remaining_files(owner, name, number, cursor, page):
     """Page through a PR's remaining files.
 
@@ -519,7 +534,8 @@ def remaining_files(owner, name, number, cursor, page):
     return paths, saw_rename
 
 
-def file_set_for(owner, name, pr, page):
+# Unused since the REST port; removed in the follow-up to #5768.
+def file_set_for_graphql(owner, name, pr, page):
     """Complete set of paths a PR changes, including pre-rename paths.
 
     Raises rather than returning a partial set: a file set that is
@@ -565,7 +581,8 @@ def file_set_for(owner, name, pr, page):
     return set(paths)
 
 
-def fetch(repo, limit, page):
+# Unused since the REST port; removed in the follow-up to #5768.
+def fetch_graphql(repo, limit, page):
     """Fetch open PRs for one repo, paginating the PR connection itself.
 
     The GraphQL `pullRequests` connection caps `first:` at 100, so a repo
@@ -630,6 +647,68 @@ def fetch(repo, limit, page):
     }
 
 
+def paths_from_files(number, files):
+    """Complete set of paths in a REST file list, with pre-rename paths.
+
+    A rename's `filename` is the NEW path only; `previous_filename` is the
+    old one, which a sibling PR still editing it collides with.
+    """
+    if len(files) >= REST_FILES_CAP:
+        raise SweepError(
+            f"#{number}: {len(files)} files reaches the REST cap of "
+            f"{REST_FILES_CAP}, so its file set may be incomplete and any "
+            "'no collision' over it would be unfounded"
+        )
+    paths = set()
+    for entry in files:
+        if not isinstance(entry, dict) or not entry.get("filename"):
+            raise SweepError(f"#{number}: a file entry has no filename")
+        paths.add(entry["filename"])
+        if entry.get("previous_filename"):
+            paths.add(entry["previous_filename"])
+    return paths
+
+
+def file_set_for(owner, name, pr, page):
+    """Complete set of paths a PR changes, raising rather than returning a
+    partial one: an incomplete set produces a clean-looking pair.
+
+    `page` is accepted and ignored until the follow-up to #5768 removes it
+    along with `--files-per-page`; REST pages at a fixed 100.
+    """
+    number = pr["number"]
+    return paths_from_files(
+        number,
+        gh_rest(
+            f"repos/{owner}/{name}/pulls/{number}/files?per_page=100",
+            f"{owner}/{name}#{number} files",
+        ),
+    )
+
+
+def fetch(repo, limit, page):
+    """Fetch every open PR for one repo, oldest first, keeping `limit`.
+
+    Keyed by PR number so a page served twice cannot inflate the count and
+    make a partial sweep look complete. `page` is ignored (see file_set_for).
+    """
+    owner, name = split_repo(repo)
+    by_number = {}
+    for pr in gh_rest(
+        f"repos/{owner}/{name}/pulls?state=open&per_page=100", repo
+    ):
+        if not isinstance(pr, dict) or pr.get("number") is None:
+            raise SweepError(
+                f"{repo}: the API returned a PR with no number, so the "
+                "open-PR set is incomplete"
+            )
+        by_number.setdefault(pr["number"], pr)
+    return owner, name, {
+        "totalCount": len(by_number),
+        "nodes": [by_number[n] for n in sorted(by_number)[:limit]],
+    }
+
+
 def sweep(repo, limit, page, include_drafts):
     """Derive one repo's open-PR set and compare every pair of file sets."""
     owner, name, connection = fetch(repo, limit, page)
@@ -639,15 +718,15 @@ def sweep(repo, limit, page, include_drafts):
     file_sets, meta, underivable, drafts_skipped = {}, {}, [], 0
     for pr in nodes:
         number = pr.get("number")
-        if pr.get("isDraft") and not include_drafts:
+        if pr.get("draft") and not include_drafts:
             drafts_skipped += 1
             continue
         meta[number] = {
             "title": pr.get("title") or "",
-            "url": pr.get("url"),
-            "isDraft": pr.get("isDraft", False),
-            "created": (pr.get("createdAt") or "")[:10],
-            "author": (pr.get("author") or {}).get("login"),
+            "url": pr.get("html_url"),
+            "isDraft": pr.get("draft", False),
+            "created": (pr.get("created_at") or "")[:10],
+            "author": (pr.get("user") or {}).get("login"),
         }
         try:
             file_sets[number] = file_set_for(owner, name, pr, page)
@@ -852,7 +931,8 @@ def main(argv=None):
     parser.add_argument(
         "--files-per-page", type=int, default=FILES_PAGE,
         help=(
-            f"Files fetched per GraphQL page (default {FILES_PAGE}, max "
+            "Ignored since the REST port (#5768); removed in a follow-up. "
+            f"(default {FILES_PAGE}, max "
             f"{MAX_PAGE_SIZE}). A PR needing more than {MAX_FILE_PAGES} "
             "pages at this size is reported as underivable rather than "
             "silently truncated."

@@ -80,7 +80,7 @@ def creations(command, start):
             flag = [b if a in ("-R", "--repo") else a.split("=", 1)[1] if a.startswith("--repo=") else a[2:]
                     for a, b in zip(args, args[1:] + [""]) if re.match(r"\A(?:-R|--repo)(?:\Z|=)|\A-R.", a)]
             repo = (flag or [None])[-1] or env_value(lead, var)
-            if not repo and len(assigns) > len(lead):
+            if not repo and any(t not in lead for t in assigns):
                 found.append((None, f"`{prog[0]} {prog[1]} create` ({var} set elsewhere in the line)"))
                 continue
             repo = repo or os.environ.get(var)
@@ -90,7 +90,7 @@ def creations(command, start):
 
 def read_session(path, prompt_text, user_bodies):
     """(texts the user wrote, first record's cwd) from the transcript at `path`."""
-    texts, first_cwd = [], None
+    texts, prompts, first_cwd = [], [], None
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -101,19 +101,19 @@ def read_session(path, prompt_text, user_bodies):
             att = rec.get("attachment") if isinstance(rec.get("attachment"), dict) else {}
             if att.get("type") == "queued_command" and att.get("commandMode") != "task-notification" \
                     and (att.get("origin") or {}).get("kind") != "peer":
-                texts.append(str(att.get("prompt") or ""))
+                prompts.append(str(att.get("prompt") or ""))
             msg = rec.get("message")
             if rec.get("type") != "user" or rec.get("isMeta") or rec.get("isSidechain") \
                     or rec.get("isCompactSummary") or not isinstance(msg, dict):
                 continue
-            text = prompt_text(msg.get("content")) or ""
-            texts += (re.findall(r"<command-args>(.*?)</command-args>", text, re.S) if "<command-name>" in text
-                      else user_bodies(text) if text else [])
-    return [PASTED.sub(" ", t) for t in texts if t.strip()], first_cwd
+            prompts.append(prompt_text(msg.get("content")) or "")
+    for text in (PASTED.sub(" ", p) for p in prompts):  # a typed slash command's args, else the user's bodies
+        texts += (re.findall(r"<command-args>(.*?)</command-args>", text, re.S)
+                  if re.match(r"\s*<command-(?:message|name)>", text) else user_bodies(text) if text.strip() else [])
+    return [t for t in texts if t.strip()], first_cwd
 
 
 def named(key, texts):
-    """True when the bare name of repo `key` is a whole word in one of `texts`."""
     rx = re.compile(r"(?<![\w.-])" + re.escape(key.split("/")[-1]) + r"(?:\.git)?(?![\w-])(?!\.\w)", re.I)
     return any(rx.search(t) for t in texts)
 

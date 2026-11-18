@@ -522,16 +522,17 @@ A hand-written list is the author's recollection of the checks that matter, pass
 The brief also owes the implementer the size cap, since the review round is the most expensive place to find it.
 
 - **Do:** name `python3 scripts/run-local-validation.py` in an implementer brief in place of a list of validators.
-- **Do:** state the cap from [`small-prs`](small-prs.md) (300 lines, 10 files) and say to measure `git diff --shortstat origin/main...HEAD` after the first commit.
-- **Do:** say that a new check hook needs a reviewer instruction, which `scripts/check-check-has-instructions.py` enforces.
+- **Do:** state the size cap in [`small-prs`](small-prs.md) and say to measure `git diff --shortstat origin/main...HEAD` after the first commit.
+- **Do:** say that a new check script or hook needs a writer instruction and a reviewer instruction, which `scripts/check-check-has-instructions.py` enforces.
 - **Don't:** list validators by hand in a brief.
 - **Don't:** leave the size cap for the review round to discover.
 
 (Morrison-Lab/ai-config, 2026-11-18, a GIA session: the conductor briefed two worktree-isolated implementers with `check-mutation-anchors`, the full `test_hooks.py` and a `load_sibling` grep.
-[#5781](https://github.com/Morrison-Lab/ai-config/pull/5781) then failed on checks the brief never named:
-`new-line-breaks` (a long line with a mid-line semicolon),
-`check-unpinned-git-fixtures.py` (an unpinned `git init` in a new test),
-and `check-check-has-instructions.py` (a new hook with no reviewer instruction).
+[#5781](https://github.com/Morrison-Lab/ai-config/pull/5781) then failed CI on checks the brief never named:
+`new-line-breaks` (a long line with a mid-line semicolon)
+and `check-unpinned-git-fixtures.py` (an unpinned `git init` in a new test).
+The `validate` job stopped at the second under `bash -e`, before `check-check-has-instructions.py` ran;
+the adversarial reviewer's local run found that one (a new hook with no reviewer instruction).
 It also reached 787 lines against the 300-line cap and needed a scope cut after a full review round.
 [#5782](https://github.com/Morrison-Lab/ai-config/pull/5782) was the other implementer's PR, briefed the same way.)
 

@@ -59,10 +59,6 @@ def pr_node(
         "_files": [{"filename": p} for p in paths],
         "number": number,
         "title": title or f"PR {number}",
-        "url": f"https://example.invalid/{number}",
-        "isDraft": draft,
-        "createdAt": "2026-08-20T00:00:00Z",
-        "author": {"login": "someone"},
         "files": {
             "totalCount": len(paths) if total is None else total,
             "pageInfo": {
@@ -105,7 +101,7 @@ def files_page(paths, cursor=None, change_type="MODIFIED"):
 
 def fake_fetch(nodes, total=None):
     """A `fetch` replacement returning fixture nodes, so no `gh` call runs."""
-    def _fetch(repo, limit, page):
+    def _fetch(repo, limit):
         owner, name = repo.split("/", 1)
         return owner, name, {
             "totalCount": len(nodes) if total is None else total,
@@ -116,10 +112,10 @@ def fake_fetch(nodes, total=None):
 
 def run_main(argv, fetch=None):
     """Run main() with stdout captured, returning (exit_code, output)."""
-    original, original_fsf = pr_overlap.fetch, pr_overlap.file_set_for
+    original, original_fsf = pr_overlap.fetch_rest, pr_overlap.file_set_for_rest
     if fetch is not None:
-        pr_overlap.fetch = fetch
-        pr_overlap.file_set_for = lambda o, n, pr, page: (
+        pr_overlap.fetch_rest = fetch
+        pr_overlap.file_set_for_rest = lambda o, n, pr: (
             pr_overlap.paths_from_files(pr["number"], pr["_files"])
         )
     buffer = io.StringIO()
@@ -130,8 +126,8 @@ def run_main(argv, fetch=None):
             except SystemExit as exc:
                 code = exc.code
     finally:
-        pr_overlap.fetch = original
-        pr_overlap.file_set_for = original_fsf
+        pr_overlap.fetch_rest = original
+        pr_overlap.file_set_for_rest = original_fsf
     return code, buffer.getvalue()
 
 
@@ -401,7 +397,7 @@ check(
 # The single most important property. An underivable file set becomes an
 # empty set, which collides with nothing, so the failure path would
 # otherwise print exactly what the clean path prints.
-def exploding_fetch(repo, limit, page):
+def exploding_fetch(repo, limit):
     raise pr_overlap.SweepError("gh failed for o/r (exit 4): bad credentials")
 
 
@@ -559,26 +555,13 @@ except pr_overlap.SweepError:
     no_cursor = True
 check("remaining_files raises when handed no cursor", no_cursor)
 
-# The unused GraphQL path keeps its own guard until the follow-up removes it.
-try:
-    pr_overlap.file_set_for_graphql(
-        "o", "r", pr_node(1, ["a.md"], total=1, has_next=True), 100
-    )
-    nullcur_raised = False
-except pr_overlap.SweepError:
-    nullcur_raised = True
-check(
-    "hasNextPage with a null cursor is an error, not an empty page",
-    nullcur_raised,
-)
-
 # --- 14. The fetch layer: pagination is actually followed ----------------
 # Nothing exercised the pagination branch before, so a bug there would have
 # silently truncated every large PR's file set.
 _real_graphql = pr_overlap.gh_graphql
 try:
     pr_overlap.gh_graphql = lambda q, f, c: files_page(["page2.md"])
-    paged = pr_overlap.file_set_for_graphql(
+    paged = pr_overlap.file_set_for(
         "o", "r", pr_node(1, ["page1.md"], total=2, cursor="CUR"), 1
     )
 finally:
@@ -609,10 +592,10 @@ check("non-terminating file pagination trips the runaway guard", runaway)
 _real_prev = pr_overlap.previous_filenames
 try:
     pr_overlap.previous_filenames = lambda o, n, num: ["old.yml"]
-    renamed = pr_overlap.file_set_for_graphql(
+    renamed = pr_overlap.file_set_for(
         "o", "r", pr_node(1, ["new.yml"], change_type="RENAMED"), 100
     )
-    unrenamed = pr_overlap.file_set_for_graphql(
+    unrenamed = pr_overlap.file_set_for(
         "o", "r", pr_node(2, ["plain.yml"], change_type="MODIFIED"), 100
     )
 finally:
@@ -632,7 +615,7 @@ try:
     pr_overlap.gh_graphql = lambda q, f, c: files_page(
         ["new.yml"], change_type="RENAMED"
     )
-    page2_rename = pr_overlap.file_set_for_graphql(
+    page2_rename = pr_overlap.file_set_for(
         "o", "r",
         pr_node(1, ["plain.md"], total=2, cursor="CUR", change_type="MODIFIED"),
         1,
@@ -790,7 +773,7 @@ _real_graphql = pr_overlap.gh_graphql
 try:
     pr_overlap.gh_graphql = stuck
     try:
-        pr_overlap.fetch_graphql("o/r", 100, 100)
+        pr_overlap.fetch("o/r", 100, 100)
         stuck_raised = False
     except pr_overlap.SweepError:
         stuck_raised = True
@@ -823,7 +806,7 @@ for label, bad in (("a null node", None), ("a node with no number", {"title": "x
             }
         }
         try:
-            pr_overlap.fetch_graphql("o/r", 100, 100)
+            pr_overlap.fetch("o/r", 100, 100)
             raised = False
         except pr_overlap.SweepError:
             raised = True
@@ -851,23 +834,22 @@ check(
     none_raised,
 )
 
-# --- 23. The REST layer (#5768) ------------------------------------------
-# Stub `subprocess.run` so the real gh_rest, fetch and file_set_for run.
-def rest_run(pages_by_fragment):
-    """A `subprocess.run` stand-in answering by endpoint fragment."""
+# --- 23. The REST layer (#5768), through a stubbed `subprocess.run` -----
+def with_rest(replies, call):
     def _run(args, **kwargs):
-        for fragment, reply in pages_by_fragment.items():
-            if fragment in args[2]:
+        endpoint = args[2]
+        # Without both flags a live listing stops at 100 items.
+        if "search/" not in endpoint and not {"--paginate", "--slurp"} <= set(args):
+            return FakeProc(code=1, err="REST list without --paginate --slurp")
+        for fragment, reply in replies.items():
+            if fragment in endpoint:
                 return reply if isinstance(reply, FakeProc) else FakeProc(
                     out=json.dumps(reply)
                 )
-        return FakeProc(code=1, err="unstubbed " + args[2])
-    return _run
+        return FakeProc(code=1, err="unstubbed " + endpoint)
 
-
-def with_rest(pages_by_fragment, call):
     _real = pr_overlap.subprocess.run
-    pr_overlap.subprocess.run = rest_run(pages_by_fragment)
+    pr_overlap.subprocess.run = _run
     try:
         return call()
     except pr_overlap.SweepError as exc:
@@ -876,51 +858,43 @@ def with_rest(pages_by_fragment, call):
         pr_overlap.subprocess.run = _real
 
 
-rest_pr = {"number": 7, "title": "t", "draft": False}
-flat = with_rest(
-    {"/pulls?": [[rest_pr], [dict(rest_pr, number=3)]]},
-    lambda: pr_overlap.fetch("o/r", 100, 100),
-)
+def listing(*numbers, counted=None):
+    return {
+        "/pulls?": [[{"number": n} for n in numbers]],
+        "search/": len(numbers) if counted is None else counted,
+    }
+
+
+def fetch_rest(replies, limit=100):
+    return with_rest(replies, lambda: pr_overlap.fetch_rest("o/r", limit))
+
+
+two_pages = {"/pulls?": [[{"number": 7}], [{"number": 3}]], "search/": 2}
 check(
-    "two REST pages are flattened and ordered by PR number",
-    [n["number"] for n in flat[2]["nodes"]] == [3, 7],
+    "REST pages are flattened and ordered by PR number",
+    [n["number"] for n in fetch_rest(two_pages)[2]["nodes"]] == [3, 7],
 )
+limited = fetch_rest(listing(7, 3, 5), limit=1)[2]
 check(
-    "a limit keeps the oldest PRs but the total still counts all",
-    with_rest(
-        {"/pulls?": [[rest_pr, dict(rest_pr, number=3)]]},
-        lambda: pr_overlap.fetch("o/r", 1, 100)[2]["totalCount"],
-    ) == 2,
+    "a limit keeps the OLDEST PR while the total still counts all",
+    [n["number"] for n in limited["nodes"]] == [3] and limited["totalCount"] == 3,
 )
-check(
-    "an unreadable page fails loud instead of shrinking the set",
-    isinstance(
-        with_rest(
-            {"/pulls?": FakeProc(code=1, err="HTTP 502")},
-            lambda: pr_overlap.fetch("o/r", 100, 100),
-        ),
-        pr_overlap.SweepError,
-    ),
-)
-check(
-    "a PR with no number is incompleteness, not something to skip",
-    isinstance(
-        with_rest(
-            {"/pulls?": [[rest_pr, {"title": "x"}]]},
-            lambda: pr_overlap.fetch("o/r", 100, 100),
-        ),
-        pr_overlap.SweepError,
-    ),
-)
+for label, replies in (
+    ("a PR missing from the listing (search counts more)", listing(1, counted=2)),
+    ("an unreadable page", {"/pulls?": FakeProc(code=1, err="HTTP 502")}),
+    ("a PR with no number", {"/pulls?": [[{"title": "x"}]], "search/": 1}),
+    ("an unreadable count", dict(listing(1), **{"search/": "many"})),
+):
+    check(
+        f"{label} fails loud instead of shrinking the set",
+        isinstance(fetch_rest(replies), pr_overlap.SweepError),
+    )
 check(
     "REST files fold a rename's old path in alongside the new one",
     with_rest(
-        {"/files?": [[
-            {"filename": "new.yml", "previous_filename": "old.yml"},
-            {"filename": "b.md"},
-        ]]},
-        lambda: pr_overlap.file_set_for("o", "r", {"number": 7}, 100),
-    ) == {"new.yml", "old.yml", "b.md"},
+        {"/files?": [[{"filename": "n.yml", "previous_filename": "o.yml"}]]},
+        lambda: pr_overlap.file_set_for_rest("o", "r", {"number": 7}),
+    ) == {"n.yml", "o.yml"},
 )
 
 print(f"\n{passes} passed, {failures} failed")

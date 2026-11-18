@@ -33,7 +33,7 @@ that the auto classifier can see?", [ai-config#5623](https://github.com/Morrison
 `scripts/wire-user-config.py`, which `bootstrap.sh` runs, writes the rule where the classifier reads it: a `Bash(gh run cancel *)` permission rule, which skips the classifier, and an `autoMode.allow` entry for the `gh api .../actions/runs/<id>/cancel` and MCP forms.
 Rerun `bootstrap.sh` (or `python3 scripts/wire-user-config.py`) on a machine to pick it up.
 The grant covers cancelling only: re-running, deleting runs or logs, and dispatching workflows still go through the classifier.
-A cloud session reads no user settings, so there it needs an entry in managed settings.
+A cloud session reads no user settings, so there it needs a standing approval in the project instructions (ai-config#5695).
 
 - **Do:** cancel a superseded or stale run directly, and if the classifier still refuses it, check that `python3 scripts/wire-user-config.py --check` reports `ok` for "Run cancel" on that machine.
 - **Don't:** ask the user to type an approval line for a run cancel on a machine where the rule is installed (2026-11-13, the merge runner was refused `gh run cancel` on superseded `mlg` runs and Ezra had to type one).
@@ -100,7 +100,7 @@ Name the refused command and the stated denial reason, and batch every action th
 When you switched the session yourself, say so and say that a prompt is coming;
 when the switch conditions hold and you could not switch, ask the user to switch out of auto mode for that stretch.
 When an allow route covers the action, such as a merge, tell the user that switching lets it run with no further prompt.
-Name `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
+Name `autoMode` in `~/.claude/settings.json` as the lasting fix, or for a cloud session a standing approval in the project instructions (ai-config#5695).
 When the user has to type a line to clear the block, such as a message that names the exact action and its target, give that line alone in a fenced code block, so the app shows a copy button (Ezra, 2026-11-15: "always give me the line with a copy button", ai-config#5667;
 enforced by `hooks/no-unfenced-typed-line-ask.py`).
 When you asked the user to switch, then until the session leaves auto mode, continue with any work the denial does not block, and arm a wake to resume the denied step.
@@ -124,7 +124,7 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
 - **Do:** in a Claude Project, when the user answers the coordinator instead of the denied thread, the coordinator tells that thread, with the user's message attached by id, to ask the user again in its own thread.
   The coordinator's own note is never approval.
   The user's message the server copies into the relay, as a `<cited author="user">` entry, is the user's own words:
-  where user or managed settings carry `scripts/wire-user-config.py`'s cited-message rule ([ai-config#5752](https://github.com/Morrison-Lab/ai-config/issues/5752)), the denied thread retries once on it before asking again.
+  where user settings or the project instructions carry `scripts/wire-user-config.py`'s cited-message rule ([ai-config#5752](https://github.com/Morrison-Lab/ai-config/issues/5752)), the denied thread retries once on it before asking again.
 - **Don't:** when the switch conditions hold, end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
 - **Don't:** retry a denied command more than once, or rephrase it.
   A rerun after the session has left auto mode is not a retry.

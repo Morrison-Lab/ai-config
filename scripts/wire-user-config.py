@@ -22,13 +22,14 @@ own wiring:
                 that lets every session push `claude/*` branches (non-force,
                 never the default branch) beyond the one branch a harness
                 prompt names (ai-config#5682). Cloud sessions need the same
-                text in managed settings.
+                text as a standing approval in the project instructions (ai-config#5695).
   Approvals     ~/.claude/settings.json -- three `autoMode.allow` prose rules
                 (ai-config#5752): posting a cross-model reviewer's verdict
                 verbatim as a PR comment; every write of a change the user
                 approved by name, and nothing outside it; and a relay's
                 server-copied `<cited author="user">` entry as the user's own
-                words. Cloud sessions need the same text in managed settings.
+                words. Cloud sessions need the same text as a standing approval
+                in the project instructions (ai-config#5695).
   Codex        $CODEX_HOME/AGENTS.md (default ~/.codex) -- Codex's
                 user-global instruction file, linked to this checkout's
                 AGENTS.md.
@@ -217,7 +218,8 @@ def wire_claude_run_cancel(check: bool) -> tuple[str, bool]:
     """Pre-allow run cancellation, keeping every entry already present."""
     if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
         return ("ok    remote container: cloud sessions read no user settings, "
-                "so only managed settings can carry this rule"), True
+                "so a standing approval in the project instructions carries "
+                "this rule (ai-config#5695)"), True
     claude_home = Path(os.environ.get("CLAUDE_HOME", home() / ".claude"))
     path = claude_home / "settings.json"
     settings = load_json(path)
@@ -273,7 +275,8 @@ def wire_auto_mode_rules(check: bool, rules: tuple[str, ...],
     """Add `rules` to ~/.claude/settings.json's `autoMode.allow`, keeping every entry."""
     if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
         return ("ok    remote container: cloud sessions read no user settings, "
-                "so only managed settings can carry this rule"), True
+                "so a standing approval in the project instructions carries "
+                "this rule (ai-config#5695)"), True
     claude_home = Path(os.environ.get("CLAUDE_HOME", home() / ".claude"))
     path = claude_home / "settings.json"
     settings = load_json(path)

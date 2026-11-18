@@ -195,7 +195,7 @@ class WireUserConfig(unittest.TestCase):
                          "pushing tags", "ALLOW_LARGE_PR=1"):
             self.assertIn(excluded, rule.split("does not cover", 1)[1])
 
-    def test_branch_push_is_left_to_managed_settings_in_a_remote_container(self):
+    def test_branch_push_is_left_to_project_instructions_in_a_remote_container(self):
         os.environ["CLAUDE_CODE_REMOTE"] = "true"
         try:
             _, out = self.run_main()
@@ -227,7 +227,7 @@ class WireUserConfig(unittest.TestCase):
         for rule in wire.APPROVAL_SCOPE_AUTO_MODE_RULES:
             self.assertEqual(allow.count(rule), 1)
 
-    def test_approvals_are_left_to_managed_settings_in_a_remote_container(self):
+    def test_approvals_are_left_to_project_instructions_in_a_remote_container(self):
         os.environ["CLAUDE_CODE_REMOTE"] = "true"
         try:
             _, out = self.run_main()

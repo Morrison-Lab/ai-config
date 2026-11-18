@@ -55,9 +55,9 @@ def gh_target(directory):
 
 
 def _glab_globals(prog):
-    """`prog` with glab's root flags (-R/--repo; --help/-h, --version/-v: root.go) after the subcommand words.
-
-    A moved -R keeps its position before any later flag or `--`, so pflag's last-value-wins still holds.
+    """`prog` with glab's root flags (root.go) handled: -R/--repo move to just after the subcommand words,
+    --help/-h and --version/-v are dropped. A moved -R stays before any later flag or `--`, so pflag's
+    last-value-wins still holds.
     """
     rest, moved = prog[1:], []
     while prog[0] == "glab" and rest[:1] and re.match(r"\A(?:-R.*|--repo(?:=.*)?|--help|--version|-h|-v)\Z", rest[0]):
@@ -175,6 +175,16 @@ def api_kind(prog, endpoint):
     return ("graphql" if parts == ["graphql"] else "rest" if rest else None), parts
 
 
+CREATION_SHAPES = (("repos", None, None, "pulls"), ("projects", None, "merge_requests"), ("graphql",))  # None: any segment
+
+
+def expands(parts):
+    """True when a shell expansion sits in a path whose segments could still form a creation endpoint."""
+    hole = [bool(re.search(r"[$`]", x)) for x in parts]
+    return any(hole) and any(len(sh) == len(parts) and all(w in (None, x) or h for w, x, h in zip(sh, parts, hole))
+                             for sh in CREATION_SHAPES)
+
+
 def api_creation(prog, cur, lead, elsewhere):
     """[(target key or None, label)] when `gh api`/`glab api` args in `prog` create a PR or MR.
 
@@ -188,7 +198,7 @@ def api_creation(prog, cur, lead, elsewhere):
     endpoint = (positionals or [None])[0]
     kind, parts = api_kind(prog[0], endpoint)
     label = f"`{prog[0]} api {endpoint}`"
-    if post and re.search(r"[$`]", re.split(r"[?#]", endpoint or "", 1)[0]):
+    if post and expands(parts):
         return [(None, f"{label} (could not read the endpoint)")]
     odd = [(None, f"{label} (unrecognised flag `{f}`)") for f in unknown[:1]]
     hidden = [(None, f"`{prog[0]} api {p}` (an unrecognised flag may hide the method or endpoint)")

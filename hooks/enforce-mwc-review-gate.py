@@ -1887,6 +1887,128 @@ def _merge_paginated_json(text, decoder=None):
     return items
 
 
+GRAPHQL_BLOCKED_MARKER = "GraphQL is not available"
+
+
+def _graphql_blocked(stderr):
+    """True when gh's stderr says the session's proxy refuses GraphQL.
+
+    Claude Code cloud sessions answer every GraphQL call with a 403 that
+    names this phrase and points at the REST and CCR routes instead
+    (ai-config#4304). Matching the phrase keeps the REST fallback to that
+    one cause, so any other `gh` failure still denies as before.
+    """
+    return GRAPHQL_BLOCKED_MARKER in (stderr or "")
+
+
+def _gh_rest_json(path, cwd, paginate=False):
+    """Return (parsed JSON, error text) for one REST read through `gh api`."""
+    args = ["api", path] + (["--paginate"] if paginate else [])
+    result = run_gh(args, cwd)
+    if result.returncode != 0:
+        return None, f"gh api {path} returned non-zero. Output: " + result.stderr
+    text = result.stdout.strip()
+    if paginate:
+        return _merge_paginated_json(text), None
+    return json.loads(text), None
+
+
+def fetch_pr_view_rest(repo, number, cwd):
+    """REST stand-in for the `gh pr view --json ...` call in `fetch_pr_data`.
+
+    Used only when GraphQL is refused (`_graphql_blocked`). Returns
+    (pr_data, error_reason) with the same keys the gate reads from
+    `gh pr view`: url, author, reviews, statusCheckRollup, headRefOid,
+    reviewRequests and commits. `statusCheckRollup` starts empty because
+    `fetch_pr_data` fills it from the commit check-runs REST endpoint.
+    REST lists at most 250 commits, which is enough for the last commit's
+    date this gate reads. Any failed read denies, never reads as empty
+    (shared/principles/fail-fast.md).
+    """
+    pr, error = _gh_rest_json(f"repos/{repo}/pulls/{number}", cwd)
+    if error:
+        return None, error
+    reviews_raw, error = _gh_rest_json(
+        f"repos/{repo}/pulls/{number}/reviews?per_page=100", cwd, paginate=True
+    )
+    if error:
+        return None, error
+    commits_raw, error = _gh_rest_json(
+        f"repos/{repo}/pulls/{number}/commits?per_page=100", cwd, paginate=True
+    )
+    if error:
+        return None, error
+    return {
+        "url": pr.get("html_url") or "",
+        "author": {"login": (pr.get("user") or {}).get("login", "")},
+        "headRefOid": (pr.get("head") or {}).get("sha", ""),
+        "statusCheckRollup": [],
+        "reviewRequests": [
+            {"login": r.get("login") or ""}
+            for r in pr.get("requested_reviewers") or []
+            if r.get("login")
+        ] + [
+            {"slug": t.get("slug") or t.get("name") or ""}
+            for t in pr.get("requested_teams") or []
+            if t.get("slug") or t.get("name")
+        ],
+        "reviews": [
+            {
+                "state": r.get("state") or "",
+                "body": r.get("body") or "",
+                "submittedAt": r.get("submitted_at") or "",
+                "authorAssociation": r.get("author_association") or "",
+                "author": {"login": (r.get("user") or {}).get("login", "")},
+                "commit": {"oid": r.get("commit_id") or ""},
+            }
+            for r in reviews_raw
+        ],
+        "commits": [
+            {
+                "oid": c.get("sha") or "",
+                "committedDate": ((c.get("commit") or {}).get("committer") or {}).get("date", ""),
+            }
+            for c in commits_raw
+        ],
+    }, None
+
+
+def fetch_review_threads_ccr(repo, number, cwd):
+    """Review threads through the cloud proxy's CCR route, when GraphQL is refused.
+
+    `GET /repos/{o}/{r}/pulls/{n}/ccr/review_threads` answers a list of
+    `{resolved, outdated, path, line, comment_ids}` objects, mapped here onto
+    the `isResolved`/`isOutdated`/`path`/`line` fields the GraphQL query
+    returns. One request asks for 100 threads and the route is not known to
+    page, so an answer of 100 or more is refused as possibly truncated rather
+    than read as "no open threads" (scripts/build-pr-payload.py does the same).
+    """
+    data, error = _gh_rest_json(
+        f"repos/{repo}/pulls/{number}/ccr/review_threads?per_page=100", cwd
+    )
+    if error:
+        return None, error
+    if not isinstance(data, list) or not all(isinstance(t, dict) for t in data):
+        return None, (
+            "the CCR review_threads route answered something other than a list "
+            "of threads, so the open threads cannot be verified."
+        )
+    if len(data) >= 100:
+        return None, (
+            f"the CCR review_threads route returned {len(data)} threads and may "
+            "be truncated, so the open threads cannot be verified."
+        )
+    return [
+        {
+            "isResolved": bool(t.get("resolved")),
+            "isOutdated": bool(t.get("outdated")),
+            "path": t.get("path") or "",
+            "line": t.get("line"),
+        }
+        for t in data
+    ], None
+
+
 def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
     """Resolve the merge target and fetch its state.
 
@@ -1897,8 +2019,11 @@ def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
     present in the GraphQL rollup are deduplicated by detailsUrl, and timestamps are
     propagated so cancel-in-progress runs are properly superseded (ai-config#4112).
     """
+    # The (repo, number) the REST fallback can read, when both are known.
+    rest_target = None
     if target_repo and target_number:
         view_args = ["pr", "view", str(target_number), "--repo", target_repo]
+        rest_target = (target_repo, str(target_number))
     else:
         api_match = GH_API_MERGE_RE.search(cmd)
         if api_match:
@@ -1906,6 +2031,7 @@ def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
             view_args = ["pr", "view", number]
             if "{" not in repo:
                 view_args += ["--repo", repo]
+                rest_target = (repo, number)
             # A "{owner}/{repo}" placeholder resolves from Cwd, exactly as gh
             # api itself would, so plain `gh pr view <n>` inspects the same PR.
         else:
@@ -1916,18 +2042,31 @@ def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
                 view_args.append(pr_arg)
             if repo_match:
                 view_args += ["--repo", repo_match.group(1)]
+            if repo_match and pr_arg and str(pr_arg).isdigit():
+                rest_target = (repo_match.group(1), str(pr_arg))
 
     result = run_gh(
         view_args
         + ["--json", "url,author,reviews,statusCheckRollup,headRefOid,reviewRequests,commits"],
         cwd,
     )
-    if result.returncode != 0:
+    if result.returncode != 0 and rest_target and _graphql_blocked(result.stderr):
+        # Cloud sessions refuse GraphQL, which `gh pr view --json` needs
+        # (ai-config#4304). Read the same fields over REST rather than
+        # denying every merge there.
+        pr_data, error = fetch_pr_view_rest(rest_target[0], rest_target[1], cwd)
+        if error:
+            return None, (
+                "Hook failed to fetch PR state over REST after GraphQL was "
+                "refused. Output: " + error
+            )
+    elif result.returncode != 0:
         return None, (
             "Hook failed to fetch PR state (gh pr view returned non-zero). "
             "Ensure the PR exists and is checked out. Output: " + result.stderr
         )
-    pr_data = json.loads(result.stdout)
+    else:
+        pr_data = json.loads(result.stdout)
 
     url_match = PR_URL_RE.search(pr_data.get("url", "") or "")
     if not url_match:
@@ -2024,6 +2163,17 @@ def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
          "-F", f"n={url_match.group(2)}", "--jq", REVIEW_THREADS_JQ],
         cwd,
     )
+    if threads_result.returncode != 0 and _graphql_blocked(threads_result.stderr):
+        threads, error = fetch_review_threads_ccr(
+            url_match.group(1), url_match.group(2), cwd
+        )
+        if error:
+            return None, (
+                "Hook failed to fetch the PR's review threads over the CCR "
+                "route after GraphQL was refused. Output: " + error
+            )
+        pr_data["reviewThreads"] = threads
+        return pr_data, None
     if threads_result.returncode != 0:
         return None, (
             "Hook failed to fetch the PR's review threads (gh api graphql "

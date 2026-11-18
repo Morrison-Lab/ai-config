@@ -14,6 +14,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 HOOK = (
@@ -334,6 +335,136 @@ def main():
 
     out = run_main("", argv=["enforce-mwc-review-gate.py", "--dry-run", "glab mr merge 5"])
     check("--dry-run glab mr merge denies", out.get("decision") == "deny")
+
+    # 9. REST fallback when the session's proxy refuses GraphQL (ai-config#4304)
+    graphql_refused = (
+        "HTTP 403: GitHub GraphQL is not available from Claude Code sessions; "
+        "use the REST API (gh api repos/{owner}/{repo}/...)."
+    )
+    rest_pr = {
+        "html_url": "https://github.com/Morrison-Lab/ai-config/pull/7",
+        "user": {"login": "someone"},
+        "head": {"sha": HEAD},
+        "requested_reviewers": [{"login": "reviewer1"}],
+        "requested_teams": [{"slug": "team-a"}],
+    }
+    rest_review = {
+        "state": "COMMENTED", "body": "ok", "submitted_at": "2026-11-18T01:00:00Z",
+        "author_association": "MEMBER", "user": {"login": "rev"}, "commit_id": HEAD,
+    }
+    rest_commit = {"sha": HEAD, "commit": {"committer": {"date": "2026-11-18T00:59:00Z"}}}
+    rest_comment = {
+        "author": {"login": "github-actions"},
+        "body": ("**Claude finished review**\n\n### Verdict\n**Ready for merge** --- all prior "
+                 f"findings addressed.\n\nReviewed commit: {HEAD}"),
+        "createdAt": "2026-11-18T01:05:00Z",
+    }
+
+    def fake_gh(overrides=None):
+        """A `run_gh` stand-in: GraphQL refused, every REST path answers."""
+        routes = {
+            "repos/Morrison-Lab/ai-config/pulls/7": (0, json.dumps(rest_pr), ""),
+            "repos/Morrison-Lab/ai-config/pulls/7/reviews?per_page=100": (0, json.dumps([rest_review]), ""),
+            "repos/Morrison-Lab/ai-config/pulls/7/commits?per_page=100": (0, json.dumps([rest_commit]), ""),
+            "repos/Morrison-Lab/ai-config/issues/7/comments": (0, json.dumps([rest_comment]), ""),
+            "repos/Morrison-Lab/ai-config/pulls/7/comments": (0, "[]", ""),
+            f"repos/Morrison-Lab/ai-config/commits/{HEAD}/check-runs": (0, "[]", ""),
+            "repos/Morrison-Lab/ai-config/pulls/7/ccr/review_threads?per_page=100": (0, "[]", ""),
+        }
+        routes.update(overrides or {})
+
+        def run(args, cwd):
+            if args[:2] == ["pr", "view"] or args[:2] == ["api", "graphql"]:
+                return SimpleNamespace(returncode=1, stdout="", stderr=graphql_refused)
+            code, out, err = routes.get(args[1], (1, "", f"no route for {args[1]}"))
+            return SimpleNamespace(returncode=code, stdout=out, stderr=err)
+
+        return run
+
+    with patch.object(gate, "run_gh", fake_gh()):
+        pr_data, err = gate.fetch_pr_data(
+            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
+        )
+    check("GraphQL refused: fetch_pr_data falls back to REST with no error", err is None, str(err))
+    check("REST fallback carries the head sha and url",
+          (pr_data or {}).get("headRefOid") == HEAD and "pull/7" in (pr_data or {}).get("url", ""))
+    check("REST fallback maps the author, review and last commit date",
+          (pr_data or {}).get("author", {}).get("login") == "someone"
+          and (pr_data or {}).get("reviews", [{}])[0].get("author", {}).get("login") == "rev"
+          and (pr_data or {}).get("commits", [{}])[-1].get("committedDate") == "2026-11-18T00:59:00Z")
+    check("REST fallback maps review requests to logins and team slugs",
+          gate.extract_request_names((pr_data or {}).get("reviewRequests", []))
+          == ["reviewer1", "team-a"])
+    check("CCR fallback with no threads reads as no open threads",
+          (pr_data or {}).get("reviewThreads") == []
+          and gate.unresolved_review_threads(pr_data or {}) == [])
+
+    open_thread = [{"resolved": False, "outdated": False, "path": "a.md", "line": 3, "comment_ids": [1]},
+                   {"resolved": True, "outdated": False, "path": "b.md", "line": 4, "comment_ids": [2]}]
+    with patch.object(gate, "run_gh", fake_gh({
+        "repos/Morrison-Lab/ai-config/pulls/7/ccr/review_threads?per_page=100":
+            (0, json.dumps(open_thread), ""),
+    })):
+        pr_data, err = gate.fetch_pr_data(
+            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
+        )
+    check("CCR fallback reports an unresolved thread as open",
+          err is None and gate.unresolved_review_threads(pr_data) == ["a.md:3"], str(err))
+
+    with patch.object(gate, "run_gh", fake_gh({
+        "repos/Morrison-Lab/ai-config/pulls/7/ccr/review_threads?per_page=100":
+            (0, json.dumps([{"resolved": True, "outdated": False}] * 100), ""),
+    })):
+        pr_data, err = gate.fetch_pr_data(
+            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
+        )
+    check("CCR answer of 100 threads is refused as possibly truncated",
+          pr_data is None and "truncated" in (err or ""), str(err))
+
+    with patch.object(gate, "run_gh", fake_gh({
+        "repos/Morrison-Lab/ai-config/pulls/7/reviews?per_page=100": (1, "", "HTTP 500"),
+    })):
+        pr_data, err = gate.fetch_pr_data(
+            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
+        )
+    check("A failed REST read after the fallback denies, not reads as empty",
+          pr_data is None and "REST" in (err or "") and "HTTP 500" in (err or ""), str(err))
+
+    def other_failure(args, cwd):
+        return SimpleNamespace(returncode=1, stdout="", stderr="GraphQL: Could not resolve to a PullRequest")
+
+    with patch.object(gate, "run_gh", other_failure):
+        pr_data, err = gate.fetch_pr_data(
+            "", "/tmp", target_repo="Morrison-Lab/ai-config", target_number=7
+        )
+    check("A gh failure that is not the GraphQL refusal still denies with no fallback",
+          pr_data is None and "gh pr view returned non-zero" in (err or ""), str(err))
+
+    with patch.object(gate, "run_gh", fake_gh()):
+        pr_data, err = gate.fetch_pr_data("gh pr merge --squash", "/tmp")
+    check("Refused GraphQL with no repo and number to read over REST still denies",
+          pr_data is None and "gh pr view returned non-zero" in (err or ""), str(err))
+
+    merge_payload = {
+        "tool_name": "mcp__github__merge_pull_request",
+        "tool_input": {
+            "owner": "Morrison-Lab", "repo": "ai-config", "pull_number": 7,
+            "expectedHeadSha": HEAD,
+        },
+    }
+    with patch.object(gate, "run_gh", fake_gh()):
+        out = run_main(merge_payload)
+    check("MCP merge denies on a pending review request read over the REST fallback",
+          out.get("decision") == "deny" and "reviewer1" in out.get("reason", ""),
+          json.dumps(out)[:300])
+
+    no_requests = dict(rest_pr, requested_reviewers=[], requested_teams=[])
+    with patch.object(gate, "run_gh", fake_gh({
+        "repos/Morrison-Lab/ai-config/pulls/7": (0, json.dumps(no_requests), ""),
+    })):
+        out = run_main(merge_payload)
+    check("MCP merge of a clean PR is allowed end to end when GraphQL is refused",
+          out.get("decision") == "allow", json.dumps(out)[:300])
 
     print(f"\n{checks - len(failures)}/{checks} checks passed.")
     if failures:

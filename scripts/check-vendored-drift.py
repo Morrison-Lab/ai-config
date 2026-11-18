@@ -154,7 +154,9 @@ def check_manifest(
                 )
 
         vendored = repo_root / path_str
-        if not vendored.resolve().is_relative_to(repo_root):
+        # Resolve both sides: on macOS a temp root under /var resolves to
+        # /private/var, so an unresolved root never contains a resolved path.
+        if not vendored.resolve().is_relative_to(repo_root.resolve()):
             errors.append(f"{path_str}: path escapes the repo root; refusing to read")
             continue
         if not vendored.is_file():

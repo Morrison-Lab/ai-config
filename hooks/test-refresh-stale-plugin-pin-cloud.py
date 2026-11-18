@@ -42,7 +42,9 @@ case "$3" in
 esac
 if [ "$2" = update ]; then
   sha=$(git -C "$AI_CONFIG_PLUGINS_DIR/marketplaces/m" rev-parse HEAD)
-  sed -i "s/\\"gitCommitSha\\": \\"[0-9a-f]*\\"/\\"gitCommitSha\\": \\"$sha\\"/" "$AI_CONFIG_PLUGINS_DIR/installed_plugins.json"
+  # No `sed -i`: BSD sed (macOS) reads its next argument as a backup suffix.
+  f="$AI_CONFIG_PLUGINS_DIR/installed_plugins.json"
+  sed "s/\\"gitCommitSha\\": \\"[0-9a-f]*\\"/\\"gitCommitSha\\": \\"$sha\\"/" "$f" > "$f.new" && mv "$f.new" "$f"
 fi
 """
 

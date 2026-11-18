@@ -3,6 +3,7 @@
 import importlib.util
 import io
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -704,7 +705,38 @@ def test_bash_needs_a_shell_that_sees_this_checkout():
         findbash.shutil.which = saved[3]
 
 
+def test_snapshot_steps_fetch_without_submodule_recursion():
+    """ai-config#5494: git 2.50+ refuses to fetch into a symlinked submodule path."""
+    env = {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.pager", "GIT_CONFIG_VALUE_0": "cat"}
+    rlv.add_git_config(env, "fetch.recurseSubmodules", "false")
+    check("add_git_config appends after a pair the caller already set",
+          env["GIT_CONFIG_COUNT"] == "2" and env["GIT_CONFIG_KEY_0"] == "core.pager"
+          and env["GIT_CONFIG_KEY_1"] == "fetch.recurseSubmodules"
+          and env["GIT_CONFIG_VALUE_1"] == "false")
+    # When this suite itself runs as a snapshot step (the cross-platform
+    # workflow runs every validate step through this runner), it inherits
+    # the parent's GIT_CONFIG_* pairs, and the in-place probe would read the
+    # parent's `false`. Probe from a clean slate, then restore.
+    inherited = {k: os.environ.pop(k) for k in list(os.environ)
+                 if k == "GIT_CONFIG_COUNT" or k.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))}
+    try:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            seen = {}
+            for in_snapshot in (True, False):
+                out = Path(tmp) / f"out-{in_snapshot}"
+                step = rlv.Step(name="probe", command="(git config --get fetch.recurseSubmodules"
+                                f" || echo unset) > {shlex.quote(out.as_posix())}")
+                rlv.run_step(step, Path(tmp), 30, in_snapshot=in_snapshot)
+                seen[in_snapshot] = out.read_text(encoding="utf-8").strip()
+    finally:
+        os.environ.update(inherited)
+    check("a snapshot step sees fetch.recurseSubmodules=false, and an in-place step does not"
+          f" (saw {seen})", seen == {True: "false", False: "unset"})
+
+
 def main():
+    print('running test_snapshot_steps_fetch_without_submodule_recursion()', flush=True)
+    test_snapshot_steps_fetch_without_submodule_recursion()
     print('running test_changed_list_handoff()', flush=True)
     test_changed_list_handoff()
     print('running test_snapshot_sees_untracked_files()', flush=True)

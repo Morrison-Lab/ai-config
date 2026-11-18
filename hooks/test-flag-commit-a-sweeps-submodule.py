@@ -173,10 +173,17 @@ def latin1_path_repo(path):
     """A tracked file whose name is not valid UTF-8 (POSIX only), plus a
     moved submodule: `ls-files -z` and `status -z` emit that name raw."""
     _base_with_submodule(path)
-    raw = os.path.join(os.fsencode(path), b"caf\xe9.txt")
-    with open(raw, "w", encoding="utf-8") as handle:
-        handle.write("x\n")
-    _run(path, "add", "-A")
+    # Staged straight into the index, never created on disk: APFS (macOS)
+    # refuses a file name that is not valid UTF-8 (ai-config#5494). Git still
+    # tracks the name, so `ls-files -z` and `status -z` (as a deletion) emit
+    # it raw, which is what this case needs.
+    blob = subprocess.run(
+        ["git", "hash-object", "-w", "--stdin"], cwd=path, check=True,
+        capture_output=True, input=b"x\n").stdout.strip()
+    subprocess.run(
+        ["git", "update-index", "--index-info"], cwd=path, check=True,
+        capture_output=True,
+        input=b"100644 " + blob + b"\tcaf\xe9.txt\n")
     _run(path, "commit", "-qm", "latin-1 name")
     _move_submodule_head(path)
 
@@ -1216,6 +1223,14 @@ MUTATIONS = {
     ),
 }
 
+# Cases a mutation MAY also flip, depending on machine speed. Under
+# M_mode_160000 every one of W38's 5000 modified files reads as a gitlink, so
+# the hook runs one `git rev-parse` per path; a slow runner (the macOS
+# cross-platform job, ai-config#5494) spends the deadline, fails open and
+# goes silent, while a fast one finishes and still warns. The declared flip
+# (S21) must still happen either way.
+MAY_FLIP = {"M_mode_160000": {"W38"}}
+
 print("\nmutation tests (revert one clause, see which cases flip):")
 mutation_wrong = 0
 with tempfile.TemporaryDirectory() as tmp:
@@ -1248,7 +1263,7 @@ with tempfile.TemporaryDirectory() as tmp:
         # every later clause: rebuild those two.
         for stat_dirty in (filter_repo, index_hook_repo):
             _REPOS.pop(stat_dirty, None)
-        ok = flipped == expected_flips
+        ok = expected_flips <= flipped <= expected_flips | MAY_FLIP.get(clause, set())
         mutation_wrong += not ok
         if not flipped and expected_flips:
             note = "NOTHING FLIPPED -- this clause is untested"

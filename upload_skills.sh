@@ -53,7 +53,8 @@ hash_dir() {
 }
 
 # Initialize or load state JSON
-STATE_TEMP="$(mktemp "${TMPDIR:-/tmp}/skill_state.XXXXXX.json")"
+# Keep the Xs trailing: BSD mktemp (macOS) replaces only trailing Xs.
+STATE_TEMP="$(mktemp "${TMPDIR:-/tmp}/skill_state.XXXXXX")"
 trap 'rm -f "$STATE_TEMP"' EXIT
 
 if [ -f "$STATE" ] && jq -e '.skills' "$STATE" >/dev/null 2>&1; then
@@ -86,7 +87,10 @@ for dir in "$STAGE"/*/; do
   [ -f "$dir/SKILL.md" ] || { echo "WARN no SKILL.md: $name"; continue; }
   # The Skills API rejects any skill name containing the reserved word
   # 'claude' (ai-config#4397), so such a skill is skipped, not counted as failed.
-  case "${name,,}" in
+  # Lowercase with tr, not a case-conversion expansion: macOS ships bash 3.2,
+  # which has none and aborts the whole run on one (ai-config#5494).
+  lower_name="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+  case "$lower_name" in
     *claude*) echo "skipped (name contains reserved word 'claude'): $name"; continue ;;
   esac
 
@@ -157,7 +161,9 @@ if [ "$PRUNE" -eq 1 ]; then
   for c_name in $cached_names; do
     [ -n "$c_name" ] || continue
     is_staged=0
-    for s_name in "${staged_names[@]}"; do
+    # The ${arr[@]+...} guard keeps an empty array legal under `set -u` on
+    # bash < 4.4 (macOS /bin/bash is 3.2), where "${arr[@]}" is unbound.
+    for s_name in ${staged_names[@]+"${staged_names[@]}"}; do
       if [ "$s_name" = "$c_name" ]; then
         is_staged=1
         break

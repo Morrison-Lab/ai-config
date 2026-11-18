@@ -713,19 +713,39 @@ if mutant is not None:
 PRODUCER = "grep -q zzz /dev/null"
 
 
+def _bash_major(path):
+    """BASH_VERSINFO[0] of the bash at PATH, or 0 when it cannot be run."""
+    try:
+        out = subprocess.run([path, "-c", "echo ${BASH_VERSINFO[0]}"],
+                             capture_output=True, text=True, timeout=10)
+        return int(out.stdout.strip())
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return 0
+
+
 def _find_bash():
+    """The first bash 4+ found, else the first bash at all.
+
+    macOS ships bash 3.2 as /bin/bash, which has no `|&` (ai-config#5494), so
+    a Homebrew bash is preferred over it when one is installed.
+    """
+    candidates = []
     if sys.platform == "win32":
-        for cand in [
+        candidates += [
             r"C:\Program Files\Git\bin\bash.exe",
             r"C:\Program Files\Git\usr\bin\bash.exe",
             r"C:\Program Files (x86)\Git\bin\bash.exe",
-        ]:
-            if os.path.exists(cand):
-                return cand
-    return shutil.which("bash") or "bash"
+        ]
+    candidates += [shutil.which("bash"), "/opt/homebrew/bin/bash", "/usr/local/bin/bash"]
+    found = [c for c in candidates if c and os.path.exists(c)]
+    for cand in found:
+        if _bash_major(cand) >= 4:
+            return cand
+    return found[0] if found else "bash"
 
 
 BASH_BIN = _find_bash()
+BASH_MAJOR = _bash_major(BASH_BIN)
 
 
 def bash_says_misread(command):
@@ -774,7 +794,6 @@ ORACLE_CASES = [
     f"{PRODUCER} | cat; rc=$?; echo $rc",
     f"{PRODUCER} | cat; echo ${{?}}",
     f"{PRODUCER} | cat 2>&1; echo $?",
-    f"{PRODUCER} |& cat; echo $?",
     f"{PRODUCER} | cat && echo $?",
     f"{PRODUCER} | cat\necho $?",
     f"{PRODUCER} |\n  cat\necho $?",
@@ -820,6 +839,16 @@ ORACLE_CASES = [
     f"( {PRODUCER} | cat ); echo $?",
 ]
 
+# Shapes whose syntax bash 3 rejects outright, so under bash 3 (macOS
+# /bin/bash) both runs print nothing and the case would test nothing. The
+# static check "|& is a pipe, not a separator" above covers the guard's side
+# on every host; the oracle adds bash's side wherever a bash 4+ exists.
+BASH4_CASES = [
+    f"{PRODUCER} |& cat; echo $?",
+]
+if BASH_MAJOR >= 4:
+    ORACLE_CASES += BASH4_CASES
+
 # Every known limit is also an oracle case, so the exemption list cannot hold
 # an entry nothing exercises.
 ORACLE_CASES += [c for c in KNOWN_LIMITS if c not in ORACLE_CASES]
@@ -859,6 +888,9 @@ else:
     # run and a harness that never ran leave the same evidence otherwise.
     print(f"differential oracle: {examined} shapes examined against bash, "
           f"{agreed} agreed, {exempt} exempt as known limits")
+    if BASH_MAJOR < 4:
+        print(f"NOTE: {BASH_BIN} is bash {BASH_MAJOR}, which has no `|&`; "
+              f"{len(BASH4_CASES)} bash-4 shape(s) not examined: {BASH4_CASES!r}")
 
 # Every KNOWN_LIMITS entry must actually be exercised, so the list cannot
 # silently accumulate stale exemptions.

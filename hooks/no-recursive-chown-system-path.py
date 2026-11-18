@@ -265,7 +265,10 @@ TOP_LEVEL = {"bin", "boot", "dev", "etc", "home", "lib", "lib32", "lib64", "libx
              "Volumes", "cores", "private"}
 SYSTEM_TREES = ("/usr", "/etc", "/bin", "/sbin", "/lib", "/lib32", "/lib64",
                 "/libx32", "/boot", "/var/lib", "/var/log", "/var/spool",
-                "/System", "/Library", "/var/db")
+                "/System", "/Library", "/var/db",
+                # root's home on macOS, where `~root` expands to it rather
+                # than to the top-level `/root` (ai-config#5494).
+                "/var/root")
 USR_LOCAL_CORE = {"bin", "sbin", "etc", "lib", "libexec", "include", "share"}
 APP_TREES = ("/var/lib", "/var/log", "/var/spool")
 WEB_ROOTS = ("/usr/share/nginx/html",)

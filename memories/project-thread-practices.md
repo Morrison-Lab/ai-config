@@ -68,3 +68,6 @@ An idle thread is any unresolved thread, not only one in `review_ready` or `bloc
 - **Do:** skip any thread whose row shows an open or draft PR, and resolve a thread only when it shows none.
 - **Don't:** say a thread belongs to another project without checking the project's own listing.
 - **Mechanism:** `hooks/require-pr-read-before-resolve.py` denies `set_thread_resolved` unless that read ran this turn, and when the row shows an open or draft PR.
+- **Do:** from a thread session, read PR state with `list_prs`, since a thread's `list_threads` has no `include_pull_requests` and errors on any value ([ai-config#5812](https://github.com/Morrison-Lab/ai-config/issues/5812)).
+- **Do:** call `send_later` with `message` and exactly one of `delay_minutes` or `at`, `subscribe_pr_activity` with `pullNumber`, and set a PR assignee through `issue_write` with method `update`.
+- **Don't:** pass `delaySeconds` to `send_later`, `pr_number` to `subscribe_pr_activity`, or `assignees` to `update_pull_request`; each errors on the first call.

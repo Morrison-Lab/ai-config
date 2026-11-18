@@ -807,7 +807,7 @@ case, and names the shapes the substitution takes.
 
 A local validation failure outside your diff is the same case.
 On 2026-11-18, two implementer validation runs in the same GIA session failed 10 or more hook suites under `run-local-validation.py`, and an implementer's report guessed "contention from sibling agents".
-The tracebacks showed `git commit` exiting 128 in fixture repos, the signing outage tracked in [#5789](https://github.com/Morrison-Lab/ai-config/issues/5789) signing outage.
+The tracebacks showed `git commit` exiting 128 in fixture repos, the signing outage tracked in [#5789](https://github.com/Morrison-Lab/ai-config/issues/5789).
 
 - **Do:** read the traceback of each failing suite before attributing a cause to it, even when the suite is outside your diff.
 - **Don't:** name a cause such as "contention from sibling agents" from the shape of the failure list.

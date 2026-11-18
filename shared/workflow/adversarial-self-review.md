@@ -886,7 +886,14 @@ and that the pre-push guard accepts two verdict phrasings, when it accepts three
 ## Run the cross-model review on a prose PR too
 
 A cross-model review is evidence-backed for prose PRs, not only code.
-On 2026-11-18 ([ai-config#5801](https://github.com/Morrison-Lab/ai-config/pull/5801)) cross-model reviews found four prose defects across two rounds ([round 1](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972000136), three defects; [round 3](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972147426)) after the Claude review bot had already returned [a CLEAN verdict at `850bc12`](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6971793033):
+On 2026-11-18 ([ai-config#5801](https://github.com/Morrison-Lab/ai-config/pull/5801)) cross-model reviews found four prose defects across two rounds,
+after the Claude review bot had already returned [a CLEAN verdict at `850bc12`](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6971793033):
+
+- [round 1](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972000136) found three defects;
+- [round 2](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6973224729) found the fourth, plus three more wording findings;
+- [round 3](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972147426) was CLEAN and confirmed the fixes.
+
+The four defects were:
 an unscoped "every attempt";
 the same PR cited as both success evidence and a waiver case;
 an ambiguous "that day";
@@ -1590,6 +1597,15 @@ Editing the posted review to clear the gate is not a remedy: the auto-mode class
 - **Do:** post the full envelope, closing verdict block included, in the first relay of a cross-model review (cause b).
 - **Do:** re-request the same model with your dispositions when the verbatim review carried a findings section, and post its new verdict (cause a).
 - **Don't:** edit a posted review to make the gate pass.
+
+Posting order matters too.
+On #5801 (2026-11-18), an earlier round's NOT CLEAN cross-model review was posted late, for the record, after the same login had posted that model's CLEAN round.
+`check-pr-fully-clean.py` read the PR as not clean again: the late post became that login's newest verdict-bearing statement, and its verbatim "VERDICT: NOT CLEAN" matched the findings pattern for the head it names.
+Recovering needed another same-model re-review.
+
+- **Do:** post every review round when it runs.
+- **Don't:** post an old round after a clean one.
+  If an old round has to go on the record late, expect to re-run the model on the head afterwards.
 
 ## Post every independent review on the PR or MR it reviewed
 

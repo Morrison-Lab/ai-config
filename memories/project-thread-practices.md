@@ -58,3 +58,13 @@ The first thread's fix was dropped.
 - **Do:** if this thread did not open the PR, or another session pushed or commented since the reviewed head, ask the coordinator which thread owns the PR.
   An owner still working locally leaves no trace on the remote, so a quiet branch does not prove the PR is yours.
 - **Don't:** treat every PR named in a relayed message as yours to fix.
+
+## An idle-thread sweep pages every state and skips threads with an open PR
+
+Ezra, 2026-11-17: "all 37 are in this project", and the coordinator resolved "Add psw rule for choosing result div types" while its PR (lds#2623) was still open ([ai-config#5806](https://github.com/Morrison-Lab/ai-config/issues/5806)).
+An idle thread is any unresolved thread, not only one in `review_ready` or `blocked`.
+
+- **Do:** page `list_threads` with `state=done` (every cursor), `review_ready` and `blocked`, with `include_pull_requests`, and collect every row not marked resolved.
+- **Do:** skip any thread whose row shows an open or draft PR, and resolve a thread only when it shows none.
+- **Don't:** say a thread belongs to another project without checking the project's own listing.
+- **Mechanism:** `hooks/require-pr-read-before-resolve.py` denies `set_thread_resolved` unless that read ran this turn, and when the row shows an open or draft PR.

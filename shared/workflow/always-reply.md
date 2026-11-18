@@ -114,7 +114,9 @@ The orchestrator's brief had reported it as one.)
 After a worker restart, the harness turn said "If your previous turn was already complete, take no action and wait for the next event."
 The conductor replied only `No response requested.`, twice, with five PRs in flight ([#5767](https://github.com/Morrison-Lab/ai-config/issues/5767)).
 The hook did not block it.
-The session startup said "Claude Code skip: remote container with no synced plugin copy (ai-config#3948)", the likely reason the hook was not bound.
+The hook was not in force in that session, and neither candidate cause was verified there:
+the startup said "Claude Code skip: remote container with no synced plugin copy (ai-config#3948)",
+and [#3437](https://github.com/Morrison-Lab/ai-config/issues/3437) names a stale plugin cache, 459 commits behind.
 
 - **Do:** after a restart, reply with one line of state (what is in flight), even when the harness says to take no action.
 - **Don't:** answer a restart notice with a placeholder.

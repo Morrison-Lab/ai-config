@@ -63,6 +63,11 @@ The replacement hazard `LABEL_ISSUE` records belongs to a **later** edit rather 
 `method: update` replaces the whole label set, so an already-filed issue relabelled that way needs the union of its current labels and the new ones.
 A freshly created issue has no prior set, so nothing can be dropped at filing time.
 
+The labels belong in the creating call itself, not in a follow-up `update`.
+Recurrence, 2026-11-17 (lds#2771): the issue was filed with no `labels`, the PreToolUse reminder arrived only after the call,
+and the labels were added by a second `update` call.
+The reminder fires at the call, so compose `labels` in the first call rather than waiting for it.
+
 ## Creating the labels
 
 None of the labels is guaranteed to exist.

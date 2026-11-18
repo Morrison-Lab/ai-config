@@ -532,7 +532,8 @@ The brief also owes the implementer the size cap, since the review round is the 
 `new-line-breaks` (a long line with a mid-line semicolon)
 and `check-unpinned-git-fixtures.py` (an unpinned `git init` in a new test).
 The `validate` job stopped at the second under `bash -e`, before `check-check-has-instructions.py` ran;
-the adversarial reviewer's local run found that one (a new hook with no reviewer instruction).
+that check also failed at commit `c90fdae`, where the new hook had no reviewer instruction:
+`scripts/check-check-has-instructions.py --base origin/main` printed `FAIL: added check(s) hooks/no-unnamed-repo-pr.py without a reviewer instruction (.claude/agents/*.md)`.
 It also reached 787 lines against the 300-line cap and needed a scope cut after a full review round.
 [#5782](https://github.com/Morrison-Lab/ai-config/pull/5782) was the other implementer's PR, briefed the same way.)
 

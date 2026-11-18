@@ -14,7 +14,7 @@ A PR body is never flagged (ai-config#5442, #5772): GitHub rejects a PR on eithe
 end of a dependency link (422 "Source issue may only be an issue", measured on
 dependencies/blocked_by), so a PR body has nothing to record. The decision is
 offline: `create_pull_request`, `update_pull_request` and a command whose text has no
-`gh ... issue create|edit` are never flagged (see `ISSUE_CMD`).
+`gh [global flags] issue create|edit` are never flagged (see `ISSUE_CMD`).
 `issue_write` is treated as an issue body even for method=update on a PR's number,
 which cannot be told apart offline. An issue body naming a PR as its blocker is
 still flagged and cannot be recorded; the notice says to reword the cue or link
@@ -56,10 +56,20 @@ CODE = re.compile(r"```.*?```|`[^`\n]*`", re.S)
 PR_TOOL = re.compile(r"create_pull_request|update_pull_request")
 
 
-# `gh`, any global flags, then `issue create|edit`, on one line. A text match
-# covers every wrapper (`timeout 30 gh`, `xargs ... gh`, `bash -c`, a quoted
-# `$(...)`, a path to gh) without modelling any shell grammar.
-ISSUE_CMD = re.compile(r"\bgh\b[^\n]*?\bissue\s+(?:create|edit)\b")
+# `gh`, then only gh's global flags (`-R`/`--repo`/`--hostname` with a value, or
+# any other `-x`/`--long[=v]` flag), then `issue create|edit`. Words may be
+# separated by blanks or a backslash-newline. Text after the verb is not
+# examined, and any other word between `gh` and `issue` (as in
+# `gh pr create --title "the issue edit dialog"`) does not match. `gh` may follow
+# a path (`/usr/bin/gh`) or any wrapper, but not a word character or hyphen
+# (`git-gh-tool`). The alternatives do not overlap, so matching stays linear.
+_W = r"(?:[ \t]|\\\n)+"
+ISSUE_CMD = re.compile(
+    r"(?<![\w-])gh"
+    r"(?:" + _W + r"(?:-R|--repo|--hostname)(?:" + _W + r"|=)[^\s-]\S*"
+    r"|" + _W + r"--?(?!(?:R|repo|hostname)\b)\w[\w-]*(?:=\S+)?)*"
+    + _W + r"issue" + _W + r"(?:create|edit)\b"
+)
 
 
 def body_of(name: str, inp: dict) -> list[tuple[str, bool]]:

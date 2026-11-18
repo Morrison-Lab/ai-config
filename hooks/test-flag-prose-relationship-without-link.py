@@ -85,6 +85,13 @@ CASES = [
     ([human(), sh("gh issue view 3 --comments")], False, "gh issue view passes"),
     ([human(), sh("gh issue create --body 'Blocked by #3' && gh pr create --body 'x'")], True, "issue write chained with a PR write blocks"),
     ([human(), sh("gh issue create --body 'x' && gh pr create --body 'Stacked on #3'")], True, "known edge: a cue in a PR body chained with an issue write is flagged"),
+    ([human(), sh("gh pr create --title \"Fix the issue edit dialog\" --body 'Stacked on #3'")], False, "PR title containing issue edit passes"),
+    ([human(), sh("gh pr create --title 'Guard issue create flow' --body \"$(cat <<'EOF'\nStacked on #3\nEOF\n)\"")], False, "heredoc PR body under a title naming issue create passes"),
+    ([human(), sh("gh pr view 5 && echo 'next: issue create'; gh pr create --body 'Stacked on #3'")], False, "issue create in a separate echo passes"),
+    ([human(), sh("git-gh-tool issue create x; gh pr create --body 'Stacked on #3'")], False, "hyphenated gh-like program passes"),
+    ([human(), sh("gh \\\nissue create --body 'Blocked by #3'")], True, "backslash-newline between gh and issue blocks"),
+    ([human(), sh("gh -R o/r \\\nissue create --body 'Blocked by #3'")], True, "global flag then backslash-newline blocks"),
+    ([human(), sh("gh pr edit --body 'Handles gh issue edit. Depends on #3'")], True, "known edge: a PR body with the literal gh issue edit is scanned"),
     ([human(), iss("Blocked by #12"), result(), pr("Fixes the bug."), result()], True, "tool_result records between tool calls do not end the turn"),
     ([human(), iss("Blocked by #12"), result(), human_str("next"), result()], False, "tool_result records do not hide the turn boundary"),
     ([human(), call("mcp__github__issue_write", method="update", issue_number=7, body="Blocked by #12")], True, "issue_write update is treated as an issue body"),
@@ -137,4 +144,22 @@ for events, expect, label in CASES:
         fail += 1
         print(f"FAIL {label}: expected block={expect}, got {got}")
 print(f"{len(CASES) - fail}/{len(CASES)} passed")
+
+
+# Timing: a long run of flag-like words must not backtrack.
+import time  # noqa: E402
+
+import importlib.util  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location("hook_under_test", HOOK)
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+for _text in ("gh " + "-R " * 5000 + "x", "gh " + "--a " * 5000 + "x"):
+    _t0 = time.perf_counter()
+    _mod.ISSUE_CMD.search(_text)
+    _dt = time.perf_counter() - _t0
+    if _dt > 0.1:
+        print(f"FAIL regex timing: {_dt:.3f}s on {_text[:12]!r}...")
+        sys.exit(1)
+print("regex timing ok")
 sys.exit(1 if fail else 0)

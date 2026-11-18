@@ -350,6 +350,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/grep-is-not-coverage.md` | A grep matches strings. Coverage is a claim about concepts. So a grep that returns nothing never entails that the corpus does not cover something, and the st... |  |
 | `shared/workflow/growth-mindset.md` | Treat limitations as a starting point to work past, not a fixed constraint to accept. When something can't currently be done --- a missing tool, an awkward m... |  |
 | `shared/workflow/hook-first-push.md` | ai-config#5117 took four pushes because scripts that decide each miss ran only in CI and review (2026-11-08). |  |
+| `shared/workflow/idle-thread-sweep.md` | Ezra, 2026-11-17: "all 37 are in this project". The coordinator had resolved "Add psw rule for choosing result div types" in a sweep while its PR (lds#2623)... |  |
 | `shared/workflow/improve-your-subagents.md` | Part of an orchestrator's job is to find ways for its subagents to improve over time. Correcting each output as it arrives keeps the work moving and leaves t... |  |
 | `shared/workflow/incidents-dont-repeal-decisions.md` | When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse. Never just change the behav... |  |
 | `shared/workflow/irreversible.md` | An agent never takes an irreversible action without direct, explicit authorization from the human user (Ezra, 2026-11-11: "agents must never do anything irre... |  |

@@ -316,7 +316,7 @@ Always invoke `curl` in shell commands rather than Python HTTP libraries when ca
 **The Default cloud environment carries a proxy-injected OpenCode Go key (since 2026-11-18).**
 At about 04:50Z on 2026-11-18 a key was saved as a network secret for `opencode.ai` on Default, and a streamed `curl` to `https://opencode.ai/zen/go/v1/chat/completions` with `kimi-k3` then returned a full review ([ai-config#5795 comment](https://github.com/Morrison-Lab/ai-config/pull/5795#issuecomment-6971219358)).
 So the keyless `curl` route above runs from a Default cloud session, and the cross-model waiver applies there only when that route fails at run time.
-Before the key was saved, every attempt returned `authentication_error: OpenCode Go requires an API key`, and six merges that day ran under the waiver.
+Before the key was saved, every attempt returned `authentication_error: OpenCode Go requires an API key`, and six merges that day ran under the waiver ([#5757](https://github.com/Morrison-Lab/ai-config/pull/5757), [#5781](https://github.com/Morrison-Lab/ai-config/pull/5781), [#5782](https://github.com/Morrison-Lab/ai-config/pull/5782), [#5788](https://github.com/Morrison-Lab/ai-config/pull/5788), [#5791](https://github.com/Morrison-Lab/ai-config/pull/5791), [#5795](https://github.com/Morrison-Lab/ai-config/pull/5795)).
 Earlier still (as observed on 2026-11-17), the proxy refused `opencode.ai` until the user added it to Default's allowed hosts: `curl` printed `CONNECT tunnel failed, response 403`, and the proxy's failure note said `connect_rejected`.
 
 - **Do:** probe with one `curl` to `opencode.ai` before planning a cross-model review in a cloud session, and read the "no key needed" claim as holding only where the proxy injects the credential.

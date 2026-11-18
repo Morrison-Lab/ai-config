@@ -109,3 +109,12 @@ The orchestrator's brief had reported it as one.)
 - **Do:** when a brief labels a placeholder a recurrence, read that record's `model` field yourself before writing the label down.
 - **Don't:** record a placeholder as a recurrence because the brief called it one;
   a brief's framing is a premise to check ([`challenge-the-assignment`](challenge-the-assignment.md)).
+
+**Restart notice, 2026-11-17.**
+After a worker restart, the harness turn said "If your previous turn was already complete, take no action and wait for the next event."
+The conductor replied only `No response requested.`, twice, with five PRs in flight ([#5767](https://github.com/Morrison-Lab/ai-config/issues/5767)).
+The hook did not block it.
+The session startup said "Claude Code skip: remote container with no synced plugin copy (ai-config#3948)", the likely reason the hook was not bound.
+
+- **Do:** after a restart, reply with one line of state (what is in flight), even when the harness says to take no action.
+- **Don't:** answer a restart notice with a placeholder.

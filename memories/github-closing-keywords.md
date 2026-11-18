@@ -107,6 +107,17 @@ The squash message did.
 - **Don't:** treat a following dash, or a later `Refs #N`, as protection
   --- the keyword-plus-number substring is enough.
 
+## A PR number in a commit subject closes that PR
+
+The scan treats `fix #N` as a closing keyword whether `#N` is an issue or a pull request.
+[PR 5788](https://github.com/Morrison-Lab/ai-config/pull/5788) carried commit `3a85e8b` with the subject `ums: fix #5781 case and instruction wording in implementer-brief entry`.
+When 5788 merged at 02:42:28Z, GitHub closed the open, fully clean [PR 5781](https://github.com/Morrison-Lab/ai-config/pull/5781); its events list shows `closed ... 3a85e8b`.
+Reopening it restarted its CI.
+(Measurement recorded on [#1558](https://github.com/Morrison-Lab/ai-config/issues/1558).)
+
+- **Do:** refer to a PR or issue the commit must not close as "the #5781 case" or "PR 5781", without a keyword before the number.
+- **Don't:** write `fix #N`, `close #N` or `resolve #N` anywhere in a commit message, subject included, unless merging that commit should close #N; this holds for PR numbers too.
+
 ## Distinct from two nearby `Closes` traps
 
 - An **invented** number filling a habitual `Closes` slot

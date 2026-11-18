@@ -1229,3 +1229,15 @@ safer/preferred choice merely because the repo has external consumers.
   Do not defer answering behind tool calls, internal steps, or silent waiting loops.
   - **Do:** State the direct answer to user questions at the top of the reply before initiating further actions.
   - **Don't:** Defer answering or run background waiting loops without first delivering the answer.
+
+- **Read a cheap, in-reach source before saying you have not read it.**
+  When an answer depends on a file in the checked-out repo, read it first;
+  "I haven't read X" is not a hedge when one `Read` call would settle it.
+  - **Do:** open the file, then answer with what it says
+    (lds `LICENSE.md`, 2026-11-17: reading it corrected the answer the hedge had been written around).
+  - **Don't:** ship an answer, a caveat and an offer to check later when the check costs one call.
+- **Apply a repo rule to the thing it names, not to everything that resembles it.**
+  A rule such as "copy no grant into this repository" covers the private permissions library's grants,
+  not a public web page's license sentence: quote public text freely, and cite it.
+  - **Do:** re-read the rule's own stated reason before extending it to a new case.
+  - **Don't:** repeat a rule's wording as advice for a case its reason does not reach.

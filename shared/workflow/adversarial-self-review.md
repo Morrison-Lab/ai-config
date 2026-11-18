@@ -883,6 +883,25 @@ that demoting a disclosure marker changes `_reviewer_identity()`, when the Claud
 that a non-conforming payload is rejected, when nothing validates it;
 and that the pre-push guard accepts two verdict phrasings, when it accepts three.)
 
+## Run the cross-model review on a prose PR too
+
+A cross-model review is evidence-backed for prose PRs, not only code.
+On 2026-11-18 ([ai-config#5801](https://github.com/Morrison-Lab/ai-config/pull/5801)) cross-model reviews found four prose defects across two rounds,
+after the Claude review bot had already returned [a CLEAN verdict at `850bc12`](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6971793033):
+
+- [round 1](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972000136) found three defects;
+- [round 2](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6973224729) found the fourth, plus three more wording findings;
+- [round 3](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972147426) was CLEAN and confirmed the fixes.
+
+The four defects were:
+an unscoped "every attempt";
+the same PR cited as both success evidence and a waiver case;
+an ambiguous "that day";
+and one timestamp covering two events.
+
+- **Do:** dispatch the cross-model reviewer on a docs-only or prose-heavy PR before merge, exactly as for code.
+- **Don't:** skip it because a Claude review of the prose was already clean.
+
 ## Require detailed and holistic review passes
 
 Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:
@@ -1565,6 +1584,28 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 - **Don't:** rely on "all findings addressed in <sha>" inside the not-clean comment, or on later bot verdicts, to clear a not-clean you relayed.
 
 (Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)
+
+A cross-model relay (for example OpenCode kimi-k3) owes the same close.
+[ai-config#5802](https://github.com/Morrison-Lab/ai-config/issues/5802) records two independent causes of a relay reading not clean to `check-pr-fully-clean.py` (2026-11-18, a GIA session):
+(a) the model's verbatim output carried its own `### Findings (all non-blocking)` heading inside the envelope;
+(b) the closing `### Verdict` block was dropped.
+The full [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) envelope cures (b) only.
+Any findings section in the verbatim review, non-blocking included, leaves the gate not clean until the same model re-reviews after your dispositions and returns a clean verdict.
+That re-review is what cleared [#5800](https://github.com/Morrison-Lab/ai-config/pull/5800): [its re-review comment](https://github.com/Morrison-Lab/ai-config/pull/5800#issuecomment-6972138604) made `check-pr-fully-clean.py` exit 0.
+Editing the posted review to clear the gate is not a remedy: the auto-mode classifier denied that edit as undermining oversight, and it was right.
+
+- **Do:** post the full envelope, closing verdict block included, in the first relay of a cross-model review (cause b).
+- **Do:** re-request the same model with your dispositions when the verbatim review carried a findings section, and post its new verdict (cause a).
+- **Don't:** edit a posted review to make the gate pass.
+
+Posting order matters too.
+On #5801 (2026-11-18), an earlier round's NOT CLEAN cross-model review was posted late, for the record, after the same login had posted that model's CLEAN round.
+`check-pr-fully-clean.py` read the PR as not clean again: the late post became that login's newest verdict-bearing statement, and its verbatim "VERDICT: NOT CLEAN" matched the findings pattern for the head it names.
+Recovering needed another same-model re-review.
+
+- **Do:** post every review round when it runs.
+- **Don't:** post an old round after a clean one.
+  If an old round has to go on the record late, expect to re-run the model on the head afterwards.
 
 ## Post every independent review on the PR or MR it reviewed
 

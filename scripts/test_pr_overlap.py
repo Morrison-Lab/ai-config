@@ -52,12 +52,13 @@ def pr_node(
     another page while returning no cursor can be built too.
     """
     return {
+        "draft": draft,
+        "html_url": f"https://example.invalid/{number}",
+        "created_at": "2026-08-20T00:00:00Z",
+        "user": {"login": "someone"},
+        "_files": [{"filename": p} for p in paths],
         "number": number,
         "title": title or f"PR {number}",
-        "url": f"https://example.invalid/{number}",
-        "isDraft": draft,
-        "createdAt": "2026-08-20T00:00:00Z",
-        "author": {"login": "someone"},
         "files": {
             "totalCount": len(paths) if total is None else total,
             "pageInfo": {
@@ -100,7 +101,7 @@ def files_page(paths, cursor=None, change_type="MODIFIED"):
 
 def fake_fetch(nodes, total=None):
     """A `fetch` replacement returning fixture nodes, so no `gh` call runs."""
-    def _fetch(repo, limit, page):
+    def _fetch(repo, limit):
         owner, name = repo.split("/", 1)
         return owner, name, {
             "totalCount": len(nodes) if total is None else total,
@@ -111,9 +112,11 @@ def fake_fetch(nodes, total=None):
 
 def run_main(argv, fetch=None):
     """Run main() with stdout captured, returning (exit_code, output)."""
-    original = pr_overlap.fetch
+    original, original_fsf = pr_overlap.fetch_rest, pr_overlap.file_set_for_rest
     if fetch is not None:
-        pr_overlap.fetch = fetch
+        pr_overlap.fetch_rest = fetch
+        pr_overlap.file_set_for_rest = lambda o, n, pr: pr_overlap.paths_from_files(
+            pr["number"], pr["_files"])
     buffer = io.StringIO()
     try:
         with redirect_stdout(buffer):
@@ -122,7 +125,8 @@ def run_main(argv, fetch=None):
             except SystemExit as exc:
                 code = exc.code
     finally:
-        pr_overlap.fetch = original
+        pr_overlap.fetch_rest = original
+        pr_overlap.file_set_for_rest = original_fsf
     return code, buffer.getvalue()
 
 
@@ -392,7 +396,7 @@ check(
 # The single most important property. An underivable file set becomes an
 # empty set, which collides with nothing, so the failure path would
 # otherwise print exactly what the clean path prints.
-def exploding_fetch(repo, limit, page):
+def exploding_fetch(repo, limit):
     raise pr_overlap.SweepError("gh failed for o/r (exit 4): bad credentials")
 
 
@@ -416,7 +420,7 @@ check(
 UNDERIVABLE = [
     pr_node(1, ["a.md"]),
     pr_node(2, ["b.md"]),
-    pr_node(3, [], total=7),  # claims 7 files, returns none
+    pr_node(3, [f"f{i}" for i in range(pr_overlap.REST_FILES_CAP)]),  # at the REST cap: possibly cut short
 ]
 under_code, under_out = run_main(["-R", "o/r"], fetch=fake_fetch(UNDERIVABLE))
 check(
@@ -523,7 +527,7 @@ check("the sweep examined all six pairs", "pairs examined: 6" in dupe_out)
 short_code, short_out = run_main(
     ["-R", "o/r", "--strict"],
     fetch=fake_fetch([
-        pr_node(1, ["a.md"], total=3),   # claims 3 files, returns 1
+        pr_node(1, [f"f{i}" for i in range(pr_overlap.REST_FILES_CAP)]),   # at the REST cap: possibly cut short
         pr_node(2, ["shared.md"]),
     ]),
 )
@@ -549,22 +553,6 @@ try:
 except pr_overlap.SweepError:
     no_cursor = True
 check("remaining_files raises when handed no cursor", no_cursor)
-
-# `total=1` deliberately: with a larger totalCount the completeness guard
-# fires first and this test passes even with the null-cursor guard removed,
-# watching nothing. Mutation-tested -- reverting `remaining_files` to
-# `return ([], False)` must turn this exit 0.
-nullcur_code, _ = run_main(
-    ["-R", "o/r", "--strict"],
-    fetch=fake_fetch([
-        pr_node(1, ["a.md"], total=1, has_next=True),  # hasNextPage, no cursor
-        pr_node(2, ["shared.md"]),
-    ]),
-)
-check(
-    "hasNextPage with a null cursor is an error, not an empty page",
-    nullcur_code == pr_overlap.USAGE_EXIT,
-)
 
 # --- 14. The fetch layer: pagination is actually followed ----------------
 # Nothing exercised the pagination branch before, so a bug there would have
@@ -719,7 +707,7 @@ check(
 # --- 18. A wholly underivable repo does not read as an empty one ---------
 allbad_code, allbad_out = run_main(
     ["-R", "o/r"],
-    fetch=fake_fetch([pr_node(n, ["a.md"], total=9) for n in (1, 2, 3)]),
+    fetch=fake_fetch([pr_node(n, [f"f{i}" for i in range(pr_overlap.REST_FILES_CAP)]) for n in (1, 2, 3)]),
 )
 check("an all-underivable sweep exits 2", allbad_code == pr_overlap.USAGE_EXIT)
 check(
@@ -734,19 +722,19 @@ check(
 # --- 19. The control covers the completeness guard, not just the classifier
 # The control has to reach the layer where failures actually live. Breaking
 # the guard must make the control refuse to report anything.
-_real_file_set_for = pr_overlap.file_set_for
+_real_paths = pr_overlap.paths_from_files
 try:
-    pr_overlap.file_set_for = lambda o, n, pr, page: {"whatever"}
+    pr_overlap.paths_from_files = lambda number, files: {"whatever"}
     guard_ok, guard_report = pr_overlap.run_negative_control()
 finally:
-    pr_overlap.file_set_for = _real_file_set_for
+    pr_overlap.paths_from_files = _real_paths
 check(
-    "the control FAILS when the completeness guard stops rejecting short sets",
+    "the control FAILS when the cap guard stops rejecting capped lists",
     not guard_ok,
 )
 check(
-    "the control names the short-file-set failure",
-    any("short file set" in line for line in guard_report),
+    "the control names the cap-guard failure",
+    any("-file cap was accepted" in line for line in guard_report),
 )
 control_banner = pr_overlap.run_negative_control()[1][0]
 check(
@@ -800,20 +788,6 @@ check(
     stuck.calls == pr_overlap.MAX_PR_PAGES,
 )
 
-# The same shape end-to-end must not exit 0.
-_real_graphql = pr_overlap.gh_graphql
-try:
-    pr_overlap.gh_graphql = StuckConnection(
-        [pr_node(1, ["a.md"]), pr_node(2, ["b.md"])], total=9
-    )
-    stuck_code, stuck_out = run_main(["-R", "o/r", "--strict"])
-finally:
-    pr_overlap.gh_graphql = _real_graphql
-check(
-    "a stuck-pagination sweep exits with the usage status, not 0",
-    stuck_code == pr_overlap.USAGE_EXIT,
-)
-
 # --- 21. A malformed PR node is incompleteness, not something to skip ----
 # GraphQL returns a null entry for a node it cannot serve. Skipping it would
 # shrink the population silently, which is the whole failure this script
@@ -857,6 +831,73 @@ finally:
 check(
     "gh exiting 0 with unreadable stdout raises rather than returning None",
     none_raised,
+)
+
+# --- 23. The REST layer (#5768), through a stubbed `subprocess.run` -----
+calls = []
+
+
+def with_rest(replies, call):
+    def _run(args, **kwargs):
+        endpoint = args[2]
+        calls.append(endpoint)
+        if "search/" not in endpoint and not {"--paginate", "--slurp"} <= set(args):
+            return FakeProc(code=1, err="REST list without --paginate --slurp")
+        for fragment, reply in replies.items():
+            if fragment in endpoint:
+                return reply if isinstance(reply, FakeProc) else FakeProc(
+                    out=json.dumps(reply)
+                )
+        return FakeProc(code=1, err="unstubbed " + endpoint)
+
+    _real = pr_overlap.subprocess.run
+    pr_overlap.subprocess.run = _run
+    try:
+        return call()
+    except pr_overlap.SweepError as exc:
+        return exc
+    finally:
+        pr_overlap.subprocess.run = _real
+
+
+def listing(*numbers, counted=None):
+    return {
+        "/pulls?": [[{"number": n} for n in numbers]],
+        "search/": len(numbers) if counted is None else counted,
+    }
+
+
+def fetch_rest(replies, limit=100):
+    return with_rest(replies, lambda: pr_overlap.fetch_rest("o/r", limit))
+
+
+calls.clear()
+fetch_rest(listing(1))
+check("the count precedes the listing", "search/" in calls[0] and "/pulls?" in calls[1])
+two_pages = {"/pulls?": [[{"number": 7}], [{"number": 3}]], "search/": 2}
+check(
+    "REST pages are flattened and ordered by PR number",
+    [n["number"] for n in fetch_rest(two_pages)[2]["nodes"]] == [3, 7],
+)
+limited = fetch_rest(listing(7, 3, 5), limit=1)[2]
+check(
+    "a limit keeps the OLDEST PR while the total still counts all",
+    [n["number"] for n in limited["nodes"]] == [3] and limited["totalCount"] == 3,
+)
+for label, replies in (
+    ("a PR missing from the listing (search counts more)", listing(1, counted=2)),
+    ("an unreadable page", {"/pulls?": FakeProc(code=1, err="HTTP 502"), "search/": 1}),
+    ("a PR with no number", {"/pulls?": [[{"title": "x"}]], "search/": 1}),
+):
+    check(
+        f"{label} fails loud instead of shrinking the set",
+        isinstance(fetch_rest(replies), pr_overlap.SweepError),
+    )
+renames = {"/files?": [[{"filename": "n.yml", "previous_filename": "o.yml"}]]}
+check(
+    "REST files fold a rename's old path in alongside the new one",
+    with_rest(renames, lambda: pr_overlap.file_set_for_rest("o", "r", {"number": 7}))
+    == {"n.yml", "o.yml"},
 )
 
 print(f"\n{passes} passed, {failures} failed")

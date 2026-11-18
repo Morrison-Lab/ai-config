@@ -762,6 +762,14 @@ Here that mechanism is itself one of at least three candidates, so the first rea
   A corpus hook's denial is a statement about authorization;
   the classifier's is a claim about the session's permission mode that no amount of granted authority inside the conversation changes.
 
+The classifier also denies a pinned-head merge whose only authority is a standing grant described in the session's seed or system text, with no merge word typed by the user.
+The classifier reason was `[Destructive or Unwanted Actions]` (observed 2026-11-18 in a claude.ai cloud session, merging [ai-config#5800](https://github.com/Morrison-Lab/ai-config/pull/5800)).
+The identical retry above gets its one try.
+After that denial the cause is missing typed authority, which another identical retry cannot change.
+
+- **Do:** after a classifier denial on a merge whose only authority is untyped, ask the user plainly for the merge word, and keep working on everything else.
+- **Don't:** retry that merge a second time, or route around the denial with a different command.
+
 **The marker is per-repository, so a grant in one repo authorizes nothing in another.**
 `check_mwc_active()` looks for `<git-common-dir>/ai-sessions/<session>.mwc`,
 resolved from the session's working directory (`cwd`) and `CLAUDE_PROJECT_DIR`

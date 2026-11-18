@@ -28,6 +28,10 @@ Four more misses sent [#5615](https://github.com/Morrison-Lab/ai-config/pull/561
 - **Do:** give every algorithmic check both a writer rule and a reviewer instruction, then commit and run `python3 scripts/check-check-has-instructions.py`.
   It diffs `origin/main...HEAD`, so before the commit it reports "no check added" and passes ([#5707](https://github.com/Morrison-Lab/ai-config/pull/5707) went red in CI that way, 2026-11-16).
 - **Don't:** ship the writer rule alone.
+- **Do:** change a `shared/**/*.md` fragment, `AGENTS.md`, `CLAUDE.md` or `skills/*/SKILL.md` as the writer rule, and a `.claude/agents/*.md` file as the reviewer rule, since `check-check-has-instructions.py` counts only those paths.
+  [#5807](https://github.com/Morrison-Lab/ai-config/pull/5807) failed `new-line-breaks` once for lacking both (2026-11-18).
+- **Do:** after adding any file under `shared/`, run `python3 scripts/gen-topic-map.py` and commit `docs/topic-map.md`, which `validate` checks with `--check`.
+- **Don't:** leave the regenerated topic map for CI to demand (#5807 failed `validate` on it).
 - **Do:** run `python3 scripts/check_regex_patterns.py` on a new regex and flatten any nested quantifier (a repeat inside a repeat).
 - **Don't:** leave a nested quantifier for CI to find.
 
@@ -39,6 +43,12 @@ Changing an existing hook's event or matcher in `hooks/hooks.json` needs the sam
 
 - **Do:** split a shell command into stages with `shlex` (`punctuation_chars=";&|\n"`), as [`least-flexible-tool`](../coding/least-flexible-tool.md) says, and test a quoted operator, a trailing operator and an unbalanced quote.
 - **Don't:** split on `&&`, `|` or `;` with a regex that cannot see quoting, as #5631 first did and broke on `rg "a|b" f` and `grep x f;`.
+
+A hook that parses a CLI's argv (`gh`, `glab`) needs the CLI's complete flag and placeholder table before its first commit.
+The hook for [#5784](https://github.com/Morrison-Lab/ai-config/issues/5784) (branch `claude/5784-unnamed-repo-api-paths`) took four adversarial review rounds with 17 findings (session record, 2026-11-18), largely undeclared flags (`glab` `--form`, `--output`, `--placeholder`), placeholder forms, and endpoint forms (query string, fragment, full URL, leading `//`).
+
+- **Do:** derive the flag table, the placeholder forms and the endpoint forms from the tool's own `--help` or docs before the first commit, and put that requirement in the implementer brief.
+- **Don't:** write the parser from the flags the first test cases happen to use and let review rounds find the rest.
 
 For a guard against a destructive command ([`destructive-actions-catalog`](destructive-actions-catalog.md)):
 

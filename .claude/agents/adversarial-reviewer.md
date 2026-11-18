@@ -380,5 +380,4 @@ Read the transcript and the PR list yourself;
 do not report the output of `hooks/no-unrequested-sweep-pr.py` as your finding.
 See [`no-sweeps-by-default`](../../shared/workflow/no-sweeps-by-default.md#approving-a-check-is-not-approving-a-sweep).
 
-Flag a PR opened in a repository the user named only as precedent ("we did similar things in X"), not as a target.
-`hooks/no-unnamed-repo-pr.py` passes that case, so read the transcript yourself rather than trust its verdict ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).
+Flag a PR opened in a repository the user named only as precedent ("we did similar things in X"), not as a target: `hooks/no-unnamed-repo-pr.py` passes that case, so read the transcript yourself rather than trust its verdict ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).

@@ -38,8 +38,7 @@ A new check reads changed lines, so existing violations do not trip it, and a re
   A typed `gia`, `gii`, `gip` or `gmd` also allows more.
   There is no agent-side bypass; the user's next message resets the count.
   The reviewer layer is "Unrequested sweeps" in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md).
-- `hooks/no-unnamed-repo-pr.py` denies a PR in a repository the user never named this session, other than the session's own checkout ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).
-  A repository named only as precedent ("we did similar things in X") still passes, so do not read that as a request.
+- `hooks/no-unnamed-repo-pr.py` denies a PR in a repository the user never named this session, other than the session's own checkout, though a repository named only as precedent still passes ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).
 - `hooks/warn-sweep-pr-without-ask.py` warns when `gh pr create` or `mcp__github__create_pull_request` has "sweep" in the title (or, for `gh pr create` only, a `sweep` label) and no `Sweep authorized:` marker (followed by a message id or link).
   It warns rather than blocks because a title containing the word is not always a sweep, and a hook cannot read Ezra's intent.
 - gha's content checks (`check-new-line-breaks`, `check-def-commentary`, `check-exm-figures`, `check-one-div-per-subfile`, `check-tree-lists`, `check-visualization-figures`, `check-typos` and others) are diff-scoped by default (checked 2026-10-29), reflagging nothing already merged.

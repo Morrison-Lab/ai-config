@@ -144,7 +144,8 @@ the `web-fetch` subagent, and two PreToolUse hooks gate every launch.
 - The rejected launch is an error, so it owes a UMS pass at once
   (`remind-ums-after-error.py`), not a dismissal as "only a missing argument":
   a known one-argument cause is the case a note exists for.
-- **Do:** `Agent(subagent_type: "web-fetch", model: "haiku", description, prompt)`, with the URL and the question in the prompt.
+- **Do:** `Agent(subagent_type: "web-fetch", model: "haiku", description, prompt)`, with the URL and the question in the prompt,
+  and the isolation decision stated in the prompt (a read-only fetch needs no worktree).
 - **Don't:** launch it bare and let the hook reject the first call.
 - (lds session, 2026-11-17: the first `web-fetch` launch was rejected for no `model`
   and relaunched with `haiku`.

@@ -3117,14 +3117,17 @@ class TestNoPositionalSubprocessMocks(unittest.TestCase):
         # Scope: this file only. The adapter runs hooks on a thread pool, so
         # a positional `side_effect` sequence hands results to whichever
         # thread calls first and the test flakes under load (ai-config#5792).
-        # The guard targets that positional-sequence pattern (a List, Tuple
+        # The guard targets that positional-sequence pattern: a List, Tuple
         # or list()/iter() Call as the value, via attribute assignment or a
-        # `side_effect=` keyword). It does not check single-hook paths
-        # specially: a one-element sequence is flagged too.
+        # `side_effect=` keyword. A bare Name value is flagged when the same
+        # enclosing function assigns that name such a sequence; a Name bound
+        # to a def, a lambda or anything else is left alone. It does not
+        # check single-hook paths specially: a one-element sequence is
+        # flagged too.
         import ast
         tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
 
-        def positional(node):
+        def literal(node):
             if isinstance(node, (ast.List, ast.Tuple)):
                 return True
             return (
@@ -3133,23 +3136,41 @@ class TestNoPositionalSubprocessMocks(unittest.TestCase):
                 and node.func.id in ("iter", "list")
             )
 
-        bad = []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Assign):
-                if positional(node.value) and any(
-                    isinstance(t, ast.Attribute) and t.attr == "side_effect"
-                    for t in node.targets
-                ):
-                    bad.append(node.lineno)
-            elif isinstance(node, ast.Call):
-                bad.extend(
-                    kw.value.lineno
-                    for kw in node.keywords
-                    if kw.arg == "side_effect" and positional(kw.value)
+        bad = set()
+        scopes = [
+            n for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        for scope in scopes:
+            seq_names = {
+                t.id
+                for n in ast.walk(scope)
+                if isinstance(n, ast.Assign) and literal(n.value)
+                for t in n.targets
+                if isinstance(t, ast.Name)
+            }
+
+            def positional(node):
+                return literal(node) or (
+                    isinstance(node, ast.Name) and node.id in seq_names
                 )
+
+            for node in ast.walk(scope):
+                if isinstance(node, ast.Assign):
+                    if positional(node.value) and any(
+                        isinstance(t, ast.Attribute) and t.attr == "side_effect"
+                        for t in node.targets
+                    ):
+                        bad.add(node.lineno)
+                elif isinstance(node, ast.Call):
+                    bad.update(
+                        kw.value.lineno
+                        for kw in node.keywords
+                        if kw.arg == "side_effect" and positional(kw.value)
+                    )
         self.assertEqual(
-            bad, [],
-            f"positional side_effect at lines {bad}: use a command-keyed function",
+            sorted(bad), [],
+            f"positional side_effect at lines {sorted(bad)}: use a command-keyed function",
         )
 
 if __name__ == "__main__":

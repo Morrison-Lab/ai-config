@@ -63,6 +63,14 @@ The replacement hazard `LABEL_ISSUE` records belongs to a **later** edit rather 
 `method: update` replaces the whole label set, so an already-filed issue relabelled that way needs the union of its current labels and the new ones.
 A freshly created issue has no prior set, so nothing can be dropped at filing time.
 
+The labels belong in the creating call itself, not in a follow-up `update`.
+Recurrence, 2026-11-17 ([lds#2771](https://github.com/Morrison-Lab/lds/issues/2771)):
+the issue was filed with no `labels`, and the labels were added by a second `update` call.
+The reminder hook fires only once the creating call has been made, so it cannot supply them.
+
+- **Do:** put `labels` (`ai-authored`, `model:<id>`, one of `P1`, `P2`, `P3`) in the creating call itself.
+- **Don't:** file first and relabel with `update` afterward.
+
 ## Creating the labels
 
 None of the labels is guaranteed to exist.

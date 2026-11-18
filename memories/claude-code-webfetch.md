@@ -129,3 +129,24 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
   ai-config#601 to verify the GitHub Actions billing and `jobs.<job_id>.if`
   citations offline, and on gha#272 to confirm the approval-required
   `pull_request`-runs exception applies to github.com.)
+
+
+## Launching the `web-fetch` subagent: pass `model` and decide `isolation` in the first call
+
+There is no direct `WebFetch` in a cloud session, so a page is read through
+the `web-fetch` subagent, and two PreToolUse hooks gate every launch.
+- A launch with no `model` is rejected ("choose the model deliberately"),
+  because it would inherit the conductor's model unchosen.
+  A lookup is bounded work: pass `model: "haiku"` (or `sonnet`), never Fable.
+- A launch with no `isolation` draws a reminder to pass `isolation: "worktree"`
+  or to say deliberately that none is needed.
+  A read-only fetch needs none, so say so in the prompt.
+- The rejected launch is an error, so it owes a UMS pass at once
+  (`remind-ums-after-error.py`), not a dismissal as "only a missing argument":
+  a known one-argument cause is the case a note exists for.
+- **Do:** `Agent(subagent_type: "web-fetch", model: "haiku", description, prompt)`, with the URL and the question in the prompt,
+  and the isolation decision stated in the prompt (a read-only fetch needs no worktree).
+- **Don't:** launch it bare and let the hook reject the first call.
+- (lds session, 2026-11-17: the first `web-fetch` launch was rejected for no `model`
+  and relaunched with `haiku`.
+  The same session's later launches again drew the `isolation` reminder.)

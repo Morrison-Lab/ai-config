@@ -45,13 +45,14 @@ Changing an existing hook's event or matcher in `hooks/hooks.json` needs the sam
 - **Don't:** split on `&&`, `|` or `;` with a regex that cannot see quoting, as #5631 first did and broke on `rg "a|b" f` and `grep x f;`.
 
 A hook that parses a CLI's argv (`gh`, `glab`) needs the CLI's complete flag and placeholder table before its first commit.
-The hook for [#5784](https://github.com/Morrison-Lab/ai-config/issues/5784) (branch `claude/5784-unnamed-repo-api-paths`) took four adversarial review rounds with 17 findings (session record, 2026-11-18), largely undeclared flags (`glab` `--form`, `--output`, `--placeholder`), placeholder forms, and endpoint forms (query string, fragment, full URL, leading `//`).
+The hook for [#5784](https://github.com/Morrison-Lab/ai-config/issues/5784) (branch `claude/5784-unnamed-repo-api-paths`) took four adversarial review rounds with 17 findings before its PR opened (session record, 2026-11-18), largely undeclared flags (`glab` `--form`, `--output`, `--placeholder`), placeholder forms, and endpoint forms (query string, fragment, full URL, leading `//`).
 
-- **Do:** derive the flag table, the placeholder forms and the endpoint forms from the tool's own `--help` or docs before the first commit, and put that requirement in the implementer brief.
+- **Do:** derive the flag table, the placeholder forms and the endpoint forms from the tool's own `--help`, docs and source before the first commit, and put that requirement in the implementer brief.
 - **Don't:** write the parser from the flags the first test cases happen to use and let review rounds find the rest.
 
-`--help` and docs were not enough either.
-[#5814](https://github.com/Morrison-Lab/ai-config/pull/5814) and [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) each took 10 or more adversarial rounds (2026-11-18), and the defects that remained were visible only in the CLI's source and argument parser:
+After its PR opened, [#5814](https://github.com/Morrison-Lab/ai-config/pull/5814) took three more adversarial rounds and five kimi-k3 rounds.
+Its stacked follow-up [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) took four of each (session record, 2026-11-18).
+The defects found in those rounds were visible only in the CLI's source and argument parser:
 
 - pflag short-flag clusters (`-iX POST`), attached `-R=value`, and `--` termination;
 - glab's compound placeholders (`:group/:namespace/:repo`, in `internal/commands/api/api.go`);

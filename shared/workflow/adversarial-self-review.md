@@ -906,7 +906,8 @@ and one timestamp covering two events.
 
 On [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) at `2de2419` (2026-11-18), the cross-model reviewer (kimi-k3) and the Claude review bot both passed a regression: an expansion counted as exactly one path segment, so `"repos/$R/pulls"` passed silently.
 The Claude adversarial reviewer caught it.
-In the same round kimi-k3 caught an input-controlled recursion depth that the adversarial reviewer had called acceptable.
+At the later head `ca77cdf`, kimi-k3 caught an input-controlled recursion depth ([comment](https://github.com/Morrison-Lab/ai-config/pull/5821#issuecomment-6990696509)).
+The adversarial reviewer had measured that it failed open with a note, and so had not flagged it.
 Each reviewer found a real defect the other missed.
 
 - **Do:** run both the cross-model reviewer and the Claude adversarial reviewer on every hook change.

@@ -200,6 +200,10 @@ CASES = [
     ("a literal that rules out every shape passes", "Bash", 'gh api -X POST "repos/o/x/issues/$N/comments/$M" -f body=x', GO, "pass"),
     ("a method from a variable on a creation path gives a note", "Bash", 'gh api -X "$M" repos/o/mlg/pulls -f t=x', GO, "note"),
     ("a method from a variable on another path passes", "Bash", 'gh api -X "$M" repos/o/mlg/issues -f t=x', GO, "pass"),
+    ("a 2000-segment all-expansion path gives a note, no crash", "Bash",
+     'gh api -X POST "' + "/".join(["$X"] * 2000) + '" -f t=x', GO, "note"),
+    ("a path longer than the cap with a literal gives a note", "Bash",
+     'gh api -X POST "' + "/".join(["$X"] * 65 + ["issues"]) + '" -f t=x', GO, "note"),
     ("a missing transcript gives a note", MCP, "mlg", os.path.join(TMP, "none.jsonl"), "note"),
     ("no user message gives a note", MCP, "mlg", transcript({"type": "assistant", "message": {}}), "note"),
 ]
@@ -224,6 +228,7 @@ MUTATIONS = [  # each must fail this suite; skipped inside a mutant run
     ("a flag taken as the endpoint", 'elif not arg.startswith("-") or arg == "-":', "elif True:"),
     ("implied POST removed", "post = bool(bodies) if not methods", "post = False if not methods"),
     ("a method expansion read as not POST", "None if re.search(r\"[$`]\", methods[-1]) else", "False if re.search(r\"[$`]\", methods[-1]) else"),
+    ("the expansion length cap removed", "    if len(parts) > MAX_EXPANSION_PARTS:", "    if False:"),
     ("an expansion stands for exactly one segment", "return fits(shape, i, j + 1) or fits(shape, i + 1, j)", "return fits(shape, i + 1, j + 1)"),
     ("placeholder resolution dropped", "    if not any(x in fills for x in elems):", "    if True:"),
     ("URL normalisation dropped", "urlsplit(endpoint).path if url else", "endpoint if url else"),

@@ -180,10 +180,17 @@ def api_kind(prog, endpoint):
 CREATION_SHAPES = (("repos", None, None, "pulls"), ("projects", None, "merge_requests"), ("graphql",))  # None: any segment
 
 
+MAX_EXPANSION_PARTS = 64  # far above any real API path; bounds fits()'s recursion, which grows with the input
+
+
 def expands(parts):
     """True when a shell expansion in `parts` could stand for any number of segments (`R=owner/name`, or none)
     so that the path becomes a creation endpoint; a literal segment no shape allows (`issues`) rules it out."""
     hole = [bool(re.search(r"[$`]", x)) for x in parts]
+    if hole.count(False) > max(map(len, CREATION_SHAPES)):  # each literal segment needs its own shape segment
+        return False
+    if len(parts) > MAX_EXPANSION_PARTS:
+        return any(hole)  # too long to match exactly: note, the fail-open direction
 
     @functools.lru_cache(maxsize=None)
     def fits(shape, i, j):

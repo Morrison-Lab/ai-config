@@ -2066,6 +2066,18 @@
         ]
       },
       {
+        "matcher": "mcp__github__create_pull_request|mcp__github__create_pull_request_with_copilot|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unnamed-repo-pr.py\"",
+            "timeout": 10,
+            "script": "no-unnamed-repo-pr.py",
+            "why": "ai-config#5780 (Ezra, 2026-11-17: an agent read 'we've done similar things in mlg and epi204' as a request and opened PRs in both). Denies a PR creation whose target repo no message the user wrote names and that is not the session's home checkout; fails open with a note when it cannot decide."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__hearthbot__start_remote_control",
         "hooks": [
           {

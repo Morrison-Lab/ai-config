@@ -55,12 +55,18 @@ def gh_target(directory):
 
 
 def _glab_globals(prog):
-    """`prog` with glab's root flags (-R/--repo; --help and --version per root.go) moved to the end of the args."""
+    """`prog` with glab's root flags (-R/--repo; --help/-h, --version/-v: root.go) after the subcommand words.
+
+    A moved -R keeps its position before any later flag or `--`, so pflag's last-value-wins still holds.
+    """
     rest, moved = prog[1:], []
-    while prog[0] == "glab" and rest[:1] and re.match(r"\A(?:-R.?|--repo(?:=.*)?|--help|--version)\Z", rest[0]):
-        n = 2 if rest[0] in ("-R", "--repo") else 1
-        moved, rest = moved + rest[:n], rest[n:]
-    return prog[:1] + rest + moved if prog[0] == "glab" and moved else prog
+    while prog[0] == "glab" and rest[:1] and re.match(r"\A(?:-R.*|--repo(?:=.*)?|--help|--version|-h|-v)\Z", rest[0]):
+        flag, n = rest[0], 2 if rest[0] in ("-R", "--repo") else 1
+        moved += rest[:2] if n == 2 else ["-R", flag[2:].removeprefix("=")] if flag.startswith("-R") else (
+            [flag] if flag.startswith("--repo=") else [])
+        rest = rest[n:]
+    k = 2 if rest[:1] == ["mr"] else 1
+    return prog[:1] + rest[:k] + moved + rest[k:] if prog[0] == "glab" and rest != prog[1:] else prog
 
 
 def _program(argv):
@@ -182,7 +188,7 @@ def api_creation(prog, cur, lead, elsewhere):
     endpoint = (positionals or [None])[0]
     kind, parts = api_kind(prog[0], endpoint)
     label = f"`{prog[0]} api {endpoint}`"
-    if post and re.search(r"[$`]", endpoint or ""):
+    if post and re.search(r"[$`]", re.split(r"[?#]", endpoint or "", 1)[0]):
         return [(None, f"{label} (could not read the endpoint)")]
     odd = [(None, f"{label} (unrecognised flag `{f}`)") for f in unknown[:1]]
     hidden = [(None, f"`{prog[0]} api {p}` (an unrecognised flag may hide the method or endpoint)")

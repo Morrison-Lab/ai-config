@@ -55,17 +55,6 @@ def gh_target(directory):
     return _key(remotes[order[0]].get("url")) if order else None
 
 
-def _glab_globals(prog):
-    """`prog` with glab's root persistent flags (-R/--repo, --help, --version; root.go) moved to the end."""
-    rest, moved = prog[1:], []
-    while prog[0] == "glab" and rest[:1] and rest[0].startswith("-"):
-        n = 2 if rest[0] in ("-R", "--repo") else 1 if re.match(r"\A(?:-R.|--repo=|--help\Z|--version\Z|-[hv]\Z)", rest[0]) else 0
-        moved, rest = moved + rest[:n], rest[n:]
-        if not n:
-            break
-    return prog[:1] + rest + moved if prog[0] == "glab" and moved else prog
-
-
 def _program(argv):
     """(argv from its gh or glab word on, the assignments before it), or (None, [])."""
     while argv and argv[0] in SHELL_KEYWORDS:
@@ -74,7 +63,7 @@ def _program(argv):
         if os.path.basename(tok) in REPO_ENV:
             lead = argv[:i]
             if all(ENV_ASSIGNMENT.match(t) for t in lead) or any(t in COMMAND_WRAPPERS for t in lead):
-                return _glab_globals([os.path.basename(tok)] + argv[i + 1:]), [t for t in lead if ENV_ASSIGNMENT.match(t)]
+                return [os.path.basename(tok)] + argv[i + 1:], [t for t in lead if ENV_ASSIGNMENT.match(t)]
             break
     return None, []
 
@@ -186,8 +175,6 @@ def api_creation(prog, cur, lead, elsewhere):
     endpoint = (positionals or [None])[0]
     kind, parts = api_kind(prog[0], endpoint)
     label = f"`{prog[0]} api {endpoint}`"
-    if post and re.search(r"[$`]", endpoint or ""):
-        return [(None, f"{label} (could not read the endpoint)")]
     odd = [(None, f"{label} (unrecognised flag `{f}`)") for f in unknown[:1]]
     hidden = [(None, f"`{prog[0]} api {p}` (an unrecognised flag may hide the method or endpoint)")
               for p in positionals[1:] if unknown and api_kind(prog[0], p)[0]][:1]

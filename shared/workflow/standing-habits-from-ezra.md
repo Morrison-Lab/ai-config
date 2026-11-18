@@ -45,6 +45,17 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   Test the script on a scratch copy, including a second run that changes nothing, and get an adversarial review of it before you hand it over.
   Limit it to the blocked step: it never merges, force-pushes, or touches another repository.
 - **Do:** ask Ezra for a manual step only when another rule reserves it to him: a secret or credential, a hard-prohibited category, or merge words.
+- **Don't:** offer a hand-merge or a typed merge word as the way out of a blocked merge.
+  The merge-words reservation covers the grant he chooses to type.
+  It is not a route the agent recommends.
+  Recurrence, 2026-11-17 (Morrison-Lab/lds#2772, #2785, #2786):
+  while two merge gates refused a cloud session,
+  the agent twice recommended "merge them in the GitHub UI" and "type `mwc all` in a local session".
+  Ezra: "I don't want to do things by hand", then "do not tell me to do this" and "nor this".
+  Report the refusal as a measured fact, then fix or coordinate on the blocker, as the ai-config#4304 work does.
+  `hooks/no-manual-step-ask.py` is wired to the `mcp__hearthbot__` reply tools only,
+  and its merge pattern has no UI or typed-word phrasing,
+  so this prose carries the rule until that gap is closed ([ai-config#5797](https://github.com/Morrison-Lab/ai-config/issues/5797)).
 - **Don't:** list the steps for him to perform, or ask him to hand-edit a file.
   Ezra, 2026-10-26, after a reply asked him to paste an `autoMode.allow` entry into `~/.claude/settings.json`: "never ask me to paste anything into a file;
   always give me a script-based command to run that does it for me".

@@ -48,11 +48,13 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Don't:** offer a hand-merge or a typed merge word as the way out of a blocked merge.
   The merge-words reservation covers the grant he chooses to type.
   It is not a route the agent recommends.
-  Recurrence, 2026-11-17 (Morrison-Lab/lds#2772, #2785, #2786):
+  Recurrence, 2026-11-17 ([Morrison-Lab/lds#2772](https://github.com/Morrison-Lab/lds/pull/2772),
+  [#2785](https://github.com/Morrison-Lab/lds/pull/2785),
+  [#2786](https://github.com/Morrison-Lab/lds/pull/2786)):
   while two merge gates refused a cloud session,
   the agent twice recommended "merge them in the GitHub UI" and "type `mwc all` in a local session".
   Ezra: "I don't want to do things by hand", then "do not tell me to do this" and "nor this".
-  Report the refusal as a measured fact, then fix or coordinate on the blocker, as the ai-config#4304 work does.
+  Report the refusal as a measured fact, then fix or coordinate on the blocker, as the [ai-config#4304](https://github.com/Morrison-Lab/ai-config/issues/4304) work does.
   `hooks/no-manual-step-ask.py` is wired to the `mcp__hearthbot__` reply tools only,
   and its merge pattern has no UI or typed-word phrasing,
   so this prose carries the rule until that gap is closed ([ai-config#5797](https://github.com/Morrison-Lab/ai-config/issues/5797)).

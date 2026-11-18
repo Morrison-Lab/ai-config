@@ -101,6 +101,18 @@ CASES = [
     ([TOOL, say("I can see the job if you wanted to check it yourself, "
                 "but it already passed.")], False,
      "'if you wanted' in a past-tense aside stays silent"),
+    # Morrison-Lab/lds, 2026-11-18: an answer closed on "If you want, I can
+    # open a PR that adds ...", the condition-first order, which the
+    # "I can X if you want" pattern does not match; the user had to reply
+    # "daytb".
+    ([TOOL, say("The traces link is a stray.\n\nIf you want, I can open a "
+                "PR that adds the two topics to the prerequisites page.")],
+     True, "'If you want, I can X' (condition first) warns"),
+    ([TOOL, say("If you'd like, I could also draft the issue.")], True,
+     "'If you'd like, I could X' warns"),
+    ([TOOL, say("If you want the full log, it is in the scratchpad, "
+                "and I can see it passed.")], False,
+     "'if you want' leading a pointer, not an offer, stays silent"),
 
     # ai-config#3694: `flag-session-boundaries` appends a stopping-point
     # declaration to every reply, and for a non-clean stop it puts the pending

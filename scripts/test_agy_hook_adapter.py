@@ -3117,56 +3117,86 @@ class TestNoPositionalSubprocessMocks(unittest.TestCase):
         # Scope: this file only. The adapter runs hooks on a thread pool, so
         # a positional `side_effect` sequence hands results to whichever
         # thread calls first and the test flakes under load (ai-config#5792).
-        # The guard targets that positional-sequence pattern: a List, Tuple
-        # or list()/iter() Call as the value, via attribute assignment or a
-        # `side_effect=` keyword. A bare Name value is flagged when the same
-        # enclosing function assigns that name such a sequence; a Name bound
-        # to a def, a lambda or anything else is left alone. Direct
-        # sequences are flagged at any depth (module, class, function). It
-        # does not
-        # check single-hook paths specially: a one-element sequence is
-        # flagged too.
+        # The guard targets that positional-sequence pattern: a List or Tuple
+        # literal, a list()/tuple()/sorted()/iter() call, or a `.copy()` of
+        # a sequence, as the value of a `side_effect` attribute assignment
+        # (plain or annotated) or a `side_effect=` keyword. A bare Name
+        # value is flagged when an enclosing scope binds that name (plain or
+        # annotated assignment) to such a sequence; a Name bound to a def, a
+        # lambda or anything else is left alone. Direct sequences are
+        # flagged at any depth (module, class, function). It does not check
+        # single-hook paths specially: a one-element sequence is flagged too.
+        #
+        # It errs toward over-flagging, the safe direction: name resolution
+        # walks nested functions too, and a module-level name is visible in
+        # every function, so an unrelated same-named binding can flag a
+        # `side_effect` that is not a sequence. Rename it or key on the
+        # command.
         import ast
         tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+        factories = ("iter", "list", "tuple", "sorted")
 
-        def literal(node):
+        def literal(node, names):
             if isinstance(node, (ast.List, ast.Tuple)):
                 return True
+            if not isinstance(node, ast.Call):
+                return False
+            func = node.func
+            if isinstance(func, ast.Name):
+                return func.id in factories
             return (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id in ("iter", "list")
+                isinstance(func, ast.Attribute)
+                and func.attr == "copy"
+                and (
+                    literal(func.value, names)
+                    or (isinstance(func.value, ast.Name) and func.value.id in names)
+                )
             )
 
+        def assignments(nodes):
+            # (targets, value) for every Assign and valued AnnAssign.
+            for n in nodes:
+                if isinstance(n, ast.Assign):
+                    yield n.targets, n.value
+                elif isinstance(n, ast.AnnAssign) and n.value is not None:
+                    yield [n.target], n.value
+
         bad = set()
-        # The module scope walks the whole tree, so the direct literal forms
-        # are caught anywhere (module level, class body, function). Names
-        # are resolved against the module-level assignments there, and per
-        # enclosing function in each function scope.
+        # The module scope walks the whole tree, so the direct forms are
+        # caught anywhere. Names are resolved against the module-level
+        # assignments there, and per enclosing function in each function
+        # scope.
         scopes = [(tree, tree.body)] + [
             (n, list(ast.walk(n)))
             for n in ast.walk(tree)
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
         ]
         for scope, binding_nodes in scopes:
-            seq_names = {
-                t.id
-                for n in binding_nodes
-                if isinstance(n, ast.Assign) and literal(n.value)
-                for t in n.targets
-                if isinstance(t, ast.Name)
-            }
+            seq_names = set()
+            for _ in range(2):  # the second pass resolves `b = a.copy()`
+                seq_names |= {
+                    t.id
+                    for targets, value in assignments(binding_nodes)
+                    if literal(value, seq_names)
+                    for t in targets
+                    if isinstance(t, ast.Name)
+                }
 
             def positional(node):
-                return literal(node) or (
+                return literal(node, seq_names) or (
                     isinstance(node, ast.Name) and node.id in seq_names
                 )
 
             for node in ast.walk(scope):
-                if isinstance(node, ast.Assign):
-                    if positional(node.value) and any(
-                        isinstance(t, ast.Attribute) and t.attr == "side_effect"
-                        for t in node.targets
+                if isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                    if (
+                        node.value is not None
+                        and positional(node.value)
+                        and any(
+                            isinstance(t, ast.Attribute) and t.attr == "side_effect"
+                            for t in targets
+                        )
                     ):
                         bad.add(node.lineno)
                 elif isinstance(node, ast.Call):

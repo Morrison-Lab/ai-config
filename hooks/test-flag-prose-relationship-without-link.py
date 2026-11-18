@@ -37,6 +37,11 @@ def iss(body):
     return call("mcp__github__issue_write", method="create", title="t", body=body)
 
 
+def result():
+    """A tool_result carrier record, as real transcripts interleave between tool calls."""
+    return {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "x", "content": "ok"}]}}
+
+
 def sh(cmd):
     return call("Bash", command=cmd)
 
@@ -51,7 +56,13 @@ CASES = [
     ([human(), iss("Stacked on #12")], True, "stacked on in an issue blocks"),
     ([human_str(), iss("Depends on #12"), human_str("next"), reply("Depends on #12 is how it reads")], False, "later turn with no body written passes (string-content human turn)"),
     ([human_str(), iss("Depends on #12"), human_str("next")], False, "string-content human turn ends the turn"),
-    ([human(), reply("This is Blocked by #12 in prose")], False, "assistant reply text is not scanned"),
+    ([human(), reply("This is Blocked by #12 in prose")], False, "assistant reply text is not scanned (guards nothing new; also passes on the old hook)"),
+    ([human(), sh("gh issue create --body 'Blocked by #3' && gh pr create --body 'x'")], True, "issue write chained with a PR write still blocks"),
+    ([human(), sh("gh issue create --body 'Blocked by #3. Next: gh pr edit 4'")], True, "issue body containing the text gh pr edit still blocks"),
+    ([human(), sh("gh pr create --body 'Stacked on #3' && gh issue create --body 'Blocked by #4'")], True, "PR write chained with an issue write blocks on the issue"),
+    ([human(), iss("Blocked by #12"), result(), pr("Fixes the bug."), result()], True, "tool_result records between tool calls do not end the turn"),
+    ([human(), iss("Blocked by #12"), result(), human_str("next"), result()], False, "tool_result records do not hide the turn boundary"),
+    ([human(), call("mcp__github__issue_write", method="update", issue_number=7, body="Blocked by #12")], True, "issue_write update is treated as an issue body"),
     ([human(), call("mcp__github__issue_write", method="create", body="Part of Morrison-Lab/lds#5")], True, "cross-repo part of in an issue blocks"),
     ([human(), pr("Part of Morrison-Lab/lds#5")], False, "part of in a PR body passes"),
     ([human(), call("mcp__github__update_pull_request", body="Child of #5")], False, "child of in an updated PR body passes"),
@@ -90,6 +101,7 @@ def run(events):
         # The reason is the only part the agent reads, so assert what it says.
         reason = verdict.get("reason", "")
         assert "relationships field" in reason and "[!IMPORTANT]" in reason, verdict
+        assert "needs #N merged first" in reason and "issue that PR closes" in reason, verdict
         return True
 
 

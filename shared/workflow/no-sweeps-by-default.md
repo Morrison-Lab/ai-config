@@ -38,10 +38,8 @@ A new check reads changed lines, so existing violations do not trip it, and a re
   A typed `gia`, `gii`, `gip` or `gmd` also allows more.
   There is no agent-side bypass; the user's next message resets the count.
   The reviewer layer is "Unrequested sweeps" in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md).
-- `hooks/no-unnamed-repo-pr.py` denies a PR creation in a repository the user never named this session, unless it is the session's own checkout or already has a PR from this session ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).
-  Ezra, 2026-11-17, after an agent read "we've done similar things in mlg and epi204" as a request and opened PRs in both: "never broaden your scope like that again without my direct instructions;
-  this counts as an unauthorized sweep."
-  A repository named only as precedent still passes: "we did similar things in X" is not a request for work in X, and only the reader can tell.
+- `hooks/no-unnamed-repo-pr.py` denies a PR in a repository the user never named this session, other than the session's own checkout ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).
+  A repository named only as precedent ("we did similar things in X") still passes, so do not read that as a request.
 - `hooks/warn-sweep-pr-without-ask.py` warns when `gh pr create` or `mcp__github__create_pull_request` has "sweep" in the title (or, for `gh pr create` only, a `sweep` label) and no `Sweep authorized:` marker (followed by a message id or link).
   It warns rather than blocks because a title containing the word is not always a sweep, and a hook cannot read Ezra's intent.
 - gha's content checks (`check-new-line-breaks`, `check-def-commentary`, `check-exm-figures`, `check-one-div-per-subfile`, `check-tree-lists`, `check-visualization-figures`, `check-typos` and others) are diff-scoped by default (checked 2026-10-29), reflagging nothing already merged.

@@ -517,6 +517,26 @@ checking the wrong revision generally.
 - **Don't:** trust a clean local run against uncommitted changes as evidence
   about what CI will see.
 
+The same substitution happens one level up, when a conductor writes the pre-push list into an implementer's brief.
+A hand-written list is the author's recollection of the checks that matter, passed to an agent that cannot tell what it omits.
+The brief also owes the implementer the size cap, since the review round is the most expensive place to find it.
+
+- **Do:** name `python3 scripts/run-local-validation.py` in an implementer brief in place of a list of validators.
+- **Do:** state the size cap in [`small-prs`](small-prs.md) and say to measure `git diff --shortstat origin/main...HEAD` after the first commit.
+- **Do:** say that a new check script or hook needs a writer instruction and a reviewer instruction, which `scripts/check-check-has-instructions.py` enforces.
+- **Don't:** list validators by hand in a brief.
+- **Don't:** leave the size cap for the review round to discover.
+
+(Morrison-Lab/ai-config, 2026-11-18, a GIA session: the conductor briefed two worktree-isolated implementers with `check-mutation-anchors`, the full `test_hooks.py` and a `load_sibling` grep.
+[#5781](https://github.com/Morrison-Lab/ai-config/pull/5781) then failed CI on checks the brief never named:
+`new-line-breaks` (a long line with a mid-line semicolon)
+and `check-unpinned-git-fixtures.py` (an unpinned `git init` in a new test).
+The `validate` job stopped at the second under `bash -e`, before `check-check-has-instructions.py` ran;
+that check also failed at commit `c90fdae`, where the new hook had no reviewer instruction:
+`scripts/check-check-has-instructions.py --base origin/main` printed `FAIL: added check(s) hooks/no-unnamed-repo-pr.py without a reviewer instruction (.claude/agents/*.md)`.
+It also reached 787 lines against the 300-line cap and needed a scope cut after a full review round.
+[#5782](https://github.com/Morrison-Lab/ai-config/pull/5782) was the other implementer's PR, briefed the same way.)
+
 (Morrison-Lab/ai-config, 2026-09-09, manuscript-review session: two
 successive pushes on one PR each ran a hand-picked subset of local checks
 and each failed CI on a check that was never in that subset --- first

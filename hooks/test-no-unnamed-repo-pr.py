@@ -20,7 +20,7 @@ def checkout(name, remotes):
     """A git checkout under TMP whose remotes are `remotes` ({name: url})."""
     path = os.path.join(TMP, name)
     os.makedirs(path)
-    subprocess.run(["git", "init", "-q", path], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", path], check=True)
     for remote, url in remotes.items():
         subprocess.run(["git", "-C", path, "remote", "add", remote, url], check=True)
     return path

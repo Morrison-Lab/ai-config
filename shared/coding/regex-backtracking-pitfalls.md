@@ -40,6 +40,16 @@ If branch A and branch B can consume the same leading character
 (such as `\([^()\n]{0,120}\)` and `[^,:;.!?]`, both of which consume `(`),
 a failing input like `"(1) " * 24` triggers exponential backtracking.
 
+A brief or review comment that proposes a regex is a claim about its cost, so time it first.
+The pattern proposed in a brief for [ai-config#5782](https://github.com/Morrison-Lab/ai-config/pull/5782) (2026-11-18) was
+`\bgh(?:\s+(?:-R|--repo|--hostname)(?:\s+|=)\S+|\s+--?\w[\w-]*)*\s+issue\s+(?:create|edit)\b`.
+Its two alternatives under the `*` both start with `\s+` and both match `-R`, so they overlap.
+The reviewer measured 3.6 s on `"gh " + "-R " * 34 + "x"`, about 1.6x per added token, against a 10 s hook timeout.
+The shipped hook uses alternatives that do not overlap.
+
+- **Do:** time a regex on a repeated-token non-matching input before proposing it in a brief or review, with `scripts/check_regex_patterns.py` or a short timing loop.
+- **Don't:** propose a pattern with overlapping alternatives under `(...)*` on the strength of its matching cases alone.
+
 ## Backtracking through an optional group can defeat a following negative lookahead
 
 Catastrophic backtracking wastes time; this failure wastes correctness while

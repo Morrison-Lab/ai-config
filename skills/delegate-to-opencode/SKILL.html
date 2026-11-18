@@ -612,7 +612,7 @@ cookieconsent.run({
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>Verdict: <span class="dt">&lt;</span><span class="kw">Clean</span><span class="ot"> or Needs more work</span><span class="dt">&gt;</span></span>
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>_Posted by &lt;Agent Name&gt; (AI agent) --- not written by a human._</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>This ensures <code>check-pr-fully-clean.py</code> admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean comments (#4425). Never use Codex for this routing.</p>
+<p>This ensures <code>check-pr-fully-clean.py</code> admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean comments (#4425). The “by construction” claim holds only for a review with no findings section of its own (<a href="https://github.com/Morrison-Lab/ai-config/issues/5802">ai-config#5802</a>). Post the full envelope from the first relay, and see the Do/Don’t pair in <a href="../../shared/workflow/adversarial-self-review.md"><code>adversarial-self-review</code></a> for the re-review a findings section requires. Never use Codex for this routing.</p>
 </section>
 <section id="ollama-cloud-when-go-is-exhausted" class="level2">
 <h2 class="anchored" data-anchor-id="ollama-cloud-when-go-is-exhausted">Ollama Cloud when Go is exhausted</h2>

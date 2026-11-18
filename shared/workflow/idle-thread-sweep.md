@@ -12,3 +12,4 @@ An idle thread is any unresolved thread, not only one in `review_ready` or `bloc
 
 Mechanism: [`hooks/require-pr-read-before-resolve.py`](../../hooks/require-pr-read-before-resolve.py) denies `set_thread_resolved` unless that read ran since the last user turn, and when the thread's row shows an open or draft PR.
 The row check is best-effort, because the hook sees the result only as transcript text.
+A project thread's `list_threads` has no `include_pull_requests` argument, so a thread resolving itself reads `list_prs` instead, which the hook also accepts ([ai-config#5812](https://github.com/Morrison-Lab/ai-config/issues/5812)).

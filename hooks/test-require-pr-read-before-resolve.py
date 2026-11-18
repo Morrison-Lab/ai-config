@@ -56,6 +56,12 @@ CASES = [
       result(OTHER_MERGED_ROW + "\n" + OPEN_ROW)], True),
     ("own-thread resolve with a read", {"resolved": True},
      [USER, call({"include_pull_requests": True}), result(NO_PR_ROW)], False),
+    ("list_prs read counts in a thread session", {"resolved": True},
+     [USER, {"type": "assistant", "message": {"role": "assistant", "content": [
+         {"type": "tool_use", "id": "p1", "name": "mcp__hearthbot__list_prs", "input": {}}]}}], False),
+    ("list_prs read before the last user turn does not count", {"resolved": True},
+     [{"type": "assistant", "message": {"role": "assistant", "content": [
+         {"type": "tool_use", "id": "p1", "name": "mcp__hearthbot__list_prs", "input": {}}]}}, USER], True),
     ("resolved false is not checked", {"resolved": False, "thread_id": TID}, [USER], False),
     ("no transcript path", {"resolved": True, "thread_id": TID}, None, False),
 ]

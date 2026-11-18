@@ -313,12 +313,15 @@ Until that is measured, keep streaming as the first try for a per-PR payload, an
 In a claude.ai cloud session (as observed on 2026-10-13), HTTP requests made via Python's `urllib` (or `requests`) to `https://opencode.ai/zen/go/v1/chat/completions` fail with `403 Forbidden` from the cloud agent proxy, while `curl` with the identical body and headers returns `200 OK`.
 Always invoke `curl` in shell commands rather than Python HTTP libraries when calling the OpenCode Go API in cloud sessions.
 
-**The key is not saved in the Default cloud environment (as observed on 2026-11-17).**
-`opencode.ai` was refused by the proxy there until the user approved adding it to Default's allowed hosts: `curl` printed `CONNECT tunnel failed, response 403`, and the proxy's failure note said `connect_rejected`.
-No OpenCode Go API key is saved on that environment, so the keyless `curl` route above still cannot run from a Default cloud session.
+**The Default cloud environment carries a proxy-injected OpenCode Go key (since 2026-11-18).**
+At about 04:50Z on 2026-11-18 a key was saved as a network secret for `opencode.ai` on Default, and a streamed `curl` to `https://opencode.ai/zen/go/v1/chat/completions` with `kimi-k3` then returned a full review ([ai-config#5795 comment](https://github.com/Morrison-Lab/ai-config/pull/5795#issuecomment-6971219358)).
+So the keyless `curl` route above runs from a Default cloud session, and the cross-model waiver applies there only when that route fails at run time.
+Before the key was saved, every attempt returned `authentication_error: OpenCode Go requires an API key`, and six merges that day ran under the waiver.
+Earlier still (as observed on 2026-11-17), the proxy refused `opencode.ai` until the user added it to Default's allowed hosts: `curl` printed `CONNECT tunnel failed, response 403`, and the proxy's failure note said `connect_rejected`.
 
 - **Do:** probe with one `curl` to `opencode.ai` before planning a cross-model review in a cloud session, and read the "no key needed" claim as holding only where the proxy injects the credential.
-- **Don't:** count on that claim in an environment where you have not seen the probe succeed.
+- **Do:** run that route on the final head before every `mwc` merge from a Default cloud session.
+- **Don't:** count on that claim in an environment where you have not seen the probe succeed, or apply the waiver from this section's history alone.
 
 **Per-model 502 upstream errors and fallback loop:**
 Both `glm-5.3` and `deepseek-v4-pro` can intermittently return `502 upstream request failed` (as observed on 2026-10-13) even on short diffs (e.g. 1 KB), while `kimi-k3` answers.

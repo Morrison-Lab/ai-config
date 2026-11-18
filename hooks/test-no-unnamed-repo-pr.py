@@ -131,6 +131,12 @@ CASES = [
     ("gh api the hook-environment GH_REPO fills the placeholders", "Bash", "gh api -X POST repos/{owner}/{repo}/pulls", GO, "deny"),
     ("gh api an exported GH_REPO elsewhere gives a note", "Bash",
      "export GH_REPO=o/mlg; gh api -X POST repos/{owner}/{repo}/pulls", GO, "note"),
+    ("gh api a fragment does not hide the endpoint", "Bash", "gh api -X POST 'repos/o/mlg/pulls#x?y' -f title=x", GO, "deny"),
+    ("glab api a fragment does not hide the endpoint", "Bash", "glab api -X POST 'projects/g%2Fmlg/merge_requests#x'", GO, "deny"),
+    ("glab api :username is unknown, so a note", "Bash",
+     "glab api -X POST projects/:namespace%2F:username/merge_requests", GO, "note"),
+    ("glab api graphql mergeRequestCreate gives a note", "Bash",
+     "glab api graphql -f query='mutation { mergeRequestCreate(input: {}) { clientMutationId } }'", GO, "note"),
     ("a missing transcript gives a note", MCP, "mlg", os.path.join(TMP, "none.jsonl"), "note"),
     ("no user message gives a note", MCP, "mlg", transcript({"type": "assistant", "message": {}}), "note"),
 ]
@@ -159,6 +165,8 @@ MUTATIONS = [  # each must fail this suite; skipped inside a mutant run
     ("api prefix only at the start", "(url or cut[0] == 0)", "(cut[0] == 0)"),
     ("glab --form not a body flag", '"--form": "body"', '"--form": ""'),
     ("unknown placeholder passes", 'if any(x.startswith(":") and x not in fills for x in elems):', "if False:"),
+    ("fragment not cut", 're.split(r"[?#]", endpoint', 're.split(r"[?]", endpoint'),
+    ("glab graphql mutation name", 'else "mergeRequestCreate"', 'else "createPullRequest"'),
     ("payload cwd is home", "gh_target(first_cwd or payload.get(\"cwd\"))", "gh_target(payload.get(\"cwd\"))"),
 ]
 if not os.environ.get("NURP_MUTANT"):

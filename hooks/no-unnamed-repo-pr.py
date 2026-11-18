@@ -94,7 +94,7 @@ def api_request(args):
 def api_parts(endpoint):
     """Path segments of an API endpoint, without query string, host, empty segments or an `api/v3|v4` prefix."""
     url = "://" in (endpoint or "")
-    parts = [x for x in (urlsplit(endpoint).path if url else (endpoint or "").split("?", 1)[0]).split("/") if x]
+    parts = [x for x in (urlsplit(endpoint).path if url else re.split(r"[?#]", endpoint or "", 1)[0]).split("/") if x]
     cut = [i for i in range(len(parts) - 1) if parts[i] == "api" and parts[i + 1] in ("v3", "v4")]
     return parts[cut[0] + 2:] if cut and (url or cut[0] == 0) else parts
 
@@ -117,16 +117,17 @@ def api_creation(prog, cur, lead, elsewhere):
     endpoint, post, bodies = api_request(prog[2:])
     parts = api_parts(endpoint)
     label = f"`{prog[0]} api {endpoint}`"
-    if prog[0] == "gh" and parts == ["graphql"]:
-        if any("createPullRequest" in val for _, val in bodies):
-            return [(None, "`gh api graphql` createPullRequest (the target is a repository node id)")]
-        return [(None, "`gh api graphql` (could not read the GraphQL body; it may create a PR)")] * unreadable_body(bodies)
+    if parts == ["graphql"]:
+        mutation = "createPullRequest" if prog[0] == "gh" else "mergeRequestCreate"
+        if any(mutation in val for _, val in bodies):
+            return [(None, f"`{prog[0]} api graphql` {mutation} (the target is a node id or path we cannot read)")]
+        return [(None, f"`{prog[0]} api graphql` (could not read the GraphQL body; it may create a PR)")] * unreadable_body(bodies)
     gh_rest = prog[0] == "gh" and len(parts) == 4 and parts[0] == "repos" and parts[3] == "pulls"
     glab_rest = prog[0] == "glab" and len(parts) == 3 and parts[0] == "projects" and parts[2] == "merge_requests"
     if not post or not (gh_rest or glab_rest):
         return []
     elems = parts[1:3] if gh_rest else unquote(parts[1]).split("/")
-    fills = {"{owner}": 0, "{repo}": 1, ":namespace": 0, ":group": 0, ":user": 0, ":username": 0, ":repo": 1,
+    fills = {"{owner}": 0, "{repo}": 1, ":namespace": 0, ":group": 0, ":repo": 1,
              ":id": 2, ":fullpath": 2}
     if any(x.startswith(":") and x not in fills for x in elems):
         return [(None, f"{label} (an unknown placeholder)")]

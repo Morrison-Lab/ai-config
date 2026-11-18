@@ -14,6 +14,9 @@ Rule, on `mcp__hearthbot__set_thread_resolved` with `resolved: true`:
   2. DENY when such a call ran and its result, in the row for the target thread
      (the `thread_id` argument, when the call carries one), shows an open or
      draft PR.
+     A `list_prs` read satisfies part 1 only: its rows carry no thread id, so
+     part 2 cannot run for a thread session, and nothing enforces that the
+     thread's own PRs are merged or closed.
 
 WHY PART 2 IS BEST-EFFORT
 -------------------------

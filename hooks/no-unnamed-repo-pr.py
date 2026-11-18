@@ -12,6 +12,7 @@
 - Known limits: a repo named only as precedent passes; new-branch pushes are not guarded (a push opens
   no PR); `git push` and the MCP branch-write tools are ai-config#5784 part B.
 """
+import functools
 import json
 import os
 import re
@@ -143,7 +144,8 @@ def api_request(args):
     methods = [v.upper() for k, _, v in kinds if k == "method"]
     bodies = [(f, v) for k, f, v in kinds if k == "body"]
     repos = [v for k, _, v in kinds if k == "repo"]
-    return positionals, (methods[-1] == "POST" if methods else bool(bodies)), bodies, (repos or [None])[-1], unknown
+    post = bool(bodies) if not methods else None if re.search(r"[$`]", methods[-1]) else methods[-1] == "POST"  # None: unreadable
+    return positionals, post, bodies, (repos or [None])[-1], unknown
 
 
 def api_parts(endpoint):
@@ -179,10 +181,20 @@ CREATION_SHAPES = (("repos", None, None, "pulls"), ("projects", None, "merge_req
 
 
 def expands(parts):
-    """True when a shell expansion sits in a path whose segments could still form a creation endpoint."""
+    """True when a shell expansion in `parts` could stand for any number of segments (`R=owner/name`, or none)
+    so that the path becomes a creation endpoint; a literal segment no shape allows (`issues`) rules it out."""
     hole = [bool(re.search(r"[$`]", x)) for x in parts]
-    return any(hole) and any(len(sh) == len(parts) and all(w in (None, x) or h for w, x, h in zip(sh, parts, hole))
-                             for sh in CREATION_SHAPES)
+
+    @functools.lru_cache(maxsize=None)
+    def fits(shape, i, j):
+        if i == len(shape):
+            return all(hole[j:])
+        if j == len(parts):
+            return False
+        if hole[j]:
+            return fits(shape, i, j + 1) or fits(shape, i + 1, j)
+        return shape[i] in (None, parts[j]) and fits(shape, i + 1, j + 1)
+    return any(hole) and any(fits(shape, 0, 0) for shape in CREATION_SHAPES)
 
 
 def api_creation(prog, cur, lead, elsewhere):
@@ -198,7 +210,9 @@ def api_creation(prog, cur, lead, elsewhere):
     endpoint = (positionals or [None])[0]
     kind, parts = api_kind(prog[0], endpoint)
     label = f"`{prog[0]} api {endpoint}`"
-    if post and expands(parts):
+    if post is None and kind == "rest":
+        return [(None, f"{label} (could not read the method)")]
+    if post is not False and expands(parts):
         return [(None, f"{label} (could not read the endpoint)")]
     odd = [(None, f"{label} (unrecognised flag `{f}`)") for f in unknown[:1]]
     hidden = [(None, f"`{prog[0]} api {p}` (an unrecognised flag may hide the method or endpoint)")

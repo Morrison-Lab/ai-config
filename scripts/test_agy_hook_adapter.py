@@ -633,7 +633,13 @@ class TestAgyHookAdapter(unittest.TestCase):
     def test_pre_invocation_multi_message_steps(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         res1 = MagicMock(returncode=0, stdout="Message 1\n", stderr="")
         res2 = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Message 2"}), stderr="")
-        mock_run.side_effect = [res1, res2]
+        # Key each result on the command, not the call order: the adapter runs
+        # UserPromptSubmit hooks on a thread pool, so the order in which they
+        # reach subprocess.run is nondeterministic (ai-config#5792).
+        by_cmd = {"test-prompt1.py": res1, "test-prompt2.py": res2}
+        mock_run.side_effect = lambda cmd, *a, **kw: next(
+            res for key, res in by_cmd.items() if key in cmd
+        )
         
         payload = {"invocationNum": 1, "transcriptPath": "/tmp/transcript.jsonl"}
         mock_stdin.write(json.dumps(payload))
@@ -767,7 +773,12 @@ class TestAgyHookAdapter(unittest.TestCase):
             MagicMock(returncode=0, stdout=multibyte_chunk, stderr=""),  # overflows by 1 byte mid-char
             MagicMock(returncode=0, stdout="Z", stderr=""),  # ASCII: fits the 1 leftover byte
         ]
-        mock_run.side_effect = results
+        # Key each result on its command, not the call order: hooks run on a
+        # thread pool, so they reach subprocess.run in a nondeterministic
+        # order, and a positional side_effect list permuted the outputs
+        # (ai-config#5792).
+        by_cmd = {f"cmd_{i}": res for i, res in enumerate(results)}
+        mock_run.side_effect = lambda cmd, *a, **kw: by_cmd[cmd]
 
         payload = {"invocationNum": 1, "prompt": "test"}
         mock_stdin.write(json.dumps(payload))
@@ -3089,6 +3100,16 @@ class TestWarnOnlyPreToolUseSurfacing(unittest.TestCase):
         self.assertIn("holder:released", events)
         self.assertIn("contender:acquired", events)
         self.assertLess(events.index("holder:releasing"), events.index("contender:acquired"))
+
+class TestNoPositionalSubprocessMocks(unittest.TestCase):
+    def test_subprocess_run_mocks_do_not_use_positional_side_effect_lists(self):
+        # The adapter runs hooks on a thread pool, so a positional
+        # `side_effect = [...]` hands results to whichever thread calls first
+        # and the test flakes under load (ai-config#5792). Key on the command.
+        import re
+        src = Path(__file__).read_text(encoding="utf-8")
+        bad = re.findall(r"^\s*mock_run\.side_effect\s*=\s*(?:\[|results\b|iter\()", src, re.M)
+        self.assertEqual(bad, [], "use a command-keyed side_effect function, not a positional list")
 
 if __name__ == "__main__":
     unittest.main()

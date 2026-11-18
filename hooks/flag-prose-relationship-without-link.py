@@ -3,13 +3,27 @@
 
 shared/workflow/github-relationships.md (ai-config#4907): an issue or PR body
 saying "Blocked by #N", "Stacked on #N" or "Part of #N" is not a relationship
-in GitHub's relationships field. When a turn creates or edits an issue or PR
+in GitHub's relationships field. When a turn creates or edits an issue
 with such a body and makes no relationship call at or after it, block the stop
 once so the agent records it (parent/sub-issue, blocked-by/blocking).
 
 Code spans and fences are ignored, so a body that quotes the phrase is fine.
-A PR body may say "Part of #N" (or child of, sub-issue of, parent): no relationship
-call exists for a PR, so only issue bodies and the blocked/stacked cues are flagged.
+Only bodies written by tool calls in the current turn are scanned (the turn
+boundary is `transcript_meta.is_real_user_turn`), never assistant reply text.
+A PR body is never flagged (ai-config#5442, #5772): GitHub rejects a PR on either
+end of a dependency link (422 "Source issue may only be an issue", measured on
+dependencies/blocked_by), so a PR body has nothing to record. The decision is
+offline: `create_pull_request`, `update_pull_request` and a command whose text has no
+`gh [global flags] issue create|edit` are never flagged (see `ISSUE_CMD`).
+`issue_write` is treated as an issue body even for method=update on a PR's number,
+which cannot be told apart offline. An issue body naming a PR as its blocker is
+still flagged and cannot be recorded; the notice says to reword the cue or link
+the issue that PR closes (no network call). A stacked PR is recorded by its base
+branch and the `> [!IMPORTANT]` alert.
+Known edges, each costing at most one block per turn: a command that chains an
+issue write with a PR write is scanned whole, so a cue in the PR body is flagged
+too; and a PR-only or `echo` command whose text literally contains
+`gh issue create|edit` plus a cue is scanned too.
 Fails open on any error.
 """
 from __future__ import annotations
@@ -23,9 +37,9 @@ _LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 from agent_notice import stop_notice  # noqa: E402
+from transcript_meta import is_real_user_turn  # noqa: E402
 
 WRITE_TOOL = re.compile(r"issue_write|create_pull_request|update_pull_request")
-WRITE_CMD = re.compile(r"\bgh\s+(?:issue|pr)\s+(?:create|edit)\b")
 # A relationship call: MCP sub-issue tool, the REST endpoints, or the gh flags.
 LINK = re.compile(
     r"sub_issue_write|parent_issue_number|dependencies/(?:blocked_by|blocking)|"
@@ -39,32 +53,43 @@ CUE = re.compile(
     re.I,
 )
 CODE = re.compile(r"```.*?```|`[^`\n]*`", re.S)
-# Cues that need a parent/child link. A PR cannot be a sub-issue (REST 422), and a
-# `Closes` keyword would close a multi-PR issue early, so "Part of #N" in a PR body
-# is a sidebar link GitHub already shows and has no relationship call to write.
-PARENT_CUE = re.compile(r"^(?:sub-?issue\s+of|child\s+of|part\s+of|parent)", re.I)
 PR_TOOL = re.compile(r"create_pull_request|update_pull_request")
-PR_CMD = re.compile(r"\bgh\s+pr\s+(?:create|edit)\b")
 
 
-def body_of(name: str, inp: dict) -> tuple[str, bool] | None:
-    """(body text, whether it belongs to a PR) of an issue/PR write call, else None."""
+# `gh`, then only gh's global flags (`-R`/`--repo`/`--hostname` with a value, or
+# any other `-x`/`--long[=v]` flag), then `issue create|edit`. Words may be
+# separated by blanks or a backslash-newline. Text after the verb is not
+# examined, and any other word between `gh` and `issue` (as in
+# `gh pr create --title "the issue edit dialog"`) does not match. `gh` may follow
+# a path (`/usr/bin/gh`) or any wrapper, but not a word character or hyphen
+# (`git-gh-tool`). The alternatives do not overlap, so matching stays linear.
+_W = r"(?:[ \t]|\\\n)+"
+ISSUE_CMD = re.compile(
+    r"(?<![\w-])gh"
+    r"(?:" + _W + r"(?:-R|--repo|--hostname)(?:" + _W + r"|=)[^\s-]\S*"
+    r"|" + _W + r"--?(?!(?:R|repo|hostname)\b)\w[\w-]*(?:=\S+)?)*"
+    + _W + r"issue" + _W + r"(?:create|edit)\b"
+)
+
+
+def body_of(name: str, inp: dict) -> list[tuple[str, bool]]:
+    """(body text, whether it belongs to a PR) for each issue/PR write in a tool call.
+
+    A command whose text contains `gh ... issue create|edit` is scanned whole,
+    heredocs included, as an issue body; any other command is never flagged.
+    """
     if WRITE_TOOL.search(name or ""):
-        return str(inp.get("body") or ""), bool(PR_TOOL.search(name or ""))
+        return [(str(inp.get("body") or ""), bool(PR_TOOL.search(name or "")))]
     cmd = str(inp.get("command") or "")
-    if WRITE_CMD.search(cmd):
-        return cmd, bool(PR_CMD.search(cmd))
-    return None
+    return [(cmd, False)] if ISSUE_CMD.search(cmd) else []
 
 
 def first_cue(body: str, is_pr: bool) -> str | None:
-    """The first cue phrase in body that has a relationship call to write."""
-    for hit in CUE.finditer(CODE.sub("", body)):
-        phrase = hit.group(0).strip()
-        if is_pr and PARENT_CUE.match(phrase):
-            continue
-        return phrase
-    return None
+    """The first cue phrase in an issue body; a PR body has no recordable relationship."""
+    if is_pr:
+        return None
+    hit = CUE.search(CODE.sub("", body))
+    return hit.group(0).strip() if hit else None
 
 
 def scan(path: str):
@@ -76,12 +101,11 @@ def scan(path: str):
                 m = json.loads(line)
             except Exception:
                 continue
-            blocks = (m.get("message") or {}).get("content") or []
-            if not isinstance(blocks, list):
+            if is_real_user_turn(m):
+                pending = None  # a new human turn, string or block content
                 continue
-            if (m.get("type") or m.get("role")) == "user":
-                if any(isinstance(b, dict) and b.get("type") == "text" for b in blocks):
-                    pending = None  # a new human turn
+            blocks = (m.get("message") or {}).get("content") or []
+            if not isinstance(blocks, list) or (m.get("type") or m.get("role")) == "user":
                 continue
             for b in blocks:
                 if not (isinstance(b, dict) and b.get("type") == "tool_use"):
@@ -91,9 +115,9 @@ def scan(path: str):
                 if LINK.search(blob):
                     pending = None
                     continue
-                written = body_of(b.get("name") or "", inp)
-                if written is not None and pending is None:
-                    pending = first_cue(*written)
+                for written in body_of(b.get("name") or "", inp):
+                    if pending is None:
+                        pending = first_cue(*written)
     return pending
 
 
@@ -107,11 +131,14 @@ def main() -> int:
         return 0
     print(stop_notice(
         payload,
-        f"An issue or PR body this turn says \"{phrase}\" in prose, and no relationship call followed. "
+        f"An issue body this turn says \"{phrase}\" in prose, and no relationship call followed. "
         "Record it in GitHub's relationships field (REST, not GraphQL): sub-issue via `sub_issue_write` "
         "or `POST .../issues/<parent>/sub_issues`, blocked-by via `gh issue edit --add-blocked-by` or "
-        "`POST .../issues/<n>/dependencies/blocked_by`; a PR closing an issue needs a `Closes #N` keyword "
-        "(\"Part of #N\" in a PR body needs no call). "
+        "`POST .../issues/<n>/dependencies/blocked_by`. GitHub cannot record a PR on either end of a "
+        "link: a stacked PR is recorded by its base branch plus a leading `> [!IMPORTANT]` alert in the "
+        "PR body, and a PR closing an issue needs a `Closes #N` keyword. If #N is a PR, no call can "
+        "record the link (422 \"Target issue may only be an issue\"): reword the cue in plain prose "
+        "(e.g. \"needs #N merged first\") or link the issue that PR closes. "
         "See shared/workflow/github-relationships.md.",
         "flag-prose-relationship-without-link",
     ))

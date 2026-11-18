@@ -2,7 +2,7 @@
 
 Ezra, 2026-11-03 (`cai:`, ai-config#4907): use GitHub's relationships field for **every** relationship among issues and PRs.
 Prose such as "Blocked by #N", "Stacked on #N" or "Part of #N" is a label for a reader, not a record: GitHub, the sub-issue tree and every tool that reads dependencies see nothing.
-Write the prose if it helps a reader, and make the relationship call as well.
+Write the prose if it helps a reader, and for issues make the relationship call as well.
 
 | Relationship | How to record it |
 | --- | --- |
@@ -10,13 +10,17 @@ Write the prose if it helps a reader, and make the relationship call as well.
 | Blocked by | `gh issue edit <n> --add-blocked-by <m>` (gh 2.94.0 or later), or `POST /repos/{owner}/{repo}/issues/<n>/dependencies/blocked_by` with `{"issue_id": <id>}` |
 | Blocking | `gh issue edit <n> --add-blocking <m>`, or the same endpoint on the blocked issue |
 | PR closes issue | A closing keyword (`Closes #N`) in the PR body; REST has no other way to set the link |
-| Stacked PR | Blocked by the base PR (a PR is an issue there), and a `> [!IMPORTANT]` note in the body |
-| PR is part of an issue that other PRs also serve | "Part of #N" in the PR body: GitHub shows the reference in the issue's sidebar. No call exists: a PR cannot be a sub-issue, and `Closes` would close the issue early. The hook leaves this phrase alone in PR bodies and still flags it in issue bodies. |
+| Stacked PR | The PR's base branch, plus a `> [!IMPORTANT]` alert leading the body ([`surface-merge-order`](surface-merge-order.md)). No blocked-by link: GitHub rejects a PR on either end of a dependency (422 "Source issue may only be an issue" or "Target issue may only be an issue", measured on `dependencies/blocked_by`, #5442), so PR-to-PR cannot be recorded. When an issue says it is blocked by a PR, no call can record that either: reword the cue ("needs #N merged first") or link the issue that PR closes |
+| PR is part of an issue that other PRs also serve | "Part of #N" in the PR body: GitHub shows the reference in the issue's sidebar. No call exists: a PR cannot be a sub-issue (a known GitHub limit, not measured here), and `Closes` would close the issue early. |
 
 `<id>` is the numeric `id` from `GET /repos/{owner}/{repo}/issues/<n>`, not the issue number.
 Use the REST API, not GraphQL, which cloud sessions block.
 
-Mechanism: `hooks/flag-prose-relationship-without-link.py` blocks the stop once per turn when the turn created or edited an issue or PR whose body states one of these relationships in prose and no relationship call followed.
+Mechanism: `hooks/flag-prose-relationship-without-link.py` blocks the stop once per turn when the turn created or edited an issue whose body states one of these relationships in prose and no relationship call followed.
+It reads only bodies written by tool calls in the current turn, and never flags a PR body (`create_pull_request`, `update_pull_request`, `gh pr create|edit`), since GitHub rejects a PR on either end of a dependency link, except when the same Bash command also runs, or literally names, `gh issue create|edit` (at most one block per turn).
+An `issue_write` update is treated as an issue body even when its number is a PR's, which cannot be told apart offline.
+The hook makes no network call, so an issue body naming a PR as its blocker is still flagged.
+The notice says to reword the cue.
 It does not sweep existing issues.
 Related: [`issue-first`](issue-first.md), [`stack-prs`](../../skills/stack-prs/SKILL.md).
 

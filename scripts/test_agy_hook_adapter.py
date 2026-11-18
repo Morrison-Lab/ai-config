@@ -756,6 +756,17 @@ class TestAgyHookAdapter(unittest.TestCase):
         # 30000 bytes, then hooks returning 2-byte UTF-8 characters
         # ("e" with an acute accent, U+00E9) that cannot fit in the
         # single remaining byte.
+        # The adapter reads these caps from AGY_ADAPTER_* env vars at import;
+        # this test depends on the defaults exactly, so pin them.
+        for name, value in (
+            ("PRE_INVOCATION_MSG_BYTE_CAP", 10000),
+            ("PRE_INVOCATION_TOTAL_BYTE_CAP", 30000),
+            ("PRE_INVOCATION_MSG_CAP", 20),
+            ("MAX_WORKERS", 16),
+        ):
+            patcher = patch.object(self.adapter, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         five_hooks = {
             "hooks": {
                 "UserPromptSubmit": [
@@ -3102,14 +3113,44 @@ class TestWarnOnlyPreToolUseSurfacing(unittest.TestCase):
         self.assertLess(events.index("holder:releasing"), events.index("contender:acquired"))
 
 class TestNoPositionalSubprocessMocks(unittest.TestCase):
-    def test_subprocess_run_mocks_do_not_use_positional_side_effect_lists(self):
-        # The adapter runs hooks on a thread pool, so a positional
-        # `side_effect = [...]` hands results to whichever thread calls first
-        # and the test flakes under load (ai-config#5792). Key on the command.
-        import re
-        src = Path(__file__).read_text(encoding="utf-8")
-        bad = re.findall(r"^\s*mock_run\.side_effect\s*=\s*(?:\[|results\b|iter\()", src, re.M)
-        self.assertEqual(bad, [], "use a command-keyed side_effect function, not a positional list")
+    def test_mocks_do_not_use_positional_side_effect_sequences(self):
+        # Scope: this file only. The adapter runs hooks on a thread pool, so
+        # a positional `side_effect` sequence hands results to whichever
+        # thread calls first and the test flakes under load (ai-config#5792).
+        # The guard targets that positional-sequence pattern (a List, Tuple
+        # or list()/iter() Call as the value, via attribute assignment or a
+        # `side_effect=` keyword). It does not check single-hook paths
+        # specially: a one-element sequence is flagged too.
+        import ast
+        tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+
+        def positional(node):
+            if isinstance(node, (ast.List, ast.Tuple)):
+                return True
+            return (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in ("iter", "list")
+            )
+
+        bad = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                if positional(node.value) and any(
+                    isinstance(t, ast.Attribute) and t.attr == "side_effect"
+                    for t in node.targets
+                ):
+                    bad.append(node.lineno)
+            elif isinstance(node, ast.Call):
+                bad.extend(
+                    kw.value.lineno
+                    for kw in node.keywords
+                    if kw.arg == "side_effect" and positional(kw.value)
+                )
+        self.assertEqual(
+            bad, [],
+            f"positional side_effect at lines {bad}: use a command-keyed function",
+        )
 
 if __name__ == "__main__":
     unittest.main()

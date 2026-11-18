@@ -668,9 +668,9 @@ def fetch_rest(repo, limit):
 
     REST pages by offset, so a PR closing mid-listing shifts later ones up
     and one is never read. The search total is taken BEFORE the listing so
-    that fetched < counted catches it; a PR opened meanwhile lands last
-    (direction=asc) and only enlarges the listing, and index lag on a new PR
-    only lowers the count, so neither false-alarms.
+    fetched < counted catches a single such close. It can be defeated when
+    index lag lowers the count while a close skips a PR; an identity check
+    is tracked in #5805. A PR opened meanwhile lands last (direction=asc).
     """
     owner, name = split_repo(repo)
     counted = run_gh(
@@ -682,7 +682,7 @@ def fetch_rest(repo, limit):
     ).strip()
     by_number = {}
     for pr in gh_rest(
-        f"repos/{owner}/{name}/pulls?state=open&direction=asc&per_page=100",
+        f"repos/{owner}/{name}/pulls?state=open&sort=created&direction=asc&per_page=100",
         repo,
     ):
         if not isinstance(pr, dict) or pr.get("number") is None:

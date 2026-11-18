@@ -734,7 +734,7 @@ check(
 )
 check(
     "the control names the cap-guard failure",
-    any("cap" in line for line in guard_report),
+    any("-file cap was accepted" in line for line in guard_report),
 )
 control_banner = pr_overlap.run_negative_control()[1][0]
 check(

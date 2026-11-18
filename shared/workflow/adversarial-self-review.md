@@ -902,6 +902,16 @@ and one timestamp covering two events.
 - **Do:** dispatch the cross-model reviewer on a docs-only or prose-heavy PR before merge, exactly as for code.
 - **Don't:** skip it because a Claude review of the prose was already clean.
 
+## Run both reviewers on a hook change
+
+On [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) at `2de2419` (2026-11-18), the cross-model reviewer (kimi-k3) and the Claude review bot both passed a regression: an expansion counted as exactly one path segment, so `"repos/$R/pulls"` passed silently.
+The Claude adversarial reviewer caught it.
+In the same round kimi-k3 caught an input-controlled recursion depth that the adversarial reviewer had called acceptable.
+Each reviewer found a real defect the other missed.
+
+- **Do:** run both the cross-model reviewer and the Claude adversarial reviewer on every hook change.
+- **Don't:** treat one reviewer's pass as covering the other's class of defect, or skip the second because the first was clean.
+
 ## Require detailed and holistic review passes
 
 Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:

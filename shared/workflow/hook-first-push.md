@@ -50,6 +50,17 @@ The hook for [#5784](https://github.com/Morrison-Lab/ai-config/issues/5784) (bra
 - **Do:** derive the flag table, the placeholder forms and the endpoint forms from the tool's own `--help` or docs before the first commit, and put that requirement in the implementer brief.
 - **Don't:** write the parser from the flags the first test cases happen to use and let review rounds find the rest.
 
+`--help` and docs were not enough either.
+[#5814](https://github.com/Morrison-Lab/ai-config/pull/5814) and [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) each took 10 or more adversarial rounds (2026-11-18), and the defects that remained were visible only in the CLI's source and argument parser:
+
+- pflag short-flag clusters (`-iX POST`), attached `-R=value`, and `--` termination;
+- glab's compound placeholders (`:group/:namespace/:repo`, in `internal/commands/api/api.go`);
+- glab's `GITLAB_REPO` fallback (`internal/cmdutils/repo_override.go`);
+- glab root persistent flags placed before the subcommand (`internal/commands/root.go`).
+
+- **Do:** emulate the CLI's own argument parser, and read its source for the parser, the placeholder expansion, the environment fallbacks and the root persistent flags, before the first commit.
+- **Don't:** take `--help` or the docs as the complete flag and placeholder table.
+
 For a guard against a destructive command ([`destructive-actions-catalog`](destructive-actions-catalog.md)):
 
 - **Do:** test it by feeding the hook a payload, or inside a throwaway repository made for that test.

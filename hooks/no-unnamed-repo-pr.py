@@ -8,8 +8,7 @@
   slash-command args and queued messages kept). Override: `ALLOW_UNNAMED_REPO_PR=1` in the hook's
   own environment only. Fails open with a note: unreadable transcript, no user message, unresolved target.
 - Also denies `gh api repos/<o>/<r>/pulls` and `glab api projects/<o>%2F<r>/merge_requests` sent as POST
-  (explicit method, or implied by a body flag), and notes `gh api graphql` with `createPullRequest`, whose
-  target is a node id (ai-config#5784 part A).
+  (explicit method or a body flag), and notes `gh api graphql` `createPullRequest` (node id; ai-config#5784 part A).
 - Known limits: a repo named only as precedent passes; new-branch pushes are not guarded (a push opens
   no PR); `git push` and the MCP branch-write tools are ai-config#5784 part B.
 """
@@ -56,13 +55,11 @@ def gh_target(directory):
 
 
 def _glab_globals(prog):
-    """`prog` with glab's root persistent flags (-R/--repo, --help, --version; root.go) moved to the end."""
+    """`prog` with glab's root flags (-R/--repo; --help and --version per root.go) moved to the end of the args."""
     rest, moved = prog[1:], []
-    while prog[0] == "glab" and rest[:1] and rest[0].startswith("-"):
-        n = 2 if rest[0] in ("-R", "--repo") else 1 if re.match(r"\A(?:-R.|--repo=|--help\Z|--version\Z|-[hv]\Z)", rest[0]) else 0
+    while prog[0] == "glab" and rest[:1] and re.match(r"\A(?:-R.?|--repo(?:=.*)?|--help|--version)\Z", rest[0]):
+        n = 2 if rest[0] in ("-R", "--repo") else 1
         moved, rest = moved + rest[:n], rest[n:]
-        if not n:
-            break
     return prog[:1] + rest + moved if prog[0] == "glab" and moved else prog
 
 
@@ -80,10 +77,10 @@ def _program(argv):
 
 
 # Flag tables derived from the tools, not recalled (ai-config#5784, 2026-11-18).
-# gh 2.89.0 (2026-03-26), `gh api --help`. Value flags: --cache, -F/--field, -H/--header, --hostname, --input,
-#   -q/--jq, -X/--method, -p/--preview, -f/--raw-field, -t/--template. Boolean: -i/--include, --paginate,
-#   --silent, --slurp, --verbose, --help. gh api has NO -R/--repo (it exits "unknown shorthand flag" before
-#   any request); placeholders `{owner}`, `{repo}`, `{branch}` come from GH_REPO, else the current directory.
+# gh 2.89.0 (2026-03-26), `gh api --help`. Value flags: --cache, -F/--field, -H/--header, --hostname, --input, -q/--jq,
+#   -X/--method, -p/--preview, -f/--raw-field, -t/--template. Boolean: -i/--include, --paginate, --silent, --slurp,
+#   --verbose, --help. gh api has NO -R/--repo (it exits "unknown shorthand flag" before any request); placeholders
+#   `{owner}`, `{repo}`, `{branch}` come from GH_REPO, else the current directory.
 # glab (not installed here): gitlab-org/cli docs/source/api/_index.md (fetched 2026-11-18 through a summarising
 #   fetcher) and internal/commands/api/api.go (read by the round-5 reviewer, 2026-11-18). Value flags:
 #   -F/--field, --form, -H/--header, --hostname, --input, -X/--method, --output, --placeholder,
@@ -150,8 +147,7 @@ def api_parts(endpoint):
     for compound in COMPOUND_PLACEHOLDERS:
         path = path.replace(compound, ":fullpath")
     parts = [x for x in path.split("/") if x]
-    # A prefix counts only at the start, or anywhere in an absolute URL when a real API root follows, so a
-    # repo literally named api/v3 survives.
+    # A prefix counts at the start, or anywhere in an absolute URL if a real API root follows (repo `api/v3` survives).
     for i in range(len(parts) - 1):
         versioned = parts[i] == "api" and parts[i + 1] in ("v3", "v4") and parts[i + 2:i + 3] in (["repos"], ["projects"], ["graphql"])
         if (url or i == 0) and (versioned or parts[i:i + 2] == ["api", "graphql"]):

@@ -49,6 +49,7 @@ OPEN_PR = re.compile(
     re.I,
 )
 ROW_WINDOW = 600
+OTHER_ID = re.compile(r"\bcmsg_[A-Za-z0-9]+")
 
 DENY_UNREAD = (
     "[hook: require-pr-read-before-resolve] Do not resolve this thread yet: no list_threads "
@@ -124,7 +125,14 @@ def list_reads_this_turn(path):
 def row_shows_open_pr(texts, thread_id):
     for text in texts:
         for m in re.finditer(re.escape(thread_id), text):
-            window = text[max(0, m.start() - 100): m.start() + ROW_WINDOW]
+            # The row runs from its id to the next other message id, so a
+            # neighbouring row's PR marker cannot count against this one.
+            end = m.start() + ROW_WINDOW
+            for other in OTHER_ID.finditer(text, m.end(), end):
+                if other.group(0) != thread_id:
+                    end = other.start()
+                    break
+            window = text[m.start(): end]
             if OPEN_PR.search(window):
                 return True
     return False

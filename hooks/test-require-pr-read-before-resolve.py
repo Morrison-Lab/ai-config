@@ -32,6 +32,9 @@ OPEN_ROW = f'{{"id": "{TID}", "title": "Add psw rule", "state": "done", "pull_re
 MERGED_ROW = f'{{"id": "{TID}", "title": "Add psw rule", "state": "done", "pull_requests": [{{"number": 2623, "state": "merged"}}]}}'
 NO_PR_ROW = f'{{"id": "{TID}", "title": "Add psw rule", "state": "done", "pull_requests": []}}'
 
+OTHER_OPEN_ROW = '{"id": "cmsg_OTHER1", "title": "Other", "state": "done", "pull_requests": [{"number": 9, "state": "open"}]}'
+OTHER_MERGED_ROW = '{"id": "cmsg_OTHER2", "title": "Other", "state": "done", "pull_requests": [{"number": 8, "state": "merged"}]}'
+
 # (name, tool_input, transcript entries or None, should_deny)
 CASES = [
     ("no list_threads read", {"resolved": True, "thread_id": TID}, [USER], True),
@@ -45,6 +48,12 @@ CASES = [
      [USER, call({"include_pull_requests": True}), result(MERGED_ROW)], False),
     ("row shows no PR", {"resolved": True, "thread_id": TID},
      [USER, call({"include_pull_requests": True}), result(NO_PR_ROW)], False),
+    ("neighbour row with an open PR does not count", {"resolved": True, "thread_id": TID},
+     [USER, call({"include_pull_requests": True}),
+      result(NO_PR_ROW + "\n" + OTHER_OPEN_ROW)], False),
+    ("own open row after an unrelated merged row", {"resolved": True, "thread_id": TID},
+     [USER, call({"include_pull_requests": True}),
+      result(OTHER_MERGED_ROW + "\n" + OPEN_ROW)], True),
     ("own-thread resolve with a read", {"resolved": True},
      [USER, call({"include_pull_requests": True}), result(NO_PR_ROW)], False),
     ("resolved false is not checked", {"resolved": False, "thread_id": TID}, [USER], False),

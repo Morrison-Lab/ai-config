@@ -10,13 +10,14 @@ Write the prose if it helps a reader, and make the relationship call as well.
 | Blocked by | `gh issue edit <n> --add-blocked-by <m>` (gh 2.94.0 or later), or `POST /repos/{owner}/{repo}/issues/<n>/dependencies/blocked_by` with `{"issue_id": <id>}` |
 | Blocking | `gh issue edit <n> --add-blocking <m>`, or the same endpoint on the blocked issue |
 | PR closes issue | A closing keyword (`Closes #N`) in the PR body; REST has no other way to set the link |
-| Stacked PR | Blocked by the base PR (a PR is an issue there), and a `> [!IMPORTANT]` note in the body |
+| Stacked PR | The PR's base branch, plus a `> [!IMPORTANT]` alert leading the body ([`surface-merge-order`](surface-merge-order.md)). No blocked-by link: GitHub rejects a PR on either end of a dependency (422 "Source issue may only be an issue"), so PR-to-PR cannot be recorded |
 | PR is part of an issue that other PRs also serve | "Part of #N" in the PR body: GitHub shows the reference in the issue's sidebar. No call exists: a PR cannot be a sub-issue, and `Closes` would close the issue early. The hook leaves this phrase alone in PR bodies and still flags it in issue bodies. |
 
 `<id>` is the numeric `id` from `GET /repos/{owner}/{repo}/issues/<n>`, not the issue number.
 Use the REST API, not GraphQL, which cloud sessions block.
 
-Mechanism: `hooks/flag-prose-relationship-without-link.py` blocks the stop once per turn when the turn created or edited an issue or PR whose body states one of these relationships in prose and no relationship call followed.
+Mechanism: `hooks/flag-prose-relationship-without-link.py` blocks the stop once per turn when the turn created or edited an issue whose body states one of these relationships in prose and no relationship call followed.
+It reads only bodies written by tool calls in the current turn, and never flags a PR body, since GitHub cannot record a relationship with a PR on either end.
 It does not sweep existing issues.
 Related: [`issue-first`](issue-first.md), [`stack-prs`](../../skills/stack-prs/SKILL.md).
 

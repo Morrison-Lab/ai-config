@@ -2127,6 +2127,13 @@
             "timeout": 10,
             "script": "require-ums-before-resolve.py",
             "why": "A resolved thread loses its message box, so UMS must run first. Denies the first set_thread_resolved(true) of a thread when no UMS tool call follows the last user message; the retry is allowed (ai-config#4480)."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-pr-read-before-resolve.py\"'",
+            "timeout": 10,
+            "script": "require-pr-read-before-resolve.py",
+            "why": "A thread with an open PR must not be resolved (ai-config#5806; lds#2623 was open when its thread was resolved on 2026-11-17). Denies set_thread_resolved(true) unless list_threads with include_pull_requests ran since the last user turn, and when its result row for the thread shows an open or draft PR."
           }
         ]
       },

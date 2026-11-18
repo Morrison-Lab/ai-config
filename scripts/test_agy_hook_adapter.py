@@ -3121,7 +3121,9 @@ class TestNoPositionalSubprocessMocks(unittest.TestCase):
         # or list()/iter() Call as the value, via attribute assignment or a
         # `side_effect=` keyword. A bare Name value is flagged when the same
         # enclosing function assigns that name such a sequence; a Name bound
-        # to a def, a lambda or anything else is left alone. It does not
+        # to a def, a lambda or anything else is left alone. Direct
+        # sequences are flagged at any depth (module, class, function). It
+        # does not
         # check single-hook paths specially: a one-element sequence is
         # flagged too.
         import ast
@@ -3137,14 +3139,19 @@ class TestNoPositionalSubprocessMocks(unittest.TestCase):
             )
 
         bad = set()
-        scopes = [
-            n for n in ast.walk(tree)
+        # The module scope walks the whole tree, so the direct literal forms
+        # are caught anywhere (module level, class body, function). Names
+        # are resolved against the module-level assignments there, and per
+        # enclosing function in each function scope.
+        scopes = [(tree, tree.body)] + [
+            (n, list(ast.walk(n)))
+            for n in ast.walk(tree)
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
         ]
-        for scope in scopes:
+        for scope, binding_nodes in scopes:
             seq_names = {
                 t.id
-                for n in ast.walk(scope)
+                for n in binding_nodes
                 if isinstance(n, ast.Assign) and literal(n.value)
                 for t in n.targets
                 if isinstance(t, ast.Name)

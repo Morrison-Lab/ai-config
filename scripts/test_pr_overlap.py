@@ -886,7 +886,7 @@ check(
 )
 for label, replies in (
     ("a PR missing from the listing (search counts more)", listing(1, counted=2)),
-    ("an unreadable page", {"/pulls?": FakeProc(code=1, err="HTTP 502")}),
+    ("an unreadable page", {"/pulls?": FakeProc(code=1, err="HTTP 502"), "search/": 1}),
     ("a PR with no number", {"/pulls?": [[{"title": "x"}]], "search/": 1}),
 ):
     check(

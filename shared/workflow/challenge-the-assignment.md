@@ -369,7 +369,8 @@ written and rots nothing.
   running it.
 - **Do:** paste the source, or label the claim unverified, when a brief states a fact about a tool's source.
   A GIA wave-3 brief said "per glab's root.go, --help and --version are booleans" without root.go having been read, and the implementer built on it
-  ([#5821](https://github.com/Morrison-Lab/ai-config/pull/5821), 2026-11-18); a reviewer later confirmed it, but only because the claim happened to be true.
+  ([#5821](https://github.com/Morrison-Lab/ai-config/pull/5821), 2026-11-18).
+  A reviewer later confirmed it, but only because the claim happened to be true.
 - **Don't:** cite a source file in a brief you have not opened.
 - **Don't:** hand over the conclusion in place of the measurement --- the
   recipient cannot re-derive a number you did not supply, so the check this

@@ -28,7 +28,7 @@ Four more misses sent [#5615](https://github.com/Morrison-Lab/ai-config/pull/561
 - **Do:** give every algorithmic check both a writer rule and a reviewer instruction, then commit and run `python3 scripts/check-check-has-instructions.py`.
   It diffs `origin/main...HEAD`, so before the commit it reports "no check added" and passes ([#5707](https://github.com/Morrison-Lab/ai-config/pull/5707) went red in CI that way, 2026-11-16).
 - **Don't:** ship the writer rule alone.
-- **Do:** put the writer rule in a `shared/**/*.md` fragment and the reviewer rule in `.claude/agents/adversarial-reviewer.md`, since the checker accepts no other files.
+- **Do:** change a `shared/**/*.md` fragment, `AGENTS.md`, `CLAUDE.md` or `skills/*/SKILL.md` as the writer rule, and a `.claude/agents/*.md` file as the reviewer rule, since `check-check-has-instructions.py` counts only those paths.
   [#5807](https://github.com/Morrison-Lab/ai-config/pull/5807) failed `new-line-breaks` once for lacking both (2026-11-18).
 - **Do:** after adding any file under `shared/`, run `python3 scripts/gen-topic-map.py` and commit `docs/topic-map.md`, which `validate` checks with `--check`.
 - **Don't:** leave the regenerated topic map for CI to demand (#5807 failed `validate` on it).

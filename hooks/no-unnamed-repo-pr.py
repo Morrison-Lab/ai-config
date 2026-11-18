@@ -8,11 +8,11 @@
   slash-command args and queued messages kept). Override: `ALLOW_UNNAMED_REPO_PR=1` in the hook's
   own environment only. Fails open with a note: unreadable transcript, no user message, unresolved target.
 - Also denies `gh api repos/<o>/<r>/pulls` and `glab api projects/<o>%2F<r>/merge_requests` sent as POST
-  (explicit method, or implied by a body flag), and notes `gh api graphql` with `createPullRequest`, whose
-  target is a node id (ai-config#5784 part A).
+  (explicit method or a body flag), and notes `gh api graphql` `createPullRequest` (node id; ai-config#5784 part A).
 - Known limits: a repo named only as precedent passes; new-branch pushes are not guarded (a push opens
   no PR); `git push` and the MCP branch-write tools are ai-config#5784 part B.
 """
+import functools
 import json
 import os
 import re
@@ -55,6 +55,21 @@ def gh_target(directory):
     return _key(remotes[order[0]].get("url")) if order else None
 
 
+def _glab_globals(prog):
+    """`prog` with glab's root flags (root.go) handled: -R/--repo move to just after the subcommand words,
+    --help/-h and --version/-v are dropped. A moved -R stays before any later flag or `--`, so pflag's
+    last-value-wins still holds.
+    """
+    rest, moved = prog[1:], []
+    while prog[0] == "glab" and rest[:1] and re.match(r"\A(?:-R.*|--repo(?:=.*)?|--help|--version|-h|-v)\Z", rest[0]):
+        flag, n = rest[0], 2 if rest[0] in ("-R", "--repo") else 1
+        moved += rest[:2] if n == 2 else ["-R", flag[2:].removeprefix("=")] if flag.startswith("-R") else (
+            [flag] if flag.startswith("--repo=") else [])
+        rest = rest[n:]
+    k = 2 if rest[:1] == ["mr"] else 1
+    return prog[:1] + rest[:k] + moved + rest[k:] if prog[0] == "glab" and rest != prog[1:] else prog
+
+
 def _program(argv):
     """(argv from its gh or glab word on, the assignments before it), or (None, [])."""
     while argv and argv[0] in SHELL_KEYWORDS:
@@ -63,16 +78,16 @@ def _program(argv):
         if os.path.basename(tok) in REPO_ENV:
             lead = argv[:i]
             if all(ENV_ASSIGNMENT.match(t) for t in lead) or any(t in COMMAND_WRAPPERS for t in lead):
-                return [os.path.basename(tok)] + argv[i + 1:], [t for t in lead if ENV_ASSIGNMENT.match(t)]
+                return _glab_globals([os.path.basename(tok)] + argv[i + 1:]), [t for t in lead if ENV_ASSIGNMENT.match(t)]
             break
     return None, []
 
 
 # Flag tables derived from the tools, not recalled (ai-config#5784, 2026-11-18).
-# gh 2.89.0 (2026-03-26), `gh api --help`. Value flags: --cache, -F/--field, -H/--header, --hostname, --input,
-#   -q/--jq, -X/--method, -p/--preview, -f/--raw-field, -t/--template. Boolean: -i/--include, --paginate,
-#   --silent, --slurp, --verbose, --help. gh api has NO -R/--repo (it exits "unknown shorthand flag" before
-#   any request); placeholders `{owner}`, `{repo}`, `{branch}` come from GH_REPO, else the current directory.
+# gh 2.89.0 (2026-03-26), `gh api --help`. Value flags: --cache, -F/--field, -H/--header, --hostname, --input, -q/--jq,
+#   -X/--method, -p/--preview, -f/--raw-field, -t/--template. Boolean: -i/--include, --paginate, --silent, --slurp,
+#   --verbose, --help. gh api has NO -R/--repo (it exits "unknown shorthand flag" before any request); placeholders
+#   `{owner}`, `{repo}`, `{branch}` come from GH_REPO, else the current directory.
 # glab (not installed here): gitlab-org/cli docs/source/api/_index.md (fetched 2026-11-18 through a summarising
 #   fetcher) and internal/commands/api/api.go (read by the round-5 reviewer, 2026-11-18). Value flags:
 #   -F/--field, --form, -H/--header, --hostname, --input, -X/--method, --output, --placeholder,
@@ -129,7 +144,8 @@ def api_request(args):
     methods = [v.upper() for k, _, v in kinds if k == "method"]
     bodies = [(f, v) for k, f, v in kinds if k == "body"]
     repos = [v for k, _, v in kinds if k == "repo"]
-    return positionals, (methods[-1] == "POST" if methods else bool(bodies)), bodies, (repos or [None])[-1], unknown
+    post = bool(bodies) if not methods else None if re.search(r"[$`]", methods[-1]) else methods[-1] == "POST"  # None: unreadable
+    return positionals, post, bodies, (repos or [None])[-1], unknown
 
 
 def api_parts(endpoint):
@@ -139,8 +155,7 @@ def api_parts(endpoint):
     for compound in COMPOUND_PLACEHOLDERS:
         path = path.replace(compound, ":fullpath")
     parts = [x for x in path.split("/") if x]
-    # A prefix counts only at the start, or anywhere in an absolute URL when a real API root follows, so a
-    # repo literally named api/v3 survives.
+    # A prefix counts at the start, or anywhere in an absolute URL if a real API root follows (repo `api/v3` survives).
     for i in range(len(parts) - 1):
         versioned = parts[i] == "api" and parts[i + 1] in ("v3", "v4") and parts[i + 2:i + 3] in (["repos"], ["projects"], ["graphql"])
         if (url or i == 0) and (versioned or parts[i:i + 2] == ["api", "graphql"]):
@@ -162,6 +177,33 @@ def api_kind(prog, endpoint):
     return ("graphql" if parts == ["graphql"] else "rest" if rest else None), parts
 
 
+CREATION_SHAPES = (("repos", None, None, "pulls"), ("projects", None, "merge_requests"), ("graphql",))  # None: any segment
+
+
+MAX_EXPANSION_PARTS = 64  # far above any real API path; bounds fits()'s recursion, which grows with the input
+
+
+def expands(parts):
+    """True when a shell expansion in `parts` could stand for any number of segments (`R=owner/name`, or none)
+    so that the path becomes a creation endpoint; a literal segment no shape allows (`issues`) rules it out."""
+    hole = [bool(re.search(r"[$`]", x)) for x in parts]
+    if hole.count(False) > max(map(len, CREATION_SHAPES)):  # each literal segment needs its own shape segment
+        return False
+    if len(parts) > MAX_EXPANSION_PARTS:
+        return any(hole)  # too long to match exactly: note, the fail-open direction
+
+    @functools.lru_cache(maxsize=None)
+    def fits(shape, i, j):
+        if i == len(shape):
+            return all(hole[j:])
+        if j == len(parts):
+            return False
+        if hole[j]:
+            return fits(shape, i, j + 1) or fits(shape, i + 1, j)
+        return shape[i] in (None, parts[j]) and fits(shape, i + 1, j + 1)
+    return any(hole) and any(fits(shape, 0, 0) for shape in CREATION_SHAPES)
+
+
 def api_creation(prog, cur, lead, elsewhere):
     """[(target key or None, label)] when `gh api`/`glab api` args in `prog` create a PR or MR.
 
@@ -175,6 +217,10 @@ def api_creation(prog, cur, lead, elsewhere):
     endpoint = (positionals or [None])[0]
     kind, parts = api_kind(prog[0], endpoint)
     label = f"`{prog[0]} api {endpoint}`"
+    if post is None and kind == "rest":
+        return [(None, f"{label} (could not read the method)")]
+    if post is not False and expands(parts):
+        return [(None, f"{label} (could not read the endpoint)")]
     odd = [(None, f"{label} (unrecognised flag `{f}`)") for f in unknown[:1]]
     hidden = [(None, f"`{prog[0]} api {p}` (an unrecognised flag may hide the method or endpoint)")
               for p in positionals[1:] if unknown and api_kind(prog[0], p)[0]][:1]

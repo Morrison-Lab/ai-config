@@ -17,7 +17,7 @@ Write the prose if it helps a reader, and for issues make the relationship call 
 Use the REST API, not GraphQL, which cloud sessions block.
 
 Mechanism: `hooks/flag-prose-relationship-without-link.py` blocks the stop once per turn when the turn created or edited an issue whose body states one of these relationships in prose and no relationship call followed.
-It reads only bodies written by tool calls in the current turn, and never flags a PR body (`create_pull_request`, `update_pull_request`, `gh pr create|edit`), since GitHub rejects a PR on either end of a dependency link.
+It reads only bodies written by tool calls in the current turn, and never flags a PR body (`create_pull_request`, `update_pull_request`, `gh pr create|edit`), since GitHub rejects a PR on either end of a dependency link, except when the same Bash command also runs, or literally names, `gh issue create|edit` (at most one block per turn).
 An `issue_write` update is treated as an issue body even when its number is a PR's, which cannot be told apart offline.
 The hook makes no network call, so an issue body naming a PR as its blocker is still flagged.
 The notice says to reword the cue.

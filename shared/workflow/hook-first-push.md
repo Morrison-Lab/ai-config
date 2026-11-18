@@ -51,7 +51,7 @@ The hook for [#5784](https://github.com/Morrison-Lab/ai-config/issues/5784) (bra
 - **Don't:** write the parser from the flags the first test cases happen to use and let review rounds find the rest.
 
 After its PR opened, [#5814](https://github.com/Morrison-Lab/ai-config/pull/5814) took three more adversarial rounds and five kimi-k3 rounds.
-Its stacked follow-up [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) took four of each (session record, 2026-11-18).
+Its stacked follow-up [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) took four of each, the first of each on the branch before its PR opened, so only three kimi-k3 rounds are posted there (session record, 2026-11-18).
 The defects found in those rounds were visible only in the CLI's source and argument parser:
 
 - pflag short-flag clusters (`-iX POST`), attached `-R=value`, and `--` termination;

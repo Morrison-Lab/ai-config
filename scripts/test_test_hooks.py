@@ -199,6 +199,24 @@ except SystemExit as exc:
     check("a value that would overflow the subprocess wait is fatal",
           "exceeds the" in str(exc), str(exc))
 
+def _suite_env(preset):
+    """The env run_one_suite hands a suite, given os.environ pairs already set."""
+    seen = {}
+    with patch.dict(os.environ, preset), \
+            patch.object(th, "_run_in_env", lambda *a: seen.update(a[4]) or 0):
+        th.run_one_suite("t.py", "s", 5)
+    return seen
+
+
+# ai-config#5789: fixture repos must not inherit a global commit.gpgsign=true.
+_env = _suite_env({"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.pager",
+                   "GIT_CONFIG_VALUE_0": "cat"})
+_pairs = {_env[f"GIT_CONFIG_KEY_{i}"]: _env[f"GIT_CONFIG_VALUE_{i}"]
+          for i in range(int(_env["GIT_CONFIG_COUNT"]))}
+check("suite env pins commit.gpgsign and tag.gpgsign to false",
+      _pairs.get("commit.gpgsign") == "false" and _pairs.get("tag.gpgsign") == "false", repr(_pairs))
+check("suite env keeps a GIT_CONFIG pair the caller already set",
+      _pairs.get("core.pager") == "cat", repr(_pairs))
 check("timeout label drops trailing .0", th._timeout_label(600) == "600")
 check("timeout label keeps a fraction", th._timeout_label(0.5) == "0.5")
 check("captured None decodes to empty", th._decode_captured(None) == "")

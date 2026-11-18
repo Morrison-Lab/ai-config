@@ -886,14 +886,14 @@ and that the pre-push guard accepts two verdict phrasings, when it accepts three
 ## Run the cross-model review on a prose PR too
 
 A cross-model review is evidence-backed for prose PRs, not only code.
-On 2026-11-18 (Morrison-Lab/ai-config, a GIA session) one found four prose defects that the Claude review bot and a Claude adversarial reviewer both missed:
+On 2026-11-18 ([ai-config#5801](https://github.com/Morrison-Lab/ai-config/pull/5801)) cross-model reviews found four prose defects across two rounds ([round 1](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972000136), three defects; [round 3](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972147426)) after the Claude review bot had already returned [a CLEAN verdict at `850bc12`](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6971793033):
 an unscoped "every attempt";
 the same PR cited as both success evidence and a waiver case;
 an ambiguous "that day";
 and one timestamp covering two events.
 
 - **Do:** dispatch the cross-model reviewer on a docs-only or prose-heavy PR before merge, exactly as for code.
-- **Don't:** skip it because two Claude reviews of the prose were already clean.
+- **Don't:** skip it because a Claude review of the prose was already clean.
 
 ## Require detailed and holistic review passes
 
@@ -1578,15 +1578,17 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 
 (Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)
 
-A cross-model relay (for example OpenCode kimi-k3) owes the same close, and it owes it from the first post.
-Use [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)'s full envelope, with the closing `### Verdict` heading and `Verdict: Clean` or `Verdict: Needs more work` line.
-A relay without it, one that also quotes a `### Findings` heading, made `check-pr-fully-clean.py` read the PR as not clean (Morrison-Lab/ai-config, 2026-11-18, a GIA session).
-The skill's claim that the envelope "admits by construction" is misleading and is tracked in [ai-config#5802](https://github.com/Morrison-Lab/ai-config/issues/5802).
-The remedy is to re-request the same model with your dispositions and post its new verdict.
+A cross-model relay (for example OpenCode kimi-k3) owes the same close.
+[ai-config#5802](https://github.com/Morrison-Lab/ai-config/issues/5802) records two independent causes of a relay reading not clean to `check-pr-fully-clean.py` (2026-11-18, a GIA session):
+(a) the model's verbatim output carried its own `### Findings (all non-blocking)` heading inside the envelope;
+(b) the closing `### Verdict` block was dropped.
+The full [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) envelope cures (b) only.
+Any findings section in the verbatim review, non-blocking included, leaves the gate not clean until the same model re-reviews after your dispositions and returns a clean verdict.
+That re-review is what cleared [#5800](https://github.com/Morrison-Lab/ai-config/pull/5800): [its re-review comment](https://github.com/Morrison-Lab/ai-config/pull/5800#issuecomment-6972138604) made `check-pr-fully-clean.py` exit 0.
 Editing the posted review to clear the gate is not a remedy: the auto-mode classifier denied that edit as undermining oversight, and it was right.
 
-- **Do:** post the full envelope, closing verdict block included, in the first relay of a cross-model review.
-- **Do:** re-request the same model with your dispositions when a posted relay reads not clean, and post its new verdict.
+- **Do:** post the full envelope, closing verdict block included, in the first relay of a cross-model review (cause b).
+- **Do:** re-request the same model with your dispositions when the verbatim review carried a findings section, and post its new verdict (cause a).
 - **Don't:** edit a posted review to make the gate pass.
 
 ## Post every independent review on the PR or MR it reviewed

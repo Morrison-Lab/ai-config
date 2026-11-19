@@ -1007,3 +1007,13 @@ So a recipe cannot tell "nothing found" from "looked nowhere" by its exit status
 
 - **Do:** check each pathspec exists (`git ls-files -- <dir> | head -1`) before trusting a zero from a fixed list.
 - **Don't:** expect `git grep` to fail on a directory that no longer exists.
+
+## A `--depth=1` fetch of your own pushed branch grafts its tip, and the next merge of `main` fails as "unrelated histories"
+
+In a shallow clone, `git fetch --depth=1 origin <branch>` marks the branch tip itself as a shallow boundary, even when you made that commit locally on top of a deeper history.
+The tip then has no parent, so a later `git merge origin/main` fails with `fatal: refusing to merge unrelated histories`, and `git rev-parse HEAD^1` reports an unknown revision.
+Measured 2026-11-19 on [ai-config#5954](https://github.com/Morrison-Lab/ai-config/pull/5954): a `--depth=1` fetch, used only to set up tracking for a branch already pushed, broke the next merge of `main`.
+
+- **Do:** set tracking with `git config branch.<b>.remote origin`, `branch.<b>.merge refs/heads/<b>` and a fetch refspec for `<b>`, with no depth-1 fetch;
+  to merge `main`, fetch both `main` and the branch at a depth that reaches their merge base (`git fetch --depth=300 origin <b> main`).
+- **Don't:** run `git fetch --depth=1 origin <b>` on a branch you will later merge `main` into.

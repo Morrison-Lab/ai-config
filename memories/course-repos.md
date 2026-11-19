@@ -59,6 +59,10 @@ Move every other version to the evaluation repo's exercise bank (`exercises/` in
 
 - The move is intentional in the sense of the section above: the PR says so, the item and its solution leave the notes, and the item joins the question bank.
 - Never bank the version that stays in the notes, and never leave a banked item's solution in the notes.
+- Removing a solution from the notes does not withdraw it from the published site or git history.
+  A banked version whose solution the notes already showed needs new numbers or data before any assessment grades it.
+  Only a version that never had a solution in the notes may be graded as it stands
+  (Claude review of Morrison-Lab/lds#2878, 2026-11-19).
 - Apply it to a passage you are editing anyway, not as a sweep ([`no-sweeps-by-default`](../shared/workflow/no-sweeps-by-default.md)).
   List other candidates in one issue for Ezra to release.
 - A parallel pair that teaches two different things (LDA and QDA discriminant functions) is not redundant.

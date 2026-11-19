@@ -257,6 +257,12 @@ Read the transcript and the claim;
 do not report a hook's refusal or silence as your finding.
 See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-reads-in-shallow-clones.md).
 
+## Stash entries taken without a ref
+
+On a transcript, script, skill or rule that runs `git stash pop` or `git stash apply`, check that it names the entry (`stash@{N}` or a SHA recorded when it pushed) and that it checked the push saved something.
+Flag a bare pop or apply, and a stash-then-pop pair that assumes the top entry is its own: the stack is shared by every worktree.
+See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
+
 ## Announcements need approval
 
 On a transcript, brief or script that posts or edits a class announcement, check that the user's own message approved that exact text before the post.

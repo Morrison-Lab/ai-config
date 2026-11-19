@@ -666,13 +666,14 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
      [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030).
      In a cloud session, merge with the MCP `merge_pull_request` tool, passing `owner`, `repo`, `pullNumber`, `merge_method: squash` and `expectedHeadSha: <pinned-sha>` ([`AGENTS.md`](../../AGENTS.md)'s "Cloud sessions use MCP tools").
      `gh pr merge` goes through GraphQL, which the cloud proxy refuses with HTTP 403 before anything merges (measured on Morrison-Lab/lbt#18, 2026-10-05, [#4304](https://github.com/Morrison-Lab/ai-config/issues/4304)).
-     Where no MCP tool is loaded, use the REST endpoint pinned to the same head, which does not go through GraphQL: `gh api -X PUT repos/<owner>/<repo>/pulls/<number>/merge -f merge_method=squash -f sha=<pinned-sha>`.
-     A cloud session cannot delete the merged head branch at all: the REST ref delete and `git push --delete` both return 403 there.
+     If the tool is deferred, load it with `ToolSearch` (`select:mcp__github__merge_pull_request`).
+     If no MCP merge tool is available at all, stop and report rather than fall back to `gh api`: the REST merge endpoint worked on lbt#18, but `hooks/prefer-mcp-over-bash-in-cloud.py` now denies `gh api` in a cloud session on every path but `search/` and `graphql`.
+     A cloud session cannot delete the merged head branch at all: on lbt#18 the REST ref delete returned HTTP 403 ("Write access to this GitHub API path is not permitted through this proxy"), and `git push origin --delete` failed with an HTTP 403 RPC error ([#4304](https://github.com/Morrison-Lab/ai-config/issues/4304)).
      Leave the branch, say so in the wrap-up, and do not retry;
      repository auto-delete of head branches, where it is on, removes it.
 
      - **Do:** in a cloud session, merge through `merge_pull_request` with `expectedHeadSha`, and report the leftover branch.
-     - **Don't:** run `gh pr merge` or retry a branch delete in a cloud session.
+     - **Don't:** run `gh pr merge` or `gh api .../merge`, or retry a branch delete, in a cloud session.
    - **Wrap up**:
      Verify the merge landed on GitHub/GitLab,
      verify CI passed on the merge commit itself (`scripts/check-merge-commit-ci.py`),

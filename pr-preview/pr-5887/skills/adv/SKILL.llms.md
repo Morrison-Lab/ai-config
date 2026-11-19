@@ -5,7 +5,9 @@ Runs a detailed and holistic local adversarial AI code review on outgoing branch
 ## When this fires
 
 - “adv”, “run adv”, “get an adversarial review from another model”
-- When the user wants a quick adversarial review using a different desktop subscription model (e.g., Codex, Claude, Cursor, OpenCode, Antigravity) without using their primary model’s context or quota.
+- When the user wants a quick adversarial review using a different desktop subscription model (e.g., Claude, Cursor, OpenCode, Antigravity) without using their primary model’s context or quota.
+
+Codex is not an engine here outside a UCDH project (the `bcs` and `hac` groups): the UCDH Codex plan is scoped to those projects ([`memories/delegation.md`](../../memories/delegation.md)). `pre-push-review.py` drops Codex from `auto` and `alternate`, and refuses `--engine codex`, unless the checkout’s origin is a UCDH remote or `AI_CONFIG_ALLOW_CODEX=1` is set (ai-config#5084).
 
 ## Usage
 
@@ -35,10 +37,10 @@ else
 fi
 ```
 
-Or explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use Codex or OpenCode):
+Or explicitly choose an alternate engine (e.g., if you are currently using Claude, you might use OpenCode or Antigravity):
 
 ``` bash
-python3 "$REVIEW_SCRIPT" --engine codex
+python3 "$REVIEW_SCRIPT" --engine opencode
 ```
 
 ## How it works

@@ -157,6 +157,18 @@ exception a function RAISES is a signature change that fails silently":
 swapping the type can route an error into a handler written for something else,
 making it quieter rather than louder, with nothing red to show for it.
 
+A named class has to cover every way the input can be unreadable, not only the usual one.
+`json.loads` reports malformed text as `ValueError`,
+but a record nested too deeply for it raises `RecursionError`, which is a `RuntimeError`.
+A transcript reader that caught only `ValueError` crashed every Stop hook that called it,
+and only the hook suite's per-record fail-open fixture showed it (ai-config#5900).
+
+- **Do:** list the classes a decoder raises on hostile input
+  (for `json.loads`, `ValueError` and `RecursionError`),
+  catch each by name, and add a fixture for each.
+- **Don't:** treat `except ValueError` as "any unreadable JSON",
+  or widen it to `except Exception`, which also hides the reader's own bugs.
+
 ## When exit codes carry meaning, an error path must set its own
 
 The "In code" bullets say to stop with a clear error rather than proceed on bad

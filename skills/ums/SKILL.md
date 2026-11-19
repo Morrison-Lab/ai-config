@@ -171,7 +171,7 @@ committed pass.
      add the new case to that rule rather than writing a new one,
      or change nothing when the rule already holds the case.
      When no rule states it, write the principle into the entry this pass writes or extends for the learning.
-     In either case, when the principle needs more than a rule's text (for example, a new hook, a sweep or a new fragment),
+     Whether or not a rule already states it, when the principle needs more than a rule's text (for example, a new hook, a sweep or a new fragment),
      file that work with [`defer-issue`](../defer-issue/SKILL.md) in the same pass.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the
      append, and read its warning band, not only its pass/fail line.**

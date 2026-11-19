@@ -63,12 +63,14 @@ def read_sources(path: Path) -> list[dict]:
 
 
 MAX_SUBJECT = 200
+MAX_BODY = 60000  # GitHub refuses an issue body over 65536 characters.
 
 
 def inert(subject: str) -> str:
     """Render an outside commit subject for a code span, where GitHub links no @mention: a
     backtick, which could end the span, becomes a quote, and "<!--" cannot start a marker.
-    A long subject is cut to MAX_SUBJECT characters plus "..."."""
+    A long subject is cut to MAX_SUBJECT characters plus "..." (main checks the body against
+    MAX_BODY)."""
     if len(subject) > MAX_SUBJECT:
         subject = subject[:MAX_SUBJECT] + "..."
     return subject.replace("`", "'").replace("<!--", "< !--")
@@ -121,12 +123,18 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
     ap.add_argument("--api", default="https://api.github.com")
     ap.add_argument("--token-env", default="GH_TOKEN", help="variable holding the API token")
     ap.add_argument("--max-subjects", type=int, default=20)
+    ap.add_argument("--footer", type=Path,
+                    help="print the footer state of this digest body as sorted JSON (empty if none) and exit")
     ap.add_argument("--github-output", type=Path,
                     help="append new_commits=<n> and moved=<number of repositories> to this file")
     args = ap.parse_args(argv)
     if args.max_subjects < 0:
         ap.error("--max-subjects must be 0 or more")
     try:
+        if args.footer:
+            found = footer_state(args.footer.read_text(encoding="utf-8"))
+            print("" if found is None else json.dumps(found, sort_keys=True))
+            return 0
         rows = read_sources(args.sources)
         state = footer_state(args.previous.read_text(encoding="utf-8")) if args.previous else {}
         if state is None:
@@ -136,6 +144,9 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
             raise DigestError(f"the previous digest's state has a non-sha head for {bad}")
         fetch = fetch or http_fetch(args.api, os.environ.get(args.token_env, ""))
         text, total, moved = digest(rows, state, fetch, args.max_subjects)
+        if len(text) > MAX_BODY:
+            raise DigestError(f"the digest is {len(text)} characters, over {MAX_BODY}; "
+                              "lower --max-subjects")
         if args.github_output:
             with args.github_output.open("a", encoding="utf-8") as fh:
                 fh.write(f"new_commits={total}\nmoved={moved}\n")

@@ -10806,6 +10806,58 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("repeated --annotations-read keeps every value (ai-config#4980)",
           parsed.annotations_read == ["5", "6,7"])
 
+    # --mwr (ai-config#3946): review verdicts and quorum stop blocking, a
+    # formal objection and every other axis still block, and the pass line
+    # is never the FULLY CLEAN line an mwc gate keys on.
+    check("--mwr parses, and is off by default",
+          checker.parse_args(["1", "--mwr"]).mwr is True
+          and checker.parse_args(["1"]).mwr is False)
+
+    def run_mwr(review_issues, mwr=True, ci=(True, [])):
+        from types import SimpleNamespace
+        pr = PullRequest.__new__(PullRequest)
+        pr.pr_num, pr.repo = "7", TEST_REPO
+        pr._data = {"headRefOid": "abcdef1234567890", "headRefName": "b",
+                    "state": "OPEN", "reviewDecision": ""}
+        args = SimpleNamespace(from_json="", pr_number="7", repo=TEST_REPO,
+                               quorum=1, mwr=mwr)
+        out = io.StringIO()
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CODE_REMOTE"}
+        with patch.dict(os.environ, env, clear=True), \
+                patch.object(checker, "parse_args", return_value=args), \
+                patch.object(checker, "resolve_repo", return_value=TEST_REPO), \
+                patch.object(checker, "get_pr_info", return_value=pr), \
+                patch.object(checker, "check_ci_runs", return_value=ci), \
+                patch.object(checker, "check_review_threads", return_value=(True, [])), \
+                patch.object(checker, "check_maintainer_feedback", return_value=(True, [])), \
+                patch.object(checker, "check_review_comments",
+                             return_value=(not review_issues, list(review_issues))), \
+                patch.object(checker, "check_base_drift", return_value=(True, [])), \
+                patch.object(checker, "check_required_checks", return_value=(True, [])), \
+                contextlib.redirect_stdout(out):
+            try:
+                checker.main()
+                code = 0
+            except SystemExit as exc:
+                code = exc.code
+        return code, out.getvalue()
+
+    no_review = "No clean automated review found evaluating HEAD SHA abcdef12"
+    code, text = run_mwr([no_review])
+    check("--mwr passes a PR with no clean review, on a MERGE-READY line",
+          code == 0 and "is MERGE-READY under mwr" in text
+          and "FULLY CLEAN" not in text and "review verdicts and quorum were not evaluated" in text)
+    code, text = run_mwr([no_review], mwr=False)
+    check("without --mwr the same PR is not clean",
+          code == 1 and "MERGE-READY" not in text)
+    objection = "PR has active formal review state 'CHANGES_REQUESTED' from alice"
+    code, text = run_mwr([no_review, objection])
+    check("--mwr still blocks on a formal CHANGES_REQUESTED",
+          code == 1 and objection in text and no_review not in text)
+    code, text = run_mwr([], ci=(False, ["Check run 'validate' failed"]))
+    check("--mwr still blocks on failing CI",
+          code == 1 and "MERGE-READY" not in text)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

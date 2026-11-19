@@ -276,7 +276,8 @@ def gha_checkout_ref(text: str) -> str | None:
                         break
                     kv = KEY_VALUE.match(cur)
                     if kv:
-                        siblings[kv.group("key")] = kv.group("value").strip("'\"")
+                        value = re.sub(r"(?:^|\s+)#.*$", "", kv.group("value")).strip()
+                        siblings[kv.group("key")] = value.strip("'\"")
                 j += step
         if siblings.get("path", "").rstrip("/") in (".gha", "./.gha") and siblings.get("ref"):
             return siblings["ref"]

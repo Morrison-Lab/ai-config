@@ -355,6 +355,8 @@ expect("T63 a gha checkout at another path is not read as .gha",
        hook.parse_run_check_lines(BUNDLED.replace("path: .gha", "path: tools/gha")), [])
 expect("T64 checkout keys in another order still give the ref",
        hook.gha_checkout_ref("      with:\n        path: .gha\n        ref: v3\n        repository: Morrison-Lab/gha\n"), "v3")
+expect("T66 a trailing comment on a checkout key is ignored",
+       hook.gha_checkout_ref("      with:\n        repository: Morrison-Lab/gha\n        ref: v3 # floating\n        path: .gha # here\n"), "v3")
 no_fail = make_repo({"cluster-checks.yml": BUNDLED.replace(" CAW_FAIL=false", ""), "annotation-gate.yml": GATE})
 run("git push origin feat", no_fail, 0)
 env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))

@@ -7,12 +7,16 @@
   message the user wrote (`no-unrequested-sweep-pr.py`'s helpers; reminders and pastes dropped,
   slash-command args and queued messages kept). Override: `ALLOW_UNNAMED_REPO_PR=1` in the hook's
   own environment only. Fails open with a note: unreadable transcript, no user message, unresolved target.
+- Allowed with no user message naming it: a repo the project configures ("Repositories configured for this
+  project:" in the first prompt) or one the coordinator's relay `<note>` in the first prompt names (Ezra,
+  2026-11-18, decision card "Allow project and named repos"). Only the first prompt counts.
 - Also denies `gh api repos/<o>/<r>/pulls` and `glab api projects/<o>%2F<r>/merge_requests` sent as POST
   (explicit method or a body flag), and notes `gh api graphql` `createPullRequest` (node id; ai-config#5784 part A).
 - Known limits: a repo named only as precedent passes; new-branch pushes are not guarded (a push opens
   no PR); `git push` and the MCP branch-write tools are ai-config#5784 part B.
 """
 import functools
+import html
 import json
 import os
 import re
@@ -280,7 +284,7 @@ def creations(command, start):
 
 
 def read_session(path, prompt_text, user_bodies):
-    """(texts the user wrote, first record's cwd) from the transcript at `path`."""
+    """(texts the user wrote, first record's cwd, first prompt) from the transcript at `path`."""
     texts, prompts, first_cwd = [], [], None
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -301,7 +305,25 @@ def read_session(path, prompt_text, user_bodies):
     for text in (PASTED.sub(" ", p) for p in prompts):  # a typed slash command's args, else the user's bodies
         texts += (re.findall(r"<command-args>(.*?)</command-args>", text, re.S)
                   if re.match(r"\s*<command-(?:message|name)>", text) else user_bodies(text) if text.strip() else [])
-    return [t for t in texts if t.strip()], first_cwd
+    return [t for t in texts if t.strip()], first_cwd, (prompts[:1] or [""])[0]
+
+
+PROJECT_REPOS = re.compile(r"Repositories configured for this project:[ \t]*\n((?:[ \t]*-[ \t]*\S+[ \t]*(?:\n|\Z))+)", re.I)
+RELAY_NOTE = re.compile(r"<relay\b[^>]*\bfrom=\"coordinator\"[^>]*>.*?<note>(.*?)</note>", re.S)
+
+
+def brief_scope(first_prompt):
+    """(repo keys the project configures, texts of the coordinator's brief) from the session's FIRST prompt.
+
+    Ezra, 2026-11-18 (decision card, ai-config#5780 follow-up): a thread may open PRs in the project's
+    configured repos and in any repo the ask or the coordinator's brief names. Only the first prompt counts:
+    a later message carrying the same markup is not the harness's spawn message.
+    """
+    text = html.unescape(first_prompt or "")
+    listed = PROJECT_REPOS.search(text)
+    lines = listed.group(1).splitlines() if listed else []
+    keys = {k for k in (_key(line.strip().lstrip("-").strip()) for line in lines) if k}
+    return keys, [m.group(1) for m in RELAY_NOTE.finditer(text)]
 
 
 def named(key, texts):
@@ -320,14 +342,16 @@ def decide(payload):
         return None, ""
     tpath, sweep = payload.get("transcript_path"), load_sibling(__file__, "no-unrequested-sweep-pr.py")
     try:
-        texts, first_cwd, err = *read_session(tpath, sweep.prompt_text, sweep.load_user_bodies()[0]), ""
+        texts, first_cwd, first, err = *read_session(tpath, sweep.prompt_text, sweep.load_user_bodies()[0]), ""
     except Exception as exc:  # noqa: BLE001 -- reported in the note
-        texts, first_cwd, err = [], None, f" ({exc})"
+        texts, first_cwd, first, err = [], None, "", f" ({exc})"
+    project, brief = brief_scope(first)
+    texts = texts + brief
     if not texts:
         return "note", ("no-unnamed-repo-pr: this opens a PR, and no message the user wrote could be read from the "
                         f"transcript{err}; open it only in a repo the user named (ai-config#5780).")
     home = gh_target(first_cwd or payload.get("cwd"))
-    denied = [f"`{k}` ({label})" for k, label in found if k and k != home and not named(k, texts)]
+    denied = [f"`{k}` ({label})" for k, label in found if k and k != home and k not in project and not named(k, texts)]
     if denied:
         return "deny", (
             f"MECHANISTIC PROHIBITION: no PR in a repository the user never named (ai-config#5780). Target: "

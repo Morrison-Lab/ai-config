@@ -167,7 +167,10 @@ def swept_message(cwd, path, sweeps):
     rel = os.path.relpath(full, top)
     if rel.split(os.sep)[0] == ".git":  # git never stages its own directory
         return None
-    if rel in (git(cwd, "diff", "--cached", "--name-only", "-z", nul=True) or []):
+    # --name-only prints top-relative paths from any subdirectory;
+    # --no-relative keeps that true under a `diff.relative` config.
+    if rel in (git(cwd, "diff", "--cached", "--name-only", "--no-relative",
+                   "-z", nul=True) or []):
         return "is staged"
     if git(cwd, "check-ignore", "-q", "--", full) is not None:
         return None

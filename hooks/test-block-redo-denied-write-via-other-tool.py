@@ -124,8 +124,8 @@ def main():
     check("deny output carries only hookSpecificOutput",
           out and set(out) == {"hookSpecificOutput"})
     reason = out["hookSpecificOutput"]["permissionDecisionReason"] if out else ""
-    check("...naming the repo, number and the retry phrase",
-          "morrison-lab/gha#1631" in reason and "retry #1631" in reason)
+    check("...naming the repo, number and the verb release form",
+          "morrison-lab/gha#1631" in reason and '"close ... #1631"' in reason)
     check("...and the tool that was denied",
           "`Bash`" in reason and "mcp__github__issue_write" in reason)
     check("denies `gh issue close` with -R after the same denial",
@@ -204,6 +204,22 @@ def main():
                  "retry gha1631 gha1635"):
         check(f"a typed go-ahead naming the number releases: {text!r}",
               not run(*MCP_CLOSE, [d, user(text)])[0])
+    # ai-config#5852: an imperative naming the denied action and the number.
+    dc = denied("Bash", {"command": GH_COMMENT})
+    for text in ("post the agy verdict on gha 1631",
+                 "please post it on #1631", "ok, comment on 1631",
+                 "go ahead and post the verdict on gha 1631"):
+        check(f"an imperative with the action's verb releases: {text!r}",
+              not run(*MCP_COMMENT, [dc, user(text)])[0])
+    for text in ("did you post on 1631?", "why not post on 1631",
+                 "don't post on 1631", "close 1631"):
+        check(f"a question, negation or other verb does not release: {text!r}",
+              run(*MCP_COMMENT, [dc, user(text)])[0])
+    check("close 1631 releases a denied close",
+          not run(*MCP_CLOSE, [d, user("close gha 1631")])[0])
+    check("the deny text names the action's verb as a release form",
+          '"comment ... #1631"' in run(*MCP_COMMENT, [dc])[1][
+              "hookSpecificOutput"]["permissionDecisionReason"])
     check("a go-ahead typed BEFORE the denial does not release",
           run(*MCP_CLOSE, [user("retry 1631"), d])[0])
     check("a go-ahead naming a different number does not release",

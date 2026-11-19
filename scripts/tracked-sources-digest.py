@@ -97,11 +97,11 @@ def digest(rows: list[dict], state: dict, fetch, max_subjects: int) -> tuple[str
     moved = [r for r in results if r["moved"]]
     lines = ["New commits in `memories/tracked-sources.csv`. Sift them into issues for ideas worth "
              "adopting, then close this issue as completed.", "",
-             f"Examined {len(results)} repositories ({len(moved)} moved, {total} new commits); "
-             f"listed {len(manual)} manual sources.", ""]
+             f"Repositories examined: {len(results)} (moved: {len(moved)}, new commits: {total}). "
+             f"Manual sources listed: {len(manual)}.", ""]
     # A head that moved back (status "behind") has no new commits but is still listed.
     for r in moved:
-        lines.append(f"### [{r['repo']}]({r['url']}): {r['count']} new commits ({r['status']})")
+        lines.append(f"### [{r['repo']}]({r['url']}): {r['status']}, new commits: {r['count']}")
         lines += [f"- `{inert(s)}`" for s in r["subjects"]]
         if r["count"] > len(r["subjects"]):
             lines.append(f"- ... and {r['count'] - len(r['subjects'])} more; see the compare link.")
@@ -139,9 +139,9 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
         if args.github_output:
             with args.github_output.open("a", encoding="utf-8") as fh:
                 fh.write(f"new_commits={total}\nmoved={moved}\n")
-    except (DigestError, OSError, LookupError, TypeError, ValueError, AttributeError) as exc:
+    except (DigestError, OSError, LookupError, TypeError, ValueError, AttributeError, csv.Error) as exc:
         # Besides DigestError and OSError: an API response or CSV row of the wrong shape,
-        # bad JSON, or a file that is not UTF-8.
+        # bad JSON, a file that is not UTF-8, or a CSV field over the parser's limit.
         print(f"tracked-sources-digest: {exc!r}", file=sys.stderr)
         return 2
     sys.stdout.write(text)

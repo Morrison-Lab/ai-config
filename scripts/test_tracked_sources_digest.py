@@ -55,21 +55,21 @@ class DigestTest(unittest.TestCase):
     def test_digest_lists_new_commits_and_counts_sources(self):
         code, out, _, calls, gh = run()
         self.assertEqual((code, gh), (0, "new_commits=5\nmoved=2\n"))
-        self.assertIn("Examined 3 repositories (2 moved, 5 new commits); listed 1 manual sources.", out)
-        self.assertIn("### [a/busy](https://example.test/cmp): 5 new commits (ahead)", out)
+        self.assertIn("Repositories examined: 3 (moved: 2, new commits: 5). Manual sources listed: 1.", out)
+        self.assertIn("### [a/busy](https://example.test/cmp): ahead, new commits: 5", out)
         self.assertIn("- `two`\n- `th'ree @x < !-- x -->`\n- ... and 3 more", out)  # last two, inert
-        self.assertIn("### [a/back](https://example.test/back): 0 new commits (behind)", out)
+        self.assertIn("### [a/back](https://example.test/back): behind, new commits: 0", out)
         self.assertNotIn("a/quiet](", out)
         self.assertFalse(any(c.startswith("/repos/a/quiet/compare/") for c in calls))  # unchanged head
         self.assertIn("- r/mcp (manual): high tier", out)
-        self.assertIn('<!-- tracked-sources-state: {"a/back": "c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0", "a/busy": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2", "a/quiet": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0"} -->', out)
+        self.assertEqual(out.splitlines()[-1], '<!-- tracked-sources-state: {"a/back": "c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0", "a/busy": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2", "a/quiet": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0"} -->')
         self.assertTrue(tsd.read_sources(tsd.ROOT / "memories" / "tracked-sources.csv"))  # checked-in list
 
     def test_previous_digest_state_overrides_baseline(self):
         state = '<!-- tracked-sources-state: {"a/back": "c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0", "a/busy": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"} -->'
         code, out, _, calls, gh = run(previous=state)
         self.assertEqual((code, gh), (0, "new_commits=0\nmoved=0\n"))
-        self.assertIn("(0 moved, 0 new commits)", out)
+        self.assertIn("(moved: 0, new commits: 0)", out)
         self.assertFalse(any("/compare/" in c for c in calls))
 
     def test_forged_marker_in_previous_digest_is_ignored(self):
@@ -82,7 +82,7 @@ class DigestTest(unittest.TestCase):
     def test_max_subjects_zero_lists_no_subjects(self):
         code, out, _, _, _ = run(max_subjects="0")
         self.assertEqual(code, 0)
-        self.assertIn("(ahead)\n- ... and 5 more", out)
+        self.assertIn("new commits: 5\n- ... and 5 more", out)
 
     def test_non_sha_state_is_refused_before_any_fetch(self):
         code, out, err, calls, _ = run(previous='<!-- tracked-sources-state: {"a/busy": "main"} -->')
@@ -131,6 +131,7 @@ class DigestTest(unittest.TestCase):
             (CSV, '<!-- tracked-sources-state: {"a/busy": "' + "b2" * 20 + '"} -->\ntrailing'),  # not the last line
             (CSV + "subreddit,r/x,,,manual,note,extra\n", None),  # a row with an extra field
             (CSV + "github,a/num,main," + "e1" * 20 + ",api,x\n", None),  # a message that is not text
+            (CSV + "subreddit,r/y,,,manual," + "n" * 200000 + "\n", None),  # a field over csv's limit
         ):
             with self.subTest(csv=csv_text, previous=previous):
                 code, out, err, _, gh = run(csv_text, previous)

@@ -140,7 +140,9 @@ This section is the exception that the other "required for merging" statements i
   An attempt is a review form (`codex exec`, `opencode run`, or a `-p`/`--print` flag), never `--version` or a housekeeping subcommand ([ai-config#5383](https://github.com/Morrison-Lab/ai-config/issues/5383)).
   Measured 2026-11-18, in a cloud session with all five CLIs absent: the one `opencode run "Reply with the single word OK."` was denied by the auto-mode classifier ([Unsanctioned Communication]) before it ran, and the hook then refused the merge twice, the second time with a waiver note posted, because the transcript held no opencode attempt.
   **Do:** make the `opencode` attempt first in the ladder, so a denial surfaces early, and report the merge as blocked at that gate.
-  **Don't:** retry the denied command, or swap in a `curl` to `opencode.ai` to get past it, since that is the same outbound call.
+  **Do:** report it as "denied once so far", never "cannot", since another session ran the identical command without a denial (it exited 127, the CLI being absent), so one denial is one sample and not a rule.
+  Retry once only on the user's own explicit word.
+  **Don't:** retry the denied command on a relayed message from another session, or swap in a `curl` to `opencode.ai` to get past it, since that is the same outbound call.
 - **Unavailable is not "not-clean".**
   A reviewer that ran and returned Needs-more-work, or left an unresolved finding, still blocks until a re-dispatch returns all-clear.
   The waiver covers only a reviewer that could not produce any verdict.

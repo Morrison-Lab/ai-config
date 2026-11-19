@@ -52,11 +52,12 @@ def read_sources(path: Path) -> list[dict]:
 
 
 MAX_SUBJECT = 200
+MAX_BODY = 60000  # GitHub refuses an issue body over 65536 characters.
 
 
 def inert(subject: str) -> str:
     """Render an outside commit subject so it can neither mention anyone, forge the state marker,
-    nor push the issue body past GitHub's 65536-character limit."""
+    nor grow past MAX_SUBJECT characters (the whole body is checked against MAX_BODY in main)."""
     if len(subject) > MAX_SUBJECT:
         subject = subject[:MAX_SUBJECT] + "..."
     return subject.replace("`", "'").replace("<!--", "< !--")
@@ -125,6 +126,9 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
             raise DigestError(f"the previous digest's state has a non-sha head for {bad}")
         fetch = fetch or http_fetch(args.api, os.environ.get(args.token_env, ""))
         text, total, moved = digest(rows, state, fetch, args.max_subjects)
+        if len(text) > MAX_BODY:
+            raise DigestError(f"the digest is {len(text)} characters, over {MAX_BODY}; "
+                              "lower --max-subjects")
     except (DigestError, OSError, KeyError, json.JSONDecodeError) as exc:
         print(f"tracked-sources-digest: {exc!r}", file=sys.stderr)
         return 2

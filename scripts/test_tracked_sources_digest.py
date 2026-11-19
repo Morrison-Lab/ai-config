@@ -25,8 +25,11 @@ API = {"/repos/a/busy/commits/main": {"sha": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2
 
 
 def run(csv_text=CSV, previous=None, max_subjects="2"):
-    tmp_dir = tempfile.TemporaryDirectory()
-    tmp = Path(tmp_dir.name)
+    with tempfile.TemporaryDirectory() as name:
+        return run_in(Path(name), csv_text, previous, max_subjects)
+
+
+def run_in(tmp, csv_text, previous, max_subjects):
     (tmp / "s.csv").write_text(csv_text, encoding="utf-8")
     args = ["--sources", str(tmp / "s.csv"), "--max-subjects", max_subjects, "--github-output", str(tmp / "o")]
     if previous is not None:
@@ -43,7 +46,6 @@ def run(csv_text=CSV, previous=None, max_subjects="2"):
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
         code = tsd.main(args, fetch=fetch)
     gh = (tmp / "o").read_text(encoding="utf-8") if (tmp / "o").exists() else ""
-    tmp_dir.cleanup()
     return code, out.getvalue(), err.getvalue(), calls, gh
 
 
@@ -100,6 +102,16 @@ class DigestTest(unittest.TestCase):
     def test_long_subject_is_cut(self):
         self.assertEqual(tsd.inert("x" * 500), "x" * 200 + "...")
         self.assertEqual(tsd.inert("x" * 200), "x" * 200)
+
+    def test_body_over_the_limit_is_refused(self):
+        limit = tsd.MAX_BODY
+        tsd.MAX_BODY = 100
+        try:
+            code, out, err, _, gh = run()
+        finally:
+            tsd.MAX_BODY = limit
+        self.assertEqual((code, out, gh), (2, "", ""))
+        self.assertIn("over 100; lower --max-subjects", err)
 
     def test_negative_max_subjects_is_refused(self):
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):

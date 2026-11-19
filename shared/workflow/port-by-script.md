@@ -41,8 +41,6 @@ When Ezra asks to incorporate, port or adapt a source (a lab, a slide deck, a ch
 5. **Report the source-to-target map** before calling the work done, one row per source item.
    A missing row is the defect.
 
-The method has a skill, `port-source-exercises`.
-
 ### Why no hook enforces this
 
 A hook sees tool calls, PR text and diffs.

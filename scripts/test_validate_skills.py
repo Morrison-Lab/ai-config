@@ -209,17 +209,43 @@ def alias_cases(tmp: Path) -> None:
     check("an Aliases clause must end the description", len(errs) == 1
           and "does not name its alias 'drive'" in errs[0])
 
+    errs = run_aliases(tmp / "a11", {
+        "ardi": canonical, "drive": 'description: "Alias for `ardi`."\n',
+    })
+    check("an old-template alias is reported, not skipped", len(errs) == 2
+          and "reads as an alias redirect" in errs[0])
+    errs = run_aliases(tmp / "a12", {
+        "ardi": canonical,
+        "drive": alias + HIDDEN + "user-invocable: false\n",
+    })
+    check("a hidden alias that is not user-invocable errors", len(errs) == 1
+          and "user-invocable" in errs[0])
+
     errs = run_aliases(tmp / "a5", {"ardi": canonical, "drive": alias + HIDDEN})
     check("consistent alias and canonical are clean", errs == [])
+    errs = run_aliases(tmp / "a13", {
+        "ardi": canonical, "drive": 'description: "-> ardi."\n' + HIDDEN,
+    })
+    check("an ASCII-arrow alias with the flag is clean", errs == [])
+    errs = run_aliases(tmp / "a14", {
+        "ardi": canonical,
+        "drive": f'description: >\n  {ARROW} ardi.\n' + HIDDEN,
+    })
+    check("a block-scalar alias with a trailing newline still parses", errs == [])
 
-    paths = write_skills(tmp / "a6", {"ardi": canonical, "drive": alias + HIDDEN})
+    paths = write_skills(tmp / "a6", {
+        "ardi": canonical,
+        "drive": alias + HIDDEN,
+        "secret": 'description: "Not an alias."\n' + HIDDEN,
+    })
     original_root = vs.ROOT
     vs.ROOT = tmp / "a6"
     try:
         names = [name for name, _ in vs.listing_entries(paths)]
     finally:
         vs.ROOT = original_root
-    check("hidden alias is left out of the listing", names == ["ardi"])
+    check("hidden alias and hidden non-alias are left out of the listing",
+          names == ["ardi"])
 
 
 def main() -> int:

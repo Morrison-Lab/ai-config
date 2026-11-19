@@ -287,7 +287,11 @@ def check_skills() -> None:
 
 # An alias redirect's whole description; an ASCII "->" is accepted too, so a
 # hand-typed alias is still held to the rules below rather than missed.
-ALIAS_DESCRIPTION = re.compile(r"\A(?:→|->) ([a-z0-9-]+)\.\Z")
+ALIAS_DESCRIPTION = re.compile(r"\A(?:→|->) ([a-z0-9-]+)\.\s*\Z")
+# A description that reads as a redirect, whether or not it parses as one:
+# the arrow forms and the "Alias for" template skill-builder used before
+# #5882. One that does not parse is an error, not a silent skip.
+ALIAS_LIKE = re.compile(r"\A\s*(?:→|->|Alias for\b)")
 # The canonical's clause ends its description: "Aliases: a, b-c."
 ALIASES_CLAUSE = re.compile(r"\bAliases: ([a-z0-9-]+(?:, [a-z0-9-]+)*)\.\s*\Z")
 
@@ -295,13 +299,16 @@ ALIASES_CLAUSE = re.compile(r"\bAliases: ([a-z0-9-]+(?:, [a-z0-9-]+)*)\.\s*\Z")
 def check_aliases(skill_mds: list[Path]) -> None:
     """Keep alias redirects out of the listing without losing their words.
 
-    An alias is a skill whose description is exactly "-> <canonical>." (with
-    a real arrow). It must set `disable-model-invocation: true`, so it costs
-    the model's listing nothing while `/alias` still works, and its canonical
+    An alias is a skill whose description is exactly "→ <canonical>." (an
+    ASCII "->" also parses). It must set `disable-model-invocation: true`, so
+    it costs the model's listing nothing, and must not set
+    `user-invocable: false`, so `/alias` still works. Its canonical
     skill's description must name it in an "Aliases: a, b." clause, so a
     bare alias word in a prompt still routes to the canonical skill
     (#5316 step 3). The clause must name no skill that is not an alias of
-    that canonical, so a removed alias does not linger in it.
+    that canonical, so a removed alias does not linger in it. A description
+    that reads as a redirect but does not parse as one is an error, so an
+    old-template alias cannot escape these rules.
     """
     frontmatters = {}
     for skill_md in skill_mds:
@@ -312,8 +319,14 @@ def check_aliases(skill_mds: list[Path]) -> None:
             frontmatters[skill_md.parent.name] = fm
     aliases_of: dict[str, set[str]] = {}
     for name, fm in frontmatters.items():
-        m = ALIAS_DESCRIPTION.match(str(fm.get("description", "")))
+        description = str(fm.get("description", ""))
+        m = ALIAS_DESCRIPTION.match(description)
         if not m:
+            if ALIAS_LIKE.match(description):
+                errors.append(
+                    f"skills/{name}: description reads as an alias redirect "
+                    f"but is not exactly '→ <canonical>.': {description!r}"
+                )
             continue
         canonical = m.group(1)
         aliases_of.setdefault(canonical, set()).add(name)
@@ -322,6 +335,12 @@ def check_aliases(skill_mds: list[Path]) -> None:
                 f"skills/{name}: an alias redirect must set "
                 "`disable-model-invocation: true`, so it stays out of the "
                 "model's skill listing (#5316)"
+            )
+        if fm.get("user-invocable") is False:
+            errors.append(
+                f"skills/{name}: an alias redirect must not set "
+                "`user-invocable: false`; with the model listing off too, "
+                "nothing could invoke it"
             )
         if canonical not in frontmatters:
             errors.append(f"skills/{name}: alias of missing skill {canonical!r}")

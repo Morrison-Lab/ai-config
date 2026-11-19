@@ -305,6 +305,10 @@ jobs:
         # discriminates a loaded skill's body from a scheduled check-in
         # continuation, both of which carry isMeta: true.
         run: python3 scripts/test_transcript_meta.py
+      - name: Run session-pause library tests
+        # ai-config#3911: scripts/lib/session_pause.py reads a pause from the
+        # transcript, and agent_notice.stop_notice never blocks while paused.
+        run: python3 scripts/test_session_pause.py
       - name: Run transcript-meta fallback-messaging tests
         # ai-config#3860 (fail-fast.md follow-up): each of the six consuming
         # hooks must print an observable stderr message, naming itself and

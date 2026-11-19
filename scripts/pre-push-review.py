@@ -1142,7 +1142,10 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
 
     available = detect_available_engines(codex_ok)
     if not available:
-        log_error("No supported AI CLI found (`claude`, `cursor`, `codex`, `opencode`, `agy`).")
+        log_error(
+            "No supported AI CLI found (`claude`, `cursor`, `codex`, `opencode`, `agy`). "
+            f"Codex counts only in a UCDH project, or with {CODEX_OVERRIDE_ENV}=1 (ai-config#5084)."
+        )
         return None, "None"
 
     for cand in available:

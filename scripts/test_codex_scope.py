@@ -21,6 +21,7 @@ class TestCodexAllowed(unittest.TestCase):
             "https://github.com/UCDavis/hac.dashboard",
             "git@hc2-gitlab.ucdmc.ucdavis.edu:health-analytics-core/abridge.git",
             "https://hc2-gitlab.ucdmc.ucdavis.edu/bcs/pipeline",
+            "https://hc2-gitlab.ucdmc.ucdavis.edu/health-analytics-core/sub/proj",
             "ssh://git@github.com:22/ucdavis/hac.git",
             "ssh://git@hc2-gitlab.ucdmc.ucdavis.edu:2222/bcs/x.git",
         ):
@@ -42,6 +43,9 @@ class TestCodexAllowed(unittest.TestCase):
             "https://evil.com/hc2-gitlab.ucdmc.ucdavis.edu/bcs/x",
             "https://github.com/ucdavis/bcs/extra",
             "https://hc2-gitlab.ucdmc.ucdavis.edu/",
+            "https://hc2-gitlab.ucdmc.ucdavis.edu/some-other-team/proj",
+            "git@hc2-gitlab.ucdmc.ucdavis.edu:bcs.git",
+            "https://hc2-gitlab.ucdmc.ucdavis.edu/bcsx/proj",
             "/home/user/local-clone",
             "",
         ):
@@ -59,6 +63,12 @@ class TestCodexAllowed(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if k != OVERRIDE_ENV}
         with patch.dict(os.environ, env, clear=True):
             self.assertFalse(codex_allowed(repo_dir="/nonexistent-dir-for-codex-scope-test"))
+
+    def test_missing_git_refuses(self):
+        with patch.dict(os.environ, {}, clear=True), patch(
+            "scripts.lib.codex_scope.subprocess.run", side_effect=FileNotFoundError("git")
+        ):
+            self.assertFalse(codex_allowed())
 
 
 if __name__ == "__main__":

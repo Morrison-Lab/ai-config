@@ -71,25 +71,35 @@ and earlier ones can merge while later ones are still in review.
 
 1. **Order the concerns** so that each one needs only the ones before it:
    refactors and renames first, then the substantive change,
-   then tests or docs that cover it
+   then docs that cover it
    ([refactor-before-modifying-substance](../../shared/principles/refactor-before-modifying-substance.md)).
+   Keep each change's tests in the same layer as the change,
+   so every layer passes CI on its own.
 2. **Build each layer from the original branch's diff.**
-   Start the first branch from the original PR's base branch (usually `main`),
-   and each later branch from the tip of the one before it.
+   Start the first branch from the commit the original branch forked from,
+   `git merge-base <base-branch> <original-branch>`, not from the base's current tip,
+   so that step 3's comparison is not polluted by commits the base gained since.
+   Start each later branch from the tip of the one before it.
    Bring in a layer's whole files with `git checkout <original-branch> -- <paths>`,
    or with `git cherry-pick` when the original commits already follow the split.
    When two layers change the same file, take only this layer's hunks
    with `git restore -p --source=<original-branch> -- <path>`.
 3. **Prove nothing was lost or added:**
    `git diff <original-branch> <top-of-stack>` must be empty.
-4. **Open each PR against the branch below it**, following
+4. **Open a PR for each layer except the first**, against the branch below it, following
    [`stack-prs`](../stack-prs/SKILL.md),
    with a `> [!IMPORTANT]` alert naming the PR that has to merge first.
-5. **Retire the original PR.**
-   Repoint its branch to the first layer, or close it with a comment
-   that links every PR in the stack, in merge order.
-   Closing is outward-facing, so confirm it with the user
+5. **Turn the original PR into the first layer.**
+   Force-push the first layer's branch tip to the original PR's branch
+   (`git push --force-with-lease origin <layer-1>:<original-branch>`),
+   so the original PR, its review history and its number carry the first layer,
+   and no layer gets two PRs.
+   It targets the base branch, so it needs no merge-order alert.
+   Edit its description to cover only that layer and to link every later PR in merge order.
+   A force-push rewrites a shared branch, so confirm it with the user
    unless a standing grant covers it.
+   If the user would rather not rewrite it, open the first layer as a new PR against the base
+   and close the original with a comment linking every PR in the stack.
 
 ## Benefits to communicate
 

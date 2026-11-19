@@ -21,6 +21,16 @@ LIST_EVENTS = "mcp__claude-code-remote__list_events"
 CLASSIFIER = ("Permission for this action was denied by the Claude Code auto "
               "mode classifier. Stop and explain to the user.")
 
+MUTATIONS = [
+    ("carries always false", "def carries(text, parts):\n",
+     "def carries(text, parts):\n    return False\n"),
+    ("release always true",
+     "def released(at, sids, tool, inp, users, target_sid):\n",
+     "def released(at, sids, tool, inp, users, target_sid):\n    return True\n"),
+    ("release ignores order", "if i <= at or not rx_action",
+     "if not rx_action"),
+]
+
 PASSED, FAILED = [], []
 
 
@@ -169,28 +179,21 @@ def main():
 
     # mutation check: each guard, disabled, must flip a case the tests pin
     src = open(HOOK, encoding="utf-8").read()
-    sig = "def released(at, sids, tool, inp, users, target_sid):\n"
-    mutants = {
-        "carries always false": (
-            "def carries(text, parts):\n",
-            "def carries(text, parts):\n    return False\n",
-            (CREATE, handoff, d)),
-        "release always true": (
-            sig, sig + "    return True\n",
-            (CREATE, handoff, d + [user("nothing")])),
-        "release ignores order": (
-            "if i <= at or not rx_action", "if not rx_action",
-            (CREATE, handoff, [typed] + d)),
+    pinned = {
+        "carries always false": (CREATE, handoff, d),
+        "release always true": (CREATE, handoff, d + [user("nothing")]),
+        "release ignores order": (CREATE, handoff, [typed] + d),
     }
-    for name, (old, new, (tool_, inp_, steps_)) in mutants.items():
-        assert old in src, name
+    for clause, old, new in MUTATIONS:
+        assert old in src, clause
         fd, mpath = tempfile.mkstemp(suffix=".py")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(src.replace(old, new, 1))
         try:
+            tool_, inp_, steps_ = pinned[clause]
             real = run(tool_, inp_, steps_)[0]
             mutated = run(tool_, inp_, steps_, hook=mpath)[0]
-            check("mutant '%s' flips a pinned case" % name, real != mutated)
+            check("mutant '%s' flips a pinned case" % clause, real != mutated)
         finally:
             os.unlink(mpath)
 

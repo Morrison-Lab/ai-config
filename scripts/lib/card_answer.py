@@ -26,7 +26,9 @@ import html
 import json
 import re
 
-TAP_WAKE = re.compile(r'<wake\b[^>]*\breason="decision-chosen"[^>]*>(.*?)</wake>', re.S)
+# A tap wake is top-level: one quoted inside another wake (a PR comment in an external-event wake) is not
+# one. The harness may put a line before it ("A message arrived in the bound thread while you were working:").
+TAP_WAKE = re.compile(r'(?:\A|\n)\s*<wake\b[^>]*\breason="decision-chosen"[^>]*>(.*?)</wake>', re.S)
 PRINCIPAL = re.compile(
     r'<message\b(?=[^>]*\bfrom="human")(?=[^>]*\btrust="principal")'
     r'(?=[^>]*\btrigger="true")[^>]*>(.*?)</message>', re.S)
@@ -53,6 +55,9 @@ def answers_in_prompt(prompt):
     """[(option, question, decision_id or None, option_index or None)] in one prompt's text."""
     found = []
     for wake in TAP_WAKE.finditer(prompt or ""):
+        before = prompt[:wake.start()]
+        if len(re.findall(r"<wake\b", before)) != len(re.findall(r"</wake>", before)):
+            continue  # nested inside another wake
         inner = wake.group(1)
         if not VERIFIED.search(inner):
             continue
@@ -78,6 +83,15 @@ def _text(content):
     return ""
 
 
+def _prompt(content):
+    """A user record's prompt text; "" for a record holding a tool result, which the agent can fill."""
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list) or any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
+        return ""
+    return "\n".join(str(b.get("text") or "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+
+
 def card_text(option, question, consequence=""):
     """The words a tap stands for, or "" when the option declines."""
     if DECLINE.match(option):
@@ -89,7 +103,7 @@ def answers_in_record(rec, cards):
     """Card-answer texts in one transcript record; `cards` maps a card's message_id to its input."""
     msg = rec.get("message") if isinstance(rec.get("message"), dict) else {}
     out = []
-    for option, question, did, idx in answers_in_prompt(_text(msg.get("content"))):
+    for option, question, did, idx in answers_in_prompt(_prompt(msg.get("content"))):
         consequence = ""
         opts = (cards.get(did) or {}).get("options") if did else None
         if isinstance(opts, list) and idx is not None and idx < len(opts) and isinstance(opts[idx], dict):

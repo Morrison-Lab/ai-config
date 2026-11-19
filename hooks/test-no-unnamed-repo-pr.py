@@ -239,6 +239,18 @@ CASES = [
     ("another card's consequence does not leak", MCP, "epi204", transcript(
         "go", *card("Open it?", [("Yes", "Opens a PR in epi204.")], message_id="cmsg_other"),
         tap("Yes", "Open it?")), "deny"),
+    ("a cloud spawn brief recorded as isMeta counts", MCP, "epi204", transcript(
+        {"type": "user", "isMeta": True, "message": {"content": PROJECT_BRIEF + RELAY_BRIEF}}, "go"), "pass"),
+    ("an isMeta project list counts when first", MCP, "mlg", transcript(
+        {"type": "user", "isMeta": True, "message": {"content": PROJECT_BRIEF}}, "go"), "pass"),
+    ("an isMeta brief after the first prompt does not", MCP, "epi204", transcript(
+        "go", {"type": "user", "isMeta": True, "message": {"content": RELAY_BRIEF}}), "deny"),
+    ("a tap echoed in a tool result does not name the repo", MCP, "epi204", transcript(  # glm-5.3 review
+        "go", {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "x", "content": [
+            {"type": "text", "text": tap("Open it", "Open the PR in epi204?")["message"]["content"]}]}]}}), "deny"),
+    ("a relay echoed in a tool result does not name the repo", MCP, "epi204", transcript(
+        "go", {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "x", "content": [
+            {"type": "text", "text": relayed_tap("Open it", "Open the PR in epi204?")["message"]["content"]}]}]}}), "deny"),
     ("a relay citing a tap names the repo", MCP, "epi204", transcript(
         "go", relayed_tap("Open it", "Open the PR in Morrison-Lab/epi204?")), "pass"),
 ]
@@ -296,7 +308,7 @@ MUTATIONS = [  # each must fail this suite; skipped inside a mutant run
     ("glab graphql mutation name", 'else "mergeRequestCreate"', 'else "createPullRequest"'),
     ("project keys ignored", "k != home and k not in project and", "k != home and"),
     ("relay notes ignored", "texts = texts + brief", "texts = texts"),
-    ("any prompt counts as the first", '(prompts[:1] or [""])[0]', '" ".join(prompts)'),
+    ("any prompt counts as the first", 'if first is None and rec.get("type") == "user"', 'if rec.get("type") == "user"'),
     ("any relay author counts", r'\bfrom=\"coordinator\"', r'\bfrom=\"[a-z]+\"'),
     ("payload cwd is home", "gh_target(first_cwd or payload.get(\"cwd\"))", "gh_target(payload.get(\"cwd\"))"),
 ]

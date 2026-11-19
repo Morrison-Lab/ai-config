@@ -288,7 +288,7 @@ def creations(command, start):
 
 def read_session(path, prompt_text, user_bodies):
     """(texts the user wrote, first record's cwd, first prompt) from the transcript at `path`."""
-    texts, prompts, first_cwd, cards_pending, cards, card_texts = [], [], None, {}, {}, []
+    texts, prompts, first_cwd, cards_pending, cards, card_texts, first = [], [], None, {}, {}, [], None
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -296,6 +296,11 @@ def read_session(path, prompt_text, user_bodies):
             except (ValueError, TypeError):
                 continue
             first_cwd = first_cwd or (rec.get("cwd") if isinstance(rec.get("cwd"), str) else None)
+            # The cloud spawn prompt (project context + coordinator brief) is recorded with isMeta set, so the
+            # brief is read from the first user record of any kind (ai-config#5839; #5830 read only non-meta ones).
+            if first is None and rec.get("type") == "user" and not rec.get("isSidechain") \
+                    and isinstance(rec.get("message"), dict):
+                first = prompt_text(rec["message"].get("content")) or ""
             att = rec.get("attachment") if isinstance(rec.get("attachment"), dict) else {}
             if att.get("type") == "queued_command" and att.get("commandMode") != "task-notification" \
                     and (att.get("origin") or {}).get("kind") != "peer":
@@ -313,7 +318,7 @@ def read_session(path, prompt_text, user_bodies):
                   if re.match(r"\s*<command-(?:message|name)>", text) else user_bodies(text) if text.strip() else [])
     # A card answer counts through card_answer (verified, declines dropped, consequence added), not as raw text.
     texts = [t for t in texts if t.strip() and not card_answer.CHOSE.match(html.unescape(t))] + card_texts
-    return texts, first_cwd, (prompts[:1] or [""])[0]
+    return texts, first_cwd, first if first is not None else (prompts[:1] or [""])[0]
 
 
 PROJECT_REPOS = re.compile(r"Repositories configured for this project:[ \t]*\n((?:[ \t]*-[ \t]*\S+[ \t]*(?:\n|\Z))+)", re.I)

@@ -487,8 +487,9 @@ committed pass.
    - Search open and closed issues first
      ([`issue-first`](../../shared/workflow/issue-first.md)'s all-state search).
      Link an open match and add the new case to it as a comment.
-     Report a closed match to the user, as [`defer-issue`](../defer-issue/SKILL.md) step 2b says,
-     rather than commenting on it or filing fresh.
+     Link a closed match in the report and ask the user whether to reopen it, file fresh, or treat the matter as settled,
+     as [`defer-issue`](../defer-issue/SKILL.md)'s closed-issue step says,
+     rather than commenting on it or filing fresh unasked.
    - Skip a learning the step 3 grep already found in `memories/`, `shared/`, `skills/` or `hooks/`.
    - File one issue per learning with the [`defer-issue`](../defer-issue/SKILL.md) body
      (Context, What to do, Why not now),

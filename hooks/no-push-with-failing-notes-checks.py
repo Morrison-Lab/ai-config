@@ -245,11 +245,8 @@ def find_calls(git_root: str) -> list[dict]:
 
 
 def gha_checkout_ref(text: str) -> str | None:
-    """The `ref:` of the step that checks Morrison-Lab/gha out at `path: .gha`, or None.
-
-    Reads the sibling keys of each `repository: Morrison-Lab/gha` line (the `with:`
-    mapping, in any order), so a checkout to another path is not taken for `.gha`.
-    """
+    """The `ref:` of the step that checks Morrison-Lab/gha out at `path: .gha`, or None,
+    read from the sibling keys of each `repository: Morrison-Lab/gha` line, in any order."""
     lines = text.splitlines()
     for i, line in enumerate(lines):
         m = GHA_REPOSITORY.match(line)
@@ -328,10 +325,12 @@ def parse_run_check_lines(text: str) -> list[dict]:
                          or p.startswith(RESERVED_PREFIXES))
         unhandled.extend(f"{k} is not one of the check's own value-safe variables"
                          for k in assigns if not any(k == p + s for p in prefixes for s in VALUE_SAFE_KEYS))
-        # Only a pull-request base belongs in a *_BASE_REF; a pull_request test anywhere
-        # else (a FAIL switch, an argument) has no local meaning, so it is not guessed.
+        # Values are data too: a *_BASE_REF is exactly the pull-request base and nothing else
+        # holds it, no value reads as an option, and a file a check reads stays in the repo.
         unhandled.extend(f"{k}={v}" for k, v in assigns.items()
-                         if BASE_PLACEHOLDER in v and not k.endswith("_BASE_REF"))
+                         if (v == BASE_PLACEHOLDER) != k.endswith("_BASE_REF") or v.startswith("-")
+                         or BASE_PLACEHOLDER in v and not k.endswith("_BASE_REF")
+                         or k.endswith(("_FILE", "_LIBRARY")) and (v.startswith(("/", "~")) or ".." in v))
         unhandled.extend(tok for tok in command if BASE_PLACEHOLDER in tok)
         # Run only what the wrapper is for: python on this check's own script.
         if not gha_script_command(command, name):
@@ -707,6 +706,9 @@ def evaluate(command: str):
         by_ref: dict[str, str | None] = {}
         runnable = []
         for call in calls:
+            if call.get("unhandled"):  # refused before any fetch; run_bundled says why
+                runnable.append((call, ""))
+                continue
             if call["ref"] not in by_ref:
                 by_ref[call["ref"]] = ensure_gha(call["ref"])
             if by_ref[call["ref"]]:

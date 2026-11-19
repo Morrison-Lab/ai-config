@@ -474,12 +474,13 @@ RX_STRIP = re.compile(
     # words. One that declares neither is kept, as before this rule. The
     # attribute may be quoted either way or not at all, with spaces round its
     # `=`; `data-trust` is a different attribute and is not read.
-    r"|<message\b(?=[^>]*(?<![\w-])trust\s*=)"
-    r"(?![^>]*(?<![\w-])trust\s*=\s*[\"']?principal[\"']?(?=[\s/>]))"
-    r"[^>]*>.*?</message>"
-    r"|<message\b(?=[^>]*(?<![\w-])from\s*=)"
-    r"(?![^>]*(?<![\w-])from\s*=\s*[\"']?human[\"']?(?=[\s/>]))"
-    r"[^>]*>.*?</message>",
+    # ANY such declaration that is not exactly the allowed value drops the
+    # message, so a second attribute or a look-alike inside another
+    # attribute's value cannot rescue it.
+    r"|<message\b(?=[^>]*(?<![\w-])trust\s*=\s*"
+    r"(?![\"']?principal[\"']?(?=[\s/>])))[^>]*>.*?</message>"
+    r"|<message\b(?=[^>]*(?<![\w-])from\s*=\s*"
+    r"(?![\"']?human[\"']?(?=[\s/>])))[^>]*>.*?</message>",
     re.IGNORECASE | re.DOTALL)
 # A decision-card tap arrives as a body that reads, in full, `Chose "<label>"
 # on the decision card asking "<question>"`. The agent wrote the label and the

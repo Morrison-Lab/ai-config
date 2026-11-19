@@ -4,9 +4,16 @@
 Ezra asked for an inventory of "quarto extensions, R packages, etc.;
 anything reusable" across our repositories. Such a list goes stale the
 moment any repository vendors a new extension, so this script derives it
-from each repository's default-branch tree instead of keeping a hand list.
+from each repository's committed tree instead of keeping a hand list.
 
-It finds, per non-archived, non-fork repository:
+It reads one of two sources:
+
+* the GitHub API (the default): each non-archived, non-fork repository's
+  default branch, for the whole org or only the ``--repo`` names given;
+* local checkouts (``--path DIR``, repeatable): each checkout's committed
+  ``HEAD`` tree, taken as given, with no archive or fork filter.
+
+In each tree it finds:
 
 * Quarto extensions: every ``_extensions/<owner>/<name>/_extension.yml``
   (or ``.yaml``), keyed by ``<owner>/<name>`` and listed with every
@@ -20,9 +27,11 @@ Output is Markdown on stdout, headed with the time it was generated.
 
 Usage:
     python3 scripts/inventory-org-tools.py [--org Morrison-Lab] [--repo NAME ...]
+    python3 scripts/inventory-org-tools.py [--org Morrison-Lab] --path DIR [--path DIR ...]
 
-Needs GITHUB_TOKEN or GH_TOKEN. A failed API read stops the run with the
-path that failed (fail fast), with one exception: a repository with no
+The API source needs GITHUB_TOKEN or GH_TOKEN; ``--path`` needs neither.
+A failed API read stops the run with the path that failed (fail fast),
+with one exception: a repository with no
 commits, for which GitHub answers 409 "Git Repository is empty", is
 skipped and named on stderr. A repository whose tree the API truncates is
 reported, not silently shortened.

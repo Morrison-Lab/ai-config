@@ -31,7 +31,7 @@ START_OR_FILE = re.compile(
     r"\b(?:now|immediately)\s+or\s+(?:file|defer|later|tonight|queue)\w*"
     r"|\bstart\b[^.?\n]{0,40}\bor\s+file\b", re.I)
 CHOICE_CUE = re.compile(
-    r"\b(?:which|choose|pick|prefer|select|want|should|would you like|do you)\b|\bor\b", re.I)
+    r"\b(?:which|choose|pick|prefer|select)\b|\bor\b", re.I)
 
 REASON = (
     "[hook: no-plain-text-choice] This message asks a multiple-choice question in plain "

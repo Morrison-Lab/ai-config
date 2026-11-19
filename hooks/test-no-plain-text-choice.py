@@ -25,6 +25,7 @@ CASES = [
     ("numbered list", "Which do you prefer?\n1. Hook\n2. Memory", True),
     ("bulleted letters", "Pick one?\n- A) Hook\n- B) Memory", True),
     ("option labels", "Option A is a hook. Option B is a memory. Which do you want?", True),
+    ("results list then yes/no question", "Status: done.\n1. Fixed X\n2. Fixed Y\nShould I merge?", False),
     ("open question", "What should the hook be named?", False),
     ("list, no question", "Steps:\n1. Clone\n2. Edit", False),
     ("question, one option only", "Which file?\n1. hooks.json", False),

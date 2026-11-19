@@ -776,11 +776,15 @@ class TestPrePushReview(unittest.TestCase):
 
     @patch.object(reviewer, "run_codex_review")
     def test_explicit_codex_engine_refused_outside_ucdh(self, mock_codex):
+        # log_error is patched: under GITHUB_ACTIONS it prints `::error::`, which
+        # turned this expected refusal into failure annotations on every CI run.
         for name in ("codex", "dtc"):
-            with patch.object(reviewer, "codex_allowed", return_value=False):
+            with patch.object(reviewer, "codex_allowed", return_value=False), \
+                    patch.object(reviewer, "log_error") as mock_log_error:
                 report, label = reviewer.execute_review(name, "prompt")
             self.assertIsNone(report)
             self.assertEqual(label, "OpenAI Codex")
+            self.assertIn("Codex is limited to UCDH projects", mock_log_error.call_args[0][0])
         mock_codex.assert_not_called()
 
     @patch.object(reviewer, "detect_cli_engines", return_value=["codex", "opencode"])

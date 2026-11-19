@@ -1,6 +1,7 @@
 ---
 name: pma
 description: "→ prompt-me-all."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools: []
 ---

@@ -1,6 +1,7 @@
 ---
 name: start-task
 description: "→ st."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

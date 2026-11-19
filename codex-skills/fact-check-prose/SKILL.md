@@ -1,6 +1,6 @@
 ---
 name: "fact-check-prose"
-description: "Verify claims and values in prose."
+description: "Verify claims and values in prose. Aliases: fcp."
 ---
 
 # fact-check-prose (Codex wrapper)

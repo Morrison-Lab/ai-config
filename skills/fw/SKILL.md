@@ -1,6 +1,7 @@
 ---
 name: fw
 description: "→ finish-wave."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

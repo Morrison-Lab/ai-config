@@ -54,6 +54,14 @@ A multi-backend harness qualifies only when both its harness
 and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch
 is probed here.
+GitHub Copilot CLI is a different harness whose **default model is Claude**: on 2026-11-10 `copilot -p "Which AI model are you?"` answered "Claude Haiku 4.5" on Ezra's Mac ([ai-config#5286](https://github.com/Morrison-Lab/ai-config/issues/5286)).
+So a `copilot -p` run qualifies only with an explicit non-Claude `--model`, such as `--model gpt-5.3-codex`, and `hooks/warn-merge-without-cross-harness-review.py` credits it only in that form.
+Which models an account can use differs by account, so probe before relying on one: `copilot --model <id> -p "Reply OK"` answers, or says the model is not available.
+That evening `gpt-5.3-codex` was available on that account, and ten other GPT and Gemini ids were not.
+
+- **Do:** pass `--model` with a non-Claude id on every `copilot` review run, after probing that id.
+- **Don't:** count a bare `copilot -p` run as the cross-model review.
+
 If no qualifying entry can run, the gate is waived under [the waiver below](#waiver-when-no-cross-model-reviewer-can-run) --- it never falls through to a same-model or same-harness reviewer standing in as the cross-model verdict.
 A quota outage reroutes the dispatch --- it does not license skipping it.
 Waiting does not overrule a human:

@@ -35,7 +35,7 @@ fix for free.
 ## The procedure
 
 1. **List every open PR in the repo** (`mcp__github__list_pull_requests` /
-   `gh pr list --json number,headRefName,author,assignees`).
+   `gh pr list --limit 100 --json number,headRefName,author,assignees`).
    Note each PR's number, `headRefName`, `author`, and `assignees`.
    Filter the list by `memories/reviewing-prs.md`'s scope test first (opened by or assigned to the invoking user,
    explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)):

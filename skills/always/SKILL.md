@@ -1,6 +1,7 @@
 ---
 name: always
 description: "→ memorize."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Read

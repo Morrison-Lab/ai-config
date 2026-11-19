@@ -173,11 +173,17 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
   acronym/short name (`gi`, `sup`, `ums`, `dc`), also create the spelled-out
   alias dir (`grab-issue`, `send-upstream`, `update-memories-and-skills`) — and
   give a memorable short alias to a spelled-out canonical where it helps. The
-  alias file is thin and only redirects:
+  alias file is thin and only redirects.
+  It sets `disable-model-invocation: true`, so it spends nothing from the
+  model's skill listing while `/<alias>` still works,
+  and the canonical's description ends with an `Aliases: <alias>, ...` clause,
+  so a bare alias word in a prompt still routes to the canonical
+  (`scripts/validate-skills.py` checks both, ai-config#5316):
   ```markdown
   ---
   name: <alias>
-  description: "Alias for `<canonical>`. <one-line>. Use when asked to '<trigger>'."
+  description: "→ <canonical>."
+  disable-model-invocation: true
   user-invocable: true
   allowed-tools:        # mirror the canonical's allowed-tools exactly
     - Bash
@@ -197,6 +203,20 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
   verbatim so invoking the alias permits exactly what the canonical needs (an
   alias redirects, so it must not be more restrictive than its target).
 - **Cross-link** related skills under `## Relationship to other skills`.
+- **Cite another skill's steps by a number its procedure defines, and recheck
+  citers when you renumber.**
+  A reference names its target before the number
+  (`` `ardi`'s step 2 ``, ``[`ums`](../ums/SKILL.md) steps 2 through 3``) or
+  after it (``step 3 of `ums` ``),
+  and the number matches a `### N.` heading or a column-0 `N.` item in that skill.
+  A backticked name means a skill, so cite a shared fragment by its link.
+  When you add, remove or renumber a step, search for `` `<this-skill>` step ``
+  and fix every citer in the same PR, since the citing file is the one that
+  goes wrong and your diff never shows it.
+  `python3 scripts/check-step-references.py` reports a number that names no
+  step, a backwards range, and a citation of a skill or file that no longer
+  exists (ai-config#1865);
+  it cannot tell that a number now names a different step, so read each citer.
 - **No registry to update.** Skills are auto-discovered from `skills/` (the
   bootstrap symlink and the plugin root both read the directory) — adding the
   directory is enough.
@@ -341,13 +361,14 @@ python3 scripts/check-links.py                 # relative markdown links resolve
 python3 scripts/check-vendored-drift.py        # shared-fragment vendored-content drift check
 npx --yes markdownlint-cli2@0.22.1             # markdown style (config in .markdownlint-cli2.jsonc)
 git add skills/<name>/SKILL.md codex-skills/<name> \
-        skills/<alias>/SKILL.md codex-skills/<alias> \
         memories/preferences.md                             # stage the files you
                                                             # touched (incl. the
-                                                            # generated wrappers, and
-                                                            # the alias dir if you made
-                                                            # one) — NOT `-A`, which
-                                                            # sweeps in unrelated edits
+                                                            # generated wrapper), not
+                                                            # `-A`, which sweeps in
+                                                            # unrelated edits
+# For a new alias instead, stage the alias and its canonical skill.
+# An alias has no wrapper of its own, and the canonical's "Aliases:" clause and wrapper change:
+# git add skills/<alias>/SKILL.md skills/<canonical>/SKILL.md codex-skills/<canonical>
 git commit -m "skills: add <name> — <summary>"   # COMMIT
 ```
 
@@ -375,7 +396,9 @@ gh pr create --fill   # CREATE_PR
 log reads `Codex skill wrappers are out of sync:`). After writing the skill (and
 any alias dir), run
 `python3 scripts/sync-codex-skill-wrappers.py`, then `git add` the new
-`codex-skills/<name>/` (and `codex-skills/<alias>/`) alongside the source.
+`codex-skills/<name>/` alongside the source.
+An alias gets no wrapper of its own: Codex reaches it through the canonical's
+`Aliases:` clause.
 The `validate` CI job runs four checks — `scripts/validate-skills.py`
 (frontmatter + wrapper sync + manifests), `scripts/check-links.py` (relative
 markdown links), `scripts/check-vendored-drift.py` (shared-fragment drift), and

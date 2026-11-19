@@ -1,6 +1,6 @@
 ---
 name: split-concerns
-description: "Split multi-concern PRs."
+description: "Split multi-concern PRs. Aliases: split-pr."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -60,6 +60,52 @@ Examples:
    - Cherry-pick or recreate the relevant commits on each branch
    - Open separate MRs with focused descriptions
    - Cross-reference them ("Related: #25, #26")
+
+## Splitting an open PR into a stacked series
+
+When one large PR is already open and its concerns depend on each other,
+split it into a stack of narrower PRs rather than into independent ones
+([ai-config#3598](https://github.com/Morrison-Lab/ai-config/issues/3598)).
+Each PR in the stack is small enough to review on its own,
+and earlier ones can merge while later ones are still in review.
+
+1. **Order the concerns** so that each one needs only the ones before it:
+   refactors and renames first, then the substantive change,
+   then docs that cover it
+   ([refactor-before-modifying-substance](../../shared/principles/refactor-before-modifying-substance.md)).
+   Keep each change's tests in the same layer as the change,
+   so every layer passes CI on its own.
+2. **Build each layer from the original branch's diff.**
+   Start the first branch from the commit the original branch forked from,
+   `git merge-base <base-branch> <original-branch>`, not from the base's current tip,
+   so that step 3's comparison is not polluted by commits the base gained since.
+   Start each later branch from the tip of the one before it.
+   Bring in a layer's whole files with `git checkout <original-branch> -- <paths>`,
+   or with `git cherry-pick` when the original commits already follow the split.
+   When two layers change the same file, take only this layer's hunks
+   with `git restore -p --source=<original-branch> -- <path>`.
+3. **Prove nothing was lost or added:**
+   `git diff <original-branch> <top-of-stack>` must be empty.
+4. **Turn the original PR into the first layer.**
+   Force-push the first layer's branch tip to the original PR's branch
+   (`git push --force-with-lease origin <layer-1>:<original-branch>`),
+   so the original PR, its review history and its number carry the first layer,
+   and no layer gets two PRs.
+   It targets the base branch, so it needs no merge-order alert.
+   A force-push rewrites a shared branch, so confirm it with the user
+   unless a standing grant covers it.
+   If the user would rather not rewrite it, open the first layer as a new PR against the base,
+   and close the original once step 5 has opened the rest,
+   with a comment linking every PR in the stack.
+5. **Open a PR for each later layer**, following
+   [`stack-prs`](../stack-prs/SKILL.md),
+   with a `> [!IMPORTANT]` alert naming the PR that has to merge first.
+   The second layer's PR targets the branch that now carries the first layer:
+   the force-pushed `<original-branch>`, or, if step 4 opened a new PR instead,
+   that PR's branch (never the unrewritten `<original-branch>`).
+   Each layer after that targets the layer below it.
+   Then edit the first layer's PR description to cover only that layer
+   and to link every later PR in merge order.
 
 ## Benefits to communicate
 

@@ -1,6 +1,6 @@
 ---
 name: "resolve-conflicts"
-description: "Resolve merge conflicts."
+description: "Resolve merge conflicts. Aliases: rc, rmc."
 ---
 
 # resolve-conflicts (Codex wrapper)

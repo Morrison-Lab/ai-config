@@ -349,11 +349,11 @@ npx --yes markdownlint-cli2@0.22.1             # markdown style (config in .mark
 git add skills/<name>/SKILL.md codex-skills/<name> \
         memories/preferences.md                             # stage the files you
                                                             # touched (incl. the
-                                                            # generated wrapper) — NOT
+                                                            # generated wrapper), not
                                                             # `-A`, which sweeps in
                                                             # unrelated edits
-# For a new alias instead, stage the alias and its canonical skill; an alias has no
-# wrapper of its own, and the canonical's "Aliases:" clause and wrapper change:
+# For a new alias instead, stage the alias and its canonical skill.
+# An alias has no wrapper of its own, and the canonical's "Aliases:" clause and wrapper change:
 # git add skills/<alias>/SKILL.md skills/<canonical>/SKILL.md codex-skills/<canonical>
 git commit -m "skills: add <name> — <summary>"   # COMMIT
 ```

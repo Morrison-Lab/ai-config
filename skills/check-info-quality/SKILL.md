@@ -1,6 +1,6 @@
 ---
 name: check-info-quality
-description: "Flag stale or misleading content."
+description: "Flag stale or misleading content. Aliases: ciq."
 user-invocable: true
 allowed-tools:
   - Bash

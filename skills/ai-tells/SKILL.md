@@ -1,6 +1,7 @@
 ---
 name: ai-tells
 description: "→ find-ai-tells."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

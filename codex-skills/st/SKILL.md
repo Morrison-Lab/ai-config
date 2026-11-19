@@ -1,6 +1,6 @@
 ---
 name: "st"
-description: "Start task issue-first."
+description: "Start task issue-first. Aliases: start-task."
 ---
 
 # st (Codex wrapper)

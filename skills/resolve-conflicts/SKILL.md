@@ -1,6 +1,6 @@
 ---
 name: resolve-conflicts
-description: "Resolve merge conflicts."
+description: "Resolve merge conflicts. Aliases: rc, rmc."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -198,6 +198,16 @@ go read the history first (step 2).
    duplicated a CLAUDE.md sentence verbatim into a different section, where
    "this policy" lost its antecedent — the intra-PR variant, caught by the
    `@claude` review bot as a distinct finding from the conflict resolution.)
+
+   **Then read each resolved file whole, as one document.**
+   Choosing the better side hunk by hunk can splice two self-consistent halves into an incoherent whole:
+   each side is consistent with itself, so no per-hunk judgment sees that the combination is worse than either.
+   On d-morrison/rme#1138, one side's opening and the other side's closing used one name for three different objects.
+   The repair has its own trap: unifying the notation made one symbol stand for both sides of the inequality the sentence compared,
+   a circular definition found two review rounds later.
+   - **Do:** read the resolved file top to bottom, and check that every term and symbol means one thing throughout.
+   - **Do:** after unifying notation, check that each comparison still has distinct symbols on its two sides.
+   - **Don't:** treat a resolution as done because each hunk, judged alone, took the better side.
 
 4. **Prove no markers (or whitespace damage) slipped through:**
    ```bash

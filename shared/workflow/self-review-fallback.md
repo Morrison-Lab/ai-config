@@ -579,6 +579,9 @@ for the next fresh round.
 - **Don't:** stop after one fallback review plus verification passes ---
   that is one round wearing the loop's name.
 - **Don't:** hand a new round the previous rounds' findings.
+- **Do:** give each round the full branch diff against its base (`git diff "$(git merge-base HEAD origin/main)"`).
+- **Don't:** scope a round to the files the latest fix or conflict touched.
+  On d-morrison/rme#1138, four consecutive rounds each found real defects, three of them in files the conflict-scoped briefs never showed (ai-config#3350).
 
 **A defect the self-review SURFACES and then dismisses
 is worse than one it misses.**

@@ -1,6 +1,6 @@
 ---
 name: register-oaicopilot-models
-description: "Register models in the OAICopilot extension."
+description: "Register models in the OAICopilot extension. Aliases: rom."
 user-invocable: true
 allowed-tools:
   - Bash

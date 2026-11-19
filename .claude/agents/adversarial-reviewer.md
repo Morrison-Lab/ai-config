@@ -266,8 +266,8 @@ See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
 
 ## Scratch staged by an add-everything
 
-On a diff, check for a gitlink (mode 160000) that no `.gitmodules` entry names.
-On a transcript, script or skill, flag `git add -A` in a repository that does not ignore `.claude/worktrees/`.
+On a diff, check for a gitlink (mode 160000) that no `.gitmodules` entry names, and for a committed file that reads as a commit message.
+On a transcript, script or skill, flag `git add -A` in a repository that does not ignore `.claude/worktrees/`, and `git commit -F <file>` whose file sits inside the work tree.
 Read the diff yourself; do not report `hooks/no-add-sweeping-scratch.py`'s refusal or silence as your finding.
 See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
 

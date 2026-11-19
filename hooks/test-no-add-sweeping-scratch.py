@@ -48,6 +48,78 @@ with tempfile.TemporaryDirectory() as root:
     git("commit", "-q", "-m", "init", cwd=repo)
     sub = os.path.join(repo, "sub")
     os.makedirs(sub)
+    link = os.path.join(root, "link")
+    os.symlink(repo, link)
+    other = os.path.join(root, "other")
+    os.makedirs(other)
+    git("init", "-q", "-b", "main", cwd=other)
+
+    # The message file case (#3558), before anything is embedded.
+    write(os.path.join(repo, "msg.txt"))
+    write(os.path.join(repo, "ignored.msg"))
+    write(os.path.join(repo, ".gitignore"), "*.msg\n")
+    sweep = "git add -A && git commit -F msg.txt"
+    for command, cwd, want in [
+            (sweep, repo, "deny"),
+            (sweep, link, "deny"),
+            ("git add . && git commit --file=msg.txt", repo, "deny"),
+            ("git add --all && git commit --file msg.txt", repo, "deny"),
+            ("git add -A && git commit -Fmsg.txt", repo, "deny"),
+            ("git add -A && git commit -aF msg.txt", repo, "deny"),
+            ("printf x > new.txt && git add -A && git commit -F new.txt", repo, "deny"),
+            ("git add -A && git commit -F ../msg.txt", sub, "deny"),
+            ("git add -A && git -C sub commit -F ../msg.txt", repo, "deny"),
+            ("git add -A && git commit --template t.txt -F msg.txt", repo, "deny"),
+            ("git add -A && git commit --message x -F msg.txt", repo, "deny"),
+            ("git add -A && git reset --soft && git commit -F msg.txt", repo, "deny"),
+            ("git add -A && git commit -mF a.txt", repo, "allow"),
+            ('git add -A && git commit -F "$TMPDIR/msg.txt"', repo, "allow"),
+            ("git add -A && git commit -F $SCRATCH/msg.txt", repo, "allow"),
+            ('git add -A && git commit -F "$(mktemp)"', repo, "allow"),
+            ("git add -A && git commit -F .git/MY_MSG", repo, "allow"),
+            ("git -C ../other add -A && git commit -F msg.txt", repo, "allow"),
+            ("cd ../other && git add -A && cd ../repo && git commit -F msg.txt",
+             repo, "allow"),
+            ("git add -A ; git reset ; git commit -F msg.txt", repo, "allow"),
+            ("git add -A ; git reset -q HEAD ; git commit -F msg.txt", repo, "allow"),
+            ("git add -A ; git reset main ; git commit -F msg.txt", repo, "allow"),
+            ("git add -A ; git reset a.txt ; git commit -F msg.txt", repo, "deny"),
+            ("git add -A ; git reset -- msg.txt ; git commit -F msg.txt", repo,
+             "deny"),
+            ("git add -A && git commit --dry-run -F msg.txt", repo, "allow"),
+            ("git add -A && git commit -F /tmp/m -F msg.txt", repo, "deny"),
+            ("git add -A && git commit -F msg.txt -F /tmp/m", repo, "allow"),
+            ("git add -A && git commit -F /tmp/msg.txt", repo, "allow"),
+            ("git add -A && git commit -F ignored.msg", repo, "allow"),
+            ("git add -A && git commit -F -", repo, "allow"),
+            ("git add -A ':!msg.txt' && git commit -F msg.txt", repo, "allow"),
+            ("git add a.txt && git commit -F msg.txt", repo, "allow"),
+            ("git add -u && git commit -F msg.txt", repo, "allow"),
+            ("git add . && git commit -F ../msg.txt", sub, "allow"),
+            ("git commit -F msg.txt", repo, "allow"),
+            ("git commit -F msg.txt && git add -A", repo, "allow"),
+            ("git add -A && git --git-dir=.git commit -F msg.txt", repo, "allow"),
+            ("ALLOW_SCRATCH_ADD=1 git add -A && git commit -F msg.txt", repo, "allow"),
+            ("git add -A && ALLOW_SCRATCH_ADD=1 git commit -F msg.txt", repo, "allow")]:
+        check(f"{command} in {cwd}", run(command, cwd), want)
+    git("add", "msg.txt", cwd=repo)
+    check("staged message file", run("git commit -F msg.txt", repo), "deny")
+    check("staged message file, commit from a subdirectory",
+          run("git commit -F ../msg.txt", sub), "deny")
+    check("staged message file, -C into a subdirectory",
+          run("git -C sub commit -F ../msg.txt", repo), "deny")
+    git("config", "diff.relative", "true", cwd=repo)
+    check("staged message file under diff.relative",
+          run("git commit -F ../msg.txt", sub), "deny")
+    git("config", "--unset", "diff.relative", cwd=repo)
+    check("pathspec commit", run("git commit -F msg.txt -- a.txt", repo), "allow")
+    git("rm", "-q", "--cached", "msg.txt", cwd=repo)
+    write(os.path.join(repo, "café.txt"))
+    git("add", "café.txt", cwd=repo)
+    check("staged non-ASCII message file",
+          run("git commit -F café.txt", repo), "deny")
+    git("rm", "-q", "--cached", "café.txt", cwd=repo)
+    os.remove(os.path.join(repo, "café.txt"))
     agent = os.path.join(repo, ".claude", "worktrees", "agent-1")
     os.makedirs(agent)
     git("init", "-q", "-b", "main", cwd=agent)

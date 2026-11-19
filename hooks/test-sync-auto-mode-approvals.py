@@ -14,9 +14,11 @@ spec = importlib.util.spec_from_file_location("wire", HERE.parent / "scripts" / 
 wire = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(wire)
 FAILED = []
+RAN = []
 
 
 def check(label, cond):
+    RAN.append(label)
     print(("PASS: " if cond else "FAIL: ") + label)
     if not cond:
         FAILED.append(label)
@@ -81,8 +83,10 @@ def main():
         check("a non-object settings file fails open and is left alone",
               proc.returncode == 0 and proc.stdout.strip() == ""
               and (home / ".claude" / "settings.json").read_text(encoding="utf-8") == "[1]")
+        check("a skipped step reports its reason on stderr",
+              "is not a JSON object" in proc.stderr)
 
-    print(f"\n{9 - len(FAILED)} passed, {len(FAILED)} failed")
+    print(f"\n{len(RAN) - len(FAILED)} passed, {len(FAILED)} failed")
     return 1 if FAILED else 0
 
 

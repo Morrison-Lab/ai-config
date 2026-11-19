@@ -22,8 +22,9 @@ beyond that text. When a step writes, it says so as additional context:
 the classifier reads settings at session start, so the new rule takes effect
 in the NEXT session, and the context says that too.
 
-Silent when every rule is already present. Fails open, with a line on
-stderr, when the script cannot be loaded or a step raises: a broken sync must
+Silent when every rule is already present. A step that skips (a settings
+file it cannot safely edit) prints its reason on stderr. Fails open, with a
+line on stderr, when the script cannot be loaded or a step raises: a broken sync must
 never block a session. Opt out with AI_CONFIG_NO_APPROVAL_SYNC=1.
 """
 import importlib.util
@@ -67,6 +68,11 @@ def sync(wire):
             continue
         if message.startswith("write"):
             wrote.append(message)
+        elif message.startswith("skip"):
+            # A skip means the rule is NOT in place (for example, a settings
+            # file that is not a JSON object), so say so rather than drop it.
+            print(f"sync-auto-mode-approvals: {name}: {message}",
+                  file=sys.stderr)
     return wrote
 
 

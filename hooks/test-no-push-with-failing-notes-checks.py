@@ -350,7 +350,7 @@ expect("T61 an unquoted expression fails open with a note, never runs as text",
 commented = hook.parse_run_check_lines(BUNDLED.replace(
     "check-avoided-words.py\n", "check-avoided-words.py # trailing note\n"))
 expect("T62 a trailing YAML comment is not passed as arguments",
-       commented[0]["command"], ["python3", "-u", ".gha/check-avoided-words/check-avoided-words.py"])
+       " ".join(commented[0]["command"]), "python3 -u .gha/check-avoided-words/check-avoided-words.py")
 expect("T63 a gha checkout at another path is not read as .gha",
        hook.parse_run_check_lines(BUNDLED.replace("path: .gha", "path: tools/gha")), [])
 expect("T64 checkout keys in another order still give the ref",

@@ -54,7 +54,8 @@ The high-yield subreddits above, the outside repositories that [`CREDITS.md`](..
 The daily [`tracked-sources.yml`](../.github/workflows/tracked-sources.yml) workflow runs [`tracked-sources-digest.py`](../scripts/tracked-sources-digest.py) over it, and opens a `tracked-sources-digest` issue when a tracked repository's head has moved since the last sifted digest.
 A session sifts that issue into issues for ideas worth adopting and closes it as completed, which is what moves the next digest's starting point.
 A run whose heads differ from the newest open digest's opens a new digest and closes the earlier open ones as not planned, since the new digest lists their commits too;
-a run with the same heads posts nothing.
+a run with the same heads posts nothing,
+and so does a run whose heads are back at the last sifted digest's, which leaves any open digest for a session to close.
 Sifting the digests unattended waits on [#5937](https://github.com/Morrison-Lab/ai-config/issues/5937).
 To add a repository, add a `github` row with its default branch and the head sha you last reviewed as `baseline` (`git ls-remote <url> HEAD`).
 The first baselines are the heads on 2026-11-19, when tracking started, except `sembr/skills`, whose baseline is the submodule's pinned commit.

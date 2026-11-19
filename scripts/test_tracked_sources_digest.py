@@ -144,6 +144,7 @@ class DigestTest(unittest.TestCase):
             (CSV.replace("a/quiet", "a/gone"), None),  # API error
             (CSV.replace(",b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0,", ",,"), None),  # github row without a baseline
             (CSV.replace(",manual,", ",api,"), None),  # subreddit marked fetchable
+            (CSV.replace(",api,busy repo", ",manual,busy repo"), None),  # github row marked manual
             (CSV, "no marker"),
             (CSV, "<!-- tracked-sources-state: {oops} -->"),
         ):

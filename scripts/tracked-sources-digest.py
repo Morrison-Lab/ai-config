@@ -53,8 +53,8 @@ def read_sources(path: Path) -> list[dict]:
     for n, row in enumerate(rows, start=2):
         if row["kind"] == "github" and not (row["branch"] and SHA.fullmatch(row["baseline"])):
             raise DigestError(f"{path}:{n}: a github row needs a branch and a full-sha baseline")
-        if row["kind"] != "github" and row["fetch"] != "manual":
-            raise DigestError(f"{path}:{n}: only a github row can be fetched; mark others manual")
+        if row["fetch"] != ("api" if row["kind"] == "github" else "manual"):
+            raise DigestError(f"{path}:{n}: a github row is fetched (api); mark others manual")
     return rows
 
 

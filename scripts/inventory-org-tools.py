@@ -21,8 +21,10 @@ Output is Markdown on stdout, headed with the time it was generated.
 Usage:
     python3 scripts/inventory-org-tools.py [--org Morrison-Lab] [--repo NAME ...]
 
-Needs GITHUB_TOKEN or GH_TOKEN. Any failed API read stops the run with the
-path that failed (fail fast); a repository whose tree the API truncates is
+Needs GITHUB_TOKEN or GH_TOKEN. A failed API read stops the run with the
+path that failed (fail fast), with one exception: a repository with no
+commits, for which GitHub answers 409 "Git Repository is empty", is
+skipped and named on stderr. A repository whose tree the API truncates is
 reported, not silently shortened.
 """
 from __future__ import annotations

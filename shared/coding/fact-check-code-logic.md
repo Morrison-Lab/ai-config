@@ -1926,16 +1926,20 @@ Where an outcome has two consumers that disagree --- as `ambiguous` did --- the 
 
 ## An allowlist the input can name is not an allowlist
 
-On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through five review rounds, and four of them found the same flaw in a new place.
-Each guard took its allowed set from the workflow line it was filtering:
-the allowed variable prefix came from the line's own `*_BASE_REF` key, so `LD_BASE_REF` admitted `LD_PRELOAD`;
-the allowed script was any `.gha/*.py` the line named, so it could pick a gha script that renders the repository;
-the gha ref came from the workflow, so a commit sha could name a fork's code, and `..` named a directory the cache cleanup then deleted;
-and once the line could only pick its own check, it still picked every variable that check reads, so `TYPOS_BIN_DIR=tools` ran a binary from the pushed repository.
-Probes that kept the check's real prefix (`CAW_`) and script passed every round.
-The fix holds each allowed value in the hook itself: the script is `.gha/<name>/<name>.py` for the line's own check name, each variable is the line's one prefix followed by a suffix from a fixed list, and the ref must start with a letter or digit, contain no `..` and not be a commit sha.
-Limiting variable names was not enough while the line chose which program read them.
+On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through six review rounds, and five of them found the same kind of flaw in a new place.
+Each guard limited one thing the workflow line chose, and left another choice open.
 
-- **Do:** for every allowlist on untrusted input, trace where each allowed value comes from, and probe with the input choosing that value too.
+- The variable prefix came from the line's own `*_BASE_REF` key, so `LD_BASE_REF` admitted `LD_PRELOAD`.
+- The script was any `.gha/*.py` the line named, so it could pick a gha script that renders the repository.
+- The gha ref came from the workflow, so a commit sha could name a fork's code, and `..` named a directory the cache cleanup then deleted.
+- The line could set any variable under its own prefix, so `TYPOS_BIN_DIR=tools` ran a binary from the pushed repository.
+- The line passed arguments to its script, so `--output-markdown ~/.bashrc` wrote over a file outside it.
+
+Probes that kept the check's real prefix (`CAW_`), script and arguments passed every round.
+The line still names its check, its prefix and a gha branch.
+What the hook now holds itself is the shape of each: only that check's own script, with no arguments, variables only from a fixed list of suffixes, and a ref with no `..` that is not a commit sha.
+Limiting variable names was not enough while the line chose which program read them, and limiting the program was not enough while the line chose its arguments.
+
+- **Do:** for every allowlist on untrusted input, list each thing the input still chooses, and probe with the input choosing each one.
 - **Do:** when an allowlist limits names, ask what each allowed name does in the program that reads it.
 - **Don't:** derive the allowed set from the same input it filters.

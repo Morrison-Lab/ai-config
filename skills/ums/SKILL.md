@@ -116,7 +116,8 @@ committed pass.
      commits to *that* repo's own agent docs instead --- see the checklist
      item below for where. This changes step 4's target, not just the
      content.)
-   - **For a correction, what general principle is it a case of?**
+   - **What general principle is it a case of?**
+     Answer for a correction, a preference or a missing workflow step.
      A plain fact, such as a tool quirk, needs none.
      Write the principle as one sentence in your working list for this pass, not yet in any file,
      at the scope [`read-instructions-fully`](../../shared/workflow/read-instructions-fully.md)'s
@@ -157,7 +158,8 @@ committed pass.
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
-   - **Search for the principle from step 2 as well as for the subject.**
+   - **For each item that has a principle from step 2, search for the principle as well as for the subject,
+     even when the subject grep found an entry.**
      A rule stating the same principle in other words need not contain the subject the grep above used,
      so that grep misses it
      ([`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
@@ -166,9 +168,9 @@ committed pass.
      and read the rules it links under that principle.
      When the catalog has no heading for it, the grep is the whole search.
      When an existing rule states the principle,
-     add the new case to that rule rather than writing a new one.
-     When no rule states it, write the principle into the entry this pass writes for the learning,
-     whether a new rule or an addition to an existing file.
+     add the new case to that rule rather than writing a new one,
+     or change nothing when the rule already holds the case.
+     When no rule states it, write the principle into the entry this pass writes or extends for the learning.
      When the principle needs more than that entry (for example, a new hook, a sweep or a new fragment),
      still write it into that entry,
      and file the rest with [`defer-issue`](../defer-issue/SKILL.md) in the same pass.
@@ -536,8 +538,9 @@ committed pass.
    | Poll for new reviews | `iterate/SKILL.md` | Added explicit polling procedure |
    | glab has no --state flag | `/memories/gitlab.md` | New bullet |
 
-   Under the table, give each correction's principle sentence from step 2.
-   Say whether it extended an existing rule or went into the entry this pass wrote,
+   Under the table, give each principle sentence from step 2.
+   Say whether an existing rule already held the case, the pass added the case to an existing rule,
+   or the principle went into the entry this pass wrote or extended,
    and link the issue when step 3 also filed one.
 
 ## What to look for (checklist)

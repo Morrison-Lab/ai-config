@@ -366,7 +366,7 @@ See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliver
 
 ## Model and thread choice at launch
 
-On a transcript, brief or skill change that starts a subagent, thread or session, check that a model was chosen for the task (a bounded edit on a lighter tier, a large content pass or hard reasoning on a stronger one) rather than inherited by default, and that Fable was not used without the user's permission for that launch.
+On a transcript, brief or skill change that starts a subagent, thread or session, check that a model was chosen for the task (a bounded edit on a lighter tier, a large content pass or hard reasoning on a stronger one) rather than inherited by default, that Fable was considered (a Fable-fit task asked the user on a decision card), and that Fable was not used without the user's explicit yes for that launch.
 On a message that hands new work to an existing thread, check that the transcript shows a reason a new thread would not do (the topic, the files or the context is already there), not a reflex to reuse the nearest thread.
 Read the transcript yourself; do not report the output of `hooks/require-model-choice.py` as your finding.
 See [`choose-thread`](../../skills/choose-thread/SKILL.md) and [`select-model`](../../skills/select-model/SKILL.md).

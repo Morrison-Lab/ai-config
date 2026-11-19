@@ -144,7 +144,8 @@ def decide(payload):
             "user's explicit, specific permission (ai-config#2927).\n\n"
             f"    This launch: {what}.\n\n"
             "Pass `model: \"sonnet\"` (or `haiku`) for mechanical or bounded "
-            "work, or, if the user has said yes to running THIS launch on "
+            "work. If Fable would be the best fit, ask Ezra on a decision card "
+            "(request_decision) whether to use it; if he has said yes to running THIS launch on "
             f"Fable, re-run it with {OVERRIDE_ENV}=1 set for that one command. "
             "Do not export the override for the session.")
     if tool == "Workflow":

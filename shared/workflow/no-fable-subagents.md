@@ -1,8 +1,7 @@
 # Never launch a subagent on Fable without explicit, specific permission
 
-Moved whole from [`CLAUDE.md`](../../CLAUDE.md#never-launch-a-subagent-on-fable-without-explicit-specific-permission) to keep it out of the
-always-loaded context; that section keeps the rule's one-sentence core and a
-link here.
+Moved whole from [`CLAUDE.md`](../../CLAUDE.md#consider-fable-for-every-model-choice-launch-on-it-only-with-explicit-specific-permission) to keep it out of the always-loaded context;
+that section keeps the rule's one-sentence core and a link here.
 
 An `Agent` call that omits `model` inherits the conductor's model.
 In a Fable session that makes the cheapest thing to type the most expensive thing to run, and nothing reports the substitution: the call reads as "default", the transcript records `claude-fable-5-1`, and the account hits its usage limit.
@@ -15,8 +14,10 @@ The rule is the user's, verbatim: never spawn a subagent on Fable without their 
 Exporting it for a session is the violation wearing an environment variable.
 The persona files under `.claude/agents/` and `.opencode/agents/` deliberately carry no `model:` (per `skills/agent-builder/SKILL.md`, the tier is pinned at the call site so one persona serves every tier), which is exactly why the call site has to name it: every `Agent()`, `Task`, or `Workflow` `agent()` invocation passes `model`, and the hook denies the Claude Code launch that does not.
 
+- **Do:** consider Fable on every model choice, and when it would be the best fit, ask Ezra on a decision card (`request_decision`) whether to use it (Ezra, 2026-11-18: "you can and should ask me whether to use Fable when it would be the best fit for a task" and "you should always consider using it").
 - **Do:** pass `model` on every `Agent` call, `sonnet` or `haiku` for bounded or mechanical work, and ask before naming Fable.
 - **Do:** set `FABLE_SUBAGENT_OK=1` only on the single command the user approved, after they approved it.
+- **Don't:** skip Fable without considering it, or name it without his yes: the card asks, and only his answer grants.
 - **Don't:** omit `model` and let the launch inherit, which in a Fable session is a Fable launch nobody chose.
 - **Don't:** treat a `daytb`, `away`, or `mwc` grant as covering the model tier; none of them does.
 

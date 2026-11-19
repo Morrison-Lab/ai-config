@@ -1,8 +1,7 @@
 # Never launch a subagent on Fable without explicit, specific permission
 
-Moved whole from [`CLAUDE.md`](../../CLAUDE.md#never-launch-a-subagent-on-fable-without-explicit-specific-permission) to keep it out of the
-always-loaded context; that section keeps the rule's one-sentence core and a
-link here.
+Moved whole from [`CLAUDE.md`](../../CLAUDE.md#consider-fable-for-every-model-choice-launch-on-it-only-with-explicit-specific-permission) to keep it out of the always-loaded context;
+that section keeps the rule's one-sentence core and a link here.
 
 An `Agent` call that omits `model` inherits the conductor's model.
 In a Fable session that makes the cheapest thing to type the most expensive thing to run, and nothing reports the substitution: the call reads as "default", the transcript records `claude-fable-5-1`, and the account hits its usage limit.

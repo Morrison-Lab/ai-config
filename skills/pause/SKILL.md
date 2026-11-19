@@ -7,7 +7,7 @@ allowed-tools:
   - Write
 ---
 
-# pause — stop new work until the user writes again
+# pause: stop new work until the user writes again
 
 The user wants the session to stop starting new work for now:
 no new agents, pushes, reviews, issues or hooks to write.

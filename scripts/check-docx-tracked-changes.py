@@ -505,6 +505,7 @@ BREAK_RUN_CONTAINERS = frozenset(
 # breaks count, and an equation inside one is not checked.
 BREAK_REMOVED_CONTAINERS = frozenset(W + name for name in ("del", "moveFrom"))
 LINE_BREAK_TAGS = frozenset((W + "br", W + "cr"))
+TEXT_TAGS = frozenset((W + "t", M + "t"))
 # Run children that render nothing: properties, a comment's anchor, Word's
 # cached page-break hint, and a complex field's markers and hidden code.
 NON_RENDERING_RUN_TAGS = frozenset(
@@ -548,19 +549,31 @@ def enclosing_paragraph(elem: ET.Element, parents: dict):
 
 def run_content(run: ET.Element) -> list:
     """The children of a w:r or m:r that render, leaving out its properties,
-    comment anchors, cached page breaks and field markers."""
-    return [c for c in run if c.tag not in NON_RENDERING_RUN_TAGS]
+    comment anchors, cached page breaks, field markers and empty text
+    elements (an empty w:t or m:t renders nothing)."""
+    return [
+        c
+        for c in run
+        if c.tag not in NON_RENDERING_RUN_TAGS
+        and not (c.tag in TEXT_TAGS and not c.text)
+    ]
 
 
 def closes_with_break(omp: ET.Element) -> bool:
     """True if an m:oMathPara's last m:oMath ends with an m:r whose last
-    rendered child is a line break."""
+    rendered child is a line break. The m:oMath's children are read as
+    accepted: runs inside a tracked insertion count, deleted runs do not,
+    and a run that renders nothing is skipped."""
     maths = omp.findall(M + "oMath")
-    if not maths or not len(maths[-1]):
+    if not maths:
         return False
-    last = maths[-1][-1]
-    content = run_content(last) if last.tag == M + "r" else []
-    return bool(content) and content[-1].tag in LINE_BREAK_TAGS
+    for elem in reversed(flatten_runs(list(maths[-1]))):
+        if elem.tag != M + "r":
+            return False
+        content = run_content(elem)
+        if content:
+            return content[-1].tag in LINE_BREAK_TAGS
+    return False
 
 
 def is_visible(elem: ET.Element) -> bool:
@@ -647,8 +660,9 @@ def check_display_equation_breaks(
         for side in missing:
             where = (
                 "no line break before the m:oMathPara (the nearest visible "
-                "content before it is not a w:r whose last rendered child is "
-                "a w:br or w:cr), so the prose before it runs into the equation"
+                "content before it is neither a w:r whose last rendered child "
+                "is a w:br or w:cr nor an earlier m:oMathPara that closes with "
+                "one), so the content before it runs into the equation"
                 if side == "before"
                 else "no line break after it (its last m:oMath does not end "
                 "with an m:r whose last rendered child is a break, and the "

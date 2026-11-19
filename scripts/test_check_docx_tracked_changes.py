@@ -1033,5 +1033,68 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
         rc == 1 and "content after it" in out,
     )
 
+    INS_OPEN = '<w:ins w:id="7" w:author="A" w:date="2026-01-01T00:00:00Z">'
+    DEL_OPEN = '<w:del w:id="8" w:author="A" w:date="2026-01-01T00:00:00Z">'
+    rc, out = breaks_run(
+        "eq-closing-break-inserted.docx",
+        PROSE_BEFORE + BR_RUN
+        + f"<m:oMathPara><m:oMath>{BODY}{INS_OPEN}{CLOSE_BR}</w:ins></m:oMath></m:oMathPara>"
+        + PROSE_AFTER,
+    )
+    check(
+        "a closing break inside a tracked insertion in the m:oMath counts",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-closing-break-then-deleted.docx",
+        PROSE_BEFORE + BR_RUN
+        + f"<m:oMathPara><m:oMath>{BODY}{CLOSE_BR}{DEL_OPEN}<m:r><m:t>z</m:t></m:r></w:del>"
+        + "</m:oMath></m:oMathPara>"
+        + PROSE_AFTER,
+    )
+    check(
+        "deleted math after the closing break does not hide the break",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-closing-break-deleted.docx",
+        PROSE_BEFORE + BR_RUN
+        + f"<m:oMathPara><m:oMath>{BODY}{DEL_OPEN}{CLOSE_BR}</w:del></m:oMath></m:oMathPara>"
+        + PROSE_AFTER,
+    )
+    check(
+        "a deleted closing break supplies no break",
+        rc == 1 and "content after it" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-empty-text-run-before.docx",
+        PROSE_BEFORE + BR_RUN + "<w:r><w:t></w:t></w:r>" + omp() + PROSE_AFTER,
+    )
+    check(
+        "a run holding only an empty w:t between the break and the equation is transparent",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-after-closed-equation.docx",
+        PROSE_BEFORE + BR_RUN + omp() + omp() + PROSE_AFTER,
+    )
+    check(
+        "an earlier equation that closes with a break supplies the break before",
+        rc == 0 and "2 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-after-open-equation.docx",
+        PROSE_BEFORE + BR_RUN + omp(close_break=False) + omp() + PROSE_AFTER,
+    )
+    check(
+        "the before-side message names the earlier-equation form",
+        rc == 1 and "earlier m:oMathPara that closes" in out,
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

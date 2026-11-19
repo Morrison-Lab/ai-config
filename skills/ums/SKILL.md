@@ -163,7 +163,7 @@ committed pass.
      A rule stating the same principle in other words need not contain the subject the grep above used,
      so that grep misses it
      ([`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
-     Grep the principle's key terms over the same paths.
+     Grep each key term of the principle separately over the same paths.
      Then find the principle in [`shared/principles/README.md`](../../shared/principles/README.md)'s catalog
      and read the rules it links under that principle.
      When the catalog has no heading for it, the grep is the whole search.
@@ -171,9 +171,8 @@ committed pass.
      add the new case to that rule rather than writing a new one,
      or change nothing when the rule already holds the case.
      When no rule states it, write the principle into the entry this pass writes or extends for the learning.
-     When the principle needs more than that entry (for example, a new hook, a sweep or a new fragment),
-     still write it into that entry,
-     and file the rest with [`defer-issue`](../defer-issue/SKILL.md) in the same pass.
+     In either case, when the principle needs more than a rule's text (for example, a new hook, a sweep or a new fragment),
+     file that work with [`defer-issue`](../defer-issue/SKILL.md) in the same pass.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the
      append, and read its warning band, not only its pass/fail line.**
      The band names every memory file near the cap and how many lines each

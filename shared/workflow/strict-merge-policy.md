@@ -44,6 +44,31 @@ The waiver removes only the cross-model requirement;
 authorization, [`fully-clean`](fully-clean.md), and the clean-on-head rules still bind.
 Full procedure: [`adversarial-self-review`](adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run) (Ezra, 2026-10-16).
 
+## The user's waiver of the fully-clean check
+
+Only the user can waive the fully-clean check.
+`hooks/block-merge-without-clean-checker.py` reads the waiver from the transcript in two forms:
+
+- **Typed:** "merge it anyway" or "override the merge check" in the user's own message (Ezra, 2026-11-02).
+- **Tapped:** a decision card in your own thread (Ezra, 2026-11-19, [ai-config#5892](https://github.com/Morrison-Lab/ai-config/issues/5892)).
+
+The agent writes a card's text, so the hook counts a tap only when all of these hold:
+
+- The tapped option's label is "Waive the check", with at most ", merge it" (or "both", "them", "all") after it.
+- Another option on the card is exactly "Hold it" (or "Hold", "Hold both", "No", "Not now"),
+  and its consequence names no merge, waiver or other way of going ahead.
+- The tapped option's consequence is "I merge" followed by each pull request, as `owner/repo#N` or its `github.com` pull URL, and nothing else.
+  Join several with commas or "and": "I merge owner/repo#1 and owner/other#2."
+  The waiver covers the pull requests named there and no other.
+  The hook does not read the card's question.
+- The platform verified the tap, and the session that merges is the session that posted the card.
+
+A waiver in another session's note, or a tap relayed from another thread, does not count.
+The merge still needs the full head sha pinned, and a PR comment recording the waiver and why the check could not pass.
+
+- **Do:** ask for a waiver only when no fix can make the check pass, such as a repository with no workflows and no review bot.
+- **Don't:** ask for one when the checker or its input can be fixed.
+
 ## Infrastructure PRs standing `mwc` grant
 
 Infrastructure PRs carry a standing `mwc` grant in every repo the user can push to.

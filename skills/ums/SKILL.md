@@ -168,7 +168,8 @@ committed pass.
      add the new case to that rule rather than writing a new one.
      When no rule states it, write the principle into the rule this pass adds for the learning.
      When the principle needs more than that rule (for example, a new hook, a sweep or a new fragment),
-     file it with [`defer-issue`](../defer-issue/SKILL.md) in the same pass instead.
+     still write it into that rule,
+     and file the rest with [`defer-issue`](../defer-issue/SKILL.md) in the same pass.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the
      append, and read its warning band, not only its pass/fail line.**
      The band names every memory file near the cap and how many lines each

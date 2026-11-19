@@ -1926,7 +1926,7 @@ Where an outcome has two consumers that disagree --- as `ambiguous` did --- the 
 
 ## An allowlist the input can name is not an allowlist
 
-On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through seven review rounds, and six of them found the same kind of flaw in a new place.
+On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through eight review rounds, and seven of them found the same kind of flaw in a new place.
 Each guard limited one thing the workflow line chose, and left another choice open.
 
 - The variable prefix came from the line's own `*_BASE_REF` key, so `LD_BASE_REF` admitted `LD_PRELOAD`.
@@ -1935,17 +1935,23 @@ Each guard limited one thing the workflow line chose, and left another choice op
 - The line could set any variable under its own prefix, so `TYPOS_BIN_DIR=tools` ran a binary from the pushed repository.
 - The line passed arguments to its script, so `--output-markdown ~/.bashrc` wrote over a file outside it.
 - The line chose its variables' values, so `PHI_BASE_REF=--output=<path>` became a `git diff` option that wrote a file.
+- The value check read the raw string, but the checks strip and split it, so `' /etc/passwd'` and `'x /root/.netrc'` passed a test for a leading `/`.
 
 Probes that kept the check's real prefix (`CAW_`), script, arguments and values passed every round.
 A bundled line still names its check, its prefix, a gha branch and its values.
-What the hook now holds itself is the shape of each:
-only that check's own script, with no arguments;
-variables only from a fixed list of suffixes;
-a base that is exactly the pull-request placeholder, no value starting with `-`, and file values inside the repository;
-and a ref with no `..` that is not a commit sha.
+What the hook now holds itself is the shape of each.
+
+- The script is that check's own, with no arguments.
+- Variables come only from a fixed list of suffixes.
+- Each suffix has a closed form of value, checked after splitting as the checks split it.
+- The ref has no `..` and is not a commit sha.
+
+The prefix still comes from the line, screened only against a list of refused prefixes, so the hook does not yet follow the **Don't** below.
+A committed symlink can still lead a check out of the repository ([#5948](https://github.com/Morrison-Lab/ai-config/issues/5948)).
 The `uses:` route still accepts a commit sha ([#5933](https://github.com/Morrison-Lab/ai-config/issues/5933)).
 Limiting variable names was not enough while the line chose which program read them, limiting the program was not enough while the line chose its arguments, and limiting both was not enough while the line chose the values.
 
 - **Do:** for every allowlist on untrusted input, list each thing the input still chooses, and probe with the input choosing each one.
 - **Do:** when an allowlist limits names, ask what each allowed name does in the program that reads it.
+- **Do:** check a value in the form the reading program sees, after its strip and split, against the forms it may take.
 - **Don't:** derive the allowed set from the same input it filters.

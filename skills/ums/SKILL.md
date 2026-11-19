@@ -535,8 +535,9 @@ committed pass.
    | Poll for new reviews | `iterate/SKILL.md` | Added explicit polling procedure |
    | glab has no --state flag | `/memories/gitlab.md` | New bullet |
 
-   Under the table, give each correction's principle sentence from step 2,
-   and say whether it extended an existing rule, went into a new entry, or was also filed as an issue.
+   Under the table, give each learning's principle sentence from step 2.
+   Say whether it extended an existing rule or went into a new entry,
+   and link the issue when step 3 also filed one.
 
 ## What to look for (checklist)
 

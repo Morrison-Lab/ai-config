@@ -613,6 +613,7 @@ def _codex_in_scope() -> bool:
     so an installation fault never widens Codex's scope.
     """
     try:
+        # scripts/lib is on sys.path: _LIB is inserted at module load.
         from codex_scope import codex_allowed
     except ImportError as exc:
         print(f"{os.path.basename(__file__)}: cannot load "

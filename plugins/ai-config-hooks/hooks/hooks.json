@@ -642,7 +642,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unrequested-sweep-pr.py\"'",
             "timeout": 10,
             "script": "no-unrequested-sweep-pr.py",
-            "why": "ai-config#5773. Ezra, 2026-11-17: \"how did a sweep get started without my authorization?\" after a spelling-check thread opened about 25 unrequested fix PRs, none titled \"sweep\". DENIES a PR creation once 3 PRs were opened since the user's latest message, unless a message the user wrote (not a coordinator note) asks for a sweep. See shared/workflow/no-sweeps-by-default.md. Fails open on a missing transcript."
+            "why": "ai-config#5773. Ezra, 2026-11-17: \"how did a sweep get started without my authorization?\" after a spelling-check thread opened about 25 unrequested fix PRs, none titled \"sweep\". DENIES a PR creation once 10 PRs were opened since the user's latest message, unless a message the user wrote (not a coordinator note) asks for a sweep. See shared/workflow/no-sweeps-by-default.md. Fails open on a missing transcript."
           },
           {
             "type": "command",

@@ -35,13 +35,11 @@ _LIB = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "scripts"
 if os.path.isdir(_LIB):
     sys.path.insert(0, os.path.realpath(_LIB))
 from agent_notice import stop_notice  # noqa: E402
+from shellcmd import git_subcommand, simple_commands, strip_env  # noqa: E402
 
 PUSH_TOOLS = ("push_files", "create_or_update_file", "delete_file")
-RX_PUSH_CMD = re.compile(r"(?:^|[;&|(]\s*|\s)git(?:\s+-C\s+\S+)?\s+push\b")
-RX_BODY_CMD = re.compile(
-    r"\bgh\s+pr\s+create\b"
-    r"|\bgh\s+pr\s+edit\b[^;&|]*?(?:--title|--body|--body-file|\s-t\s|\s-b\s|\s-F\s)"
-    r"|\bgh\s+api\b(?=[^;&|]*(?:-X\s*PATCH|--method\s+PATCH))[^;&|]*\bpulls/\d+(?![/\w])")
+BODY_FLAGS = ("--title", "--body", "--body-file", "-t", "-b", "-F")
+RX_PULL_PATH = re.compile(r"(?:^|/)pulls/\d+$")
 
 
 def blocks(record):
@@ -60,20 +58,55 @@ def is_real_prompt(record):
     return any(b.get("type") == "text" for b in blocks(record))
 
 
-def classify(block):
-    """Return 'push', 'body' or None for one tool_use block."""
-    name = str(block.get("name", ""))
-    inputs = block.get("input") or {}
-    command = str(inputs.get("command", "")) if name == "Bash" else ""
-    if name.endswith(PUSH_TOOLS) or (command and RX_PUSH_CMD.search(command)):
-        return "push"
-    if name.endswith("create_pull_request"):
+def is_patch_on_pull(args):
+    """True for `gh api` args that PATCH a `pulls/N` endpoint."""
+    method = None
+    for i, arg in enumerate(args):
+        if arg in ("-X", "--method") and i + 1 < len(args):
+            method = args[i + 1]
+        elif arg.startswith(("-X", "--method=")):
+            method = arg.split("=", 1)[-1] if "=" in arg else arg[2:]
+    return (method or "").upper() == "PATCH" and any(RX_PULL_PATH.search(a) for a in args)
+
+
+def classify_argv(argv):
+    """Return 'push', 'body' or None for one simple command (dequoted argv)."""
+    git = git_subcommand(argv)
+    if git is not None:
+        return "push" if git[0] == "push" else None
+    _env, rest = strip_env(argv)
+    if len(rest) < 2 or rest[0] != "gh":
+        return None
+    if rest[1:3] == ["pr", "create"]:
         return "body"
-    if name.endswith("update_pull_request") and (inputs.get("body") or inputs.get("title")):
-        return "body"
-    if command and RX_BODY_CMD.search(command):
+    if rest[1:3] == ["pr", "edit"]:
+        flags = [a.split("=", 1)[0] for a in rest[3:]]
+        return "body" if any(f in BODY_FLAGS for f in flags) else None
+    if rest[1] == "api" and is_patch_on_pull(rest[2:]):
         return "body"
     return None
+
+
+def classify(block):
+    """Return the ordered 'push'/'body' events for one tool_use block.
+
+    A Bash command is split into simple commands first, so text inside a
+    quoted argument (a body or commit message that mentions `git push`) is
+    never read as a command, and a chained `git push && gh pr edit --body`
+    yields both events in order.
+    """
+    name = str(block.get("name", ""))
+    inputs = block.get("input") or {}
+    if name.endswith(PUSH_TOOLS):
+        return ["push"]
+    if name.endswith("create_pull_request"):
+        return ["body"]
+    if name.endswith("update_pull_request"):
+        return ["body"] if (inputs.get("body") or inputs.get("title")) else []
+    if name != "Bash":
+        return []
+    commands = simple_commands(str(inputs.get("command", ""))) or []
+    return [kind for kind in map(classify_argv, commands) if kind]
 
 
 def unrefreshed_push(path):
@@ -89,9 +122,7 @@ def unrefreshed_push(path):
                 continue
             for block in blocks(record):
                 if block.get("type") == "tool_use":
-                    kind = classify(block)
-                    if kind:
-                        events.append(kind)
+                    events.extend(classify(block))
     last_push = max((i for i, kind in enumerate(events) if kind == "push"), default=None)
     return last_push is not None and "body" not in events[last_push + 1:]
 

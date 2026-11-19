@@ -35,6 +35,11 @@ GH_EDIT_LABEL = call("Bash", command="gh pr edit 12 --add-label P2")
 GH_PATCH = call("Bash", command="gh api -X PATCH repos/o/r/pulls/12 -F body=@b.md")
 GH_PATCH_COMMENT = call("Bash", command="gh api -X PATCH repos/o/r/pulls/comments/12 -f body=x")
 GIT_LOG = call("Bash", command="git log --oneline -3")
+GH_EDIT_MENTIONS_PUSH = call("Bash", command='gh pr edit 12 --body "after a git push, refresh"')
+COMMIT_MENTIONS_PUSH = call("Bash", command='git commit -m "explain git push timing"')
+ECHO_PUSH = call("Bash", command="echo git push")
+CHAINED = call("Bash", command='git push origin b && gh pr edit 12 --body "x"')
+CHAINED_REVERSED = call("Bash", command='gh pr edit 12 --body "x" && git push origin b')
 
 
 def run(records, active=False):
@@ -72,4 +77,10 @@ check("a body edit before the push does not count", [prompt(), EDIT_BODY, PUSH, 
 check("a push in an earlier turn is not this turn's", [prompt(), PUSH, result(), prompt("next")], False)
 check("no push is silent", [prompt(), GIT_LOG], False)
 check("stop_hook_active never blocks again", [prompt(), PUSH, result()], False, active=True)
+check("a body edit whose text mentions git push discharges the push",
+      [prompt(), PUSH, GH_EDIT_MENTIONS_PUSH], False)
+check("a commit message mentioning git push is not a push", [prompt(), COMMIT_MENTIONS_PUSH], False)
+check("echo git push is not a push", [prompt(), ECHO_PUSH], False)
+check("a chained push then body edit is fine", [prompt(), CHAINED], False)
+check("a chained body edit then push blocks", [prompt(), CHAINED_REVERSED], True)
 print("all passed")

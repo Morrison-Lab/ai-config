@@ -13,8 +13,8 @@ It finds, per non-archived, non-fork repository:
   repository that vendors it;
 * R packages: a root ``DESCRIPTION`` next to a root ``R/`` directory, with
   the ``Package:`` and ``Title:`` fields read from the file;
-* Lua filters: ``*.lua`` files at the root or under ``filters/``, outside
-  ``_extensions/``.
+* Lua filters: ``*.lua`` files at the repository root or directly in
+  ``filters/`` (not in its subdirectories), outside ``_extensions/``.
 
 Output is Markdown on stdout, headed with the time it was generated.
 

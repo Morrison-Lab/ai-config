@@ -34,6 +34,8 @@ check("an extension path missing its owner level is not an extension",
 check("DESCRIPTION plus R/ is a package", pkg is True)
 check("Lua filters: root and filters/ only, never inside _extensions/",
       lua == ["filters/unlink-pages.lua", "math-xrefs.lua"])
+check("a Lua file in a subdirectory of filters/ is not counted",
+      inv.classify_tree(["filters/sub/x.lua", "filters/y.lua"])[2] == ["filters/y.lua"])
 check("DESCRIPTION without R/ is not a package",
       inv.classify_tree(["DESCRIPTION", "renv.lock"])[1] is False)
 

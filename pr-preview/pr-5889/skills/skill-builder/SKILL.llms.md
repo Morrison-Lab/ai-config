@@ -167,14 +167,14 @@ python3 scripts/check-links.py                 # relative markdown links resolve
 python3 scripts/check-vendored-drift.py        # shared-fragment vendored-content drift check
 npx --yes markdownlint-cli2@0.22.1             # markdown style (config in .markdownlint-cli2.jsonc)
 git add skills/<name>/SKILL.md codex-skills/<name> \
-        skills/<alias>/SKILL.md skills/<canonical>/SKILL.md \
-        codex-skills/<canonical> \
         memories/preferences.md                             # stage the files you
                                                             # touched (incl. the
-                                                            # generated wrappers, and
-                                                            # the alias dir if you made
-                                                            # one) — NOT `-A`, which
-                                                            # sweeps in unrelated edits
+                                                            # generated wrapper) — NOT
+                                                            # `-A`, which sweeps in
+                                                            # unrelated edits
+# For a new alias instead, stage the alias and its canonical skill; an alias has no
+# wrapper of its own, and the canonical's "Aliases:" clause and wrapper change:
+# git add skills/<alias>/SKILL.md skills/<canonical>/SKILL.md codex-skills/<canonical>
 git commit -m "skills: add <name> — <summary>"   # COMMIT
 ```
 

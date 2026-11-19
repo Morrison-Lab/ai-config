@@ -72,15 +72,19 @@ class Repo:
         return None if n is None else int(n)
 
     def tip_time(self, ref):
-        return int(git(self.path, "log", "-1", "--format=%ct", ref) or 0)
+        """Commit time of the ref's tip, or None when git cannot read it."""
+        t = git(self.path, "log", "-1", "--format=%ct", ref)
+        return int(t) if t else None
 
     def merged_pr(self, branch, ref):
-        """(number, tip predates the merge) for the branch's last merged PR."""
+        """(number, tip predates the merge) for the branch's last merged PR.
+        An unreadable tip counts as not predating it, so the row is flagged."""
         done = sorted(self.merged.get(branch, []), key=lambda p: p["mergedAt"])
         if not done:
             return None
         at = datetime.fromisoformat(done[-1]["mergedAt"].replace("Z", "+00:00"))
-        return done[-1]["number"], self.tip_time(ref) < at.timestamp()
+        tip = self.tip_time(ref)
+        return done[-1]["number"], tip is not None and tip < at.timestamp()
 
     def branch(self, name, ref, local):
         """(status, action) for a branch, local or remote."""
@@ -94,7 +98,8 @@ class Repo:
         if landed:
             return f"Inspect (PR #{landed[0]} merged, tip after it)", "flag"
         if ahead == 0:
-            young = self.now - self.tip_time(ref) < WEEK
+            tip = self.tip_time(ref)
+            young = tip is None or self.now - tip < WEEK  # unreadable: keep it
             if local:
                 return "Merged into main", "delete-d"
             return ("New (0 ahead, <7d)", "skip") if young else ("Dead (0 ahead)", "delete")
@@ -123,7 +128,10 @@ class Repo:
             return {**row, "status": "Missing dir", "action": "prune"}
         if w.get("locked"):
             return {**row, "status": "Locked", "action": "skip"}
-        if git(path, "status", "--porcelain"):
+        status = git(path, "status", "--porcelain")
+        if status is None:  # dirtiness unknown, so never plan its removal
+            return {**row, "status": "git status failed", "action": "flag"}
+        if status:
             return {**row, "status": "Dirty (uncommitted)", "action": "flag"}
         if self.now - os.stat(path).st_mtime < LIVE:
             return {**row, "status": "Live? (touched <10 min ago)", "action": "skip"}

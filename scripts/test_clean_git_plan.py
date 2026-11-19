@@ -56,6 +56,9 @@ with tempfile.TemporaryDirectory() as root:
         fh.write("x")
     git(repo, "worktree", "add", "-q", os.path.join(root, "wt-gone"), "-b", "gone")
     shutil.rmtree(os.path.join(root, "wt-gone"))
+    git(repo, "worktree", "add", "-q", os.path.join(root, "wt-broken"), "-b", "broken")
+    with open(os.path.join(root, "wt-broken", ".git"), "w", encoding="utf-8") as fh:
+        fh.write("gitdir: /nonexistent\n")  # git status now fails there
     prs = [pr(1, "open-head", "OPEN"), pr(2, "child", "OPEN", base="stack-base"),
            pr(3, "landed", "MERGED", merged="2026-06-01T00:00:00Z"),
            pr(4, "closed", "CLOSED")]
@@ -81,6 +84,7 @@ with tempfile.TemporaryDirectory() as root:
     check("local branch held by a live worktree is not listed", "unmerged" in local, False)
     check("dirty worktree", trees.get("wt-dirty"), "flag")
     check("worktree whose directory is gone", trees.get("wt-gone"), "prune")
+    check("worktree where git status fails", trees.get("wt-broken"), "flag")
     many = subprocess.run([sys.executable, SCRIPT, "--repo", root, "--prs-json", prs_file],
                           capture_output=True, check=False, text=True)
     check("non-repo parent classifies its child repositories, not their worktrees",

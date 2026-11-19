@@ -119,6 +119,8 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
 
 - **Cross-link** related skills under `## Relationship to other skills`.
 
+- **Cite another skill’s steps by a number its procedure defines, and recheck citers when you renumber.** A reference names its target before the number (`` `ardi`'s step 2 ``, `` [`ums`](../ums/SKILL.md) steps 2 through 3 ``) or after it (`` step 3 of `ums` ``), and the number matches a `### N.` heading or a column-0 `N.` item in that skill. A backticked name means a skill, so cite a shared fragment by its link. When you add, remove or renumber a step, search for `` `<this-skill>` step `` and fix every citer in the same PR, since the citing file is the one that goes wrong and your diff never shows it. `python3 scripts/check-step-references.py` reports a number that names no step, a backwards range, and a citation of a skill or file that no longer exists (ai-config#1865); it cannot tell that a number now names a different step, so read each citer.
+
 - **No registry to update.** Skills are auto-discovered from `skills/` (the bootstrap symlink and the plugin root both read the directory) — adding the directory is enough.
 
 - **List it in `skills.qmd` if it belongs in one of the category tables**, and bump the “All N+ canonical skills” count at the bottom to the **actual** directory count (`ls -d skills/*/ | wc -l`), not a manual +1 — `main` often gains other skills while your PR is in review, so a hand-incremented count drifts and reads as stale by the time you merge (ai-config#347).

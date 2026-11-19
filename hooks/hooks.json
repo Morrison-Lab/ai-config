@@ -2023,7 +2023,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-leftover-cleanup-ask.py\"",
             "timeout": 10,
             "script": "no-leftover-cleanup-ask.py",
-            "why": "ai-config#5843. Ezra, 2026-11-18: \"cai: always clean up after yourself after installs etc\". After installing ONLYOFFICE on cf463-02, a session left the 426 MB AppImage download in ~/.local/opt/onlyoffice-dl and told Ezra he could delete it. Blocks (deny) a user-visible reply tool call whose sentence names an install or setup leftover (download, installer, AppImage, archive, tarball, scratch or temp directory, package file) and hands its removal to the user (you can delete, safe to remove, can be deleted, I left ...). A sentence naming a secret or key, or saying the agent already removed it, is exempt. ALLOW_LEFTOVER_HANDOFF=1 overrides. Fails open on parse trouble."
+            "why": "ai-config#5843. Ezra, 2026-11-18: \"cai: always clean up after yourself after installs etc\". After installing ONLYOFFICE on a lab machine, a session left the 426 MB AppImage download in ~/.local/opt/onlyoffice-dl and told Ezra he could delete it. Blocks (deny) a user-visible reply tool call whose sentence names an install or setup leftover (download, installer, AppImage, archive, tarball, scratch or temp directory, package file) and hands its removal to the user (you can delete, safe to remove, can be deleted, I left ...). A sentence naming a secret or key, or saying the agent already removed it, is exempt. ALLOW_LEFTOVER_HANDOFF=1 overrides. Fails open on parse trouble."
           },
           {
             "type": "command",

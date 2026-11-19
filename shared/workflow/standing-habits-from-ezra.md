@@ -77,7 +77,7 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** after an install or other setup task, delete your own temporary downloads, installers, extracted archives, scratch directories and similar leftovers, without asking.
   Report what you removed and how much space it freed.
 - **Don't:** leave a leftover in place and tell Ezra he can delete it.
-  Ezra, 2026-11-18, after a session left the 426 MB ONLYOFFICE AppImage download in `~/.local/opt/onlyoffice-dl` on cf463-02 and told him he could delete it:
+  Ezra, 2026-11-18, after a session left the 426 MB ONLYOFFICE AppImage download in `~/.local/opt/onlyoffice-dl` on a lab machine and told him he could delete it:
   "always clean up after yourself after installs etc" ([ai-config#5843](https://github.com/Morrison-Lab/ai-config/issues/5843)).
 - **Do:** leave a file in place only when it is not yours to delete (something you did not create), and say whose it is.
 - `hooks/no-leftover-cleanup-ask.py` denies a reply that hands such a removal to the user.

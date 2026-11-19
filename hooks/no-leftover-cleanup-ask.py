@@ -2,7 +2,7 @@
 """PreToolUse: delete your own install leftovers instead of handing them to the user.
 
 ai-config#5843. Ezra, 2026-11-18: "cai: always clean up after yourself after
-installs etc". After installing ONLYOFFICE on cf463-02, a session left the
+installs etc". After installing ONLYOFFICE on a lab machine, a session left the
 426 MB AppImage download in ~/.local/opt/onlyoffice-dl and told Ezra he could
 delete it. The agent removes its own temporary downloads, installers,
 extracted archives and scratch directories after an install or other setup

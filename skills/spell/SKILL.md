@@ -32,8 +32,12 @@ A repository's `CLAUDE.md` pre-commit checklist usually names this step.
 2. **With `typos`**, check the changed files:
 
    ```sh
-   { git diff --name-only --diff-filter=AMR origin/main...HEAD; git diff --name-only --diff-filter=AMR HEAD; } | sort -u | xargs -r typos
+   files=$( { git diff --name-only --diff-filter=AMR origin/main...HEAD; git diff --name-only --diff-filter=AMR HEAD; } | sort -u )
+   [ -n "$files" ] && typos $files
    ```
+
+   The first `git diff` lists committed changes and the second staged and unstaged ones.
+   The test skips `typos` when nothing changed, since `typos` with no path scans the whole tree.
 
    Install it with `pip install typos` if it is missing.
    A correctly spelled term it misreads goes in `_typos.toml`, never in a disabled check.

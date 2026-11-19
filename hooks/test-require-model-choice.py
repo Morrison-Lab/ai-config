@@ -33,7 +33,11 @@ check("Agent with sonnet silent", verdict("Agent", {"prompt": "x", "model": "son
 check("start_thread without model denied", verdict("mcp__hearthbot__start_thread", {"prompt": "x"}), "deny")
 check("start_thread with model silent", verdict("mcp__hearthbot__start_thread", {"prompt": "x", "model": "opus"}), None)
 check("start_thread with Model-fit line silent",
-      verdict("mcp__hearthbot__start_thread", {"prompt": "do x\nModel-fit: sonnet -- bounded edit"}), None)
+      verdict("mcp__hearthbot__start_thread", {"prompt": "do x\nModel-fit: sonnet -- bounded edit; Fable: not the best fit, bounded work"}), None)
+check("start_thread with Model-fit line not naming Fable denied",
+      verdict("mcp__hearthbot__start_thread", {"prompt": "do x\nModel-fit: sonnet -- bounded edit"}), "deny")
+check("start_thread with a casual Fable mention but no Fable field denied",
+      verdict("mcp__hearthbot__start_thread", {"prompt": "do x\nModel-fit: opus -- hard task, Fable too expensive"}), "deny")
 check("create_thread is not a start tool", verdict("mcp__hearthbot__create_thread", {"prompt": "x"}), None)
 check("create_session without model denied", verdict("mcp__claude-code-remote__create_session", {"prompt": "x"}), "deny")
 check("message_thread without reason denied", verdict("mcp__hearthbot__message_thread", {"text": "do more"}), "deny")

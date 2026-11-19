@@ -81,9 +81,12 @@ LIMITS
 * The typed path reads a wake's `<message>` elements as the harness wrote them.
   If a harness ever left a literal `</message>` unescaped inside a peer
   message's body, the text after it would read as a new element.
-* A tap is told from typed words by its shape alone. A user who types, as a
-  whole message, exactly `Chose "..." on the decision card asking "..."` is
-  read as a tap and gets no override; any other words in the message keep it.
+* A tap is told from typed words by its shape alone. A whole message the user
+  types that opens with `Chose "`, holds `" on the decision card asking "`
+  and ends with a quote mark is read as a tap and gives no override.
+* The trust and sender checks read the whole `<message>` tag, so the user's
+  own message is skipped if another attribute's value holds text such as
+  `trust=peer`. Both limits refuse a merge and never allow one.
 * A wake `<message>` with neither a `trust` nor a `from` attribute is read, as
   it was before those attributes were checked.
 * A relayed line is trusted as relayed: a session that forges a message-reading

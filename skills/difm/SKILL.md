@@ -1,6 +1,7 @@
 ---
 name: difm
 description: "→ do-it-for-me."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

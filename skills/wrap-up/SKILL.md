@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: "End-of-session verification and UMS."
+description: "End-of-session verification and UMS. Aliases: done, merged."
 user-invocable: true
 allowed-tools:
   - Bash

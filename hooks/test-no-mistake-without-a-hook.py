@@ -52,6 +52,17 @@ CASES = [
     ([say("I removed redundant prose because it repeated an existing rule."), UNRELATED], True,
      "recognizing redundant prose with no mechanism reminds"),
 
+    # Paused (ai-config#3911): writing a hook is new work, so no reminder
+    # while the user's latest prompt is "pause", and the reminder returns
+    # once a later prompt ends the pause.
+    ([say("I was wrong about that."), UNRELATED,
+      {"type": "user", "message": {"content": "pause"}}], False,
+     "a paused session is not reminded"),
+    ([say("I was wrong about that."), UNRELATED,
+      {"type": "user", "message": {"content": "pause"}},
+      {"type": "user", "message": {"content": "ok, carry on"}}], True,
+     "the reminder returns after the pause ends"),
+
     # Discharged by doing the work.
     ([say("I was wrong."), WROTE_HOOK, say("Wrote the guard.")], False,
      "writing a hook file discharges it"),

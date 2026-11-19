@@ -1,6 +1,6 @@
 ---
 name: whats-next
-description: "Recommend concrete next step or action."
+description: "Recommend concrete next step or action. Aliases: wn."
 user-invocable: true
 allowed-tools:
   - Bash

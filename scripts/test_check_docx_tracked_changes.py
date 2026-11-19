@@ -995,6 +995,36 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
     )
 
     rc, out = breaks_run(
+        "eq-two-equations.docx",
+        PROSE_BEFORE + BR_RUN + omp() + omp() + PROSE_AFTER,
+    )
+    check(
+        "a display equation that closes with a break starts the next on a new line",
+        rc == 0 and "2 display equation(s) (0 missing a line break)" in out,
+    )
+    rc, out = breaks_run(
+        "eq-two-equations-unbroken.docx",
+        PROSE_BEFORE + BR_RUN + omp(close_break=False) + omp() + PROSE_AFTER,
+    )
+    check(
+        "an earlier equation with no closing break leaves the next one unbroken",
+        rc == 1 and "content before it" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-container-props.docx",
+        PROSE_BEFORE
+        + BR_RUN
+        + "<w:customXml><w:customXmlPr/></w:customXml>"
+        + "<w:smartTag><w:smartTagPr/></w:smartTag>"
+        + omp(),
+    )
+    check(
+        "smart-tag and custom-XML properties are transparent",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
         "eq-empty-omath.docx",
         PROSE_BEFORE + BR_RUN + "<m:oMathPara><m:oMath/></m:oMathPara>" + PROSE_AFTER,
     )

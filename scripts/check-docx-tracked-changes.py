@@ -477,6 +477,9 @@ BREAK_TRANSPARENT_TAGS = frozenset(
         "customXmlMoveToRangeEnd",
         "sdtPr",
         "sdtEndPr",
+        "smartTagPr",
+        "customXmlPr",
+        "fldData",
     )
 )
 
@@ -549,6 +552,17 @@ def run_content(run: ET.Element) -> list:
     return [c for c in run if c.tag not in NON_RENDERING_RUN_TAGS]
 
 
+def closes_with_break(omp: ET.Element) -> bool:
+    """True if an m:oMathPara's last m:oMath ends with an m:r whose last
+    rendered child is a line break."""
+    maths = omp.findall(M + "oMath")
+    if not maths or not len(maths[-1]):
+        return False
+    last = maths[-1][-1]
+    content = run_content(last) if last.tag == M + "r" else []
+    return bool(content) and content[-1].tag in LINE_BREAK_TAGS
+
+
 def is_visible(elem: ET.Element) -> bool:
     """True if a paragraph-level sibling of an m:oMathPara renders anything."""
     if elem.tag in BREAK_TRANSPARENT_TAGS:
@@ -569,7 +583,8 @@ def check_display_equation_breaks(
     its own line when prose shares its w:p; two ordinary breaks do:
 
       * BEFORE: the nearest visible sibling before the m:oMathPara is a w:r
-        whose last rendered child is <w:br/>;
+        whose last rendered child is <w:br/>, or an earlier m:oMathPara
+        that closes with its own break (the AFTER form below);
       * AFTER: the last m:oMath in the m:oMathPara ends with an m:r whose
         last rendered child is <w:br/>, or the nearest visible sibling after
         the m:oMathPara is a w:r whose first rendered child is <w:br/>.
@@ -577,7 +592,8 @@ def check_display_equation_breaks(
     A break is required only on a side that has visible content in the same
     w:p, so an equation alone in its paragraph -- Word's own layout -- needs
     none. A w:cr counts as a break, as w:br does. Bookmarks, comment ranges,
-    proofing marks, change-tracking range markers and properties are
+    proofing marks, change-tracking range markers and properties (of the
+    paragraph, a content control, a smart tag, custom XML or a field) are
     transparent, and so is a run holding only a comment anchor, a cached
     page break or field markers. Runs inside tracked insertions, moves,
     hyperlinks, content controls, simple fields and bidirectional
@@ -599,7 +615,9 @@ def check_display_equation_breaks(
         examined += 1
         siblings = flatten_runs(list(parent))
         # flatten_runs keeps the m:oMathPara itself, since it is no container.
-        idx = next(i for i, e in enumerate(siblings) if e is omp)
+        idx = next((i for i, e in enumerate(siblings) if e is omp), None)
+        if idx is None:
+            continue  # unreachable while flatten_runs mirrors the walk up
         before = [e for e in siblings[:idx] if is_visible(e)]
         after = [e for e in siblings[idx + 1:] if is_visible(e)]
         ctx = "".join(t.text or "" for t in parent.iter(W + "t"))[:60]
@@ -608,16 +626,16 @@ def check_display_equation_breaks(
         if before:
             prev = before[-1]
             content = run_content(prev) if prev.tag == W + "r" else []
-            if not (content and content[-1].tag in LINE_BREAK_TAGS):
+            broken = bool(content) and content[-1].tag in LINE_BREAK_TAGS
+            # An earlier display equation that closes with its own break
+            # already starts this one on a new line.
+            if prev.tag == M + "oMathPara" and closes_with_break(prev):
+                broken = True
+            if not broken:
                 missing.append("before")
 
         if after:
-            ends_with_break = False
-            maths = omp.findall(M + "oMath")
-            if maths and len(maths[-1]):
-                last = maths[-1][-1]
-                content = run_content(last) if last.tag == M + "r" else []
-                ends_with_break = bool(content) and content[-1].tag in LINE_BREAK_TAGS
+            ends_with_break = closes_with_break(omp)
             nxt = after[0]
             content = run_content(nxt) if nxt.tag == W + "r" else []
             starts_with_break = bool(content) and content[0].tag in LINE_BREAK_TAGS

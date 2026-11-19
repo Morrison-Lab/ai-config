@@ -129,6 +129,16 @@ import os
 import subprocess
 import sys
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from tool_names import is_subagent_tool
+except Exception:  # broken install: the launch tools named in ai-config#3740
+    def is_subagent_tool(name):  # noqa: D103
+        return str(name or "").lower() in {
+            "agent", "task", "invoke_subagent", "spawn_agent", "collaboration.spawn_agent"}
+
 # The harness declares Explore and Plan as read-only ROLES; that contract, not
 # their tool inventory, is what the exemption rests on. Both are granted Bash,
 # so a strict can-this-touch-a-file test would exempt nothing. See "Classifying
@@ -172,7 +182,7 @@ def _unisolated_subagent_types(payload):
     the launch happened.
     """
     tname = payload.get("tool_name")
-    if tname not in ("Agent", "invoke_subagent"):
+    if not is_subagent_tool(tname):
         return []
 
     tool_input = payload.get("tool_input")
@@ -208,7 +218,7 @@ def _unisolated_subagent_types(payload):
 def unassigned(payload):
     """Return the subagent_type to warn about, or None to stay silent."""
     tname = payload.get("tool_name")
-    if tname not in ("Agent", "invoke_subagent"):
+    if not is_subagent_tool(tname):
         return None
 
     tool_input = payload.get("tool_input")
@@ -371,11 +381,20 @@ def _has_unpushed_commits(cwd):
     return out.isdigit() and int(out) > 0
 
 
+# The DENY tells the caller to set isolation, so it applies only to the launch
+# tools that have that setting. Every other subagent launch
+# (`scripts/lib/tool_names.py`, such as Codex's `spawn_agent`) still gets the WARN
+# (ai-config#3740).
+DENY_TOOLS = ("Agent", "Task", "invoke_subagent")
+
+
 def _should_deny(payload, cwd):
     """Return the DENY message, or None to fall through to the WARN above."""
     if os.environ.get(OVERRIDE_ENV) == "1":
         return None
 
+    if payload.get("tool_name") not in DENY_TOOLS:
+        return None  # a launch tool with no isolation setting: WARN only
     types = _unisolated_subagent_types(payload)
     if not types:
         return None  # isolated, or not an Agent-shaped launch at all

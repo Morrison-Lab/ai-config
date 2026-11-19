@@ -273,12 +273,16 @@ How depends on the repo's review trigger first, and on whether this round pushed
    Other PRs in this repo can become conflicting at any time (someone merges to `main` while the review runs).
    Poll every few minutes with `/loop` or a manual re-check:
    ```bash
-   gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments \
-     --jq '.[] | select(.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN")'   # LIST_PRS
+   LIST=$(mktemp)
+   gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments > "$LIST"   # LIST_PRS
+   IN=$(python3 scripts/pr-scope.py --user "$ME" --alias "$ALIASES" \
+     --requested "$REQUESTED" --excluded "$EXCLUDED" < "$LIST" | jq -c '.included')
+   jq --argjson in "$IN" '.[] | select((.number | IN($in[])) and (.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN"))' "$LIST"
    ```
-   Apply the same scope test as the sweep above, with `scripts/pr-scope.py`, before touching a candidate;
-   the script reads a JSON array, so give it the listing without the `--jq` filter and filter its in-scope PRs afterwards;
-   an out-of-scope one is reported to the user and left untouched.
+   The script reads the whole JSON array, so it gets the listing before any filter;
+   its `included` numbers then pick the in-scope candidates from the saved listing, which keeps `mergeable`.
+   The identity flags are the ones `ardia` step 1 defines.
+   A conflicting PR outside `included` is reported to the user and left untouched.
    Verify each in-scope candidate with `git merge-tree --write-tree origin/main
    origin/<branch>` (git ≥ 2.38; see `resolve-conflicts`, "Verify before you act") before
    claiming --- `UNKNOWN` isn't proof of a real conflict, and `CONFLICTING` can

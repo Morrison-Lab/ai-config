@@ -81,6 +81,11 @@ LIMITS
 * The typed path reads a wake's `<message>` elements as the harness wrote them.
   If a harness ever left a literal `</message>` unescaped inside a peer
   message's body, the text after it would read as a new element.
+* A tap is told from typed words by its shape alone. A user who types, as a
+  whole message, exactly `Chose "..." on the decision card asking "..."` is
+  read as a tap and gets no override; any other words in the message keep it.
+* A wake `<message>` with neither a `trust` nor a `from` attribute is read, as
+  it was before those attributes were checked.
 * A relayed line is trusted as relayed: a session that forges a message-reading
   result is outside what a transcript can show. The sha tie still means the
   line must name the exact head being merged.

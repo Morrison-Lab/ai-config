@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Delegate sidecar work to OpenCode or OpenRouter models.">
+<meta name="description" content="Delegate sidecar work to OpenCode or OpenRouter models. Aliases: dto.">
 
 <title>skill – ai-config</title>
 <style>
@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -518,6 +518,7 @@ cookieconsent.run({
 <ul>
 <li><strong>Do:</strong> ask a free reviewer for a reason per changed line, so a verdict comes with the lines it checked.</li>
 <li><strong>Don’t:</strong> turn on the Go plan’s “Extra Usage” when the weekly limit hits: it is pay-as-you-go.</li>
+<li><strong>Do:</strong> post the model, the head sha and the verdict line as a PR comment when another session will merge the PR. The merge gate credits only a read made in the merging session, and the merge runner on <a href="https://github.com/Morrison-Lab/ai-config/pull/5898">#5898</a> found no read on the PR and ran its own.</li>
 </ul>
 <p>Check <code>/models</code> for the current free ids and try them before relying on this route.</p></li>
 <li><p><strong>Make the request with <code>curl</code> itself if it is to satisfy the merge gate.</strong> <code>hooks/warn-merge-without-cross-harness-review.py</code> counts a Bash command whose command word is <code>curl</code>, with a data flag (<code>-d</code>, <code>--data-binary</code>, <code>--json</code> and the like) and a literal <code>https://opencode.ai/zen/go/v1/chat/completions</code> URL, that exits without error after the last push. It never reads the response, and it does not see a request made from a script. In a command that also runs <code>git push</code>, a <code>curl</code> counts only when every push in that command runs before it, at the same level: both on the top-level command line, or both inside one <code>bash -c</code> string. A push in that same command at another level, such as <code>bash -c 'git push'; curl ...</code>, makes the review stale whichever runs first, because the hook cannot order the two. In the session that merged #5486 (author’s own observation, not recorded on the PR), the hook refused the merge after a review sent from a Python script and allowed it once the same request was sent with <code>curl</code>.</p></li>

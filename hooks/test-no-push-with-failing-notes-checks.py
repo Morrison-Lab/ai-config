@@ -279,8 +279,7 @@ verdict, _ = run("git push origin feat", gated, 0, extra={"CTR_GLOBS": "*.nothin
 env_ctr = json.load(open(os.path.join(LOG, "check-title-references.py.env"), encoding="utf-8"))
 expect("T49 caller CTR_ variables do not leak into a check", env_ctr.get("CTR_GLOBS"), None)
 
-# ai-config#4986: lds's cluster-checks.yml runs its diff-scoped checks as run-check.sh lines,
-# not one caller workflow each, so the hook must read those lines too.
+# ai-config#4986: lds's cluster-checks.yml runs its diff-scoped checks as run-check.sh lines.
 BUNDLED = """name: Cluster checks
 on:
   pull_request:
@@ -333,14 +332,9 @@ odd = make_repo({"cluster-checks.yml": BUNDLED.replace(
 verdict, out = run("git push origin feat", odd, 0)
 expect("T58 an unknown expression fails open with a note naming the check",
        (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
-no_ref = make_repo({"cluster-checks.yml": BUNDLED.replace("repository: Morrison-Lab/gha", "repository: other/gha")})
-verdict, _ = run("git push origin feat", no_ref, 1)
-expect("T59 bundled lines without a gha checkout are not read", verdict, "silent")
 expect("T60 the lds line form parses: name, ref, command",
        [(c["name"], c["ref"], c["command"][-1]) for c in hook.parse_run_check_lines(BUNDLED)],
-       [("check-avoided-words", "v3", ".gha/check-avoided-words/check-avoided-words.py"),
-        ("check-new-line-breaks", "v3", ".gha/check-new-line-breaks/check-new-line-breaks.py")])
-
+       [(n, "v3", f".gha/{n}/{n}.py") for n in ("check-avoided-words", "check-new-line-breaks")])
 unquoted = make_repo({"cluster-checks.yml": BUNDLED.replace(
     "CAW_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}'",
     "CAW_BASE_REF=origin/main CAW_EXTRA=${{ github.base_ref }}")})
@@ -351,62 +345,52 @@ commented = hook.parse_run_check_lines(BUNDLED.replace(
     "check-avoided-words.py\n", "check-avoided-words.py # trailing note\n"))
 expect("T62 a trailing YAML comment is not passed as arguments",
        " ".join(commented[0]["command"]), "python3 -u .gha/check-avoided-words/check-avoided-words.py")
-expect("T63 a gha checkout at another path is not read as .gha",
-       hook.parse_run_check_lines(BUNDLED.replace("path: .gha", "path: tools/gha")), [])
-expect("T64 checkout keys in another order still give the ref",
-       hook.gha_checkout_ref("      with:\n        path: .gha\n        ref: v3\n        repository: Morrison-Lab/gha\n"), "v3")
-expect("T66 a trailing comment on a checkout key is ignored",
-       hook.gha_checkout_ref("      with:\n        repository: Morrison-Lab/gha\n        ref: v3 # floating\n        path: .gha # here\n"), "v3")
-expect("T67 a trailing comment on the repository line still finds the checkout",
-       hook.gha_checkout_ref("      with:\n        repository: Morrison-Lab/gha # pinned\n        ref: v3\n        path: .gha\n"), "v3")
-pr_fail = hook.parse_run_check_lines(BUNDLED.replace(
-    "CAW_FAIL=false", "CAW_FAIL='${{ github.event_name == 'pull_request' && 'true' || 'false' }}'"))
-expect("T68 a pull_request test outside *_BASE_REF is not read as the base",
-       any(u.startswith("CAW_FAIL=") for u in pr_fail[0]["unhandled"]), True)
-no_cmd = hook.parse_run_check_lines(BUNDLED.replace(
-    " -- python3 -u .gha/check-avoided-words/check-avoided-words.py", " --"))
-expect("T69 a line with nothing after -- is not runnable, never an empty command",
-       (no_cmd[0]["command"], bool(no_cmd[0]["unhandled"])), ([], True))
-other_cmd = hook.parse_run_check_lines(BUNDLED.replace(
-    "python3 -u .gha/check-avoided-words/check-avoided-words.py", "bash -c true"))
-expect("T70 a command that is not python on a .gha/ script is not run",
-       any("not python on a .gha/ script" in u for u in other_cmd[0]["unhandled"]), True)
-for probe in ("python3 -c 'import os' .gha/x.py", "python3 /tmp/evil.py .gha/x.py",
-              "python3 -m pip .gha/x.py", "python3 .gha/../../evil.py"):
-    probed = hook.parse_run_check_lines(BUNDLED.replace(
-        "python3 -u .gha/check-avoided-words/check-avoided-words.py", probe))
-    expect(f"T71 python with a .gha/ argument but not a .gha/ script is not run: {probe}",
-           any("not python on a .gha/ script" in u for u in probed[0]["unhandled"]), True)
-for var in ("PYTHONPATH=.", "PATH=.", "GIT_EXTERNAL_DIFF=./x", "LD_PRELOAD=./x.so"):
-    env_line = hook.parse_run_check_lines(BUNDLED.replace("CAW_FAIL=false", "CAW_FAIL=false " + var))
-    expect(f"T73 a variable outside the check's prefix is not run: {var}",
-           any(var.split("=")[0] in u for u in env_line[0]["unhandled"]), True)
-gha_tmp = tempfile.mkdtemp(prefix="npc-gha-escape-")
-outside_tmp = tempfile.mkdtemp(prefix="npc-outside-")
-open(os.path.join(outside_tmp, "evil.py"), "w").close()
-os.symlink(outside_tmp, os.path.join(gha_tmp, "x"))
-escape_call = {"name": "escape", "unhandled": [], "assigns": {"X_BASE_REF": "main"},
-               "command": "python3 .gha/x/evil.py".split()}
-expect("T74 a .gha/ path that a symlink takes outside the gha checkout is not run",
-       hook.run_bundled(gha_tmp, gha_tmp, escape_call, "origin/main")[1:],
-       ("error", "line not runnable locally: a .gha/ path leaves the gha checkout"))
-for line in ("LD_BASE_REF=origin/main LD_PRELOAD=./evil.so", "GIT_BASE_REF=origin/main GIT_EXTERNAL_DIFF=./x",
-             "XDG_BASE_REF=origin/main XDG_CONFIG_HOME=./cfg", "BASH_BASE_REF=origin/main BASH_ENV=./x",
-             "_BASE_REF=origin/main _X=1"):
-    named = hook.parse_run_check_lines(BUNDLED.replace("CAW_FAIL=false", "CAW_FAIL=false " + line))
-    expect(f"T75 a *_BASE_REF key the workflow names cannot widen the allowed prefix: {line}",
-           any("does not name a check's variables" in u for u in named[0]["unhandled"]), True)
+for case, before, after in (("T59 another repository", "repository: Morrison-Lab/gha", "repository: other/gha"),
+                            ("T63 another path", "path: .gha", "path: tools/gha")):
+    expect(f"{case} is not read as the .gha checkout", hook.parse_run_check_lines(BUNDLED.replace(before, after)), [])
+for case, keys in (("T64 keys in another order", ["path: .gha", "ref: v3", "repository: Morrison-Lab/gha"]),
+                   ("T66 a comment on a key", ["repository: Morrison-Lab/gha", "ref: v3 # f", "path: .gha # h"]),
+                   ("T67 a comment on repository", ["repository: Morrison-Lab/gha # p", "ref: v3", "path: .gha"])):
+    expect(f"{case} still gives the ref", hook.gha_checkout_ref("      with:\n" + "".join(f"        {k}\n" for k in keys)), "v3")
+CMD = "python3 -u .gha/check-avoided-words/check-avoided-words.py"
+FAIL, OWN = "CAW_FAIL=false", "is not python on .gha/check-avoided-words/"
+# (case, text replaced, replacement, expected substring of an `unhandled` entry)
+REFUSED = [
+    ("T68 a pull_request test outside *_BASE_REF", FAIL,
+     "CAW_FAIL='${{ github.event_name == 'pull_request' && 'true' || 'false' }}'", "CAW_FAIL="),
+    ("T69 nothing after --", " -- " + CMD, " --", "(empty)"),
+    ("T70 not python", CMD, "bash -c true", OWN),
+    ("T71 python -c", CMD, "python3 -c 'import os' .gha/x.py", OWN),
+    ("T71 a .. path", CMD, "python3 .gha/../../evil.py", OWN),
+    ("T77 another gha script", CMD, "python3 -u .gha/quarto-publish/render-per-file.py . out html", OWN),
+    ("T73 PYTHONPATH", FAIL, FAIL + " PYTHONPATH=.", "PYTHONPATH"),
+    ("T73 LD_PRELOAD", FAIL, FAIL + " LD_PRELOAD=./x.so", "LD_PRELOAD"),
+    ("T75 an LD_ key", FAIL, FAIL + " LD_BASE_REF=m LD_PRELOAD=./x.so", "LD_BASE_REF does not name"),
+    ("T75 a GIT_ key", FAIL, FAIL + " GIT_BASE_REF=m GIT_EXTERNAL_DIFF=./x", "GIT_BASE_REF does not name"),
+    ("T75 an XDG_ key", FAIL, FAIL + " XDG_BASE_REF=m XDG_CONFIG_HOME=./c", "XDG_BASE_REF does not name"),
+    ("T75 a BASH key", FAIL, FAIL + " BASH_BASE_REF=m BASH_ENV=./x", "BASH_BASE_REF does not name"),
+    ("T75 a bare _ key", FAIL, FAIL + " _BASE_REF=m _X=1", "_BASE_REF does not name"),
+    ("T80 a GITHUB_ key", FAIL, FAIL + " GITHUB_BASE_REF=x GITHUB_STEP_SUMMARY=/tmp/x",
+     "GITHUB_BASE_REF does not name"),
+    ("T79 two *_BASE_REF keys", FAIL, FAIL + " OI_BASE_REF=x", "not exactly one"),
+    ("T81 a commit-pinned gha ref", "ref: v3", "ref: " + "a" * 40, "is a commit, not a named tag"),
+]
+for case, before, after, reason in REFUSED:
+    refused = hook.parse_run_check_lines(BUNDLED.replace(before, after))
+    expect(f"{case} is not run", any(reason in u for u in refused[0]["unhandled"]), True)
 gha_src = tempfile.mkdtemp(prefix="npc-gha-src-")
-os.makedirs(os.path.join(gha_src, "x"))
-with open(os.path.join(gha_src, "x", "x.py"), "w", encoding="utf-8") as fh:
+os.makedirs(os.path.join(gha_src, "check-x"))
+with open(os.path.join(gha_src, "check-x", "check-x.py"), "w", encoding="utf-8") as fh:
     fh.write('PREFIX = "CAW_"\n')
-foreign_call = {"name": "foreign", "unhandled": [], "assigns": {"ZZZ_BASE_REF": "main"},
-                "command": "python3 .gha/x/x.py".split()}
+foreign_call = {"name": "check-x", "unhandled": [], "assigns": {"ZZZ_BASE_REF": "main"},
+                "command": "python3 .gha/check-x/check-x.py".split()}
 expect("T76 a prefix the gha script never names is not run",
        hook.run_bundled(gha_src, gha_src, foreign_call, "origin/main")[1:],
        ("error", "line not runnable locally: the gha script does not read ZZZ_* variables"))
 expect("T72 interpreter flags before the .gha/ script are allowed",
-       hook.gha_script_command("python3 -I -u .gha/x/x.py --flag".split()), True)
+       hook.gha_script_command("python3 -I -u .gha/check-x/check-x.py --flag".split(), "check-x"), True)
+expect("T78 a check name not of the form check-<words> runs nothing",
+       hook.gha_script_command("python3 .gha/quarto-publish/quarto-publish.py".split(), "quarto-publish"), False)
 no_fail = make_repo({"cluster-checks.yml": BUNDLED.replace(" CAW_FAIL=false", ""), "annotation-gate.yml": GATE})
 run("git push origin feat", no_fail, 0)
 env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))

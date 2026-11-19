@@ -166,12 +166,14 @@ committed pass.
      Grep each key term of the principle separately over the same paths.
      Then find the principle in [`shared/principles/README.md`](../../shared/principles/README.md)'s catalog
      and read the rules it links under that principle.
-     When the catalog has no heading for it, the grep is the whole search.
+     Match by meaning, not by heading words, since the catalog may name the principle differently.
+     When no catalog heading means the same thing, the greps are the whole search.
      When an existing rule states the principle,
      add the new case to that rule rather than writing a new one,
      or change nothing when the rule already holds the case.
      When no rule states it, write the principle into the entry this pass writes or extends for the learning.
-     Whether or not a rule already states it, when the principle needs more than a rule's text (for example, a new hook, a sweep or a new fragment),
+     Whether or not a rule already states it, when the principle is not trivial to implement in this pass
+     (for example, it needs a new hook, a sweep, a new fragment or a rewrite of several rules),
      file that work with [`defer-issue`](../defer-issue/SKILL.md) in the same pass.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the
      append, and read its warning band, not only its pass/fail line.**

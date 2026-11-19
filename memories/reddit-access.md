@@ -126,9 +126,10 @@ preflight out, whereas a Reddit 403 would confirm it.
 
 ## Retired route: Claude in Chrome, in-page fetch
 
-Retired 2026-10-22: Ezra's rule is "no chrome ever" ([`browser-last-resort`](../shared/workflow/browser-last-resort.md)).
+Retired 2026-10-22: Ezra's rule is "no chrome ever", which covers the Claude in Chrome plugin and his own Chrome but not a headless browser in the agent's container (Ezra, 2026-11-19, of the no-browser rule: "i meant the claude in browser plugin") ([`browser-last-resort`](../shared/workflow/browser-last-resort.md)).
 Do not use it; the measurements below stay as history.
-When Reddit matters, report the surface as blocked and ask the user for a non-Chrome route.
+When Reddit matters, try a headless browser in your own container first (untested against Reddit as of 2026-11-19);
+if that is blocked too, report the surface as blocked and ask the user for a non-Chrome route.
 
 The `mcp__claude-in-chrome__*` tools drive the user's real Chrome, which has
 a real TLS fingerprint and a logged-in Reddit session.

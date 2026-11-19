@@ -43,7 +43,7 @@ START_SUFFIXES = ("mcp__hearthbot__start_thread", "__create_session")
 MESSAGE_SUFFIX = "mcp__hearthbot__message_thread"
 # The line must name Fable: a launch that passes `model` cannot be checked, but a
 # Model-fit line can, so it is where "always consider Fable" is enforced.
-MODEL_FIT = re.compile(r"^\s*Model-fit:\s*\S.*\bFable\b.*\S", re.M | re.I)
+MODEL_FIT = re.compile(r"^\s*Model-fit:\s*\S.*\bFable:\s*\S", re.M | re.I)
 # A message either assigns work (and says why not a new thread) or declares
 # that it assigns none (a relay of an answer, a pinned sha, a head to merge).
 WHY_NOT_NEW = re.compile(r"^\s*(Why-not-new-thread|No-new-work):\s*\S.*\S", re.M | re.I)
@@ -93,7 +93,7 @@ def decide(payload):
                 "`sonnet` or `haiku` for bounded edits, lookups and "
                 "mechanical work; `opus` for large content passes and hard "
                 "reasoning. Consider Fable too: when it would be the best fit, ask "
-                "Ezra on a decision card whether to use it (it needs his yes).")
+                "the user on a decision card whether to use it (it needs their yes).")
     if tool.endswith(START_SUFFIXES):
         if has_model or MODEL_FIT.search(text):
             return None
@@ -102,7 +102,7 @@ def decide(payload):
                 "select-model / recm criteria: pass `model`, or put a line "
                 "`Model-fit: <model> -- <why>; Fable: <asked | not the best fit because ...>` in the "
                 "instructions, naming Fable as considered. When Fable would be "
-                "the best fit, ask Ezra on a decision card first (it needs his yes).")
+                "the best fit, ask the user on a decision card first (it needs their yes).")
     if tool.endswith(MESSAGE_SUFFIX):
         if WHY_NOT_NEW.search(text):
             return None

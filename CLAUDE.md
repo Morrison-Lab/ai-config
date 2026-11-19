@@ -496,7 +496,7 @@ Detail, rationale, and cases: [`shared/workflow/no-fable-subagents.md`](shared/w
 
 When you start a subagent, thread or session, pick the best-fit model with `select-model` and `recm` (Sonnet or Haiku for bounded edits and lookups, Opus for large content passes and hard reasoning).
 A message cannot change a running thread's model, so before giving new work to an existing thread, decide whether a new thread would fit better (Ezra, 2026-11-16).
-`hooks/require-model-choice.py` denies a launch with no `model` (or `Model-fit:` line) and a `message_thread` with neither a `Why-not-new-thread:` line (new work) nor a `No-new-work:` line (a relay or a sha).
+`hooks/require-model-choice.py` denies a launch with no `model` (or a `Model-fit:` line naming Fable) and a `message_thread` with neither a `Why-not-new-thread:` line (new work) nor a `No-new-work:` line (a relay or a sha).
 
 ## Derive a set of work items; never hand over an enumeration of it
 

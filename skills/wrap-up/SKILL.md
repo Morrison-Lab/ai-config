@@ -56,7 +56,7 @@ git log --oneline -5 origin/main           # what actually landed on main
 - **Merge conflict sweep.** Before closing out, check every open PR's
   `mergeable` field.
   Filter the list by `memories/reviewing-prs.md`'s scope test first:
-  save that list unfiltered to a file and pipe it into `python3 scripts/pr-scope.py` with the identity flags `ardia` step 1 defines.
+  save that list unfiltered to a file and pipe it into `python3 scripts/pr-scope.py` with the `--user`, `--alias`, `--requested` and `--excluded` flags `ardia` step 1 defines.
   Keep the saved list, since the script's output has no `mergeable` field.
   Report an out-of-scope conflicting PR to the user and leave it untouched (no comment, no push).
   For each in-scope PR with `mergeable == "CONFLICTING"` **or

@@ -262,7 +262,9 @@ merges: `git merge-tree "$(git merge-base origin/main origin/<sibling-branch>)" 
 cleanly.
 That check reads the sibling branch and edits nothing, so it runs for every
 sibling PR.
-Then apply `memories/reviewing-prs.md`'s scope test, with `python3 scripts/pr-scope.py` and the input and flags `ardia` step 1 defines, before preparing
+Then apply `memories/reviewing-prs.md`'s scope test
+(save the open-PR list unfiltered to a file and pipe it into `python3 scripts/pr-scope.py` with the identity flags `ardia` step 1 defines)
+before preparing
 anything: for a sibling PR that fails it, report the conflict to the user and
 leave the PR untouched, since they can assign or name it first.
 For one that passes, re-apply the sibling PR's actual semantic change (not a

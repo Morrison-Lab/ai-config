@@ -29,9 +29,10 @@ this skill exists to pin the meaning.)
    (`gh pr list --json number,headRefName,baseRefName,author,assignees`,
    or `mcp__github__list_pull_requests` in remote sessions).
    Keep the full list for mapping the stack, then exclude from the action
-   queue every PR that fails `memories/reviewing-prs.md`'s scope test, using
-   `python3 scripts/pr-scope.py`, with the input and flags `ardia` step 1 defines (opened by or assigned to the invoking user,
-   explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)), and
+   queue every PR that fails `memories/reviewing-prs.md`'s scope test (opened by or assigned to the invoking user,
+   explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)):
+   save that list unfiltered to a file and pipe it into `python3 scripts/pr-scope.py` with the identity flags `ardia` step 1 defines,
+   and
    report the PRs excluded: every later step pushes to the branch, which
    that memory forbids on any other PR.
    A stacked PR whose base PR is out of scope is synced against that base

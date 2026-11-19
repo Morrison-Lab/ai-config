@@ -335,7 +335,7 @@ expect("T60 the lds line form parses: name, ref, command",
        [(n, "v3", f".gha/{n}/{n}.py") for n in ("check-avoided-words", "check-new-line-breaks")])
 unquoted = make_repo({"cluster-checks.yml": BUNDLED.replace(
     "CAW_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}'",
-    "CAW_BASE_REF=origin/main CAW_EXTRA=${{ github.base_ref }}")})
+    "CAW_BASE_REF=${{ github.base_ref }}")})
 verdict, out = run("git push origin feat", unquoted, 0)
 expect("T61 an unquoted expression fails open with a note, never runs as text",
        (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))

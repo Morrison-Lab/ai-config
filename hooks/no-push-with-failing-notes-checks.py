@@ -313,7 +313,7 @@ def parse_run_check_lines(text: str) -> list[dict]:
         command = argv[split + 1:]
         # The pushed repo writes this line: run only .gha/<name>/<name>.py from a named
         # gha ref, with no arguments, one prefix and only the VALUE_SAFE_KEYS under it.
-        if not SAFE_REF.fullmatch(ref or "") or re.fullmatch(r"[0-9a-f]{40}", ref or ""):
+        if not SAFE_REF.fullmatch(ref or "") or re.fullmatch(r"[0-9a-fA-F]{40}", ref or ""):
             unhandled.append(f"gha ref {ref} is not a named tag or branch")
         prefixes = check_prefixes(assigns)
         if len(prefixes) != 1:
@@ -338,7 +338,7 @@ SAFE_PYTHON_FLAGS = ("-u", "-I", "-B")
 # only these suffixes, which select files to read or how to report, may follow the prefix.
 VALUE_SAFE_KEYS = ("BASE_REF", "WHOLE_TREE", "GLOBS", "PATHS_IGNORE", "FAIL", "CLAUSE_BREAKS",
                    "CLAUSE_MIN_LENGTH", "LIBRARY", "MACROS_FILE")
-# A ref that names a cache directory inside CACHE_ROOT/gha: no "." or "..", no leading "-".
+# A ref that names a cache directory inside CACHE_ROOT/gha: no "..", no leading "." or "-".
 SAFE_REF = re.compile(r"(?!.*\.\.)[A-Za-z0-9][\w.\-/]*")
 # Prefixes whose variables change how a loader, interpreter or git behaves.
 # A check's own prefix is never one of these.

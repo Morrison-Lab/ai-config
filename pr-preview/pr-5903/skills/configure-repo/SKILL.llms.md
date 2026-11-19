@@ -1,4 +1,4 @@
-# configure-repo — set a repository up for agent work
+# configure-repo: set a repository up for agent work
 
 Make a repository ready for agents from any harness: point its `AGENTS.md` at ai-config, give it the lab’s baseline CI, and add the review workflows, all in one PR ([ai-config#2238](https://github.com/Morrison-Lab/ai-config/issues/2238)). Each step below runs a tool or skill that already exists; this skill only puts them in order.
 

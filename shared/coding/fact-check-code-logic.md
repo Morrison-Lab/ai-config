@@ -1923,3 +1923,13 @@ Where an outcome has two consumers that disagree --- as `ambiguous` did --- the 
   the first is reversible by a later reader and the second is not.
 - **Don't:** assert a safety property of a return value from inside the function that produces it.
 - **Don't:** treat a fix in the cautious direction as exempt from the review a fix in the permissive direction would get --- two of this PR's seven fail-opens were introduced by the fix for the previous one.
+
+## An allowlist the input can name is not an allowlist
+
+On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) allowed a workflow line to set only the variables that share the prefix of its own `*_BASE_REF` key.
+The workflow being pushed names that key, so a line with `LD_BASE_REF` was allowed `LD_PRELOAD`, and one with `GIT_BASE_REF` was allowed `GIT_EXTERNAL_DIFF`.
+Two review rounds had passed the rule, because each probe kept the check's real prefix (`CAW_`) and varied only the other variable.
+The fix takes the allowed prefix from something the input does not write: the prefix must be a plain upper-case name outside a reserved set, and the gha script that runs must name it.
+
+- **Do:** for every allowlist on untrusted input, trace where each allowed value comes from, and probe with the input choosing that value too.
+- **Don't:** derive the allowed set from the same input it filters.

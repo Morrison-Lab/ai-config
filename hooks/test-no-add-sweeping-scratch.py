@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory() as root:
     os.makedirs(sub)
     agent = os.path.join(repo, ".claude", "worktrees", "agent-1")
     os.makedirs(agent)
-    git("init", "-q", cwd=agent)
+    git("init", "-q", "-b", "main", cwd=agent)
     write(os.path.join(agent, "f.txt"))
     git("add", "f.txt", cwd=agent)
     git("commit", "-q", "-m", "x", cwd=agent)
@@ -79,6 +79,14 @@ with tempfile.TemporaryDirectory() as root:
     os.remove(os.path.join(repo, ".git", "index.lock"))
     write(os.path.join(repo, ".gitignore"), ".claude/worktrees/\n")
     check("ignored worktree", run("git add -A", repo), "allow")
+    check("forced add of an ignored worktree",
+          run("git add -f .claude/worktrees/agent-1", repo), "deny")
+    check("forced cluster", run("git add -Af", repo), "deny")
+    check("forced add of a plain file", run("git add -f a.txt", repo), "allow")
+    cafe = os.path.join(repo, "café", "inner")
+    os.makedirs(cafe)
+    git("init", "-q", "-b", "main", cwd=cafe)
+    check("non-ASCII embedded repo", run("git add -A", repo), "deny")
 
 if FAILS:
     print("\n".join(FAILS))

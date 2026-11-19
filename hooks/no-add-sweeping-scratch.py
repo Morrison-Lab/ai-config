@@ -3,7 +3,8 @@
 such as a worktree-isolated agent under `.claude/worktrees/`, as a gitlink no
 clone can resolve (ai-config#3884). Read-only: `git ls-files -o` on the add's
 own pathspecs lists an untracked repository as `dir/`, and it takes no index
-lock. `-u` and `--pathspec-from-file` are not checked. `ALLOW_SCRATCH_ADD=1`
+lock; `-z` keeps a non-ASCII name unquoted, and a forced add (`-f`) lists
+ignored paths too. `-u` and `--pathspec-from-file` are not checked. `ALLOW_SCRATCH_ADD=1`
 clears one command. Fails open when a helper cannot load, the line does not
 parse, `--git-dir`, `--work-tree`, `GIT_DIR` or `GIT_WORK_TREE` redirect the
 repository, or git fails.
@@ -36,14 +37,24 @@ FOOTER = (" Override for one command: ALLOW_SCRATCH_ADD=1. "
           "Rule: shared/workflow/shared-git-state.md.")
 
 
-def git(cwd, *args):
-    """stdout lines of `git -C cwd args`, or None when it fails."""
+def git(cwd, *args, nul=False):
+    """stdout records of `git -C cwd args` (lines, or NUL-separated with
+    `nul`), or None when it fails."""
     try:
         p = subprocess.run(["git", "-C", cwd, *args], capture_output=True,
                            text=True, timeout=10, encoding="utf-8")
     except (OSError, subprocess.SubprocessError):
         return None
-    return p.stdout.splitlines() if p.returncode == 0 else None
+    if p.returncode != 0:
+        return None
+    return [r for r in p.stdout.split("\0") if r] if nul else p.stdout.splitlines()
+
+
+def has_flag(opts, short, long):
+    """Whether `git add` options include `-<short>` or `--<long>`, the short
+    form alone or in a cluster such as `-Af`."""
+    return any(a == "--" + long or (a.startswith("-") and not a.startswith("--")
+                                    and short in a[1:]) for a in opts)
 
 
 def embedded_repo(cwd, rest):
@@ -54,10 +65,12 @@ def embedded_repo(cwd, rest):
         return None
     cut = rest.index("--") if "--" in rest else len(rest)
     specs = [a for a in rest[:cut] if not a.startswith("-")] + rest[cut + 1:]
-    if not specs and not {"-A", "--all"} & set(rest):
+    if not specs and not has_flag(rest[:cut], "A", "all"):
         return None
-    for rel in git(cwd, "ls-files", "-o", "--exclude-standard",
-                   "--", *(specs or [":/"])) or []:
+    exclude = ([] if has_flag(rest[:cut], "f", "force")
+               else ["--exclude-standard"])
+    for rel in git(cwd, "ls-files", "-z", "-o", *exclude,
+                   "--", *(specs or [":/"]), nul=True) or []:
         if rel.endswith("/") and os.path.exists(os.path.join(cwd, rel, ".git")):
             return rel
     return None

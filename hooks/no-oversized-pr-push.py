@@ -187,6 +187,11 @@ def unmoved(lines, budget):
     return n
 
 
+def skipped(path, gen):
+    """A path the cap never counts: generated, or on the IGNORE list."""
+    return path in gen or any(re.fullmatch(p, path) for p in IGNORE)
+
+
 def measure(cwd, base, tip="HEAD"):
     mb = git(cwd, "merge-base", base, tip)
     if not mb:
@@ -196,18 +201,21 @@ def measure(cwd, base, tip="HEAD"):
         return None
     # A failed text diff only turns off move detection: numstat still counts.
     texts = changed_lines(cwd, mb, tip) or {}
-    plus, minus = move_budget(texts), move_budget(texts)
     added = git(cwd, "diff", "--name-only", "--diff-filter=A", "-M", mb, tip)
     added = set((added or "").splitlines())
     registration = registration_paths(added)
     rows = [r.split("\t", 2) for r in out.splitlines()]
     rows = [r for r in rows if len(r) == 3]
     gen = generated(cwd, [new_path(r[2]) for r in rows])
+    # Ignored and generated paths are not counted, so their lines must not
+    # pay for a counted file's lines as moves either.
+    rows = [r for r in rows if not skipped(new_path(r[2]), gen)]
+    counted = {new_path(r[2]) for r in rows}
+    texts = {path: t for path, t in texts.items() if path in counted}
+    plus, minus = move_budget(texts), move_budget(texts)
     files = lines = 0
     for parts in rows:
         path = new_path(parts[2])
-        if path in gen or any(re.fullmatch(p, path) for p in IGNORE):
-            continue
         # A pure rename (no line changed) is content-identical (ai-config#5128).
         if " => " in parts[2] and parts[:2] == ["0", "0"]:
             continue

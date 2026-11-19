@@ -206,6 +206,25 @@ def main():
     split = split_repo()
     split_edited = split_repo(edit=16)
 
+    # An ignored path's deleted lines must not pay for a counted file's added lines.
+    def ignored_source_repo():
+        d = make_repo({"docs/page.md": 700})
+        text = [f"Sentence {j} of the page.\n" for j in range(700)]
+        with open(os.path.join(d, "docs/page.md"), "w", encoding="utf-8") as f:
+            f.write("".join(text))
+        git(d, "commit", "-q", "-a", "--amend", "-m", "page")
+        git(d, "update-ref", "refs/remotes/origin/main", "HEAD")
+        os.remove(os.path.join(d, "docs/page.md"))
+        # Four parts, so no part is detected as a rename of the whole page.
+        for i in range(4):
+            with open(os.path.join(d, f"part{i}.qmd"), "w", encoding="utf-8") as f:
+                f.write("".join(text[i * 175:i * 175 + 175]))
+        git(d, "add", "-A")
+        git(d, "commit", "-q", "-m", "copy out of docs")
+        return d
+
+    ignored_source = ignored_source_repo()
+
     # lds#2896 shape: a layer of 15 files stacked on a pushed 15-file layer.
     def stack_repo():
         d = make_repo({f"a{i}.qmd": 20 for i in range(15)})
@@ -239,6 +258,8 @@ def main():
         ("a split of one page into 35 subfiles is not counted (lds#2885)",
          run("git push", split), False),
         ("a split plus over-cap new files is denied", run("git push", split_edited), True),
+        ("lines moved out of an ignored path still count",
+         run("git push", ignored_source), True),
         ("a stacked layer is measured against its pushed parent (lds#2896)",
          run("git push", stacked), False),
         ("a stacked layer is measured against its open PR's base",

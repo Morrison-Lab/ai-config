@@ -117,12 +117,11 @@ committed pass.
      item below for where. This changes step 4's target, not just the
      content.)
    - **What general principle is it a case of?**
-     Write the principle as one sentence in this pass's notes,
+     Write the principle as one sentence beside the learning,
      at the scope [`read-instructions-fully`](../../shared/workflow/read-instructions-fully.md)'s
-     "Record a rule at the scope of the user's words" sets.
-     Step 3 searches for the principle, not only for the subject.
-     When the principle is not trivial to implement at once (for example, it needs a new hook, a sweep or a new fragment),
-     file it with [`defer-issue`](../defer-issue/SKILL.md) in the same pass
+     "Record a rule at the scope of the user's words" sets,
+     and carry the sentence into step 3's search and step 5's report.
+     Step 3 searches for the principle, not only for the subject
      ([ai-config#3157](https://github.com/Morrison-Lab/ai-config/issues/3157)).
 
 3. **Apply updates.** For each item:
@@ -164,8 +163,12 @@ committed pass.
      Grep the principle's key terms over the same paths.
      Then find the principle in [`shared/principles/README.md`](../../shared/principles/README.md)'s catalog
      and read the rules it links under that principle.
+     When the catalog has no heading for it, the grep is the whole search.
      When an existing rule states the principle,
      add the new case to that rule rather than writing a new one.
+     When no rule states it, implement the principle in this pass.
+     When that is not trivial (for example, it needs a new hook, a sweep or a new fragment),
+     file it with [`defer-issue`](../defer-issue/SKILL.md) in the same pass instead.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the
      append, and read its warning band, not only its pass/fail line.**
      The band names every memory file near the cap and how many lines each

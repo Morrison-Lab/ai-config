@@ -533,14 +533,14 @@ def _typed_text(text):
 # ("... only after CI is green"), a hold ("Hold; waive the check later") or a
 # negation ("Do not waive the check") is not that label.
 RX_WAIVE_LABEL = re.compile(
-    r"\A\W*waive\s+the\s+check(?:\s*,\s*merge\s+(?:it|both|them|all))?\W*\Z",
+    r"\A\s*waive\s+the\s+check(?:\s*,\s*merge\s+(?:it|both|them|all))?[\s.]*\Z",
     re.IGNORECASE)
 # Another option must decline. Its label is one of a fixed few and nothing
 # else ("Hold it", "Hold", "Hold both", "No", "Not now"), and its consequence
 # names no way of going ahead, so "Skip the checker, land it now" and a
 # "Hold it" whose consequence merges are both refused.
 RX_DECLINE_LABEL = re.compile(
-    r"\A\W*(?:hold(?:\s+(?:it|both))?|no|not\s+now)\W*\Z",
+    r"\A\s*(?:hold(?:\s+(?:it|both))?|no|not\s+now)[\s.]*\Z",
     re.IGNORECASE)
 RX_PROCEEDS = re.compile(
     r"\b(?:merg|waiv|ship|overrid|land|push|squash|rebas|proceed|go\s+ahead)",

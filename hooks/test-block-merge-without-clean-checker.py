@@ -542,7 +542,7 @@ def main():
     check("allows a pull URL written with a capitalised host",
           not mcp(card_steps(options=(
               (WAIVE, "I merge GitHub.com/Morrison-Lab/psw/pull/354."), HOLD)))[0])
-    for other in ("Hold off", "Hold them", "Hold all"):
+    for other in ("Hold off", "Hold them", "Hold all", "-> Hold it", "No?"):
         check(f"denies when the only other option is {other!r} (not in the documented set)",
               mcp(card_steps(options=((WAIVE, NAMES), (other, "It stays open."))))[0])
     for label in ("Waive the check, merge both", "Waive the check, merge them",
@@ -551,6 +551,7 @@ def main():
               not mcp(card_steps(options=((label, NAMES), HOLD), tapped=label))[0])
     for label in ("Waive the check and merge it", "Waive the check, merge this",
                   "Waive the fully-clean check", "Waive the merge check",
+                  "(?) Waive the check", "Waive the check?!",
                   "Waive the check merge them"):
         check(f"denies the tapped label {label!r} (not in the documented set)",
               mcp(card_steps(options=((label, NAMES), HOLD), tapped=label))[0])

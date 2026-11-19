@@ -116,7 +116,9 @@ check("--dry-run prints the empty PreToolUse shape when silent",
 res = subprocess.run([sys.executable, HOOK], input="not json", capture_output=True, encoding="utf-8")
 check("malformed stdin exits 0 with no output", res.returncode == 0 and not res.stdout.strip())
 
-for name in ("Task", "invoke_subagent"):
+# `spawn_agent` is Codex's launch tool, which the hook ignored until
+# ai-config#3740 moved the names into scripts/lib/tool_names.py.
+for name in ("Task", "invoke_subagent", "spawn_agent", "collaboration.spawn_agent"):
     p = agent(); p["tool_name"] = name
     rc, out = run(p)
     check(f"tool name {name} is judged like Agent (denied when inheriting Fable)", decision(out) == "deny")

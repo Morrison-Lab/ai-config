@@ -141,6 +141,15 @@ try:
                                        '{"merged": true}</event>'})
     check("broken install: the merge reminder says the resolve check is off",
           "did not load" in out, True)
+
+    # ai-config#3740: the Fable prohibition must not switch off with the module.
+    shutil.copy(os.path.join(HOOKS, "no-fable-subagent.py"), tmp)
+    for name in ("Agent", "spawn_agent"):
+        rc, out, err = run_hook(tmp, "no-fable-subagent.py",
+                                {"tool_name": name,
+                                 "tool_input": {"model": "fable", "prompt": "x"}})
+        check(f"broken install: no-fable-subagent still denies a Fable {name}",
+              (rc, '"deny"' in out), (0, True))
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

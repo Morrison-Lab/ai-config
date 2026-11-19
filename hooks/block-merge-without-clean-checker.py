@@ -59,6 +59,9 @@ fixed or its input corrected, then re-run.
 The one path past condition 2 is the USER'S OWN TYPED WORDS: an explicit
 "merge it anyway" (or "override the merge check") in a user-role text block,
 including a relayed `<cited author="user">` entry (Ezra, 2026-11-02, epi202#4).
+A wake message that declares a trust other than `principal`, or a sender
+other than `human`, is skipped; one that declares neither is read. A
+decision-card tap is not typed words either, since the agent wrote the card.
 The agent cannot supply it: the coordinator's `<note>`, a cited coordinator
 entry, system reminders, tool results and the assistant's prose never count,
 and a negated phrase does not. Condition 1 (PR, repo, 40-character sha pin)
@@ -75,6 +78,17 @@ inert.
 
 LIMITS
 ------
+* The typed path reads a wake's `<message>` elements as the harness wrote them.
+  If a harness ever left a literal `</message>` unescaped inside a peer
+  message's body, the text after it would read as a new element.
+* A tap is told from typed words by its shape alone. A whole message the user
+  types that opens with `Chose "`, holds `" on the decision card asking "`
+  and ends with a quote mark is read as a tap and gives no override.
+* The trust and sender checks read the whole `<message>` tag, so the user's
+  own message is skipped if another attribute's value holds text such as
+  `trust=peer`. Both limits refuse a merge and never allow one.
+* A wake `<message>` with neither a `trust` nor a `from` attribute is read, as
+  it was before those attributes were checked.
 * A relayed line is trusted as relayed: a session that forges a message-reading
   result is outside what a transcript can show. The sha tie still means the
   line must name the exact head being merged.
@@ -85,6 +99,7 @@ LIMITS
 * Fails OPEN when the payload or transcript is unreadable (some harnesses
   supply no transcript); a broken `shellcmd` import writes one STDERR line.
 """
+import html
 import json
 import os
 import re
@@ -461,8 +476,41 @@ RX_CLAUSE_START = re.compile(r"[.!?;\n]")
 RX_STRIP = re.compile(
     r"<system-reminder>.*?</system-reminder>"
     r"|<note>.*?</note>"
-    r"|<cited\b[^>]*author=\"(?!user\")[^\"]*\"[^>]*>.*?</cited>",
+    r"|<cited\b[^>]*author=\"(?!user\")[^\"]*\"[^>]*>.*?</cited>"
+    # A wake message that declares a trust other than the principal's (a peer
+    # session's, a bot's), or a sender other than the human, is not the user's
+    # words. One that declares neither is kept, as before this rule. The
+    # attribute may be quoted either way or not at all, with spaces round its
+    # `=`; `data-trust` is a different attribute and is not read.
+    # ANY such declaration that is not exactly the allowed value drops the
+    # message, so a second attribute or a look-alike inside another
+    # attribute's value cannot rescue it.
+    r"|<message\b(?=[^>]*(?<![\w-])trust\s*="
+    r"(?!\s*[\"']?principal[\"']?(?=[\s/>])))[^>]*>.*?</message>"
+    r"|<message\b(?=[^>]*(?<![\w-])from\s*="
+    r"(?!\s*[\"']?human[\"']?(?=[\s/>])))[^>]*>.*?</message>",
     re.IGNORECASE | re.DOTALL)
+# A decision-card tap arrives as a body that reads, in full, `Chose "<label>"
+# on the decision card asking "<question>"`. The agent wrote the label and the
+# question, so neither is the user's TYPED words: a body that is exactly a tap
+# is dropped whole. A typed sentence that merely holds the word "chose" stays.
+RX_TAP_BODY = re.compile(
+    r'\A\s*Chose ".*?" on the decision card asking ".*"\s*\Z', re.DOTALL)
+RX_ELEMENT = re.compile(
+    r"(<(message|cited)\b[^>]*>)(.*?)(</\2>)", re.IGNORECASE | re.DOTALL)
+
+
+def _is_tap(body):
+    return bool(RX_TAP_BODY.match(html.unescape(body)))
+
+
+def _typed_text(text):
+    """*text* with everything the user did not type removed."""
+    text = RX_STRIP.sub(" ", text)
+    if _is_tap(text):
+        return ""
+    return RX_ELEMENT.sub(
+        lambda m: " " if _is_tap(m.group(3)) else m.group(0), text)
 
 
 def typed_override(path):
@@ -485,7 +533,7 @@ def typed_override(path):
         for b in _blocks(rec):
             if b.get("type") != "text":
                 continue
-            text = RX_STRIP.sub(" ", b.get("text") or "")
+            text = _typed_text(b.get("text") or "")
             for m in RX_OVERRIDE.finditer(text):
                 before = text[:m.start()]
                 starts = [s.end() for s in RX_CLAUSE_START.finditer(before)]

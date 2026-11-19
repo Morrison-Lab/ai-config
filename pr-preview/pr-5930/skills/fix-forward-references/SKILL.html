@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -431,7 +431,7 @@ cookieconsent.run({
 <li><p><strong>Fix each confirmed forward reference</strong>, in order of preference:</p>
 <ul>
 <li><strong>Reorder</strong> — move the referenced section/paragraph/div/figure/table earlier so it precedes the mention. Update the directional word (“below” → “above”) or drop it once a working crossref link carries the point.</li>
-<li><strong>Reword</strong> — only when reordering would break the document’s narrative logic. Replace the vague pointer with a precise, working link/crossref instead of leaving a bare “below”. For any <code>@</code>-crossref (<code>@def-</code>, <code>@sec-</code>, <code>@fig-</code>, <code>@tbl-</code>, <code>@thm-</code>, <code>@eq-</code>, …), keep the link and signpost it (“one-versus-one, defined later in this section (<strong>?@def-one-versus-one</strong>)”); never delete the link and leave only the bare name. The exception: you may leave out the pointer when the passage motivates the definition that follows (see the fragment’s “Keep the crossref”).</li>
+<li><strong>Reword</strong> — only when there is no good reordering: none exists, or every one would hurt the material (break the argument’s order, split a group the reader needs together). A linked forward reference is then better than no link at all (Ezra, 2026-11-19). Replace the vague pointer with a precise, working link/crossref instead of leaving a bare “below”. For any <code>@</code>-crossref (<code>@def-</code>, <code>@sec-</code>, <code>@fig-</code>, <code>@tbl-</code>, <code>@thm-</code>, <code>@eq-</code>, …), keep the link and signpost it (“one-versus-one, defined later in this section (<strong>?@def-one-versus-one</strong>)”); never delete the link and leave only the bare name. The exception: you may leave out the pointer when the passage motivates the definition that follows (see the fragment’s “Keep the crossref”).</li>
 <li><strong>Leave it</strong> when the mention is a deliberate roadmap/overview preview (see the fragment’s “roadmap exception”) — not every forward-pointing sentence is a defect.</li>
 </ul></li>
 <li><p><strong>Re-scan</strong> the touched section after editing to confirm no new forward reference was introduced by the reordering itself (e.g., a paragraph that used to follow the moved content and referenced it backward now needs the opposite fix).</p></li>

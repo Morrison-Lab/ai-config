@@ -21,7 +21,7 @@ Prune in both places — they accumulate junk independently:
 |----|----|----|
 | **Dead** | Purely behind main (no unique commits ahead), no open MR, no linked issue, not created in the last 7 days | Delete |
 | **Stale** | Has unique commits ahead of main but is behind main, no recent activity (\>30 days), not actively being worked on | Rebase on main, open MR if none exists |
-| **Active** | Has an open MR, is the base (target branch) of another open MR, has a linked issue, recent commits (\<30 days), or a claim comment | Skip — don’t touch |
+| **Active** | Has an open MR, is the base (target branch) of another open MR, has a linked issue, recent commits (\<30 days), or a claim comment | Skip; don’t touch |
 | **New** | Created in the last 7 days | Skip — too fresh to judge |
 | **Local merged** | *Local* branch fully merged into main, or whose PR merged (upstream `[gone]`) | Delete locally (`git branch -d`) — step 8 |
 | **Local-only unpushed** | *Local* branch with unique commits, never pushed, no MR | Flag — ask before touching (step 8) |

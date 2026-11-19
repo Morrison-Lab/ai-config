@@ -10,7 +10,7 @@ allowed-tools:
   - Write
 ---
 
-# split-pr — split a large PR (alias for `split-concerns`)
+# split-pr: split a large PR (alias for `split-concerns`)
 
 This is a mnemonic alias for the **split-concerns** skill,
 whose "Splitting an open PR into a stacked series" section covers

@@ -884,5 +884,56 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
         rc == 1 and "content before it" in out,
     )
 
+    INS = '<w:ins w:id="1" w:author="a" w:date="2026-01-01T00:00:00Z">{}</w:ins>'
+    DEL = '<w:del w:id="2" w:author="a" w:date="2026-01-01T00:00:00Z">{}</w:del>'
+
+    rc, out = breaks_run(
+        "eq-inserted.docx", PROSE_BEFORE + INS.format(omp(close_break=False)) + PROSE_AFTER
+    )
+    check(
+        "an equation inside a tracked insertion is checked",
+        rc == 1 and "1 display equation(s) (1 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-deleted.docx", PROSE_BEFORE + DEL.format(omp(close_break=False)) + PROSE_AFTER
+    )
+    check(
+        "an equation inside a deletion is not checked",
+        rc == 0 and "0 display equation(s)" in out,
+    )
+
+    deleted_prose = DEL.format("<w:r><w:delText>The model is</w:delText></w:r>")
+    rc, out = breaks_run("eq-deleted-prose.docx", deleted_prose + omp(close_break=False))
+    check(
+        "deleted prose beside an equation demands no break",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    deleted_break = DEL.format(BR_RUN)
+    rc, out = breaks_run("eq-deleted-break.docx", PROSE_BEFORE + deleted_break + omp())
+    check(
+        "a deleted break does not supply the break before",
+        rc == 1 and "content before it" in out,
+    )
+
+    sdt = "<w:sdt><w:sdtPr/><w:sdtContent>{}</w:sdtContent></w:sdt>"
+    rc, out = breaks_run(
+        "eq-sdt-break.docx",
+        sdt.format("<w:r><w:t>The model is</w:t><w:br/></w:r>") + omp(),
+    )
+    check(
+        "a break inside a content control supplies the break before",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-cr.docx", "<w:r><w:t>The model is</w:t><w:cr/></w:r>" + omp()
+    )
+    check(
+        "a w:cr supplies the break before, as w:br does",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

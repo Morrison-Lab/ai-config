@@ -65,8 +65,9 @@ that a content diff cannot see:
     `m:t` at all is a blank placeholder already present in the source,
     reported for information rather than as a finding.
   * a display equation (m:oMathPara) that shares its w:p with content on a
-    side it is not broken off from: no w:r ending in <w:br/> before it, or
-    no m:r ending in <w:br/> closing its m:oMath (ai-config#3438).  The
+    side it is not broken off from: no w:r ending in a break before it, or,
+    after it, neither an m:r ending in a break closing its m:oMath nor a w:r
+    starting with one (ai-config#3438).  The
     equation then runs into the neighbouring prose.  This markup is legal
     and carries no text, so neither a structural validator nor a text diff
     sees it.  The two sides are independent, so the report counts display
@@ -466,26 +467,55 @@ BREAK_TRANSPARENT_TAGS = frozenset(
         "moveFromRangeEnd",
         "moveToRangeStart",
         "moveToRangeEnd",
+        "sdtPr",
+        "sdtEndPr",
     )
 )
 
-# Containers whose children are runs in reading order: a tracked insertion,
-# deletion or move, a hyperlink, a smart tag. Their runs count as siblings.
+# Containers whose children are runs in reading order: a tracked insertion
+# or move, a hyperlink, a smart tag, a content control. Their runs count as
+# siblings.
 BREAK_RUN_CONTAINERS = frozenset(
     W + name
-    for name in ("ins", "del", "moveFrom", "moveTo", "hyperlink", "smartTag", "customXml")
+    for name in (
+        "ins",
+        "moveTo",
+        "hyperlink",
+        "smartTag",
+        "customXml",
+        "sdt",
+        "sdtContent",
+    )
 )
+# Content the accepted document no longer has: neither its prose nor its
+# breaks count, and an equation inside one is not checked.
+BREAK_REMOVED_CONTAINERS = frozenset(W + name for name in ("del", "moveFrom"))
+LINE_BREAK_TAGS = frozenset((W + "br", W + "cr"))
 
 
 def flatten_runs(elems) -> list:
-    """Expand run containers into their children, recursively, in order."""
+    """Expand run containers into their children, recursively, in order,
+    dropping deleted and moved-away content."""
     out = []
     for e in elems:
+        if e.tag in BREAK_REMOVED_CONTAINERS:
+            continue
         if e.tag in BREAK_RUN_CONTAINERS:
             out.extend(flatten_runs(list(e)))
         else:
             out.append(e)
     return out
+
+
+def enclosing_paragraph(elem: ET.Element, parents: dict):
+    """The w:p an element sits in through run containers, or None when it
+    sits elsewhere or inside deleted content."""
+    node = parents.get(elem)
+    while node is not None and node.tag in BREAK_RUN_CONTAINERS:
+        node = parents.get(node)
+    if node is None or node.tag != W + "p":
+        return None
+    return node
 
 
 def run_content(run: ET.Element) -> list:
@@ -520,10 +550,13 @@ def check_display_equation_breaks(
 
     A break is required only on a side that has visible content in the same
     w:p, so an equation alone in its paragraph -- Word's own layout -- needs
-    none. Bookmarks, comment ranges, proofing marks and w:pPr are
-    transparent, and runs inside tracked-change wrappers and hyperlinks
-    count as siblings, so a commented or tracked equation is read the way
-    Word lays it out.
+    none. A w:cr counts as a break, as w:br does. Bookmarks, comment ranges,
+    proofing marks and properties are transparent, and runs inside tracked
+    insertions, moves, hyperlinks and content controls count as siblings.
+    The paragraph is read as it will be once its changes are accepted: an
+    equation inside a tracked insertion is checked, deleted or moved-away
+    content counts neither as prose nor as a break, and an equation inside
+    a deletion is not checked.
 
     The two sides are independent, so one equation can produce two
     findings. Returns (equations_examined, equations_missing_a_break), and
@@ -531,8 +564,8 @@ def check_display_equation_breaks(
     """
     examined = defective = 0
     for omp in root.iter(M + "oMathPara"):
-        parent = parents.get(omp)
-        if parent is None or parent.tag != W + "p":
+        parent = enclosing_paragraph(omp, parents)
+        if parent is None:
             continue
         examined += 1
         siblings = flatten_runs(list(parent))
@@ -546,7 +579,7 @@ def check_display_equation_breaks(
         if before:
             prev = before[-1]
             content = run_content(prev) if prev.tag == W + "r" else []
-            if not (content and content[-1].tag == W + "br"):
+            if not (content and content[-1].tag in LINE_BREAK_TAGS):
                 missing.append("before")
 
         if after:
@@ -555,10 +588,10 @@ def check_display_equation_breaks(
             if maths and len(maths[-1]):
                 last = maths[-1][-1]
                 content = run_content(last) if last.tag == M + "r" else []
-                ends_with_break = bool(content) and content[-1].tag == W + "br"
+                ends_with_break = bool(content) and content[-1].tag in LINE_BREAK_TAGS
             nxt = after[0]
             content = run_content(nxt) if nxt.tag == W + "r" else []
-            starts_with_break = bool(content) and content[0].tag == W + "br"
+            starts_with_break = bool(content) and content[0].tag in LINE_BREAK_TAGS
             if not (ends_with_break or starts_with_break):
                 missing.append("after")
 

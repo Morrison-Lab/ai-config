@@ -38,11 +38,11 @@ A run that nobody reviews first, such as a scheduled one, adds `--labels-only`: 
 
 ### 4. Plan the worktree and branch sweep
 
-Run [`clean-git`](../../skills/clean-git/SKILL.llms.md)’s dry-run plan for each repository whose backlog this pass triaged, and delete nothing (ai-config#3517). [`post-merge`](../../skills/post-merge/SKILL.llms.md) removes a merged PR’s own worktree; this weekly plan catches the ones a session left behind, and the branches that went stale with them. Carry out a removal only when the user confirms that plan, through `clean-git`’s own confirmation step.
+For each repository this pass triaged that has a local checkout, run [`clean-git`](../../skills/clean-git/SKILL.llms.md) up to its confirmation gate and stop there (ai-config#3517). That run is not mutation-free: its classify steps run `git fetch --prune` and `git worktree prune`, so take `clean-git`’s pre-prune snapshot of the remote-tracking refs first, as that skill requires. Skip a repository with no local checkout, and every repository in a run that nobody reviews first, and say which were skipped. [`post-merge`](../../skills/post-merge/SKILL.llms.md) removes a merged PR’s own worktree; this weekly plan catches the ones a session left behind, and the branches that went stale with them. Remove a worktree or branch only when the user confirms that plan, through `clean-git`’s own confirmation step.
 
 ### 5. Report
 
-Post nothing to the tracker beyond the closes’ own comments. In chat, give the bucket counts, the examined count, every issue closed with its one-line reason, and the P1 list, each number linked. Add the sweep plan’s counts of dead worktrees and dead branches.
+Post nothing to the tracker beyond the closes’ own comments. In chat, give the bucket counts, the examined count, every issue closed with its one-line reason, and the P1 list, each number linked. Add the sweep plan’s counts of dead worktrees and dead branches, the path of each pre-prune snapshot, and the repositories skipped.
 
 ## Checklist
 
@@ -53,6 +53,11 @@ Do-Confirm, at the moment the `--apply` command is about to run:
 3.  Every close row was read, and each is a junk title, an aphorism, or a duplicate of an older open issue.
 4.  Anything unlikely-but-actionable is P3, not closed.
 5.  The dry run printed the command set, and its count matches expectations.
+
+Do-Confirm, at the moment the step 4 sweep plan is reported:
+
+1.  Each planned repository’s pre-prune snapshot was taken before its prune steps ran, and its path is in the report.
+2.  Nothing was removed without the user’s confirmation.
 
 ## New asks
 

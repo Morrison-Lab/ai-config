@@ -441,11 +441,11 @@ cookieconsent.run({
 </section>
 <section id="plan-the-worktree-and-branch-sweep" class="level3">
 <h3 class="anchored" data-anchor-id="plan-the-worktree-and-branch-sweep">4. Plan the worktree and branch sweep</h3>
-<p>Run <a href="../../skills/clean-git/SKILL.html"><code>clean-git</code></a>’s dry-run plan for each repository whose backlog this pass triaged, and delete nothing (ai-config#3517). <a href="../../skills/post-merge/SKILL.html"><code>post-merge</code></a> removes a merged PR’s own worktree; this weekly plan catches the ones a session left behind, and the branches that went stale with them. Carry out a removal only when the user confirms that plan, through <code>clean-git</code>’s own confirmation step.</p>
+<p>For each repository this pass triaged that has a local checkout, run <a href="../../skills/clean-git/SKILL.html"><code>clean-git</code></a> up to its confirmation gate and stop there (ai-config#3517). That run is not mutation-free: its classify steps run <code>git fetch --prune</code> and <code>git worktree prune</code>, so take <code>clean-git</code>’s pre-prune snapshot of the remote-tracking refs first, as that skill requires. Skip a repository with no local checkout, and every repository in a run that nobody reviews first, and say which were skipped. <a href="../../skills/post-merge/SKILL.html"><code>post-merge</code></a> removes a merged PR’s own worktree; this weekly plan catches the ones a session left behind, and the branches that went stale with them. Remove a worktree or branch only when the user confirms that plan, through <code>clean-git</code>’s own confirmation step.</p>
 </section>
 <section id="report" class="level3">
 <h3 class="anchored" data-anchor-id="report">5. Report</h3>
-<p>Post nothing to the tracker beyond the closes’ own comments. In chat, give the bucket counts, the examined count, every issue closed with its one-line reason, and the P1 list, each number linked. Add the sweep plan’s counts of dead worktrees and dead branches.</p>
+<p>Post nothing to the tracker beyond the closes’ own comments. In chat, give the bucket counts, the examined count, every issue closed with its one-line reason, and the P1 list, each number linked. Add the sweep plan’s counts of dead worktrees and dead branches, the path of each pre-prune snapshot, and the repositories skipped.</p>
 </section>
 </section>
 <section id="checklist" class="level2">
@@ -457,6 +457,11 @@ cookieconsent.run({
 <li>Every close row was read, and each is a junk title, an aphorism, or a duplicate of an older open issue.</li>
 <li>Anything unlikely-but-actionable is P3, not closed.</li>
 <li>The dry run printed the command set, and its count matches expectations.</li>
+</ol>
+<p>Do-Confirm, at the moment the step 4 sweep plan is reported:</p>
+<ol type="1">
+<li>Each planned repository’s pre-prune snapshot was taken before its prune steps ran, and its path is in the report.</li>
+<li>Nothing was removed without the user’s confirmation.</li>
 </ol>
 </section>
 <section id="new-asks" class="level2">

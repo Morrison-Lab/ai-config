@@ -348,6 +348,7 @@ python3 scripts/check-vendored-drift.py        # shared-fragment vendored-conten
 npx --yes markdownlint-cli2@0.22.1             # markdown style (config in .markdownlint-cli2.jsonc)
 git add skills/<name>/SKILL.md codex-skills/<name> \
         skills/<alias>/SKILL.md skills/<canonical>/SKILL.md \
+        codex-skills/<canonical> \
         memories/preferences.md                             # stage the files you
                                                             # touched (incl. the
                                                             # generated wrappers, and

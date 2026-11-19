@@ -26,7 +26,6 @@ do them in minimal batches", and "every PR should be as small and focused as it 
   Each batch is one concern, with its own issue and its own PR.
   Open the first batch, then the next, rather than one PR for all of them.
 - Stacked PRs are fine: each layer is small, and each names the layer it needs.
-  The push hook can hold a layer back until its base merges and `origin/main` is merged into the layer's branch (see "The mechanisms").
 - Content and infrastructure stay in separate PRs, as before.
 
 ## Measure early, and split by patch
@@ -60,23 +59,13 @@ that issue tracks both.
 
 - `hooks/no-oversized-pr-push.py` denies a `git push` of a branch over the cap, before CI is spent.
   A pure rename (no line changed) does not count toward the file cap.
-  Clear it with an `ALLOW_LARGE_PR=1` prefix for a mechanical, content-identical move or split, and state why in the reply.
-  In auto mode, do not use it for a stacked layer, although the hook's message offers it for a branch whose base is not the default branch:
-  on 2026-11-19 the auto-mode classifier refused it ("[Undermining Oversight]") for a branch whose PR's base was the layer below
-  ([#5926](https://github.com/Morrison-Lab/ai-config/pull/5926), stacked on [#5947](https://github.com/Morrison-Lab/ai-config/pull/5947)).
-  Use the path below instead.
-  The hook measures the checked-out `HEAD` against `origin/main`, not each pushed ref against its PR's base
-  ([ai-config#5873](https://github.com/Morrison-Lab/ai-config/issues/5873)):
-  check out the exact branch you push, push one branch per command,
-  and expect a stacked layer to be measured with its unmerged base's lines included.
-  When the base and the layer together exceed the cap, merge the base PR first, once it is fully clean on its own.
-  Then check out the layer's branch, run `git fetch origin`, and merge `origin/main` into it
-  (a merge, not the patch recipe above, since the layer's history already holds the base's commits).
-  After a squash merge, each file the base PR added can conflict as add/add.
-  For each such file, start from the layer's version,
-  then check `git diff origin/main -- <file>` and confirm that every difference is a change the layer's PR makes on purpose.
-  Commit the merge, read the full `git diff origin/main...HEAD` and confirm it holds the layer's own changes and nothing else,
-  then retarget the layer's PR to `main` and push.
+  Clear it with an `ALLOW_LARGE_PR=1` prefix for a stacked branch whose base is not the default branch, or for a mechanical, content-identical move or split, and state why in the reply.
+  On 2026-11-19 the hook measured a stacked layer's checked-out `HEAD` against `origin/main`, its unmerged base included
+  ([ai-config#5873](https://github.com/Morrison-Lab/ai-config/issues/5873)),
+  and the auto-mode classifier refused that prefix on the layer ("[Undermining Oversight]";
+  [#5926](https://github.com/Morrison-Lab/ai-config/pull/5926), stacked on [#5947](https://github.com/Morrison-Lab/ai-config/pull/5947)).
+  The layer went out after #5947 merged: merging `origin/main` into it brought its own diff under the cap, and the push needed no prefix.
+  Until #5873 is fixed, expect each layer of an over-cap stack to wait for the layer below it to merge.
 - gha's `check-pr-size` ([gha#1188](https://github.com/Morrison-Lab/gha/issues/1188)) fails the same PR in CI.
   The `size-exempt` label lifts it; put it on a mechanical, content-identical PR.
 - The caps are a decision, recorded here: 10 files and 300 lines, tight on purpose after Ezra changed "waves" to "minimal batches".

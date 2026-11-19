@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOKS_DIR = os.path.dirname(os.path.realpath(__file__))
 HOOK = os.path.join(HOOKS_DIR, "block-merge-without-clean-checker.py")
@@ -522,6 +523,15 @@ def main():
                  "and https://github.com/Morrison-Lab/psw/pull/9"):
         check(f"allows the tapped consequence {cons!r}",
               not mcp(card_steps(options=((WAIVE, cons), HOLD)))[0])
+    started = time.monotonic()
+    for cons in ("I merge " + "a/b#1, " * 20000 + "x",
+                 "I merge " + "a.b-c" * 20000 + "/" + "d.e-f" * 20000,
+                 "I merge a/b#1" + " and" * 20000,
+                 "I merge github.com/" + "a/" * 20000 + "pull/1 x"):
+        check(f"denies a hostile {len(cons)}-character consequence",
+              mcp(card_steps(options=((WAIVE, cons), HOLD)))[0])
+    check("...and the consequence pattern does not backtrack badly on them",
+          time.monotonic() - started < 5)
     check("allows a pull URL written with no scheme",
           not mcp(card_steps(options=(
               (WAIVE, "I merge github.com/Morrison-Lab/psw/pull/354."), HOLD)))[0])

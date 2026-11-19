@@ -15,10 +15,11 @@ a message, so the choice only exists at launch. A reminder would be read past
 ## What it decides
 
   - `Agent` / `Task` / `invoke_subagent` with no non-blank `model`  -> DENY.
-    (`no-fable-subagent.py` separately denies Fable.)
+    (`no-fable-subagent.py` separately denies Fable unless the user said yes.)
   - Thread/session START tools (`mcp__hearthbot__start_thread`,
     `create_session`) with no non-blank `model` field and no
-    `Model-fit: <model> -- <reason>` line in any string field -> DENY.
+    `Model-fit: <model> -- <reason>; Fable: <asked | not the best fit because ...>`
+    line in any string field -> DENY.
   - `message_thread` with neither a `Why-not-new-thread: <reason>` line nor a
     `No-new-work: <what it carries>` line (a relay of an answer, a pinned sha,
     a head to merge) -> DENY: it forces the "should this be a new thread, and which model?"
@@ -40,7 +41,9 @@ import sys
 AGENT_TOOLS = ("Agent", "Task", "invoke_subagent")
 START_SUFFIXES = ("mcp__hearthbot__start_thread", "__create_session")
 MESSAGE_SUFFIX = "mcp__hearthbot__message_thread"
-MODEL_FIT = re.compile(r"^\s*Model-fit:\s*\S.*\S", re.M | re.I)
+# The line must name Fable: a launch that passes `model` cannot be checked, but a
+# Model-fit line can, so it is where "always consider Fable" is enforced.
+MODEL_FIT = re.compile(r"^\s*Model-fit:\s*\S.*\bFable\b.*\S", re.M | re.I)
 # A message either assigns work (and says why not a new thread) or declares
 # that it assigns none (a relay of an answer, a pinned sha, a head to merge).
 WHY_NOT_NEW = re.compile(r"^\s*(Why-not-new-thread|No-new-work):\s*\S.*\S", re.M | re.I)
@@ -89,15 +92,17 @@ def decide(payload):
                 "fit with the select-model / recm criteria and pass it: "
                 "`sonnet` or `haiku` for bounded edits, lookups and "
                 "mechanical work; `opus` for large content passes and hard "
-                "reasoning. Never Fable without the user's explicit permission.")
+                "reasoning. Consider Fable too: when it would be the best fit, ask "
+                "Ezra on a decision card whether to use it (it needs his yes).")
     if tool.endswith(START_SUFFIXES):
         if has_model or MODEL_FIT.search(text):
             return None
         return ("This thread/session start records no model choice. A running "
                 "thread's model cannot be changed, so choose now with the "
                 "select-model / recm criteria: pass `model`, or put a line "
-                "`Model-fit: <model> -- <why it fits this task>` in the "
-                "instructions. Never Fable without the user's explicit permission.")
+                "`Model-fit: <model> -- <why>; Fable: <asked | not the best fit because ...>` in the "
+                "instructions, naming Fable as considered. When Fable would be "
+                "the best fit, ask Ezra on a decision card first (it needs his yes).")
     if tool.endswith(MESSAGE_SUFFIX):
         if WHY_NOT_NEW.search(text):
             return None

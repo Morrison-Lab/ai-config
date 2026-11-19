@@ -4531,6 +4531,13 @@ def main() -> int:
         relay_footer, "\n>\n> ## Non-blocking observations (not bugs)\n>\n"
         "> 1. **Fixture verification:** the diff doesn't show "
         "`finished_review`." + relay_footer))
+    # gha#2115 05:38Z and 06:20Z: later relays open "Fresh cross-model
+    # re-review by ...". The header must still match, or the older relay
+    # above stays the model's latest verdict.
+    relay_fresh_clean = dict(
+        relay_clean, createdAt="2026-11-19T05:38:44Z",
+        body=relay_clean["body"].replace("Cross-model re-review",
+                                         "Fresh cross-model re-review"))
     relay_other_model = dict(relay_clean, body=relay_clean["body"].replace(
         "`kimi-k3`", "`glm-5.3`"))
     relay_no_footer = dict(relay_clean, body=relay_clean["body"].replace(
@@ -4555,6 +4562,10 @@ def main() -> int:
         ("a relayed CLEAN that quotes non-blocking observations still has "
          "findings (findings win; negative control)",
          [relay_notclean, relay_clean_nits, relay_bot], False),
+        ("a 'Fresh cross-model re-review' CLEAN supersedes the same model's "
+         "earlier relay with findings (gha#2115)",
+         [relay_notclean, relay_clean_nits, relay_fresh_clean, relay_bot],
+         True),
     ):
         mock_relay = json.dumps({"comments": rounds, "reviews": []})
         with patch.object(checker, "run_cmd", return_value=mock_relay):
@@ -4570,6 +4581,9 @@ def main() -> int:
               not relay_solo_ok)
     check("relay identity is keyed on the model",
           checker._reviewer_identity(relay_clean["body"], "d-morrison")
+          == "relay:kimi-k3")
+    check("relay identity reads a header with a leading word ('Fresh')",
+          checker._reviewer_identity(relay_fresh_clean["body"], "d-morrison")
           == "relay:kimi-k3")
 
     # --- ai-config#5283 (gha#1826, 2026-11-10): an agent's rebuttal that

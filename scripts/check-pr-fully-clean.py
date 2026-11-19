@@ -579,7 +579,11 @@ def _reviewer_identity(body: str, author: str = "") -> str:
 # CLEAN relay was read as the maintainer's own verdict and the CLEAN relay
 # was dropped, so the PR stayed blocked.
 _RELAY_HEADER_RE = re.compile(
-    r"\A\s*(?:cross-model|independent)\s+(?:re-?)?review\s+by\s+[^\n]*?"
+    # Up to two leading words ("Fresh", "Second") before the reviewer kind:
+    # gha#2115's later kimi relays open "Fresh cross-model re-review by ...",
+    # and missing them left an older relay standing as kimi's latest verdict.
+    r"\A\s*(?:[A-Za-z]+[ \t]+){0,2}?(?:cross-model|independent)\s+"
+    r"(?:re-?)?review\s+by\s+[^\n]*?"
     r"\bmodel\s+`?([A-Za-z0-9][\w.:/-]*)`?",
     re.IGNORECASE,
 )

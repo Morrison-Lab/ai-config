@@ -23,7 +23,6 @@ nothing: choosing it is not a request for the act. This module never feeds a mer
 the mwc gates read typed words only, by design.
 """
 import html
-import json
 import re
 
 # A tap wake is top-level: one quoted inside another wake (a PR comment in an external-event wake) is not
@@ -131,20 +130,3 @@ def track_cards(rec, pending, cards):
             m = re.search(r'"message_id"\s*:\s*"([\w-]+)"', _text(b.get("content")))
             if m:
                 cards[m.group(1)] = pending.pop(b.get("tool_use_id"))
-
-
-def transcript_answers(path):
-    """Every verified card-answer text in the transcript at `path`, oldest first."""
-    pending, cards, out = {}, {}, []
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            try:
-                rec = json.loads(line)
-            except ValueError:
-                continue
-            if not isinstance(rec, dict) or rec.get("isSidechain"):
-                continue
-            track_cards(rec, pending, cards)
-            if rec.get("type") == "user" and not rec.get("isMeta"):
-                out += answers_in_record(rec, cards)
-    return out

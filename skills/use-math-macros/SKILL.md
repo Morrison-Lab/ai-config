@@ -427,6 +427,17 @@ The pair uses prediction errors (predicted minus observed);
 ... why not use the prediction error macro instead of `\vy - \design \vcoef`?"
 Also tracked as [`Morrison-Lab/psw#140`](https://github.com/Morrison-Lab/psw/issues/140).)
 
+### Give a defined term its own glyph, or the definition reads as a tautology
+
+A definition's left side must render differently from its right side.
+When the term's macro *is* its definitional expression (`\bform{#1}{#2}{#3}` expands to `\tp{#2} #1 #3`), `\bform{\matr{A}}{\vx}{\vy} \eqdef \tp{\vx} \matr{A} \vy` reads as a definition in source and renders as the same glyphs on both sides of $\eqdef$.
+Before writing `\term{...} \eqdef ...`, expand `\term` and compare: if it already prints the right side, give the term a symbol of its own (a function name such as $B_{\matr{A}}(\vx, \vy)$, added to `Morrison-Lab/macros` as the macro's output), and keep the expansion on the right.
+The same holds for `=` with a notational macro: `\varpar = \sdpar^2` prints $\sigma^2 = \sigma^2$.
+A deliberate reflexivity statement ($a = a$) takes `<!-- check-tautological-equations: allow -->`.
+
+`check-tautological-equations` in `Morrison-Lab/gha` (Morrison-Lab/gha#2135) is the reviewer half of this rule: it expands the macros on each side of every top-level equality a PR touches and fails when the sides match.
+(Ezra, 2026-11-19, on Morrison-Lab/mds#835: "should we have a glyph for bilinear form as a function, so the LHS and RHS ... aren't identical?" and "more generally, should we check for tautologies in rendered equations?")
+
 ### Name a repeated or coherent chunk with a new macro
 
 Before finishing any definition, theorem or proof, scan for a sub-expression written out two or more times, or a conceptually coherent chunk (the prediction error, the loss of one observation), and give it a macro instead of writing it out.
@@ -512,5 +523,7 @@ The prose rule is psw's [Writing dot products](https://github.com/Morrison-Lab/p
   itself while the source reads as a proper definition.
   Spell the operator out (`\deriv`, `\dderiv`), and check the rendered output
   rather than the source.
+- ❌ Defining a term whose macro expands to its own definition (`\bform{\matr{A}}{\vx}{\vy} \eqdef \tp{\vx} \matr{A} \vy`) --- both sides render identically.
+  Give the term its own glyph; gha's `check-tautological-equations` fails the PR otherwise.
 - ❌ Changing a formula's meaning while "condensing" — preserve the math exactly;
   only re-express it.

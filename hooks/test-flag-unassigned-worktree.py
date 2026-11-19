@@ -353,6 +353,16 @@ wrong += v_spawn_dirty != "WARN"
 print(f"  {v_spawn_safe:<6} default branch, clean -- must WARN")
 print(f"  {v_spawn_dirty:<6} dirty feature branch -- must WARN, not DENY")
 
+# Cursor's `Task` cannot mark isolation (ai-config#2331), and OpenCode's
+# lower-cased `task` names no isolation setting either: WARN, never DENY.
+print("\nTask and task (no isolation setting):")
+TASK_CASES = [("Task", "Cursor"), ("task", "lower-cased")]
+for name, label in TASK_CASES:
+    v_task = verdict({"tool_name": name, "tool_input": {"prompt": "x"},
+                      "cwd": _dirty_feature_branch_repo()})
+    wrong += v_task != "WARN"
+    print(f"  {v_task:<6} {label} {name} on a dirty feature branch -- must WARN, not DENY")
+
 print("\nescape hatch:")
 v_denied = verdict(ESCAPE_HATCH_PAYLOAD)
 v_cleared = verdict(ESCAPE_HATCH_PAYLOAD, env={"ALLOW_UNISOLATED_AGENT_LAUNCH": "1"})
@@ -362,6 +372,6 @@ print(f"  {v_denied:<6} without the override -- must DENY")
 print(f"  {v_cleared:<6} with ALLOW_UNISOLATED_AGENT_LAUNCH=1 -- must clear the deny")
 
 total = (len(SHOULD_WARN) + len(SHOULD_STAY_SILENT) + len(SHOULD_DENY)
-        + len(SHOULD_NOT_DENY) + 2 + 2 + 2)
+        + len(SHOULD_NOT_DENY) + 2 + 2 + len(TASK_CASES) + 2)
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

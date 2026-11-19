@@ -382,10 +382,12 @@ def _has_unpushed_commits(cwd):
 
 
 # The DENY tells the caller to set isolation, so it applies only to the launch
-# tools that have that setting. Every other subagent launch
-# (`scripts/lib/tool_names.py`, such as Codex's `spawn_agent`) still gets the WARN
-# (ai-config#3740).
-DENY_TOOLS = ("Agent", "Task", "invoke_subagent")
+# tools that have that setting: Claude Code's `Agent` and Antigravity's
+# `invoke_subagent`, matched by exact spelling. Every other subagent launch
+# (`scripts/lib/tool_names.py`) still gets the WARN (ai-config#3740), including
+# Cursor's `Task`, which cannot mark isolation (ai-config#2331), and Codex's
+# `spawn_agent`. Lower-casing here would deny those too, with no way to comply.
+DENY_TOOLS = ("Agent", "invoke_subagent")
 
 
 def _should_deny(payload, cwd):

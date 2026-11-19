@@ -1,6 +1,7 @@
 ---
 name: find-duplicates
 description: "→ find-overlap."
+disable-model-invocation: true
 user-invocable: true
 ---
 

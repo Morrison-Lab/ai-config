@@ -105,3 +105,7 @@ A `tippy` exclusion for the hover popups was tried and removed: that markup is i
   it answers a different question.
 - **Don't:** decide what a detector should match from the source you expect;
   render the broken case and match what the renderer actually emits.
+- **Do:** run a source-shape sweep as well as the render check when both exist, since each finds defects the other misses.
+  A render sweep never sees a page the preview did not build.
+- **Don't:** let a source pattern for a lead-in line followed by a list item fire when the line above is itself a list item;
+  a list-marker sibling is the false positive (ai-config#3349).

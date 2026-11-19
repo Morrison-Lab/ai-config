@@ -45,6 +45,10 @@ jobs:
         # position, so a cited `#eq-anchor-N` silently renames when an
         # earlier equation is added. This replays that assignment.
         run: python3 scripts/test_resolve_equation_anchors.py
+      - name: Run inventory-org-tools tests
+        # ai-config#3936. The org inventory classifies tree paths into Quarto
+        # extensions, R packages and Lua filters; these pin that, offline.
+        run: python3 scripts/test_inventory_org_tools.py
       - name: Check ASCII punctuation in source files
         # ai-config#2550. The rule covers .md too (ai-config#3284), but this
         # whole-tree scan stays on .py and .R until the .md backlog is cleared

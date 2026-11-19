@@ -477,10 +477,10 @@ RX_STRIP = re.compile(
     # ANY such declaration that is not exactly the allowed value drops the
     # message, so a second attribute or a look-alike inside another
     # attribute's value cannot rescue it.
-    r"|<message\b(?=[^>]*(?<![\w-])trust\s*=\s*"
-    r"(?![\"']?principal[\"']?(?=[\s/>])))[^>]*>.*?</message>"
-    r"|<message\b(?=[^>]*(?<![\w-])from\s*=\s*"
-    r"(?![\"']?human[\"']?(?=[\s/>])))[^>]*>.*?</message>",
+    r"|<message\b(?=[^>]*(?<![\w-])trust\s*="
+    r"(?!\s*[\"']?principal[\"']?(?=[\s/>])))[^>]*>.*?</message>"
+    r"|<message\b(?=[^>]*(?<![\w-])from\s*="
+    r"(?!\s*[\"']?human[\"']?(?=[\s/>])))[^>]*>.*?</message>",
     re.IGNORECASE | re.DOTALL)
 # A decision-card tap arrives as a body that reads, in full, `Chose "<label>"
 # on the decision card asking "<question>"`. The agent wrote the label and the

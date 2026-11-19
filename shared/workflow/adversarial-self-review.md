@@ -1602,13 +1602,14 @@ A cross-model relay (for example OpenCode kimi-k3) owes the same close.
 (b) the closing `### Verdict` block was dropped.
 The full [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) envelope cures (b) only.
 Any findings section in the verbatim review, non-blocking included, leaves the gate not clean until the same model re-reviews after your dispositions and returns a clean verdict.
-One exception (Ezra, 2026-11-19, on [ai-config#5858](https://github.com/Morrison-Lab/ai-config/issues/5858)'s decision card: "Pass only reviewer-labelled no-action"): a relayed CLEAN verdict passes when the reviewer's own heading for its non-blocking section says "no action needed" (or "requested" or "required") and no item in that section is called blocking.
+That re-review is what cleared [#5800](https://github.com/Morrison-Lab/ai-config/pull/5800): [its re-review comment](https://github.com/Morrison-Lab/ai-config/pull/5800#issuecomment-6972138604) made `check-pr-fully-clean.py` exit 0.
+Editing the posted review to clear the gate is not a remedy: the auto-mode classifier denied that edit as undermining oversight, and it was right.
+
+The re-review rule has one exception (Ezra, 2026-11-19, on [ai-config#5858](https://github.com/Morrison-Lab/ai-config/issues/5858)'s decision card: "Pass only reviewer-labelled no-action"): a relayed CLEAN verdict passes when the reviewer's own heading for its non-blocking section says "no action needed" (or "requested" or "required") and no item in that section is called blocking.
 The label has to be the reviewer's, quoted verbatim.
 A section headed only "Non-blocking" or "(not bugs)" still needs the re-review.
 `check-pr-fully-clean.py` applies this to relays only, and the adversarial reviewer checks the same thing.
 Still disposition each observation in the relay, as [`address-every-comment`](address-every-comment.md) requires.
-That re-review is what cleared [#5800](https://github.com/Morrison-Lab/ai-config/pull/5800): [its re-review comment](https://github.com/Morrison-Lab/ai-config/pull/5800#issuecomment-6972138604) made `check-pr-fully-clean.py` exit 0.
-Editing the posted review to clear the gate is not a remedy: the auto-mode classifier denied that edit as undermining oversight, and it was right.
 
 - **Do:** post the full envelope, closing verdict block included, in the first relay of a cross-model review (cause b).
 - **Do:** re-request the same model with your dispositions when the verbatim review carried a findings section, and post its new verdict (cause a).

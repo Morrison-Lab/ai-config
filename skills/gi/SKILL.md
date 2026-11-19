@@ -151,7 +151,8 @@ If an open PR already exists for the issue:
 - Or, if the existing PR is stalled/abandoned and it passes
   `memories/reviewing-prs.md`'s scope test (opened by or assigned to the
   invoking user, explicitly requested, or authored by the GitHub Actions app;
-  classify it with `python3 scripts/pr-scope.py --repo <owner>/<repo> --number <N> --user <login>`), take it over:
+  classify it with `python3 scripts/pr-scope.py --repo <owner>/<repo> --number <N> --user <login>`,
+  adding `--alias`, `--requested` and `--excluded` as `ardia` step 1 defines them), take it over:
   check it out (use the existing PR branch), claim the PR, and ARDI it
   rather than starting fresh.
 - A stalled PR that fails that test is not yours to take over: skip the

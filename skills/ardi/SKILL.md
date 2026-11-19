@@ -277,6 +277,7 @@ How depends on the repo's review trigger first, and on whether this round pushed
      --jq '.[] | select(.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN")'   # LIST_PRS
    ```
    Apply the same scope test as the sweep above, with `scripts/pr-scope.py`, before touching a candidate;
+   the script reads a JSON array, so give it the listing without the `--jq` filter and filter its in-scope PRs afterwards;
    an out-of-scope one is reported to the user and left untouched.
    Verify each in-scope candidate with `git merge-tree --write-tree origin/main
    origin/<branch>` (git ≥ 2.38; see `resolve-conflicts`, "Verify before you act") before

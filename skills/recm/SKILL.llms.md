@@ -162,6 +162,7 @@ When evaluating a repository, issue, or task, follow these steps:
 
 ## Relationship to Other Skills
 
+- Always consider Fable in the Claude tier, and ask Ezra on a decision card when it would be the best fit; it needs his explicit yes for each launch ([`no-fable-subagents`](../../shared/workflow/no-fable-subagents.md)).
 - **[`select-model`](../../skills/select-model/SKILL.llms.md)**: Focuses narrowly on choosing among Claude model tiers (Fable, Haiku, Sonnet, Opus).
 - **[`assess-model-fit`](../../skills/assess-model-fit/SKILL.llms.md)**: Assesses whether the active model tier is struggling and warrants escalation.
 - **[`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md) (`dtc`)**: Operationalizes background dispatch, schema enforcement, and fallback mechanics for Codex.

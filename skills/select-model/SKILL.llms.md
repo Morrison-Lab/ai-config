@@ -50,11 +50,11 @@ When orchestrating complex or multi-step work: 1. **Conductor (Tier 1):** Breaks
 
 ### Choosing a model when you start a thread, session or subagent
 
-Starting is the only moment the choice can be made: a message to a running thread cannot change its model. `hooks/require-model-choice.py` denies a launch that records no choice (`model`, or a `Model-fit: <model> -- <why>` line on a thread or session start).
+Starting is the only moment the choice can be made: a message to a running thread cannot change its model. `hooks/require-model-choice.py` denies a launch that records no choice (`model`, or a `Model-fit: <model> -- <why>; Fable: <asked | not the best fit because ...>` line on a thread or session start).
 
 1.  Name the task’s category in the mapping table above.
 2.  Take the lowest tier that does the job: Haiku for lookups and scans, Sonnet for bounded edits and implementation from a clear spec, Opus for large content passes, hard reasoning and adversarial review.
-3.  Never Fable without the user’s explicit permission for that launch.
+3.  Consider Fable every time. When it would be the best fit (hard reasoning, a large content pass, adversarial review), ask Ezra on a decision card whether to use it, and launch on it only after his explicit yes for that launch (Ezra, 2026-11-18).
 4.  Pass `model`, and say why in the brief when the choice is not obvious.
 
 To decide whether the work belongs in a new thread at all, see [`choose-thread`](../../skills/choose-thread/SKILL.llms.md).

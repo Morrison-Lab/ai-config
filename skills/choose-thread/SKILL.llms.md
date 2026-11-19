@@ -11,7 +11,7 @@ Answer each criterion from live state (the thread’s latest message, its open P
 3.  **Context size.** Is the existing thread’s context large, stale or mostly irrelevant to the new work? Yes: start a new thread with a brief that carries only what the work needs. No, and the new work needs what that thread already learned: continue.
 4.  **Model mismatch.** Does the new work need a different tier from the thread’s model, by [`select-model`](../../skills/select-model/SKILL.llms.md)? Yes: start a new thread on the right model. Examples: a bounded edit sent to an Opus thread, or a large content pass sent to a Sonnet thread.
 5.  **Decide and record.**
-    - New thread: start it with `model` set (or a `Model-fit: <model> -- <why>` line).
+    - New thread: start it with `model` set (or a `Model-fit: <model> -- <why>; Fable: <asked | not the best fit because ...>` line).
     - Existing thread: add `Why-not-new-thread: <the criterion that decided it>` to the message.
     - A message that assigns no new work (relaying an answer, pinning a sha, routing a head): add `No-new-work: <what it carries>`.
 

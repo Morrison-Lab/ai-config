@@ -208,9 +208,11 @@ Use no robot emoji anywhere in the footer, since review parsers can misinterpret
 When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
 Follow [`file-formatting-and-links`](shared/writing/file-formatting-and-links.md) for the rest: markdown flavour, liberal hyperlinking of tools, forge items and policies, links to files and symbols, the displayed-`#NNN` exception, and line breaks.
 
-## Never dispatch a worker on Fable without explicit, specific permission
+## Consider Fable for every model choice, and launch on it only with explicit, specific permission
 
-Workers without an explicit model inherit the conductor's: never dispatch a worker on Fable without explicit, specific permission.
+Workers without an explicit model inherit the conductor's, so name the model on every dispatch.
+Always consider Fable when choosing;
+when it would be the best fit, ask Ezra on a decision card whether to use it, and dispatch on Fable only after his explicit, specific yes for that launch (Ezra, 2026-11-18: "you can and should ask me whether to use Fable when it would be the best fit for a task" and "you should always consider using it").
 Name the model on every dispatch, defaulting to cheaper tiers for mechanical work.
 See [`no-fable-subagents`](shared/workflow/no-fable-subagents.md).
 

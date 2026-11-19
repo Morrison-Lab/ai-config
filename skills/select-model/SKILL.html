@@ -51,9 +51,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -494,11 +494,11 @@ cookieconsent.run({
 </section>
 <section id="choosing-a-model-when-you-start-a-thread-session-or-subagent" class="level3">
 <h3 class="anchored" data-anchor-id="choosing-a-model-when-you-start-a-thread-session-or-subagent">Choosing a model when you start a thread, session or subagent</h3>
-<p>Starting is the only moment the choice can be made: a message to a running thread cannot change its model. <code>hooks/require-model-choice.py</code> denies a launch that records no choice (<code>model</code>, or a <code>Model-fit: &lt;model&gt; -- &lt;why&gt;</code> line on a thread or session start).</p>
+<p>Starting is the only moment the choice can be made: a message to a running thread cannot change its model. <code>hooks/require-model-choice.py</code> denies a launch that records no choice (<code>model</code>, or a <code>Model-fit: &lt;model&gt; -- &lt;why&gt;; Fable: &lt;asked | not the best fit because ...&gt;</code> line on a thread or session start).</p>
 <ol type="1">
 <li>Name the task’s category in the mapping table above.</li>
 <li>Take the lowest tier that does the job: Haiku for lookups and scans, Sonnet for bounded edits and implementation from a clear spec, Opus for large content passes, hard reasoning and adversarial review.</li>
-<li>Never Fable without the user’s explicit permission for that launch.</li>
+<li>Consider Fable every time. When it would be the best fit (hard reasoning, a large content pass, adversarial review), ask Ezra on a decision card whether to use it, and launch on it only after his explicit yes for that launch (Ezra, 2026-11-18).</li>
 <li>Pass <code>model</code>, and say why in the brief when the choice is not obvious.</li>
 </ol>
 <p>To decide whether the work belongs in a new thread at all, see <a href="../../skills/choose-thread/SKILL.html"><code>choose-thread</code></a>.</p>

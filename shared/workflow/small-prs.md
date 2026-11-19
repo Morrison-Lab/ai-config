@@ -41,6 +41,12 @@ that issue tracks both.
   Review fixes add tests, and tests alone carried a later branch from under the cap to 311 lines.
 - **Do:** carry a change onto a new base with `git diff <merge-base> <commit> -- <files> | git apply --index --3way`,
   then compare `git diff --cached --numstat` with the original branch's numstat for those files.
+- **Do:** to move some files' changes onto a new branch, write `git diff origin/main...HEAD -- <files> > p.patch`,
+  run `git apply --index p.patch` in the other worktree, then `git apply -R --index p.patch` on the original branch (2026-11-19).
+- **Don't:** use `git checkout <ref> -- <paths>` for it: CC Safety Net blocks it (rule `git.checkout-ref-path`).
+- **Do:** count `git diff --stat origin/main...HEAD` before the first push of a multi-skill edit, and plan the split then.
+  The pre-push hook caps a PR at 10 files and 300 lines (2026-11-19).
+- **Don't:** find the cap after a reviewed head is refused.
 - **Do:** after a split, open each file a part cites at `origin/main` and confirm the cited rule is there.
   A citation checked against the unsplit branch can point at text that only an unmerged sibling PR adds
   ([ai-config#5369](https://github.com/Morrison-Lab/ai-config/pull/5369)).

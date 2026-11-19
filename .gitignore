@@ -17,7 +17,8 @@ __pycache__/
 # Mutated hook copies the mutation tests write beside the hook with
 # tempfile.mkstemp (default prefix `tmp`), so the copy resolves scripts/lib.
 # A killed test run leaves one behind, and `git add -A` committed it
-# (ai-config#5304). No tracked file matches these patterns.
+# (ai-config#5304). No tracked file matches these patterns, so never name
+# a real hook or script `tmp*`: it would be ignored too.
 hooks/tmp*.py
 scripts/tmp*.py
 

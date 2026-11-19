@@ -604,6 +604,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-bare-stash-pop.py\"",
+            "timeout": 15,
+            "script": "no-bare-stash-pop.py",
+            "why": "ai-config#1907 and #3584: the stash stack is shared by every worktree, so a bare `git stash pop` or `apply` takes whatever entry is on top, often another session's; a clean pop drops it into the wrong worktree and exits 0. DENIES `git stash pop|apply` naming no entry when the repository it runs in (cwd moved by cd and git -C) lists more than one worktree; an explicit ref or SHA is allowed. Override: ALLOW_BARE_STASH_POP=1. Fails open when shellcmd cannot load, the command does not parse, or git worktree list fails."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-delete-branch-under-stacked-pr.py\"",
             "timeout": 25,
             "script": "no-delete-branch-under-stacked-pr.py",

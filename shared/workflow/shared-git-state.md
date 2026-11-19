@@ -14,3 +14,6 @@ A clean pop applies it in your worktree and drops it, and the command exits 0 ([
 - **Do:** when you must stash, push with a unique message (`git stash push -u -m "<tag>"`), record `git rev-parse stash@{0}` and check it changed, then `git stash apply <sha>`.
 - **Do:** to drop it afterwards, find its current `stash@{N}` by its SHA in `git stash list --format='%H %gd'` just before `git stash drop`, since `N` shifts when another session pushes.
 - **Don't:** run `git stash pop` or `git stash apply` without naming the entry, or name `stash@{0}` because you just pushed: another session may have pushed since.
+
+`hooks/no-bare-stash-pop.py` denies a bare pop or apply in a repository with more than one worktree.
+`ALLOW_BARE_STASH_POP=1` clears one command.

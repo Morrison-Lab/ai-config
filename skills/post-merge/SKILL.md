@@ -333,7 +333,7 @@ gh pr list --state open \
 ```
 
 Filter that list by `memories/reviewing-prs.md`'s scope test first, with
-`python3 scripts/pr-scope.py` as `ardia` step 1 does (opened by or assigned to the invoking user, on the
+`python3 scripts/pr-scope.py`, with the input and flags `ardia` step 1 defines (opened by or assigned to the invoking user, on the
 explicitly authorized list from the brief, or authored by the GitHub Actions
 app (`github-actions`)), and report the PRs dropped.
 A conflict on an out-of-scope PR is reported to the user and the PR left

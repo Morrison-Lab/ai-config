@@ -38,7 +38,7 @@ fix for free.
    `gh pr list --json number,headRefName,author,assignees`).
    Note each PR's number, `headRefName`, `author`, and `assignees`.
    Filter the list by `memories/reviewing-prs.md`'s scope test first, with
-   `python3 scripts/pr-scope.py` as `ardia` step 1 does (opened by or assigned to the invoking user,
+   `python3 scripts/pr-scope.py`, with the input and flags `ardia` step 1 defines (opened by or assigned to the invoking user,
    explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)), and report the PRs
    dropped: a resync pushes a merge commit, which that memory forbids on any
    other PR.

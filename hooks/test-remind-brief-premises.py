@@ -587,7 +587,9 @@ def gh_stub(body):
 
 
 _NO_PR = gh_stub("exit 1")
-_PR_3107 = gh_stub("echo 3107")
+# `gh pr view --json number` prints a JSON object; the hook reads it through
+# scripts/lib/pr_view.py (ai-config#4733), with no --jq.
+_PR_3107 = gh_stub("echo '{\"number\": 3107}'")
 MINE = {"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
         "GITHUB_REF": "refs/pull/3107/merge",
         "GITHUB_HEAD_REF": "chore/9901-unrelated",

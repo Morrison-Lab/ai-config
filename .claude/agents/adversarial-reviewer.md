@@ -394,3 +394,11 @@ do not report the output of `hooks/no-unrequested-sweep-pr.py` as your finding.
 See [`no-sweeps-by-default`](../../shared/workflow/no-sweeps-by-default.md#approving-a-check-is-not-approving-a-sweep).
 
 Flag a PR opened in a repository the user named only as precedent ("we did similar things in X"), not as a target: `hooks/no-unnamed-repo-pr.py` passes that case, so read the transcript yourself rather than trust its verdict ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).
+
+## Install leftovers handed to the user
+
+On a transcript or reply, check that nothing downloaded, extracted or built for an install or setup (an installer, an AppImage, an archive, a scratch directory) is still on the machine, and flag a reply that tells the user they can delete one.
+The agent removes what it created and reports the removal in the past tense.
+A file it did not create, or one holding a secret, is the exception.
+Read the transcript yourself; do not report the output of `hooks/no-leftover-cleanup-ask.py` as your finding.
+See [`standing-habits-from-ezra`](../../shared/workflow/standing-habits-from-ezra.md) ("Clean up after yourself after installs").

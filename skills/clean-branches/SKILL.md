@@ -37,7 +37,7 @@ Prune in both places — they accumulate junk independently:
 |----------|----------|--------|
 | **Dead** | Purely behind main (no unique commits ahead), no open MR, no linked issue, not created in the last 7 days | Delete |
 | **Stale** | Has unique commits ahead of main but is behind main, no recent activity (>30 days), not actively being worked on | Rebase on main, open MR if none exists |
-| **Active** | Has an open MR, linked issue, recent commits (<30 days), or a claim comment | Skip — don't touch |
+| **Active** | Has an open MR, is the base (target branch) of another open MR, has a linked issue, recent commits (<30 days), or a claim comment | Skip — don't touch |
 | **New** | Created in the last 7 days | Skip — too fresh to judge |
 | **Local merged** | *Local* branch fully merged into main, or whose PR merged (upstream `[gone]`) | Delete locally (`git branch -d`) — step 8 |
 | **Local-only unpushed** | *Local* branch with unique commits, never pushed, no MR | Flag — ask before touching (step 8) |
@@ -135,13 +135,21 @@ supplies the *merged* and *closed-unmerged* states that b and f need.
 
 ```bash
 gh pr list --state all --limit 2000 \
-  --json number,headRefName,state,mergedAt,url,title > /tmp/all-prs.json   # LIST_PRS
+  --json number,headRefName,baseRefName,state,mergedAt,url,title > /tmp/all-prs.json   # LIST_PRS
 ```
 
 Then index by `headRefName` and look each branch up in memory.
 Raise `--limit` above the repo's total PR count and check the returned length
 against it --- a silently truncated list marks live branches as having no PR,
 which is the one error in this sweep that deletes something.
+
+**Index the same list by `baseRefName` too, and keep every open PR's base.**
+A stacked PR targets another branch rather than `main`, and that base can pass every other test here: no open PR of its own, no linked issue, weeks old, nothing ahead of `main`.
+Deleting it closes or retargets the stacked PR, whose diff then changes to something nobody reviewed, and nothing in this sweep's output shows it ([#3515](https://github.com/Morrison-Lab/ai-config/issues/3515)).
+So a branch that is the `baseRefName` of any **open** PR is **Active**, whatever its age, commits or own PR state, the same short-circuit an open PR on the branch gets.
+On GitLab the field is the MR's `target_branch` (`glab mr list --output json`).
+[`no-delete-branch-under-stacked-pr.py`](../../hooks/no-delete-branch-under-stacked-pr.py) guards the merge-time form of this hazard (`--delete-branch` on a stacked PR's parent).
+No hook sees a sweep's own deletions, so this check is their only guard.
 
 #### d. Check for linked issues
 

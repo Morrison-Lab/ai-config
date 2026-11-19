@@ -94,13 +94,15 @@ and earlier ones can merge while later ones are still in review.
    It targets the base branch, so it needs no merge-order alert.
    A force-push rewrites a shared branch, so confirm it with the user
    unless a standing grant covers it.
-   If the user would rather not rewrite it, open the first layer as a new PR against the base
-   and close the original with a comment linking every PR in the stack.
+   If the user would rather not rewrite it, open the first layer as a new PR against the base,
+   and close the original once step 5 has opened the rest,
+   with a comment linking every PR in the stack.
 5. **Open a PR for each later layer**, following
    [`stack-prs`](../stack-prs/SKILL.md),
    with a `> [!IMPORTANT]` alert naming the PR that has to merge first.
    The second layer's PR targets the branch that now carries the first layer:
-   `<original-branch>`, or the new first-layer PR's branch if step 4 opened one.
+   the force-pushed `<original-branch>`, or, if step 4 opened a new PR instead,
+   that PR's branch (never the unrewritten `<original-branch>`).
    Each layer after that targets the layer below it.
    Then edit the first layer's PR description to cover only that layer
    and to link every later PR in merge order.

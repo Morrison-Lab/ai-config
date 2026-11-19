@@ -666,6 +666,13 @@ this one is about a correctly-marked display equation missing the plain line bre
 - **Do:** run `scripts/check-docx-tracked-changes.py` on the edited `.docx`;
   its `check_display_equation_breaks` reports each side that lacks its break ([ai-config#3438](https://github.com/Morrison-Lab/ai-config/issues/3438)).
   It requires a break only on a side where visible content shares the equation's `w:p`, so an equation alone in its paragraph, Word's own layout, passes.
+- **Do:** when a check reads a paragraph's layout, read it as accepted:
+  walk up through `w:ins`, `w:hyperlink` and `w:sdt` to find the `w:p`, and drop `w:del` and `w:moveFrom` content, breaks included.
+- **Don't:** require the `w:p` as an element's direct parent, or count deleted runs as content.
+  A first draft of `check_display_equation_breaks` did both,
+  so it skipped every tracked-inserted equation
+  and flagged correct ones beside deleted prose;
+  an outside review caught it ([ai-config#5878](https://github.com/Morrison-Lab/ai-config/pull/5878)).
 
 (Measured 2026-09-09, same manuscript and session as the OMML entries above.
 Three new equations, each correctly authored as display, were missing one or both of these breaks;

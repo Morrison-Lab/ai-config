@@ -18,7 +18,7 @@ Before committing prose or code comments. A repository’s `CLAUDE.md` pre-commi
 2.  **With `typos`**, check the changed files:
 
     ``` sh
-    git diff --name-only --diff-filter=AMR origin/main...HEAD | xargs typos
+    { git diff --name-only --diff-filter=AMR origin/main...HEAD; git diff --name-only --diff-filter=AMR HEAD; } | sort -u | xargs -r typos
     ```
 
     Install it with `pip install typos` if it is missing. A correctly spelled term it misreads goes in `_typos.toml`, never in a disabled check.

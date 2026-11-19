@@ -12,10 +12,10 @@ Before committing a change to R code or to a `.qmd` or `.Rmd` file with R chunks
 
     ``` sh
     git diff --name-only --diff-filter=AMR origin/main...HEAD -- '*.R' '*.qmd' '*.Rmd'
-    git diff --name-only --diff-filter=AMR -- '*.R' '*.qmd' '*.Rmd'
+    git diff --name-only --diff-filter=AMR HEAD -- '*.R' '*.qmd' '*.Rmd'
     ```
 
-    The first line lists committed changes and the second unstaged ones; lint the union.
+    The first line lists committed changes and the second staged and unstaged ones; lint the union.
 
 2.  **Pick the linters CI uses.** Read the repository’s lint workflows under `.github/workflows/` (in the lab, `lint-changed-lines.yaml` and `lint-changed-files.yaml`) and use the linters they name:
 
@@ -37,7 +37,7 @@ Before committing a change to R code or to a `.qmd` or `.Rmd` file with R chunks
     find . -maxdepth 1 -type l -lname . -print
     ```
 
-    Remove each link that prints (`rm -f <name>`, which deletes only the link), run `Rscript -e 'lintr::lint_dir()'`, then restore it with `git checkout -- <name>`. Step 3’s per-file lint never meets the link, so prefer it whenever the change is known.
+    Remove each link that prints (`rm -f <name>`, which deletes only the link), run `lintr::lint_dir()` with the linters step 2 chose (`Rscript -e 'lintr::lint_dir(linters = lms::default_linters(nested_calls = TRUE))'` when CI uses `lms`, a bare `lintr::lint_dir()` otherwise), then restore it with `git checkout -- <name>`. Step 3’s per-file lint never meets the link, so prefer it whenever the change is known.
 
 5.  **Report** the findings grouped by file, each with its line number, the linter that fired, and a one-line fix. Fix only findings in code your change added or edited, since the lab’s rule is that unrelated pre-existing lint stays out of the PR; say so when none remain.
 

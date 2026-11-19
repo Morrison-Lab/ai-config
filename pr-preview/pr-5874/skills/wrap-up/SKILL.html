@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="End-of-session verification and UMS.">
+<meta name="description" content="End-of-session verification and UMS. Aliases: done, merged.">
 
 <title>skill – ai-config</title>
 <style>
@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -456,7 +456,7 @@ cookieconsent.run({
 </section>
 <section id="run-a-ums-review-then-close-with-the-right-signal" class="level3">
 <h3 class="anchored" data-anchor-id="run-a-ums-review-then-close-with-the-right-signal">4. Run a UMS review, then close with the right signal</h3>
-<p>Run the full <code>ums</code> procedure (invoke the <code>ums</code> skill by name): scan the session for mistakes-corrected, new user preferences, tool quirks, and skill gaps — including whether <code>spot-skill-opportunities</code> flagged a recurring pattern during the session that’s still unbuilt; update the relevant memory files and skill definitions; commit via a <strong>branch + PR</strong> (not direct to <code>main</code>). If nothing durable emerged, say so explicitly rather than manufacturing edits.</p>
+<p>Run the full <code>ums</code> procedure (invoke the <code>ums</code> skill by name): scan the session for mistakes-corrected, new user preferences, tool quirks, and skill gaps — including whether <code>spot-skill-opportunities</code> flagged a recurring pattern during the session that’s still unbuilt; update the relevant memory files and skill definitions; commit via a <strong>branch + PR</strong> (not direct to <code>main</code>). If nothing durable emerged, say so explicitly rather than manufacturing edits. When no branch can be pushed, file each unrecorded learning as an issue, as <code>ums</code> step 4’s fallback says, and merge no PR from that wrap-up (<a href="https://github.com/Morrison-Lab/ai-config/issues/2335">ai-config#2335</a>).</p>
 <section id="closing-checklist" class="level4">
 <h4 class="anchored" data-anchor-id="closing-checklist">Closing checklist</h4>
 <p><strong>Pause point: after the UMS pass above, before the closing signal or any <code>/clear</code> flag.</strong> Do-Confirm; per <a href="../../shared/workflow/skill-checklists.md"><code>shared/workflow/skill-checklists.md</code></a>. It sits here rather than in step 3 because every item confirms work from an <em>earlier</em> step — a checklist placed before the step it checks is a forward reference, not a confirmation.</p>

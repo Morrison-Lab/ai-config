@@ -48,6 +48,42 @@ with tempfile.TemporaryDirectory() as root:
     git("commit", "-q", "-m", "init", cwd=repo)
     sub = os.path.join(repo, "sub")
     os.makedirs(sub)
+    link = os.path.join(root, "link")
+    os.symlink(repo, link)
+
+    # The message file case (#3558), before anything is embedded.
+    write(os.path.join(repo, "msg.txt"))
+    write(os.path.join(repo, "ignored.msg"))
+    write(os.path.join(repo, ".gitignore"), "*.msg\n")
+    sweep = "git add -A && git commit -F msg.txt"
+    for command, cwd, want in [
+            (sweep, repo, "deny"),
+            (sweep, link, "deny"),
+            ("git add . && git commit --file=msg.txt", repo, "deny"),
+            ("git add --all && git commit --file msg.txt", repo, "deny"),
+            ("git add -A && git commit -Fmsg.txt", repo, "deny"),
+            ("git add -A && git commit -aF msg.txt", repo, "deny"),
+            ("printf x > new.txt && git add -A && git commit -F new.txt", repo, "deny"),
+            ("git add -A && git commit -F ../msg.txt", sub, "deny"),
+            ("git add -A && git -C sub commit -F ../msg.txt", repo, "deny"),
+            ("git add -A && git commit -mF a.txt", repo, "allow"),
+            ("git add -A && git commit -F /tmp/msg.txt", repo, "allow"),
+            ("git add -A && git commit -F ignored.msg", repo, "allow"),
+            ("git add -A && git commit -F -", repo, "allow"),
+            ("git add -A ':!msg.txt' && git commit -F msg.txt", repo, "allow"),
+            ("git add a.txt && git commit -F msg.txt", repo, "allow"),
+            ("git add -u && git commit -F msg.txt", repo, "allow"),
+            ("git add . && git commit -F ../msg.txt", sub, "allow"),
+            ("git commit -F msg.txt", repo, "allow"),
+            ("git commit -F msg.txt && git add -A", repo, "allow"),
+            ("git add -A && git --git-dir=.git commit -F msg.txt", repo, "allow"),
+            ("ALLOW_SCRATCH_ADD=1 git add -A && git commit -F msg.txt", repo, "allow"),
+            ("git add -A && ALLOW_SCRATCH_ADD=1 git commit -F msg.txt", repo, "allow")]:
+        check(f"{command} in {cwd}", run(command, cwd), want)
+    git("add", "msg.txt", cwd=repo)
+    check("staged message file", run("git commit -F msg.txt", repo), "deny")
+    check("pathspec commit", run("git commit -F msg.txt -- a.txt", repo), "allow")
+    git("rm", "-q", "--cached", "msg.txt", cwd=repo)
     agent = os.path.join(repo, ".claude", "worktrees", "agent-1")
     os.makedirs(agent)
     git("init", "-q", cwd=agent)

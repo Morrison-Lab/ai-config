@@ -62,17 +62,17 @@ that issue tracks both.
   A pure rename (no line changed) does not count toward the file cap.
   Clear it with an `ALLOW_LARGE_PR=1` prefix for a mechanical, content-identical move or split, and state why in the reply.
   The prefix also exists for a stacked branch whose base is not the default branch,
-  but on 2026-11-19 the auto-mode classifier refused it as undermining oversight, for a branch whose PR's base was the layer below
+  but on 2026-11-19 the auto-mode classifier refused it ("[Undermining Oversight]") for a branch whose PR's base was the layer below
   ([#5926](https://github.com/Morrison-Lab/ai-config/pull/5926), stacked on [#5947](https://github.com/Morrison-Lab/ai-config/pull/5947)),
-  so do not plan on it.
+  so do not plan on `ALLOW_LARGE_PR=1` for a stacked layer.
   The hook measures the checked-out `HEAD` against `origin/main`, not each pushed ref against its PR's base
   ([ai-config#5873](https://github.com/Morrison-Lab/ai-config/issues/5873)):
   check out the exact branch you push, push one branch per command,
   and expect a stacked layer to be measured with its unmerged base's lines included.
-  A stacked layer whose base and layer together exceed the cap therefore cannot be pushed without that override until the base merges on its own merits.
-  Then `git fetch origin main`, merge `origin/main` into the layer, retarget its PR to `main`, and push.
-  After a squash merge, the base's files can conflict as add/add.
-  Take neither side whole: resolve each conflict hunk by hunk, keeping every change the merged base made and every change the layer adds,
+  When the base and the layer together exceed the cap, push and merge the base PR first, with its own clean review.
+  Then run `git fetch origin`, merge `origin/main` into the layer, retarget the layer's PR to `main`, and push.
+  After a squash merge, each file the base PR added can conflict as add/add.
+  For each such file, start from the layer's version and confirm that every hunk of `origin/main`'s version is still in it,
   then read the full `git diff origin/main...HEAD` and confirm it holds the layer's own changes and nothing else.
 - gha's `check-pr-size` ([gha#1188](https://github.com/Morrison-Lab/gha/issues/1188)) fails the same PR in CI.
   The `size-exempt` label lifts it; put it on a mechanical, content-identical PR.

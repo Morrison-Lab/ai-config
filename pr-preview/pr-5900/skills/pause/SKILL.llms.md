@@ -1,4 +1,4 @@
-# pause — stop new work until the user writes again
+# pause: stop new work until the user writes again
 
 The user wants the session to stop starting new work for now: no new agents, pushes, reviews, issues or hooks to write. A bare `pause` or `/pause` counts. So does a short note (at most 80 characters) after `/pause`, or after `pause` and a punctuation mark (`pause, back after lunch`). `pause the video` is an ordinary request, not a pause.
 

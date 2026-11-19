@@ -30,11 +30,12 @@ A scripted copy plus targeted edits keeps the diff against the source small, so 
 
 When Ezra asks to incorporate, port or adapt a source (a lab, a slide deck, a chapter, anything) into a repo, the port covers the whole source, not only its gaps.
 
-1. **Inventory** the source item by item with a script or an explicit list: every exercise, example, figure, definition and table.
+1. **Inventory** the source item by item with a script or an explicit list: every item of every kind, such as exercises, examples, figures, definitions, tables and listings.
 2. **Map** each item to its target: an existing equivalent in the target repo (name it), or a new port.
-3. **Port every item** unless Ezra agrees to a skip.
-   A kickoff brief that says "leave out what the target already covers" is not that agreement.
-   Map such an item to its equivalent and report the match instead of dropping it silently.
+3. **Give every item a row, and port every item that has no equivalent.**
+   An item the target already covers is mapped to that equivalent, and the match is reported.
+   Nothing is dropped unless Ezra agrees to the skip.
+   A kickoff brief that says "leave out what the target already covers" is not that agreement: it still owes the row.
 4. **Copy with a script, then improve.**
    The scripted copy comes first, and the style edits and improvements come after it as separate steps.
 5. **Report the source-to-target map** before calling the work done, one row per source item.
@@ -45,7 +46,8 @@ The method has a skill, `port-source-exercises`.
 ### Why no hook enforces this
 
 A hook sees tool calls, PR text and diffs.
-Whether a port is complete depends on the source's content, which only an inventory of that source shows, so the check is the map in step 5.
+An inventory script can list a source's items, but deciding whether a target page already covers an item needs a reader of both, so no hook can decide completeness.
+The check is the map in step 5.
 On 2026-11-18 about 20 of the 32 exercises in the ISLP chapter 7 lab were left unported and unreported, because the brief framed the task as filling gaps ([ai-config#5823](https://github.com/Morrison-Lab/ai-config/issues/5823), lds#2802, lds#2803, lds#2805).
 
 ## Drift: keep improvements, question accidents
@@ -68,6 +70,7 @@ For each ported file, diff it against its source.
 Every difference beyond the required edits is either a deliberate improvement or an accidental drift.
 Route the fix for each accidental drift to the PR's own thread, which applies the decision above.
 
-Rule from Ezra, 2026-10-19; port-every-item section from Ezra, 2026-11-18.
+Rule from Ezra, 2026-10-19;
+the copy-first-for-any-content rule and the port-every-item section from Ezra, 2026-11-18.
 See [ai-config#4632](https://github.com/Morrison-Lab/ai-config/issues/4632).
 Related: [`send-notes`](../../skills/send-notes/SKILL.md), [`global-by-default`](global-by-default.md), [`reorganize-prose`](../writing/reorganize-prose.md).

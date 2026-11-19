@@ -103,6 +103,27 @@ class DigestTest(unittest.TestCase):
         self.assertEqual(tsd.inert("x" * 500), "x" * 200 + "...")
         self.assertEqual(tsd.inert("x" * 200), "x" * 200)
 
+    def footer(self, body):
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "body.md"
+            path.write_bytes(body.encode("utf-8"))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = tsd.main(["--footer", str(path)])
+        return code, out.getvalue()
+
+    def test_footer_is_the_digest_state(self):
+        code, out, *_ = run()
+        footer = self.footer(out)
+        self.assertEqual(footer[0], 0)
+        self.assertEqual(footer, self.footer(out.replace("\n", "\r\n") + "  \n"))  # CRLF, trailing space
+        self.assertIn('"a/busy": "' + "b2" * 20, footer[1])
+        self.assertEqual(self.footer("no marker\n"), (0, "\n"))
+        # The fixture's subject carries a marker-like `<!-- x -->`; inert() keeps it from counting.
+        self.assertNotIn("x -->", footer[1])
+        other = out.replace("b2" * 20 + '"', "b0" * 20 + '"')
+        self.assertNotEqual(self.footer(other), footer)
+
     def test_body_over_the_limit_is_refused(self):
         limit = tsd.MAX_BODY
         tsd.MAX_BODY = 100

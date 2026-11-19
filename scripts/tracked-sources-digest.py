@@ -40,6 +40,13 @@ def http_fetch(api: str, token: str):
     return fetch
 
 
+def footer_state(text: str) -> dict | None:
+    """The state in a digest body's footer: its last marker, since an earlier one could only
+    come from outside text.  None when the body has no marker."""
+    markers = STATE.findall(text)
+    return json.loads(markers[-1]) if markers else None
+
+
 def read_sources(path: Path) -> list[dict]:
     with path.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
@@ -108,19 +115,22 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
     ap.add_argument("--api", default="https://api.github.com")
     ap.add_argument("--token-env", default="GH_TOKEN", help="variable holding the API token")
     ap.add_argument("--max-subjects", type=int, default=20)
+    ap.add_argument("--footer", type=Path,
+                    help="print the footer state of this digest body as sorted JSON (empty if none) and exit")
     ap.add_argument("--github-output", type=Path,
                     help="append new_commits=<n> and moved=<repositories> to this file")
     args = ap.parse_args(argv)
     if args.max_subjects < 0:
         ap.error("--max-subjects must be 0 or more")
     try:
+        if args.footer:
+            found = footer_state(args.footer.read_text(encoding="utf-8"))
+            print("" if found is None else json.dumps(found, sort_keys=True))
+            return 0
         rows = read_sources(args.sources)
-        # The footer is the last marker; an earlier one could only come from outside text.
-        markers = STATE.findall(args.previous.read_text(encoding="utf-8")) if args.previous else []
-        match = markers[-1] if markers else None
-        if args.previous and not match:
+        state = footer_state(args.previous.read_text(encoding="utf-8")) if args.previous else {}
+        if state is None:
             raise DigestError("the previous digest has no tracked-sources-state marker")
-        state = json.loads(match) if match else {}
         bad = sorted(k for k, v in state.items() if not (isinstance(v, str) and SHA.fullmatch(v)))
         if bad:
             raise DigestError(f"the previous digest's state has a non-sha head for {bad}")

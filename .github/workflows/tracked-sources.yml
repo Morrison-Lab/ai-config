@@ -57,10 +57,11 @@ jobs:
           set -euo pipefail
           body="$RUNNER_TEMP/digest.md"
           # A digest still open with the same state already lists these commits: post nothing.
-          marker() { tr -d '\r' | sed -n 's/^\(<!-- tracked-sources-state: .* -->\)$/\1/p' | tail -n 1; }
-          new=$(marker < "$body")
-          open=$(gh issue list --repo "$REPO" --label tracked-sources-digest --state open --limit 1 \
-            --json body --jq '.[0].body // ""' | marker)
+          open_body="$RUNNER_TEMP/open.md"
+          gh issue list --repo "$REPO" --label tracked-sources-digest --state open --limit 1 \
+            --json body --jq '.[0].body // ""' > "$open_body"
+          new=$(python3 scripts/tracked-sources-digest.py --footer "$body")
+          open=$(python3 scripts/tracked-sources-digest.py --footer "$open_body")
           if [ -n "$new" ] && [ "$new" = "$open" ]; then
             echo "The newest open digest already has this state."
             exit 0

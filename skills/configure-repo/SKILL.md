@@ -9,7 +9,7 @@ allowed-tools:
   - Write
 ---
 
-# configure-repo — set a repository up for agent work
+# configure-repo: set a repository up for agent work
 
 Make a repository ready for agents from any harness:
 point its `AGENTS.md` at ai-config,

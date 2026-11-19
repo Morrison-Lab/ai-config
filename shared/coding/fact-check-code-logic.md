@@ -1926,7 +1926,7 @@ Where an outcome has two consumers that disagree --- as `ambiguous` did --- the 
 
 ## An allowlist the input can name is not an allowlist
 
-On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through six review rounds, and five of them found the same kind of flaw in a new place.
+On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through seven review rounds, and six of them found the same kind of flaw in a new place.
 Each guard limited one thing the workflow line chose, and left another choice open.
 
 - The variable prefix came from the line's own `*_BASE_REF` key, so `LD_BASE_REF` admitted `LD_PRELOAD`.
@@ -1934,11 +1934,17 @@ Each guard limited one thing the workflow line chose, and left another choice op
 - The gha ref came from the workflow, so a commit sha could name a fork's code, and `..` named a directory the cache cleanup then deleted.
 - The line could set any variable under its own prefix, so `TYPOS_BIN_DIR=tools` ran a binary from the pushed repository.
 - The line passed arguments to its script, so `--output-markdown ~/.bashrc` wrote over a file outside it.
+- The line chose its variables' values, so `PHI_BASE_REF=--output=<path>` became a `git diff` option that wrote a file.
 
-Probes that kept the check's real prefix (`CAW_`), script and arguments passed every round.
-The line still names its check, its prefix and a gha branch.
-What the hook now holds itself is the shape of each: only that check's own script, with no arguments, variables only from a fixed list of suffixes, and a ref with no `..` that is not a commit sha.
-Limiting variable names was not enough while the line chose which program read them, and limiting the program was not enough while the line chose its arguments.
+Probes that kept the check's real prefix (`CAW_`), script, arguments and values passed every round.
+A bundled line still names its check, its prefix, a gha branch and its values.
+What the hook now holds itself is the shape of each:
+only that check's own script, with no arguments;
+variables only from a fixed list of suffixes;
+a base that is exactly the pull-request placeholder, no value starting with `-`, and file values inside the repository;
+and a ref with no `..` that is not a commit sha.
+The `uses:` route still accepts a commit sha ([#5933](https://github.com/Morrison-Lab/ai-config/issues/5933)).
+Limiting variable names was not enough while the line chose which program read them, limiting the program was not enough while the line chose its arguments, and limiting both was not enough while the line chose the values.
 
 - **Do:** for every allowlist on untrusted input, list each thing the input still chooses, and probe with the input choosing each one.
 - **Do:** when an allowlist limits names, ask what each allowed name does in the program that reads it.

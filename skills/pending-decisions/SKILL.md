@@ -1,6 +1,6 @@
 ---
 name: pending-decisions
-description: "Surface items awaiting decision."
+description: "Surface items awaiting decision. Aliases: pd."
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,18 +1,18 @@
 ---
-name: "resync-branch"
-description: "\u2192 sync-pr-branch."
+name: "configure-repo"
+description: "Set up a repo for agent work with ai-config."
 ---
 
-# resync-branch (Codex wrapper)
+# configure-repo (Codex wrapper)
 
 This is a generated Codex wrapper around the canonical ai-config Claude skill.
 
-Source: [skills/resync-branch/SKILL.md](../../skills/resync-branch/SKILL.md)
+Source: [skills/configure-repo/SKILL.md](../../skills/configure-repo/SKILL.md)
 
 Before acting, read the source skill completely and follow its workflow, adapting it to Codex.
 
-The source lives at `skills/resync-branch/SKILL.md` in the same ai-config checkout as this wrapper.
-If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/resync-branch`, resolve the symlink target for this wrapper directory first, then read `../../skills/resync-branch/SKILL.md` relative to that real directory.
+The source lives at `skills/configure-repo/SKILL.md` in the same ai-config checkout as this wrapper.
+If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/configure-repo`, resolve the symlink target for this wrapper directory first, then read `../../skills/configure-repo/SKILL.md` relative to that real directory.
 Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
 
 - Treat `user-invocable` and `allowed-tools` as Claude metadata, not Codex permissions.

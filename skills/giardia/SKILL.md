@@ -1,6 +1,7 @@
 ---
 name: giardia
 description: "→ gia."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: check-rendered-refs
-description: "Find broken refs in render."
+description: "Find broken refs in render. Aliases: crr."
 user-invocable: true
 allowed-tools:
   - Bash

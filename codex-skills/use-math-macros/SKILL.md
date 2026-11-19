@@ -1,6 +1,6 @@
 ---
 name: "use-math-macros"
-description: "Use shared semantic math macros in all lab math."
+description: "Use shared semantic math macros in all lab math. Aliases: macroize."
 ---
 
 # use-math-macros (Codex wrapper)

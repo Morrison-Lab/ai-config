@@ -1,6 +1,6 @@
 ---
 name: "delegate-to-opencode"
-description: "Delegate sidecar work to OpenCode or OpenRouter models."
+description: "Delegate sidecar work to OpenCode or OpenRouter models. Aliases: dto."
 ---
 
 # delegate-to-opencode (Codex wrapper)

@@ -56,8 +56,8 @@ git log --oneline -5 origin/main           # what actually landed on main
 - **Merge conflict sweep.** Before closing out, check every open PR's
   `mergeable` field.
   Filter the list by `memories/reviewing-prs.md`'s scope test first, with
-  `python3 scripts/pr-scope.py`, with the input and flags `ardia` step 1 defines; report an out-of-scope conflicting PR to the user and
-  leave it untouched (no comment, no push).
+  `python3 scripts/pr-scope.py`, with the input and flags `ardia` step 1 defines;
+  report an out-of-scope conflicting PR to the user and leave it untouched (no comment, no push).
   For each in-scope PR with `mergeable == "CONFLICTING"` **or
   `"UNKNOWN"`** (see `resolve-conflicts`, "Verify before you act" —
   `UNKNOWN` can mean GitHub hasn't finished computing yet), verify with

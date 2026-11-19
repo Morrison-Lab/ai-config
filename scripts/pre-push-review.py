@@ -1382,7 +1382,7 @@ def main():
     repo_root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
     # Decide Codex scope here: the sandbox clone below has a local-path origin,
     # so codex_allowed() run inside it would always refuse (ai-config#5084).
-    codex_ok = codex_allowed(git_root)
+    codex_ok = codex_allowed(repo_root)
     with tempfile.TemporaryDirectory() as temp_dir:
         original_cwd = os.getcwd()
         try:

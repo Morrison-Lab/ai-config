@@ -1,6 +1,6 @@
 ---
 name: "sup"
-description: "Send issue or fix upstream."
+description: "Send issue or fix upstream. Aliases: send-upstream, sus."
 ---
 
 # sup (Codex wrapper)

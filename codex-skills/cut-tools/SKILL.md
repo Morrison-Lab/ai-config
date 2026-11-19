@@ -1,6 +1,6 @@
 ---
 name: "cut-tools"
-description: "Audit and disable unneeded MCP tools."
+description: "Audit and disable unneeded MCP tools. Aliases: ct."
 ---
 
 # cut-tools (Codex wrapper)

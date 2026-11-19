@@ -77,10 +77,10 @@ def has_flag(opts, short, long):
 def embedded_repo(cwd, rest):
     """The first untracked directory holding `.git` that `git add <rest>`
     would stage, or None. `-u` adds no untracked path."""
-    if {"-u", "--update"} & set(rest) or any(a.startswith("--pathspec-from")
-                                            for a in rest):
-        return None
     cut = rest.index("--") if "--" in rest else len(rest)
+    if has_flag(rest[:cut], "u", "update") or any(
+            a.startswith("--pathspec-from") for a in rest[:cut]):
+        return None
     specs = [a for a in rest[:cut] if not a.startswith("-")] + rest[cut + 1:]
     if not specs and not has_flag(rest[:cut], "A", "all"):
         return None
@@ -167,7 +167,10 @@ def swept_message(cwd, path, sweeps):
     rel = os.path.relpath(full, top)
     if rel.split(os.sep)[0] == ".git":  # git never stages its own directory
         return None
-    if rel in (git(cwd, "diff", "--cached", "--name-only", "-z", nul=True) or []):
+    # --name-only prints top-relative paths from any subdirectory;
+    # --no-relative keeps that true under a `diff.relative` config.
+    if rel in (git(cwd, "diff", "--cached", "--name-only", "--no-relative",
+                   "-z", nul=True) or []):
         return "is staged"
     if git(cwd, "check-ignore", "-q", "--", full) is not None:
         return None
@@ -203,7 +206,8 @@ def evaluate(command, cwd, environ=None):
             cur = os.path.normpath(os.path.join(cur, os.path.expanduser(d)))
         sub, rest, _env = parsed
         segment = " ".join(argv)
-        if sub == "add" and not {"-n", "--dry-run"} & set(rest):
+        cut = rest.index("--") if "--" in rest else len(rest)
+        if sub == "add" and not has_flag(rest[:cut], "n", "dry-run"):
             path = embedded_repo(cur, rest)
             if path:
                 return EMBEDDED.format(segment=segment, path=path) + FOOTER

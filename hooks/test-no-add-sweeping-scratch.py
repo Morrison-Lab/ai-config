@@ -104,6 +104,14 @@ with tempfile.TemporaryDirectory() as root:
         check(f"{command} in {cwd}", run(command, cwd), want)
     git("add", "msg.txt", cwd=repo)
     check("staged message file", run("git commit -F msg.txt", repo), "deny")
+    check("staged message file, commit from a subdirectory",
+          run("git commit -F ../msg.txt", sub), "deny")
+    check("staged message file, -C into a subdirectory",
+          run("git -C sub commit -F ../msg.txt", repo), "deny")
+    git("config", "diff.relative", "true", cwd=repo)
+    check("staged message file under diff.relative",
+          run("git commit -F ../msg.txt", sub), "deny")
+    git("config", "--unset", "diff.relative", cwd=repo)
     check("pathspec commit", run("git commit -F msg.txt -- a.txt", repo), "allow")
     git("rm", "-q", "--cached", "msg.txt", cwd=repo)
     write(os.path.join(repo, "café.txt"))
@@ -128,6 +136,10 @@ with tempfile.TemporaryDirectory() as root:
             ("git add a.txt", repo, "allow"),
             ("git add -u", repo, "allow"),
             ("git add -n -A", repo, "allow"),
+            ("git add -An", repo, "allow"),
+            ("git add -uv", repo, "allow"),
+            ("git add -vu .", repo, "allow"),
+            ("git add -Av", repo, "deny"),
             ("git add .", sub, "allow"),
             ("git add -A -- a.txt", repo, "allow"),
             ("git --git-dir=.git add -A", repo, "allow"),

@@ -1,6 +1,6 @@
 ---
 name: "assess-model-fit"
-description: "Assess model fit for task."
+description: "Assess model fit for task. Aliases: model-fit."
 ---
 
 # assess-model-fit (Codex wrapper)

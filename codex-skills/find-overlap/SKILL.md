@@ -1,6 +1,6 @@
 ---
 name: "find-overlap"
-description: "Find overlapping skills or memory."
+description: "Find overlapping skills or memory. Aliases: find-duplicates."
 ---
 
 # find-overlap (Codex wrapper)

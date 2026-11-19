@@ -1,6 +1,7 @@
 ---
 name: grab-issue
 description: "→ gi."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

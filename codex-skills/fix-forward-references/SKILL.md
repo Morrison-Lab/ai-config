@@ -1,6 +1,6 @@
 ---
 name: "fix-forward-references"
-description: "Fix forward references in text."
+description: "Fix forward references in text. Aliases: ffr."
 ---
 
 # fix-forward-references (Codex wrapper)

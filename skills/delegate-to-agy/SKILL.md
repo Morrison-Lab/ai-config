@@ -1,6 +1,6 @@
 ---
 name: delegate-to-agy
-description: "Delegate sidecar task to the Antigravity agy CLI."
+description: "Delegate sidecar task to the Antigravity agy CLI. Aliases: dta."
 user-invocable: true
 allowed-tools:
   - Bash

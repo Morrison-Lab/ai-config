@@ -1926,7 +1926,7 @@ Where an outcome has two consumers that disagree --- as `ambiguous` did --- the 
 
 ## An allowlist the input can name is not an allowlist
 
-On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through eight review rounds, and seven of them found the same kind of flaw in a new place.
+On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through about ten review rounds before one came back clean, and most of them found the same kind of flaw in a new place.
 Each guard limited one thing the workflow line chose, and left another choice open.
 
 - The variable prefix came from the line's own `*_BASE_REF` key, so `LD_BASE_REF` admitted `LD_PRELOAD`.

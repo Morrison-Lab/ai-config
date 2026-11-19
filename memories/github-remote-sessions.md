@@ -570,7 +570,7 @@ Widening the clone before the push avoids the problem: `git remote set-branches 
 - **Don't:** retry `git fetch origin <branch>` or `git branch -u origin/<branch>`, or treat the hook's "no remote branch" as proof the push failed, before checking `git ls-remote --heads origin <branch>`.
 - Seen again on 2026-11-19: `git push -u origin <branch>` succeeded and left no tracking ref, both `git branch -u` failures above recurred, and the Stop hook reported "unpushed, no remote branch".
   The four lines above fixed it again.
-- **Do:** verify a push by checking that `git ls-remote origin <branch>` prints the same sha as `git rev-parse HEAD`.
+- **Do:** verify a push by checking that `git ls-remote --heads origin <branch>` prints the same sha as `git rev-parse HEAD`.
 - **Don't:** trust `git status -sb` or the Stop hook alone in this environment.
 
 ## A command handed to the user must run where the user is, not in the container
@@ -598,8 +598,9 @@ and on the user's Mac it failed at once with `cd: no such file or directory: /ho
 Measured 2026-11-19 in a claude.ai cloud session.
 
 - **Do:** search issues over REST with `gh api -X GET search/issues -f q='repo:<owner>/<repo> is:issue <terms>'`.
-  The query must include `is:issue` or `is:pull-request`.
-- **Don't:** omit the type qualifier: `search/issues` answers 422.
+  In a cloud session the query must include `is:issue` or `is:pull-request`.
+- **Don't:** omit the type qualifier in a cloud session: there `search/issues` answers 422 "Query must include 'is:issue' or 'is:pull-request'".
+  The same query without it returned 200 from `gh` on a PC the same day, so the 422 is the cloud session's, not GitHub's everywhere.
 - **Do:** call `mcp__claude-code-remote__subscribe_pr_activity` with `pullNumber`, an integer.
 - **Don't:** pass `pr_number`, which is not the parameter name.
 - **Do:** call `mcp__claude-code-remote__add_repo` with `owner` and `repo` as separate bare names, and `access: "push"` to file issues or open PRs there.

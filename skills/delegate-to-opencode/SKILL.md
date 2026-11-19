@@ -367,6 +367,7 @@ Measured in a claude.ai cloud session on 2026-11-12, while merging [ai-config#54
 - The merge gate that requires a `check-pr-fully-clean.py` pass did not accept a run whose output was filtered through `grep`, and accepted it once the output was unpiped.
 - With every Go model at its weekly `GoUsageLimitError`, `iceman-contributor-free` returned a bare `VERDICT: CLEAN`, `beam-free` returned no text, and `longcat-2.5-free` spent all 30,000 `max_tokens` on reasoning with no text.
   Treat the bare verdict as weak evidence and the empty answers as no verdict.
+
 - **Do:** run the OpenCode `curl` directly in Bash, and run `check-pr-fully-clean.py` unpiped, before a merge.
 - **Don't:** wrap the `curl` in a script, or count another session's posted read, as the merge hook's cross-harness review.
 

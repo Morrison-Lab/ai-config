@@ -618,6 +618,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-switch-in-main-checkout.py\"",
+            "timeout": 20,
+            "script": "no-switch-in-main-checkout.py",
+            "why": "ai-config#4233, #3204: the main worktree of a repository with linked worktrees is read by other sessions and subagents, and a switch there left it on a fixer's branch with a stale index; denies git switch and a branch-changing git checkout there."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-delete-branch-under-stacked-pr.py\"",
             "timeout": 25,
             "script": "no-delete-branch-under-stacked-pr.py",

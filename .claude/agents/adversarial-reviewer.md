@@ -271,6 +271,14 @@ On a transcript, script or skill, flag `git add -A` in a repository that does no
 Read the diff yourself; do not report `hooks/no-add-sweeping-scratch.py`'s refusal or silence as your finding.
 See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
 
+## Branch changes in a shared main checkout
+
+On a transcript, script, skill or rule that runs `git checkout <branch>`, `git checkout -b`, `-B` or `git switch`, check where it runs: in a repository with linked worktrees, the main checkout is read by other sessions and subagents.
+Flag a branch change there, and a session that switches a checkout a background job or subagent is still using.
+That work belongs in `git worktree add <dir> <branch>`.
+Read the command yourself; do not report `hooks/no-switch-in-main-checkout.py`'s refusal or silence as your finding.
+See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
+
 ## Announcements need approval
 
 On a transcript, brief or script that posts or edits a class announcement, check that the user's own message approved that exact text before the post.

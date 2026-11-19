@@ -259,7 +259,7 @@ See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-read
 
 ## Stash entries taken without a ref
 
-On a transcript, script, skill or rule that runs `git stash pop` or `git stash apply`, check that it names the entry (`stash@{N}` or a SHA recorded when it pushed) and that it checked the push saved something.
+On a transcript, script, skill or rule that runs `git stash pop` or `git stash apply`, check that it names the entry by a SHA found through its own unique push message, not by a position such as `stash@{0}` read after the push, and that it checked the push saved something.
 Flag a bare pop or apply, and a stash-then-pop pair that assumes the top entry is its own: the stack is shared by every worktree.
 See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
 

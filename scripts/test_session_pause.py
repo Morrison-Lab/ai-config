@@ -40,9 +40,14 @@ def transcript(*entries):
 # The command itself.
 for prompt in ("pause", "Pause.", "  pause  ", "/pause", "/ai-config:pause",
                "pause, back after lunch", "pause: lunch", "/pause back after lunch",
-               "<command-name>/pause</command-name>\n<command-args></command-args>"):
+               "<command-name>/pause</command-name>\n<command-args></command-args>",
+               "<command-name>/pause</command-name>\n"
+               "<command-args>back after lunch</command-args>"):
     check(f"{prompt!r} pauses", is_pause_command(prompt))
-for prompt in ("pause the video at 2:13 and describe what the slide shows, "
+for prompt in ("<command-name>/pause</command-name>\n<command-args>"
+               + "x" * 81 + "</command-args>",
+               "/pause " + "x" * 81,
+               "pause the video at 2:13 and describe what the slide shows, "
                "then compare it with the notes page",
                "pause the docker container and check logs", "pause here",
                "don't pause", "paused", "pauses", "please continue", ""):

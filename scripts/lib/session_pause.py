@@ -25,13 +25,16 @@ _BARE = re.compile(
 )
 # The same command invoked as a skill, as Claude Code records a slash command.
 _SLASH = re.compile(r"<command-name>\s*/?(?:ai-config:)?pause\s*</command-name>", re.I)
+_ARGS = re.compile(r"<command-args>(?P<args>.*?)</command-args>", re.I | re.S)
 MAX_NOTE = 80
 
 
 def is_pause_command(prompt: str) -> bool:
     """True for a prompt that pauses the session."""
     if _SLASH.search(prompt):
-        return True
+        # The skill form takes the same short note as a typed "/pause".
+        args = _ARGS.search(prompt)
+        return args is None or len(args.group("args").strip()) <= MAX_NOTE
     match = _BARE.match(prompt)
     if not match:
         return False

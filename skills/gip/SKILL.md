@@ -1,6 +1,6 @@
 ---
 name: gip
-description: "Grab issues and implement in parallel."
+description: "Grab issues and implement in parallel. Aliases: grab-issues-in-parallel."
 user-invocable: true
 allowed-tools:
   - Bash

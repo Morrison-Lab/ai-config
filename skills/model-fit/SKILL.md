@@ -1,6 +1,7 @@
 ---
 name: model-fit
 description: "→ assess-model-fit."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

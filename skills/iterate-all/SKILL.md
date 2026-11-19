@@ -1,6 +1,7 @@
 ---
 name: iterate-all
 description: "→ ardia."
+disable-model-invocation: true
 user-invocable: true
 ---
 

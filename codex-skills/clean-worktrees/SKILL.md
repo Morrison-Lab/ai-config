@@ -1,6 +1,6 @@
 ---
 name: "clean-worktrees"
-description: "Clean stale git worktrees."
+description: "Clean stale git worktrees. Aliases: cw."
 ---
 
 # clean-worktrees (Codex wrapper)

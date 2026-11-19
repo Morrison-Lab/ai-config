@@ -22,11 +22,11 @@ its description does not use (ai-config#949).
 | `skills/alt-text/SKILL.md` | Write accessible alt text for figures in Quarto and pkgdown. |  |
 | `skills/always/SKILL.md` | -> memorize. |  |
 | `skills/and/SKILL.md` | Revise previous command in-place. |  |
-| `skills/ard/SKILL.md` | Address, rebut, or defer review items. |  |
-| `skills/ardi/SKILL.md` | Drive one PR to clean. |  |
-| `skills/ardia/SKILL.md` | Drive every in-scope open PR to clean. |  |
+| `skills/ard/SKILL.md` | Address, rebut, or defer review items. Aliases: adr. |  |
+| `skills/ardi/SKILL.md` | Drive one PR to clean. Aliases: adri, clean, dc, drive, iterate. |  |
+| `skills/ardia/SKILL.md` | Drive every in-scope open PR to clean. Aliases: adria, iterate-all. |  |
 | `skills/ardiaei/SKILL.md` | Drive PRs clean and run UMS. |  |
-| `skills/assess-model-fit/SKILL.md` | Assess model fit for task. |  |
+| `skills/assess-model-fit/SKILL.md` | Assess model fit for task. Aliases: model-fit. |  |
 | `skills/away/SKILL.md` | Unattended best-judgment mode. |  |
 | `skills/back/SKILL.md` | Resume after away mode. |  |
 | `skills/before/SKILL.md` | Insert before a queued task. |  |
@@ -39,45 +39,46 @@ its description does not use (ai-config#949).
 | `skills/cascade/SKILL.md` | Merge base down PR stack. |  |
 | `skills/cb/SKILL.md` | -> clean-branches. |  |
 | `skills/cdu/SKILL.md` | -> check-dependency-updates. |  |
-| `skills/check-dependency-updates/SKILL.md` | Audit dependency updates. |  |
+| `skills/check-dependency-updates/SKILL.md` | Audit dependency updates. Aliases: cdu. |  |
 | `skills/check-history/SKILL.md` | Check closed PR history for issue. |  |
-| `skills/check-info-quality/SKILL.md` | Flag stale or misleading content. |  |
+| `skills/check-info-quality/SKILL.md` | Flag stale or misleading content. Aliases: ciq. |  |
 | `skills/check-prose-claims/SKILL.md` | Check prose claims, read-only. |  |
-| `skills/check-rendered-refs/SKILL.md` | Find broken refs in render. |  |
+| `skills/check-rendered-refs/SKILL.md` | Find broken refs in render. Aliases: crr. |  |
 | `skills/checkpoint/SKILL.md` | Save mid-task snapshot. |  |
 | `skills/choose-thread/SKILL.md` | New or existing thread? |  |
-| `skills/chores/SKILL.md` | Handle chore and bump PRs. |  |
+| `skills/chores/SKILL.md` | Handle chore and bump PRs. Aliases: dependabot. |  |
 | `skills/ciq/SKILL.md` | -> check-info-quality. |  |
 | `skills/claim-pr/SKILL.md` | Post claim comment on PR/issue. |  |
 | `skills/claude-agent-workflow/SKILL.md` | Add or update claude.yml workflow. |  |
 | `skills/claude-review-workflow/SKILL.md` | Add or update claude-review workflow. |  |
 | `skills/clean/SKILL.md` | -> ardi. |  |
-| `skills/clean-branches/SKILL.md` | Clean dead or stale Git branches. |  |
+| `skills/clean-branches/SKILL.md` | Clean dead or stale Git branches. Aliases: cb, prune. |  |
 | `skills/clean-git/SKILL.md` | Sweep dead worktrees then dead branches, in that order. |  |
-| `skills/clean-worktrees/SKILL.md` | Clean stale git worktrees. |  |
+| `skills/clean-worktrees/SKILL.md` | Clean stale git worktrees. Aliases: cw. |  |
 | `skills/clear-all/SKILL.md` | -> gia. |  |
 | `skills/cli/SKILL.md` | R command-line interface styling and semantic messaging. |  |
 | `skills/compress-session/SKILL.md` | Distill context before compacting. |  |
-| `skills/config-ai/SKILL.md` | Route AI capability requests. |  |
+| `skills/config-ai/SKILL.md` | Route AI capability requests. Aliases: ca, cai. |  |
 | `skills/configure-gitattributes/SKILL.md` | Configure file merge/diff attributes. |  |
+| `skills/configure-repo/SKILL.md` | Set up a repo for agent work with ai-config. |  |
 | `skills/consolidate-memory/SKILL.md` | Merge redundant memories. |  |
 | `skills/consolidate-skills/SKILL.md` | Merge overlapping skills. |  |
-| `skills/convert-repo-format/SKILL.md` | Convert repo format. |  |
+| `skills/convert-repo-format/SKILL.md` | Convert repo format. Aliases: crf. |  |
 | `skills/cran-extrachecks/SKILL.md` | CRAN submission checklist beyond devtools::check(). |  |
 | `skills/create-release-checklist/SKILL.md` | Create an R package release-checklist issue. |  |
 | `skills/crf/SKILL.md` | -> convert-repo-format. |  |
 | `skills/crr/SKILL.md` | -> check-rendered-refs. |  |
 | `skills/ct/SKILL.md` | -> cut-tools. |  |
-| `skills/cut-tools/SKILL.md` | Audit and disable unneeded MCP tools. |  |
+| `skills/cut-tools/SKILL.md` | Audit and disable unneeded MCP tools. Aliases: ct. |  |
 | `skills/cw/SKILL.md` | -> clean-worktrees. |  |
-| `skills/daytb/SKILL.md` | Decide current question yourself. |  |
+| `skills/daytb/SKILL.md` | Decide current question yourself. Aliases: do-as-you-think-best. |  |
 | `skills/dc/SKILL.md` | -> ardi. |  |
 | `skills/decompose-skill/SKILL.md` | Split overly-broad skill. |  |
-| `skills/defer-issue/SKILL.md` | File issue for deferred work. |  |
-| `skills/delegate-to-agy/SKILL.md` | Delegate sidecar task to the Antigravity agy CLI. |  |
-| `skills/delegate-to-codex/SKILL.md` | Delegate sidecar task to Codex. |  |
+| `skills/defer-issue/SKILL.md` | File issue for deferred work. Aliases: di. |  |
+| `skills/delegate-to-agy/SKILL.md` | Delegate sidecar task to the Antigravity agy CLI. Aliases: dta. |  |
+| `skills/delegate-to-codex/SKILL.md` | Delegate sidecar task to Codex. Aliases: dtc. |  |
 | `skills/delegate-to-databricks/SKILL.md` | Dispatch sidecar work to Databricks-hosted LLMs. |  |
-| `skills/delegate-to-opencode/SKILL.md` | Delegate sidecar work to OpenCode or OpenRouter models. |  |
+| `skills/delegate-to-opencode/SKILL.md` | Delegate sidecar work to OpenCode or OpenRouter models. Aliases: dto. |  |
 | `skills/dependabot/SKILL.md` | -> chores. |  |
 | `skills/detect-hallucinations/SKILL.md` | Find fake references, read-only. |  |
 | `skills/detect-hypothetical-examples/SKILL.md` | Flag invented examples when real data exists. |  |
@@ -85,36 +86,37 @@ its description does not use (ai-config#949).
 | `skills/di/SKILL.md` | -> defer-issue. |  |
 | `skills/difm/SKILL.md` | -> do-it-for-me. |  |
 | `skills/discussions/SKILL.md` | Manage forge discussions. |  |
+| `skills/dissolve-page/SKILL.md` | Dissolve a notes page into its neighbors. |  |
 | `skills/dmmhyh/SKILL.md` | Stop over-asking. |  |
 | `skills/do-as-you-think-best/SKILL.md` | -> daytb. |  |
-| `skills/do-it-for-me/SKILL.md` | Do the step yourself; retry blocks, then lift auto mode. |  |
+| `skills/do-it-for-me/SKILL.md` | Do the step yourself; retry blocks, then lift auto mode. Aliases: difm. |  |
 | `skills/done/SKILL.md` | -> wrap-up. |  |
 | `skills/draft-in-ezras-voice/SKILL.md` | Draft Ezra's announcements, emails and comments in his voice. |  |
 | `skills/drive/SKILL.md` | -> ardi. |  |
 | `skills/dta/SKILL.md` | -> delegate-to-agy. |  |
 | `skills/dtc/SKILL.md` | -> delegate-to-codex. |  |
 | `skills/dto/SKILL.md` | -> delegate-to-opencode. |  |
-| `skills/empty-promise/SKILL.md` | Investigate and correct empty promises. |  |
+| `skills/empty-promise/SKILL.md` | Investigate and correct empty promises. Aliases: ep. |  |
 | `skills/ep/SKILL.md` | -> empty-promise. |  |
 | `skills/fa/SKILL.md` | -> fetch-all. |  |
-| `skills/fact-check-prose/SKILL.md` | Verify claims and values in prose. |  |
+| `skills/fact-check-prose/SKILL.md` | Verify claims and values in prose. Aliases: fcp. |  |
 | `skills/fcp/SKILL.md` | -> fact-check-prose. |  |
-| `skills/fetch-all/SKILL.md` | Fetch all remotes and submodules. |  |
+| `skills/fetch-all/SKILL.md` | Fetch all remotes and submodules. Aliases: fa. |  |
 | `skills/ffr/SKILL.md` | -> fix-forward-references. |  |
-| `skills/find-ai-tells/SKILL.md` | Spot AI prose tells. |  |
+| `skills/find-ai-tells/SKILL.md` | Spot AI prose tells. Aliases: ai-tells. |  |
 | `skills/find-duplicates/SKILL.md` | -> find-overlap. |  |
 | `skills/find-info-issues/SKILL.md` | Find stale or misleading text. |  |
-| `skills/find-overlap/SKILL.md` | Find overlapping skills or memory. |  |
+| `skills/find-overlap/SKILL.md` | Find overlapping skills or memory. Aliases: find-duplicates. |  |
 | `skills/find-reproducibility-gaps/SKILL.md` | Find reproducibility gaps, read-only. |  |
-| `skills/finish-wave/SKILL.md` | Finish the current wave; start no new one. |  |
+| `skills/finish-wave/SKILL.md` | Finish the current wave; start no new one. Aliases: fw. |  |
 | `skills/first/SKILL.md` | Jump to head of task queue. |  |
-| `skills/fix-forward-references/SKILL.md` | Fix forward references in text. |  |
+| `skills/fix-forward-references/SKILL.md` | Fix forward references in text. Aliases: ffr. |  |
 | `skills/fw/SKILL.md` | -> finish-wave. |  |
-| `skills/gi/SKILL.md` | Grab an issue, implement, and ARDI. |  |
-| `skills/gia/SKILL.md` | Clear PR queue then all issues. |  |
+| `skills/gi/SKILL.md` | Grab an issue, implement, and ARDI. Aliases: grab-issue. |  |
+| `skills/gia/SKILL.md` | Clear PR queue then all issues. Aliases: clear-all, giardia. |  |
 | `skills/giardia/SKILL.md` | -> gia. |  |
-| `skills/gii/SKILL.md` | Grab issues and implement in series. |  |
-| `skills/gip/SKILL.md` | Grab issues and implement in parallel. |  |
+| `skills/gii/SKILL.md` | Grab issues and implement in series. Aliases: gis. |  |
+| `skills/gip/SKILL.md` | Grab issues and implement in parallel. Aliases: grab-issues-in-parallel. |  |
 | `skills/gis/SKILL.md` | -> gii. |  |
 | `skills/gmd/SKILL.md` | Run GIA with MWC and AWAY. |  |
 | `skills/grab-issue/SKILL.md` | -> gi. |  |
@@ -129,12 +131,13 @@ its description does not use (ai-config#949).
 | `skills/learn/SKILL.md` | Persist new pattern to memory. |  |
 | `skills/lifecycle/SKILL.md` | Manage R package lifecycle using tidyverse principles. |  |
 | `skills/link-skills/SKILL.md` | Find cross-ref gaps across skills. |  |
+| `skills/lint/SKILL.md` | Lint changed R code with the linters the repo's CI uses. |  |
 | `skills/macroize/SKILL.md` | -> use-math-macros. |  |
 | `skills/manuscript/SKILL.md` | Prepare a paper for a journal. |  |
 | `skills/maw/SKILL.md` | -> mwc. |  |
 | `skills/mds/SKILL.md` | -> send-notes. |  |
-| `skills/measure-performance/SKILL.md` | Profile and benchmark. |  |
-| `skills/memorize/SKILL.md` | Persist memory across sessions. |  |
+| `skills/measure-performance/SKILL.md` | Profile and benchmark. Aliases: benchmark, perf. |  |
+| `skills/memorize/SKILL.md` | Persist memory across sessions. Aliases: always, remember. |  |
 | `skills/merge-at-will/SKILL.md` | -> mwc. |  |
 | `skills/merge-it/SKILL.md` | Merge ready PR and wrap up. |  |
 | `skills/merge-main/SKILL.md` | -> sync-pr-branch. |  |
@@ -143,14 +146,15 @@ its description does not use (ai-config#949).
 | `skills/migrate-discussion/SKILL.md` | Move items between Issues and Discussions. |  |
 | `skills/mma/SKILL.md` | Merge main into open PR branches. |  |
 | `skills/model-fit/SKILL.md` | -> assess-model-fit. |  |
-| `skills/mwc/SKILL.md` | Session merge grant with confidence gate. |  |
+| `skills/mwc/SKILL.md` | Session merge grant with confidence gate. Aliases: maw, merge-at-will, merge-when-confident. |  |
 | `skills/next/SKILL.md` | Insert after in-flight task. |  |
 | `skills/oppo/SKILL.md` | -> opposition-research. |  |
-| `skills/opposition-research/SKILL.md` | Mine competitor community demand. |  |
+| `skills/opposition-research/SKILL.md` | Mine competitor community demand. Aliases: oppo. |  |
+| `skills/pause/SKILL.md` | Pause the session; hooks stop demanding work. |  |
 | `skills/pd/SKILL.md` | -> pending-decisions. |  |
 | `skills/pdc/SKILL.md` | -> prune-dead-code. |  |
 | `skills/pds/SKILL.md` | -> send-notes. |  |
-| `skills/pending-decisions/SKILL.md` | Surface items awaiting decision. |  |
+| `skills/pending-decisions/SKILL.md` | Surface items awaiting decision. Aliases: pd. |  |
 | `skills/perf/SKILL.md` | -> measure-performance. |  |
 | `skills/permission-check/SKILL.md` | Diagnose tool prompting behavior. |  |
 | `skills/ph/SKILL.md` | -> purge-hallucinations. |  |
@@ -165,12 +169,12 @@ its description does not use (ai-config#949).
 | `skills/pre-push-review/SKILL.md` | Run local adversarial AI code review. |  |
 | `skills/prefer-upstream/SKILL.md` | Prefer upstream packages. |  |
 | `skills/promote-memory/SKILL.md` | Promote project memory to shared. |  |
-| `skills/prompt-me/SKILL.md` | Surface top question for user. |  |
-| `skills/prompt-me-all/SKILL.md` | List all open questions. |  |
+| `skills/prompt-me/SKILL.md` | Surface top question for user. Aliases: pm. |  |
+| `skills/prompt-me-all/SKILL.md` | List all open questions. Aliases: pma. |  |
 | `skills/prune/SKILL.md` | -> clean-branches. |  |
-| `skills/prune-dead-code/SKILL.md` | Detect and remove dead code, orphaned configs, stale docs. |  |
+| `skills/prune-dead-code/SKILL.md` | Detect and remove dead code, orphaned configs, stale docs. Aliases: pdc. |  |
 | `skills/psw/SKILL.md` | -> send-notes. |  |
-| `skills/purge-hallucinations/SKILL.md` | Verify and purge fake citations. |  |
+| `skills/purge-hallucinations/SKILL.md` | Verify and purge fake citations. Aliases: ph. |  |
 | `skills/push/SKILL.md` | Pre-push check for active sessions. |  |
 | `skills/push-memory/SKILL.md` | Push memory from external repo. |  |
 | `skills/quarto-authoring/SKILL.md` | Quarto document authoring and markdown conversion. |  |
@@ -181,23 +185,23 @@ its description does not use (ai-config#949).
 | `skills/r-pkg-spellcheck/SKILL.md` | Spellcheck before git push. |  |
 | `skills/rc/SKILL.md` | -> resolve-conflicts. |  |
 | `skills/rct/SKILL.md` | -> refresh-claude-token. |  |
-| `skills/rec/SKILL.md` | Provide recommendations for choices. |  |
+| `skills/rec/SKILL.md` | Provide recommendations for choices. Aliases: recommend. |  |
 | `skills/rech/SKILL.md` | -> recm. |  |
 | `skills/rechme/SKILL.md` | -> recm. |  |
-| `skills/recm/SKILL.md` | Recommend harness, provider, model, and engine for a repo or task. |  |
+| `skills/recm/SKILL.md` | Recommend harness, provider, model, and engine for a repo or task. Aliases: rech, rechme. |  |
 | `skills/recommend/SKILL.md` | -> rec. |  |
 | `skills/record-learnings/SKILL.md` | Persist insights to memory. |  |
-| `skills/recover-followups/SKILL.md` | Recover untracked follow-ups. |  |
-| `skills/refresh-claude-token/SKILL.md` | Rotate CLAUDE_CODE_OAUTH_TOKEN. |  |
-| `skills/register-oaicopilot-models/SKILL.md` | Register models in the OAICopilot extension. |  |
+| `skills/recover-followups/SKILL.md` | Recover untracked follow-ups. Aliases: rfu. |  |
+| `skills/refresh-claude-token/SKILL.md` | Rotate CLAUDE_CODE_OAUTH_TOKEN. Aliases: rct. |  |
+| `skills/register-oaicopilot-models/SKILL.md` | Register models in the OAICopilot extension. Aliases: rom. |  |
 | `skills/release-notify/SKILL.md` | Tag release and notify revdeps. |  |
 | `skills/release-post/SKILL.md` | Write R package release blog posts. |  |
 | `skills/remember/SKILL.md` | -> memorize. |  |
 | `skills/reprexes/SKILL.md` | Build minimal reproducible example. |  |
 | `skills/reproducibility-audit/SKILL.md` | Audit reproducibility posture. |  |
 | `skills/request-pr-review/SKILL.md` | Request human review on PR. |  |
-| `skills/rescue-closed/SKILL.md` | Revive worthy closed issues/PRs. |  |
-| `skills/resolve-conflicts/SKILL.md` | Resolve merge conflicts. |  |
+| `skills/rescue-closed/SKILL.md` | Revive worthy closed issues/PRs. Aliases: revive-closed. |  |
+| `skills/resolve-conflicts/SKILL.md` | Resolve merge conflicts. Aliases: rc, rmc. |  |
 | `skills/resolve-pr-threads/SKILL.md` | Resolve settled review threads. |  |
 | `skills/resync-branch/SKILL.md` | -> sync-pr-branch. |  |
 | `skills/revive-closed/SKILL.md` | -> rescue-closed. |  |
@@ -208,41 +212,43 @@ its description does not use (ai-config#949).
 | `skills/scout-peers/SKILL.md` | Survey peer repos for patterns. |  |
 | `skills/sds/SKILL.md` | -> send-notes. |  |
 | `skills/select-model/SKILL.md` | Select Claude model for task. |  |
-| `skills/send-notes/SKILL.md` | Send content to Morrison-Lab notes repos. |  |
+| `skills/send-notes/SKILL.md` | Send content to Morrison-Lab notes repos. Aliases: lds, mds, pds, psw, rme, sds, wai. |  |
 | `skills/send-upstream/SKILL.md` | -> sup. |  |
 | `skills/session-lock/SKILL.md` | Prevent session collisions. |  |
 | `skills/simplify/SKILL.md` | Prune dead code paths and logic. |  |
 | `skills/skill-audit/SKILL.md` | Audit skill usage and prune. |  |
 | `skills/skill-builder/SKILL.md` | Create or update a skill. |  |
-| `skills/slide-tag/SKILL.md` | Move floating Git tag to main. |  |
-| `skills/split-concerns/SKILL.md` | Split multi-concern PRs. |  |
+| `skills/slide-tag/SKILL.md` | Move floating Git tag to main. Aliases: ts. |  |
+| `skills/spell/SKILL.md` | Spell-check changed files with the checker the repo's CI uses. |  |
+| `skills/split-concerns/SKILL.md` | Split multi-concern PRs. Aliases: split-pr. |  |
+| `skills/split-pr/SKILL.md` | -> split-concerns. |  |
 | `skills/spot-skill-opportunities/SKILL.md` | Find opportunities for new skills. |  |
-| `skills/st/SKILL.md` | Start task issue-first. |  |
+| `skills/st/SKILL.md` | Start task issue-first. Aliases: start-task. |  |
 | `skills/stack-prs/SKILL.md` | Stack dependent PR on another. |  |
 | `skills/start-task/SKILL.md` | -> st. |  |
 | `skills/status/SKILL.md` | Diagnose stalls, resume dropped work, and report status. |  |
 | `skills/steward/SKILL.md` | Lab conventions for driving or watching a PR. |  |
 | `skills/student-test/SKILL.md` | Test assessments with a simulated student. |  |
 | `skills/style/SKILL.md` | -> use-preferred-style. |  |
-| `skills/sup/SKILL.md` | Send issue or fix upstream. |  |
+| `skills/sup/SKILL.md` | Send issue or fix upstream. Aliases: send-upstream, sus. |  |
 | `skills/sus/SKILL.md` | -> sup. |  |
 | `skills/sync/SKILL.md` | -> sync-pr-branch. |  |
-| `skills/sync-pr-branch/SKILL.md` | Sync PR branch with main. |  |
+| `skills/sync-pr-branch/SKILL.md` | Sync PR branch with main. Aliases: merge-main, resync-branch, sync. |  |
 | `skills/test/SKILL.md` | Run unit or revdep tests. |  |
 | `skills/testing-r-packages/SKILL.md` | R package testing best practices with testthat 3+. |  |
 | `skills/tidy/SKILL.md` | Audit codebase to simplify and DRY. |  |
 | `skills/triage/SKILL.md` | Triage backlog: P1/P2/P3 or close. |  |
 | `skills/ts/SKILL.md` | -> slide-tag. |  |
-| `skills/ums/SKILL.md` | Update memories and skills. |  |
+| `skills/ums/SKILL.md` | Update memories and skills. Aliases: update-memories-and-skills. |  |
 | `skills/update-memories-and-skills/SKILL.md` | -> ums. |  |
-| `skills/use-math-macros/SKILL.md` | Use shared semantic math macros in all lab math. |  |
-| `skills/use-preferred-style/SKILL.md` | Apply preferred writing style. |  |
+| `skills/use-math-macros/SKILL.md` | Use shared semantic math macros in all lab math. Aliases: macroize. |  |
+| `skills/use-preferred-style/SKILL.md` | Apply preferred writing style. Aliases: style. |  |
 | `skills/wai/SKILL.md` | -> send-notes. |  |
 | `skills/wait-for-results/SKILL.md` | Wait for pipeline/CI results. |  |
-| `skills/whats-next/SKILL.md` | Recommend concrete next step or action. |  |
+| `skills/whats-next/SKILL.md` | Recommend concrete next step or action. Aliases: wn. |  |
 | `skills/wn/SKILL.md` | -> whats-next. |  |
 | `skills/workaround-watcher/SKILL.md` | Watch upstream issue for fix. |  |
-| `skills/wrap-up/SKILL.md` | End-of-session verification and UMS. |  |
+| `skills/wrap-up/SKILL.md` | End-of-session verification and UMS. Aliases: done, merged. |  |
 
 ## Shared fragments
 
@@ -408,6 +414,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/search-library-before-saying-book-unavailable.md` | Before a reply says a reference book cannot be reached, is unavailable, or was not checked, search both places that hold the lab's books: |  |
 | `shared/workflow/self-review-fallback.md` | When a PR you're managing has its `@claude` review workflow fail to produce a usable verdict --- whether because it was **skipped for quota** or because it *... |  |
 | `shared/workflow/session-lab-notebook.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
+| `shared/workflow/shared-git-state.md` | Worktrees isolate a branch, its index and its working tree. They do not isolate everything git keeps per repository, and parallel sessions in one repository... |  |
 | `shared/workflow/skill-checklists.md` | Use checklists in skills deliberately, not by default. |  |
 | `shared/workflow/small-prs.md` | Ezra, 2026-10-23: "don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches", and "every PR should be as small and focused as it can be... |  |
 | `shared/workflow/stack-dont-pause.md` | The clear-all family --- `ardia`, `gia`, `gii`, `gip`, and the `clear-all` alias --- clears a whole queue of PRs and issues in one run. Merging stays human-g... |  |

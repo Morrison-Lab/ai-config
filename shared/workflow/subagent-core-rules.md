@@ -6,7 +6,9 @@ Keep it under 4,000 characters: it is injected on every dispatch.
 
 - Work from the brief and the files it names.
   The rules below apply even where the brief is silent.
-- **Notes content (lds, mds, pds, sds, rme, psw):** one div per subfile, one defined term per `#def-` div, an example after each abstract definition, no forward references.
+- **Notes content (lds, mds, pds, sds, rme, psw):** one div per subfile, one defined term per `#def-` div, an example after each abstract definition, no forward reference that a good reordering would remove.
+  When no good reordering exists, keep the forward link and say the target comes later.
+  Never drop a link to hide a forward reference.
   Link every technical term at first use, and link prerequisites to mds, pds or sds instead of restating them.
   Use the semantic macros from `Morrison-Lab/macros`: no literal letters, no raw `\hat`, no bare `e^`.
   Split every multi-part exercise.

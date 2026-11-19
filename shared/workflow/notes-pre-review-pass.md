@@ -28,6 +28,7 @@ State in the PR body that the checklist ran.
    Every technical term is hyperlinked at first use in each div, and each target div precedes its first mention in reading order.
    A term with no definition gets its own definition div, filed as an issue if it widens the PR, never left unlinked.
    Fix a forward reference or dependency-graph cycle by reordering the content or defining the prerequisite concept first, never by removing the hyperlink and adding `<!-- check-term-links: allow -->`.
+   When no good reordering exists, keep the link and say the target comes later: a linked forward reference beats no link.
    Run [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha)'s [`check-term-links.py`](https://github.com/Morrison-Lab/gha/blob/main/check-term-links/check-term-links.py) with `--base-ref origin/main` (or `git diff origin/main...HEAD > /tmp/pr.diff` followed by `--diff /tmp/pr.diff`) from the notes repository root locally before pushing so every `unlinked-first-use` finding in the PR diff is caught pre-push.
 3. **Symbols.**
    Every technical term is paired with its semantic macro, and the macro is the existing one: search `Morrison-Lab/macros` for the concept before writing any expression.

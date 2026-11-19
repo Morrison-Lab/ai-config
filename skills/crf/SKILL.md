@@ -1,6 +1,7 @@
 ---
 name: crf
 description: "→ convert-repo-format."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

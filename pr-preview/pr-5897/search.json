@@ -7597,9 +7597,9 @@
   {
     "objectID": "skills/split-pr/SKILL.html",
     "href": "skills/split-pr/SKILL.html",
-    "title": "split-pr — split a large PR (alias for split-concerns)",
+    "title": "split-pr: split a large PR (alias for split-concerns)",
     "section": "",
-    "text": "split-pr — split a large PR (alias for split-concerns)\nThis is a mnemonic alias for the split-concerns skill, whose “Splitting an open PR into a stacked series” section covers breaking one large PR into a series of narrower stacked PRs. Read and follow the canonical skill:\n→ split-concerns\n\n\n\n\n Back to top"
+    "text": "split-pr: split a large PR (alias for split-concerns)\nThis is a mnemonic alias for the split-concerns skill, whose “Splitting an open PR into a stacked series” section covers breaking one large PR into a series of narrower stacked PRs. Read and follow the canonical skill:\n→ split-concerns\n\n\n\n\n Back to top"
   },
   {
     "objectID": "skills/st/SKILL.html",

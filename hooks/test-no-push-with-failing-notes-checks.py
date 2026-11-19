@@ -371,6 +371,27 @@ other_cmd = hook.parse_run_check_lines(BUNDLED.replace(
     "python3 -u .gha/check-avoided-words/check-avoided-words.py", "bash -c true"))
 expect("T70 a command that is not python on a .gha/ script is not run",
        any("not python on a .gha/ script" in u for u in other_cmd[0]["unhandled"]), True)
+for probe in ("python3 -c 'import os' .gha/x.py", "python3 /tmp/evil.py .gha/x.py",
+              "python3 -m pip .gha/x.py", "python3 .gha/../../evil.py"):
+    probed = hook.parse_run_check_lines(BUNDLED.replace(
+        "python3 -u .gha/check-avoided-words/check-avoided-words.py", probe))
+    expect(f"T71 python with a .gha/ argument but not a .gha/ script is not run: {probe}",
+           any("not python on a .gha/ script" in u for u in probed[0]["unhandled"]), True)
+for var in ("PYTHONPATH=.", "PATH=.", "GIT_EXTERNAL_DIFF=./x", "LD_PRELOAD=./x.so"):
+    env_line = hook.parse_run_check_lines(BUNDLED.replace("CAW_FAIL=false", "CAW_FAIL=false " + var))
+    expect(f"T73 a variable outside the check's prefix is not run: {var}",
+           any(var.split("=")[0] in u for u in env_line[0]["unhandled"]), True)
+gha_tmp = tempfile.mkdtemp(prefix="npc-gha-escape-")
+outside_tmp = tempfile.mkdtemp(prefix="npc-outside-")
+open(os.path.join(outside_tmp, "evil.py"), "w").close()
+os.symlink(outside_tmp, os.path.join(gha_tmp, "x"))
+escape_call = {"name": "escape", "unhandled": [], "assigns": {"X_BASE_REF": "main"},
+               "command": "python3 .gha/x/evil.py".split()}
+expect("T74 a .gha/ path that a symlink takes outside the gha checkout is not run",
+       hook.run_bundled(gha_tmp, gha_tmp, escape_call, "origin/main")[1:],
+       ("error", "line not runnable locally: a .gha/ path leaves the gha checkout"))
+expect("T72 interpreter flags before the .gha/ script are allowed",
+       hook.gha_script_command("python3 -I -u .gha/x/x.py --flag".split()), True)
 no_fail = make_repo({"cluster-checks.yml": BUNDLED.replace(" CAW_FAIL=false", ""), "annotation-gate.yml": GATE})
 run("git push origin feat", no_fail, 0)
 env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))

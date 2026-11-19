@@ -333,6 +333,12 @@ def parse_run_check_lines(text: str) -> list[dict]:
         if not any(k.endswith("_BASE_REF") for k in assigns):
             continue
         command = argv[split + 1:]
+        # The line sets the check's environment, so only the check's own variables
+        # (the prefix of its *_BASE_REF key) may be set: PYTHONPATH, PATH, LD_PRELOAD
+        # or GIT_* would run code from the repository being pushed.
+        prefixes = tuple(k[:-len("BASE_REF")] for k in assigns if k.endswith("_BASE_REF"))
+        unhandled.extend(f"{k} is not one of the check's own variables"
+                         for k in assigns if not k.startswith(prefixes))
         # Only a pull-request base belongs in a *_BASE_REF; a pull_request test anywhere
         # else (a FAIL switch, an argument) has no local meaning, so it is not guessed.
         unhandled.extend(f"{k}={v}" for k, v in assigns.items()
@@ -340,12 +346,31 @@ def parse_run_check_lines(text: str) -> list[dict]:
         unhandled.extend(tok for tok in command if BASE_PLACEHOLDER in tok)
         # Run only what the wrapper is for: python on a script in the gha checkout.
         # Anything else in a repo's workflow is not executed at push time.
-        if not (command and command[0] in ("python3", "python")
-                and any(a.startswith(".gha/") for a in command[1:])):
+        if not gha_script_command(command):
             unhandled.append("command is not python on a .gha/ script: " + (" ".join(command) or "(empty)"))
         calls.append({"name": name, "ref": ref, "kind": "bundled", "inputs": {},
                       "assigns": assigns, "command": command, "unhandled": unhandled})
     return calls
+
+
+SAFE_PYTHON_FLAGS = ("-u", "-I", "-B")
+
+
+def gha_script_command(command: list) -> bool:
+    """True only for `python3 [-u|-I|-B ...] .gha/<path>.py [args]`: a fixed set of
+    interpreter flags, then one script inside the gha checkout with no `..` part.
+    `-c`, `-m` and a script outside `.gha/` are refused, so a workflow line cannot
+    run anything at push time but a gha check script."""
+    if not command or command[0] not in ("python3", "python"):
+        return False
+    rest = command[1:]
+    while rest and rest[0] in SAFE_PYTHON_FLAGS:
+        rest = rest[1:]
+    if not rest:
+        return False
+    script = rest[0]
+    return (script.startswith(".gha/") and script.endswith(".py")
+            and ".." not in script.split("/"))
 
 
 def remote_moved(dest: str, ref: str) -> bool | None:
@@ -537,6 +562,10 @@ def run_bundled(git_root: str, gha_dir: str, call: dict, base: str):
     env.update(assigns)
     command = [os.path.join(gha_dir, a[len(".gha/"):]) if a.startswith(".gha/") else a
                for a in call["command"]]
+    root = os.path.realpath(gha_dir)
+    if any(a.startswith(".gha/") and not os.path.realpath(c).startswith(root + os.sep)
+           for a, c in zip(call["command"], command)):
+        return call["name"], "error", "line not runnable locally: a .gha/ path leaves the gha checkout"
     missing = [a for a in call["command"] if a.startswith(".gha/")
                and not os.path.isfile(os.path.join(gha_dir, a[len(".gha/"):]))]
     if missing:

@@ -149,6 +149,7 @@ its description does not use (ai-config#949).
 | `skills/next/SKILL.md` | Insert after in-flight task. |  |
 | `skills/oppo/SKILL.md` | -> opposition-research. |  |
 | `skills/opposition-research/SKILL.md` | Mine competitor community demand. Aliases: oppo. |  |
+| `skills/pause/SKILL.md` | Pause the session; hooks stop demanding work. |  |
 | `skills/pd/SKILL.md` | -> pending-decisions. |  |
 | `skills/pdc/SKILL.md` | -> prune-dead-code. |  |
 | `skills/pds/SKILL.md` | -> send-notes. |  |

@@ -227,12 +227,24 @@ def scan(path):
     return admit_txt, admit_at, done_at
 
 
+try:
+    from session_pause import is_paused
+except Exception as _exc:  # broken install: say so, and behave as unpaused
+    print(f"no-mistake-without-a-hook: cannot load scripts/lib/session_pause.py ({_exc})",
+          file=sys.stderr)
+
+    def is_paused(payload):  # noqa: D103
+        return False
+
+
 def main() -> int:
     if ADMISSION is None:
         return 0  # sibling unavailable; degrade to silence
     try:
         payload = json.load(sys.stdin)
         path = payload.get("transcript_path") or ""
+        if is_paused(payload):
+            return 0  # a new hook is new work, which the pause stopped (ai-config#3911)
         admit_txt, admit_at, done_at = scan(path)
     except Exception:
         return 0  # fail open

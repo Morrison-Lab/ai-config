@@ -200,13 +200,12 @@ sits unread.
 
    **Opportunistic conflict sweep.**
    After pushing (or after any round where all findings were Rebutted/Deferred with no push), scan other open PRs in the same repo for merge conflicts:
-   ```bash
-   gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
-   ```
-   Filter that list by `memories/reviewing-prs.md`'s scope test first, by piping it through `python3 scripts/pr-scope.py` as `ardia` step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app (`github-actions`));
-   an out-of-scope conflicting PR is reported to the user and left untouched (no comment, no push);
+   run the listing and scope test in the conflict-poll block of step 6 ("While waiting, keep checking for merge conflicts"), which this sweep shares.
+   That block saves the listing, classifies it with `python3 scripts/pr-scope.py` by `memories/reviewing-prs.md`'s scope test (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)),
+   and selects the in-scope PRs whose `mergeable` is `CONFLICTING` or `UNKNOWN` from the saved listing.
+   An out-of-scope conflicting PR is reported to the user and left untouched (no comment, no push);
    they can assign or name it if they want it resolved.
-   For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (see `resolve-conflicts`, "Verify before you act" --- `UNKNOWN` can mean GitHub hasn't finished computing yet, not that there's no conflict), verify with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting, then check claim status (most recent comment) and fix unclaimed ones --- same cascade procedure as `post-merge` step 1.5 (claim → isolated worktree → fetch main → merge → `resolve-conflicts` skill → push → unclaim).
+   For each PR that block selects, `UNKNOWN` included (see `resolve-conflicts`, "Verify before you act" --- `UNKNOWN` can mean GitHub hasn't finished computing yet, not that there's no conflict), verify with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38) before acting, then check claim status (most recent comment) and fix unclaimed ones --- same cascade procedure as `post-merge` step 1.5 (claim → isolated worktree → fetch main → merge → `resolve-conflicts` skill → push → unclaim).
    A merge to `main` during your ARDI loop can create new conflicts in sibling PRs; clearing them while waiting for the next verdict is better than letting them pile up.
 
 5. **Post the ARD summary** as a comment on the MR/PR (table format per the
@@ -274,10 +273,11 @@ How depends on the repo's review trigger first, and on whether this round pushed
    Poll every few minutes with `/loop` or a manual re-check:
    ```bash
    LIST=$(mktemp)
-   gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments > "$LIST"   # LIST_PRS
+   gh pr list --state open --limit 100 --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments > "$LIST"   # LIST_PRS
    IN=$(python3 scripts/pr-scope.py --user "$ME" --alias "$ALIASES" \
      --requested "$REQUESTED" --excluded "$EXCLUDED" < "$LIST" | jq -c '.included')
    jq --argjson in "$IN" '.[] | select((.number | IN($in[])) and (.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN"))' "$LIST"
+   rm -f "$LIST"
    ```
    The script reads the whole JSON array, so it gets the listing before any filter;
    its `included` numbers then pick the in-scope candidates from the saved listing, which keeps `mergeable`.

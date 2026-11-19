@@ -21,10 +21,7 @@ mutates a PR stays serial.
 ## Procedure
 
 1. **List the open PRs/MRs and decide which are in scope.**
-   ```bash
-   gh pr list --state open --limit 100 \
-     --json number,title,headRefName,baseRefName,isDraft,author,assignees,reviewDecision   # LIST_PRS
-   ```
+   The listing is the `gh pr list` command in the classification block below (`LIST_PRS`).
    On GitLab, use `glab api "projects/:id/merge_requests?state=opened&per_page=100"`
    and look for `source_branch` (≡ `headRefName`) and `target_branch` (≡ `baseRefName`)
    in the JSON — `glab mr list` alone does not expose these fields.
@@ -39,11 +36,11 @@ mutates a PR stays serial.
      ```bash
      LIST=$(mktemp)
      gh pr list --state open --limit 100 \
-       --json number,title,headRefName,baseRefName,isDraft,author,assignees,reviewDecision > "$LIST"
+       --json number,title,headRefName,baseRefName,isDraft,author,assignees,reviewDecision > "$LIST"   # LIST_PRS
      python3 scripts/pr-scope.py --user "$ME" --alias "$ALIASES" \
        --requested "$REQUESTED" --excluded "$EXCLUDED" --text < "$LIST"
      ```
-     Run the listing above this way, saving it once to `$LIST`, so the classification and the rest of this step read the same copy.
+     The listing is saved once to `$LIST`, so the classification and the rest of this step read the same copy.
      `$ME` is the resolved login, and `$ALIASES`, `$REQUESTED` and `$EXCLUDED` are comma-separated lists, empty when there are none.
      `scripts/` is the ai-config checkout's (`$CLAUDE_PLUGIN_ROOT/scripts/` in a plugin install), as for the corpus's other scripts.
      In a remote session, save the `mcp__github__list_pull_requests` result to a file and pipe that in;

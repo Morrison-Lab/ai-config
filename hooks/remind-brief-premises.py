@@ -468,6 +468,26 @@ BRANCH_ITEM = re.compile(r"\d{2,}")
 _OWN_ITEMS = None
 
 
+def _current_pr():
+    """The current branch's PR as `gh pr view --json number` reads it, or None.
+
+    Goes through scripts/lib/pr_view.py, which reads over REST where a cloud
+    session refuses GraphQL (ai-config#4733). A broken install reads nothing.
+    """
+    lib = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if lib not in sys.path:
+        sys.path.insert(0, lib)
+    try:
+        from pr_view import gh_pr_view
+    except Exception as exc:
+        print(f"remind-brief-premises: cannot load scripts/lib/pr_view.py ({exc}); "
+              "the current PR will not be read", file=sys.stderr)
+        return None
+    data, _error = gh_pr_view(["number"], timeout=5)
+    return data if isinstance(data, dict) else None
+
+
 def own_items():
     """The PR/issue numbers this session is demonstrably working, as strings.
 
@@ -501,13 +521,7 @@ def own_items():
         except (OSError, subprocess.SubprocessError):
             branch = ""
     items.update(BRANCH_ITEM.findall(branch))
-    try:
-        out = subprocess.run(
-            ["gh", "pr", "view", "--json", "number", "--jq", ".number"],
-            capture_output=True, text=True, timeout=5)
-        number = out.stdout.strip() if out.returncode == 0 else ""
-    except (OSError, subprocess.SubprocessError):
-        number = ""
+    number = str((_current_pr() or {}).get("number") or "")
     if number.isdigit():
         items.add(number)
     _OWN_ITEMS = frozenset(items)

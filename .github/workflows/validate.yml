@@ -319,6 +319,10 @@ jobs:
         # ai-config#4266: scripts/lib/tool_names.py, the shared spellings of
         # the subagent, write and shell tools across harnesses.
         run: python3 scripts/test_tool_names.py
+      - name: Run pr_view library tests
+        # ai-config#4733: scripts/lib/pr_view.py, `gh pr view` with a REST
+        # fallback where a cloud session refuses GraphQL.
+        run: python3 scripts/test_pr_view.py
       - name: Run sibling-loader tests
         # ai-config#2018: scripts/lib/sibling.py, the one loader for a hook's
         # hyphenated sibling module.

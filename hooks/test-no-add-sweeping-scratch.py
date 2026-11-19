@@ -50,6 +50,9 @@ with tempfile.TemporaryDirectory() as root:
     os.makedirs(sub)
     link = os.path.join(root, "link")
     os.symlink(repo, link)
+    other = os.path.join(root, "other")
+    os.makedirs(other)
+    git("init", "-q", "-b", "main", cwd=other)
 
     # The message file case (#3558), before anything is embedded.
     write(os.path.join(repo, "msg.txt"))
@@ -66,7 +69,18 @@ with tempfile.TemporaryDirectory() as root:
             ("printf x > new.txt && git add -A && git commit -F new.txt", repo, "deny"),
             ("git add -A && git commit -F ../msg.txt", sub, "deny"),
             ("git add -A && git -C sub commit -F ../msg.txt", repo, "deny"),
+            ("git add -A && git commit --template t.txt -F msg.txt", repo, "deny"),
+            ("git add -A && git commit --message x -F msg.txt", repo, "deny"),
+            ("git add -A && git reset --soft && git commit -F msg.txt", repo, "deny"),
             ("git add -A && git commit -mF a.txt", repo, "allow"),
+            ('git add -A && git commit -F "$TMPDIR/msg.txt"', repo, "allow"),
+            ("git add -A && git commit -F $SCRATCH/msg.txt", repo, "allow"),
+            ('git add -A && git commit -F "$(mktemp)"', repo, "allow"),
+            ("git add -A && git commit -F .git/MY_MSG", repo, "allow"),
+            ("git -C ../other add -A && git commit -F msg.txt", repo, "allow"),
+            ("cd ../other && git add -A && cd ../repo && git commit -F msg.txt",
+             repo, "allow"),
+            ("git add -A ; git reset ; git commit -F msg.txt", repo, "allow"),
             ("git add -A && git commit -F /tmp/msg.txt", repo, "allow"),
             ("git add -A && git commit -F ignored.msg", repo, "allow"),
             ("git add -A && git commit -F -", repo, "allow"),
@@ -84,9 +98,15 @@ with tempfile.TemporaryDirectory() as root:
     check("staged message file", run("git commit -F msg.txt", repo), "deny")
     check("pathspec commit", run("git commit -F msg.txt -- a.txt", repo), "allow")
     git("rm", "-q", "--cached", "msg.txt", cwd=repo)
+    write(os.path.join(repo, "café.txt"))
+    git("add", "café.txt", cwd=repo)
+    check("staged non-ASCII message file",
+          run("git commit -F café.txt", repo), "deny")
+    git("rm", "-q", "--cached", "café.txt", cwd=repo)
+    os.remove(os.path.join(repo, "café.txt"))
     agent = os.path.join(repo, ".claude", "worktrees", "agent-1")
     os.makedirs(agent)
-    git("init", "-q", cwd=agent)
+    git("init", "-q", "-b", "main", cwd=agent)
     write(os.path.join(agent, "f.txt"))
     git("add", "f.txt", cwd=agent)
     git("commit", "-q", "-m", "x", cwd=agent)
@@ -115,6 +135,14 @@ with tempfile.TemporaryDirectory() as root:
     os.remove(os.path.join(repo, ".git", "index.lock"))
     write(os.path.join(repo, ".gitignore"), ".claude/worktrees/\n")
     check("ignored worktree", run("git add -A", repo), "allow")
+    check("forced add of an ignored worktree",
+          run("git add -f .claude/worktrees/agent-1", repo), "deny")
+    check("forced cluster", run("git add -Af", repo), "deny")
+    check("forced add of a plain file", run("git add -f a.txt", repo), "allow")
+    cafe = os.path.join(repo, "café", "inner")
+    os.makedirs(cafe)
+    git("init", "-q", "-b", "main", cwd=cafe)
+    check("non-ASCII embedded repo", run("git add -A", repo), "deny")
 
 if FAILS:
     print("\n".join(FAILS))

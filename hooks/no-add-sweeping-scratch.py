@@ -3,11 +3,14 @@
 such as a worktree-isolated agent under `.claude/worktrees/`, as a gitlink no
 clone can resolve (ai-config#3884). Read-only: `git ls-files -o` on the add's
 own pathspecs lists an untracked repository as `dir/`, and it takes no index
-lock. `-u` and `--pathspec-from-file` are not checked.
+lock; `-z` keeps a non-ASCII name unquoted, and a forced add (`-f`) lists
+ignored paths too. `-u` and `--pathspec-from-file` are not checked.
 Also a `git commit -F <file>` (`--file`, `-aF`) whose message file is staged
 now or by an earlier add-everything (`-A`, `--all`, `.`) on the same line
 (ai-config#3558), decided from the index and `check-ignore`; a commit limited
-to pathspecs without `-i` passes. `ALLOW_SCRATCH_ADD=1`
+to pathspecs without `-i`, a message path the shell still expands (`$`, a
+backtick), one under `.git/`, an add in another repository and a sweep a
+later whole-index `git reset` undid all pass. `ALLOW_SCRATCH_ADD=1`
 clears one command. Fails open when a helper cannot load, the line does not
 parse, `--git-dir`, `--work-tree`, `GIT_DIR` or `GIT_WORK_TREE` redirect the
 repository, or git fails.
@@ -34,8 +37,10 @@ except Exception as _exc:  # broken install: degrade, never block
 SHELL_TOOLS = {"Bash", "bash", "run_command", "execute_command", "terminal", "shell"}
 OVERRIDE = "ALLOW_SCRATCH_ADD"
 # `git commit` options whose value is the next argument, so not a pathspec.
-COMMIT_VALUE_OPTS = frozenset({"-m", "-F", "--file", "-C", "-c", "-t", "--author",
-                               "--date", "--fixup", "--squash", "--cleanup", "--trailer"})
+COMMIT_VALUE_OPTS = frozenset({
+    "-m", "--message", "-F", "--file", "-C", "--reuse-message", "-c",
+    "--reedit-message", "-t", "--template", "--author", "--date", "--fixup",
+    "--squash", "--cleanup", "--trailer"})
 EMBEDDED = (
     "Refused: `{segment}` would stage `{path}`, which holds its own `.git`, as "
     "a gitlink no clone can resolve (ai-config#3884). Ignore it (agents live "
@@ -48,14 +53,24 @@ FOOTER = (" Override for one command: ALLOW_SCRATCH_ADD=1. "
           "Rule: shared/workflow/shared-git-state.md.")
 
 
-def git(cwd, *args):
-    """stdout lines of `git -C cwd args`, or None when it fails."""
+def git(cwd, *args, nul=False):
+    """stdout records of `git -C cwd args` (lines, or NUL-separated with
+    `nul`), or None when it fails."""
     try:
         p = subprocess.run(["git", "-C", cwd, *args], capture_output=True,
                            text=True, timeout=10, encoding="utf-8")
     except (OSError, subprocess.SubprocessError):
         return None
-    return p.stdout.splitlines() if p.returncode == 0 else None
+    if p.returncode != 0:
+        return None
+    return [r for r in p.stdout.split("\0") if r] if nul else p.stdout.splitlines()
+
+
+def has_flag(opts, short, long):
+    """Whether `git add` options include `-<short>` or `--<long>`, the short
+    form alone or in a cluster such as `-Af`."""
+    return any(a == "--" + long or (a.startswith("-") and not a.startswith("--")
+                                    and short in a[1:]) for a in opts)
 
 
 def embedded_repo(cwd, rest):
@@ -66,10 +81,12 @@ def embedded_repo(cwd, rest):
         return None
     cut = rest.index("--") if "--" in rest else len(rest)
     specs = [a for a in rest[:cut] if not a.startswith("-")] + rest[cut + 1:]
-    if not specs and not {"-A", "--all"} & set(rest):
+    if not specs and not has_flag(rest[:cut], "A", "all"):
         return None
-    for rel in git(cwd, "ls-files", "-o", "--exclude-standard",
-                   "--", *(specs or [":/"])) or []:
+    exclude = ([] if has_flag(rest[:cut], "f", "force")
+               else ["--exclude-standard"])
+    for rel in git(cwd, "ls-files", "-z", "-o", *exclude,
+                   "--", *(specs or [":/"]), nul=True) or []:
         if rel.endswith("/") and os.path.exists(os.path.join(cwd, rel, ".git")):
             return rel
     return None
@@ -118,20 +135,34 @@ def limited_commit(rest):
     return False
 
 
-def swept_message(cwd, path, sweeps):
-    """Why the message file `path` lands in the commit, or None."""
-    full = os.path.realpath(os.path.join(cwd, os.path.expanduser(path)))
+def toplevel(cwd):
+    """The real path of the work tree holding `cwd`, or None."""
     top = git(cwd, "rev-parse", "--show-toplevel")
-    if path == "-" or not top or os.path.commonpath([top[0], full]) != top[0]:
+    return os.path.realpath(top[0]) if top else None
+
+
+def swept_message(cwd, path, sweeps):
+    """Why the message file `path` lands in the commit, or None. A path the
+    shell would still expand (`$VAR`, a backtick) is not resolved."""
+    if path == "-" or "$" in path or "`" in path:
         return None
-    if os.path.relpath(full, top[0]) in (git(cwd, "diff", "--cached", "--name-only") or []):
+    full = os.path.realpath(os.path.join(cwd, os.path.expanduser(path)))
+    top = toplevel(cwd)
+    if not top or os.path.commonpath([top, full]) != top:
+        return None
+    rel = os.path.relpath(full, top)
+    if rel.split(os.sep)[0] == ".git":  # git never stages its own directory
+        return None
+    if rel in (git(cwd, "diff", "--cached", "--name-only", "-z", nul=True) or []):
         return "is staged"
     if git(cwd, "check-ignore", "-q", "--", full) is not None:
         return None
     if git(cwd, "ls-files", "--error-unmatch", "--", full) is not None:
         return None
-    for add_dir, scope, excludes in sweeps:
-        root = os.path.realpath(top[0] if scope == "repo" else add_dir)
+    for add_dir, add_top, scope, excludes in sweeps:
+        if add_top != top:  # the add-everything ran in another repository
+            continue
+        root = os.path.realpath(top if scope == "repo" else add_dir)
         if (os.path.commonpath([root, full]) == root and not _ADD._is_excluded(
                 os.path.relpath(full, os.path.realpath(add_dir)), excludes)):
             return "the earlier `git add` in this command stages"
@@ -164,7 +195,11 @@ def evaluate(command, cwd, environ=None):
                 return EMBEDDED.format(segment=segment, path=path) + FOOTER
             everything = _ADD._add_everything(rest)
             if everything:
-                sweeps.append((cur, *everything))
+                sweeps.append((cur, toplevel(cur), *everything))
+        elif sub == "reset" and "--soft" not in rest and all(
+                a.startswith("-") or a == "HEAD" for a in rest):
+            # A whole-index reset unstages what an earlier sweep staged.
+            sweeps = [s for s in sweeps if s[1] != toplevel(cur)]
         elif sub == "commit" and not limited_commit(rest):
             msg = message_file(rest)
             how = msg and swept_message(cur, msg, sweeps)

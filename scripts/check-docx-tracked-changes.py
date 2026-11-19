@@ -467,14 +467,22 @@ BREAK_TRANSPARENT_TAGS = frozenset(
         "moveFromRangeEnd",
         "moveToRangeStart",
         "moveToRangeEnd",
+        "customXmlInsRangeStart",
+        "customXmlInsRangeEnd",
+        "customXmlDelRangeStart",
+        "customXmlDelRangeEnd",
+        "customXmlMoveFromRangeStart",
+        "customXmlMoveFromRangeEnd",
+        "customXmlMoveToRangeStart",
+        "customXmlMoveToRangeEnd",
         "sdtPr",
         "sdtEndPr",
     )
 )
 
 # Containers whose children are runs in reading order: a tracked insertion
-# or move, a hyperlink, a smart tag, a content control. Their runs count as
-# siblings.
+# or move, a hyperlink, a smart tag, a content control, a simple field's
+# result, a bidirectional embedding. Their runs count as siblings.
 BREAK_RUN_CONTAINERS = frozenset(
     W + name
     for name in (
@@ -485,12 +493,29 @@ BREAK_RUN_CONTAINERS = frozenset(
         "customXml",
         "sdt",
         "sdtContent",
+        "fldSimple",
+        "dir",
+        "bdo",
     )
 )
 # Content the accepted document no longer has: neither its prose nor its
 # breaks count, and an equation inside one is not checked.
 BREAK_REMOVED_CONTAINERS = frozenset(W + name for name in ("del", "moveFrom"))
 LINE_BREAK_TAGS = frozenset((W + "br", W + "cr"))
+# Run children that render nothing: properties, a comment's anchor, Word's
+# cached page-break hint, and a complex field's markers and hidden code.
+NON_RENDERING_RUN_TAGS = frozenset(
+    (W + "rPr", M + "rPr")
+    + tuple(
+        W + name
+        for name in (
+            "commentReference",
+            "lastRenderedPageBreak",
+            "fldChar",
+            "instrText",
+        )
+    )
+)
 
 
 def flatten_runs(elems) -> list:
@@ -519,8 +544,9 @@ def enclosing_paragraph(elem: ET.Element, parents: dict):
 
 
 def run_content(run: ET.Element) -> list:
-    """The children of a w:r or m:r that render, leaving out its properties."""
-    return [c for c in run if c.tag not in (W + "rPr", M + "rPr")]
+    """The children of a w:r or m:r that render, leaving out its properties,
+    comment anchors, cached page breaks and field markers."""
+    return [c for c in run if c.tag not in NON_RENDERING_RUN_TAGS]
 
 
 def is_visible(elem: ET.Element) -> bool:
@@ -551,8 +577,11 @@ def check_display_equation_breaks(
     A break is required only on a side that has visible content in the same
     w:p, so an equation alone in its paragraph -- Word's own layout -- needs
     none. A w:cr counts as a break, as w:br does. Bookmarks, comment ranges,
-    proofing marks and properties are transparent, and runs inside tracked
-    insertions, moves, hyperlinks and content controls count as siblings.
+    proofing marks, change-tracking range markers and properties are
+    transparent, and so is a run holding only a comment anchor, a cached
+    page break or field markers. Runs inside tracked insertions, moves,
+    hyperlinks, content controls, simple fields and bidirectional
+    embeddings count as siblings.
     The paragraph is read as it will be once its changes are accepted: an
     equation inside a tracked insertion is checked, deleted or moved-away
     content counts neither as prose nor as a break, and an equation inside
@@ -599,11 +628,15 @@ def check_display_equation_breaks(
             defective += 1
         for side in missing:
             where = (
-                "no <w:r><w:br/></w:r> immediately before the m:oMathPara, so "
-                "the prose before it runs into the equation"
+                "no line break before the m:oMathPara (the nearest visible "
+                "content before it is not a w:r whose last rendered child is "
+                "a w:br or w:cr), so the prose before it runs into the equation"
                 if side == "before"
-                else "no <m:r><w:br/></m:r> closing its m:oMath, so the "
-                "equation runs into the content after it"
+                else "no line break after it (its last m:oMath does not end "
+                "with an m:r whose last rendered child is a break, and the "
+                "nearest visible content after it is not a w:r whose first "
+                "rendered child is one), so the equation runs into the "
+                "content after it"
             )
             findings.append(
                 Finding(

@@ -935,5 +935,73 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
         rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
     )
 
+    rc, out = breaks_run(
+        "eq-hyperlink-break.docx",
+        '<w:hyperlink w:anchor="eq"><w:r><w:t>The model is</w:t><w:br/></w:r></w:hyperlink>'
+        + omp(),
+    )
+    check(
+        "a break inside a hyperlink supplies the break before",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-fldsimple-break.docx",
+        '<w:fldSimple w:instr="REF eq"><w:r><w:t>The model is</w:t><w:br/></w:r></w:fldSimple>'
+        + omp(),
+    )
+    check(
+        "a break inside a simple field's result supplies the break before",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-deleted-prose-after.docx",
+        PROSE_BEFORE
+        + BR_RUN
+        + omp(close_break=False)
+        + DEL.format("<w:r><w:delText>where x is the input.</w:delText></w:r>"),
+    )
+    check(
+        "deleted prose after an equation demands no closing break",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-comment-anchor-after.docx",
+        PROSE_BEFORE
+        + BR_RUN
+        + omp(close_break=False)
+        + '<w:r><w:rPr/><w:commentReference w:id="1"/></w:r>'
+        + "<w:r><w:lastRenderedPageBreak/></w:r>",
+    )
+    check(
+        "a run holding only a comment anchor or a cached page break is not prose",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-customxml-range.docx",
+        PROSE_BEFORE
+        + BR_RUN
+        + '<w:customXmlInsRangeStart w:id="7" w:author="a"/>'
+        + '<w:customXmlInsRangeEnd w:id="7"/>'
+        + omp(),
+    )
+    check(
+        "custom-XML change-tracking range markers are transparent",
+        "1 display equation(s) (0 missing a line break)" in out
+        and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-empty-omath.docx",
+        PROSE_BEFORE + BR_RUN + "<m:oMathPara><m:oMath/></m:oMathPara>" + PROSE_AFTER,
+    )
+    check(
+        "an empty m:oMath supplies no closing break",
+        rc == 1 and "content after it" in out,
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

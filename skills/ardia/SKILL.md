@@ -48,7 +48,7 @@ mutates a PR stays serial.
      Drop `--text` for JSON: its `included` and `excluded` lists hold PR numbers,
      each `prs[]` entry gives that PR's `reason`,
      and `identity_resolved` says whether the author and assignee arms ran.
-     With no resolvable identity, omit `--user`: the script fails closed, keeping only explicitly requested and Actions-app-authored PRs, and the report says so.
+     With no resolvable identity, leave `$ME` empty, which the script treats as no `--user` at all: it fails closed, keeping only explicitly requested and Actions-app-authored PRs, and the report says so.
      What the script cannot decide is which numbers the request authorizes, so that judgment stays here:
      pass a PR as `--requested` only when the user explicitly asked for work on it (or, via an explicit `chores` call, on the bot population) --- a mention such as "do not touch [#284](https://github.com/UCD-SERG/serodynamics/pull/284)" is not a request ---
      and pass an explicit exclusion in the request ("ardia, but do not touch" followed by a number) as `--excluded`, a veto the script checks before every positive arm, the way `chores`'s `PR_SCOPE_EXCLUDED` works.

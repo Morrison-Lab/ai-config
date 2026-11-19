@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: "End-of-session verification and UMS."
+description: "End-of-session verification and UMS. Aliases: done, merged."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -25,6 +25,9 @@ single just-merged PR rather than the whole session.)
 - "wrap up", "wrap up the session", "finish up", "let's close out", "done",
   "all done", "are we done?"
 - The end of a multi-PR / multi-issue session.
+- A bare "wrap up?" fires it too:
+  run the procedure, UMS pass included, rather than answering with a status summary
+  (2026-11-19: a status-only reply drew "`wrap up` should include a final ums").
 
 ## Procedure
 
@@ -102,6 +105,10 @@ including whether `spot-skill-opportunities` flagged a recurring pattern
 during the session that's still unbuilt; update the relevant memory files and
 skill definitions; commit via a **branch + PR** (not direct to `main`). If
 nothing durable emerged, say so explicitly rather than manufacturing edits.
+When no branch can be pushed,
+file each unrecorded learning as an issue, as `ums` step 4's fallback says,
+and merge no PR from that wrap-up
+([ai-config#2335](https://github.com/Morrison-Lab/ai-config/issues/2335)).
 
 #### Closing checklist
 

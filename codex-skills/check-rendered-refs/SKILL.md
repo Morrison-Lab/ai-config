@@ -1,6 +1,6 @@
 ---
 name: "check-rendered-refs"
-description: "Find broken refs in render."
+description: "Find broken refs in render. Aliases: crr."
 ---
 
 # check-rendered-refs (Codex wrapper)

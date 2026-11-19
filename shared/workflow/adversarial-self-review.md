@@ -54,6 +54,14 @@ A multi-backend harness qualifies only when both its harness
 and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch
 is probed here.
+GitHub Copilot CLI is a different harness whose **default model is Claude**: on 2026-11-10 `copilot -p "Which AI model are you?"` answered "Claude Haiku 4.5" on Ezra's Mac ([ai-config#5286](https://github.com/Morrison-Lab/ai-config/issues/5286)).
+So a `copilot -p` run qualifies only with an explicit non-Claude `--model`, such as `--model gpt-5.3-codex`, and `hooks/warn-merge-without-cross-harness-review.py` credits it only in that form.
+Which models an account can use differs by account, so probe before relying on one: `copilot --model <id> -p "Reply OK"` answers, or says the model is not available.
+That evening `gpt-5.3-codex` was available on that account, and ten other GPT and Gemini ids were not.
+
+- **Do:** pass `--model` with a non-Claude id on every `copilot` review run, after probing that id.
+- **Don't:** count a bare `copilot -p` run as the cross-model review.
+
 If no qualifying entry can run, the gate is waived under [the waiver below](#waiver-when-no-cross-model-reviewer-can-run) --- it never falls through to a same-model or same-harness reviewer standing in as the cross-model verdict.
 A quota outage reroutes the dispatch --- it does not license skipping it.
 Waiting does not overrule a human:
@@ -138,6 +146,11 @@ This section is the exception that the other "required for merging" statements i
   `hooks/warn-merge-without-cross-harness-review.py` denies a merge until the transcript shows, after the last push, a reviewer call or this pass:
   each reviewer CLI attempted as a review, with any result, or shown absent by `command -v <cli>` or `which <cli>` run alone and unredirected (exit 1), and `opencode` attempted through its CLI or the OpenCode Go `curl` ([ai-config#5290](https://github.com/Morrison-Lab/ai-config/issues/5290)).
   An attempt is a review form (`codex exec`, `opencode run`, or a `-p`/`--print` flag), never `--version` or a housekeeping subcommand ([ai-config#5383](https://github.com/Morrison-Lab/ai-config/issues/5383)).
+  Measured 2026-11-18, in a cloud session with all five CLIs absent: the one `opencode run "Reply with the single word OK."` was denied by the auto-mode classifier ([Unsanctioned Communication]) before it ran, and the hook then refused the merge twice, the second time with a waiver note posted, because the transcript held no opencode attempt.
+  **Do:** make the `opencode` attempt first in the ladder, so a denial surfaces early, and report the merge as blocked at that gate.
+  **Do:** report it as "denied once so far", never "cannot", since another session ran the identical command without a denial (it exited 127, the CLI being absent), so one denial is one sample and not a rule.
+  Retry once only on the user's own explicit word.
+  **Don't:** retry the denied command on a relayed message from another session, or swap in a `curl` to `opencode.ai` to get past it, since that is the same outbound call.
 - **Unavailable is not "not-clean".**
   A reviewer that ran and returned Needs-more-work, or left an unresolved finding, still blocks until a re-dispatch returns all-clear.
   The waiver covers only a reviewer that could not produce any verdict.

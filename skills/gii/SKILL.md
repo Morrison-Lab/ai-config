@@ -1,6 +1,6 @@
 ---
 name: gii
-description: "Grab issues and implement in series."
+description: "Grab issues and implement in series. Aliases: gis."
 user-invocable: true
 allowed-tools:
   - Bash

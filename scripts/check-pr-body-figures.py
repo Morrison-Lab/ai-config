@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import strip_fences  # noqa: E402
+from pr_view import gh_pr_view  # noqa: E402
 
 USAGE_EXIT = 2
 MISMATCH_EXIT = 1
@@ -519,16 +520,15 @@ def verify_pr_body_figures(
 def resolve_pr_info(
     pr_target: Optional[str], repo: Optional[str] = None
 ) -> Tuple[str, str, str, str]:
-    """Resolve PR body, headRefOid, baseRefName, and PR number via gh CLI."""
-    cmd = ["gh", "pr", "view"]
-    if pr_target:
-        cmd.append(pr_target)
-    if repo:
-        cmd.extend(["-R", repo])
-    cmd.extend(["--json", "number,body,headRefOid,baseRefName"])
+    """Resolve PR body, headRefOid, baseRefName, and PR number via gh CLI.
 
-    out_json = run_cmd(cmd)
-    data = json.loads(out_json)
+    Reads over REST where a cloud session refuses GraphQL (ai-config#4733).
+    """
+    data, error = gh_pr_view(
+        ["number", "body", "headRefOid", "baseRefName"], target=pr_target, repo=repo
+    )
+    if error or not isinstance(data, dict):
+        die(f"Could not read the pull request: {error or 'gh pr view answered no object'}")
     pr_number = str(data.get("number", ""))
     body = data.get("body", "") or ""
     head_sha = data.get("headRefOid", "") or ""

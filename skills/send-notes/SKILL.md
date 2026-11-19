@@ -1,6 +1,6 @@
 ---
 name: send-notes
-description: "Send content to Morrison-Lab notes repos."
+description: "Send content to Morrison-Lab notes repos. Aliases: lds, mds, pds, psw, rme, sds, wai."
 user-invocable: true
 allowed-tools:
   - Bash

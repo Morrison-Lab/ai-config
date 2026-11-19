@@ -1,6 +1,6 @@
 ---
 name: "defer-issue"
-description: "File issue for deferred work."
+description: "File issue for deferred work. Aliases: di."
 ---
 
 # defer-issue (Codex wrapper)

@@ -816,14 +816,19 @@ The same commit fixed two locators the branch had never touched --- `(p. 22-23)`
 Re-deriving one range from the source puts its neighbours within reach of the same check for the first time, and a page citation nobody has ever opened the PDF for is likelier to be wrong than one that survived a reading.
 Sweep the locators around a split, not only the ones the split created.)
 
-## Quote the original; put the content first; adapt, don't summarize; don't credit the group's own work
+## Quote the original; put the content first; let the citation name the source; adapt, don't summarize; don't credit the group's own work
 
-Four citation rules live canonically in PSW's Citations and evidence chapter:
+Five citation rules live canonically in PSW's Citations and evidence chapter:
 
 - [Quote the original](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#quote-the-original),
   not a secondary source quoting it;
 - [Put the content first](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#put-the-content-first):
   headings name the topic, and a quotation is followed by a bare citation;
+- [Let the citation name the source](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#let-citation-name-source):
+  write `@key [Figure 6.7]`, not "a figure in James et al. [@key, Figure 6.7]",
+  since an in-text `@key` already prints the author names
+  (goes live when [psw#679](https://github.com/Morrison-Lab/psw/pull/679) merges;
+  a check is proposed in [gha#2144](https://github.com/Morrison-Lab/gha/issues/2144));
 - [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material):
   write our own version and credit it in a collapsed `.callout-note` titled "Source"
   (a `::: notes` div only on a site whose stylesheet sets `.notes` apart);

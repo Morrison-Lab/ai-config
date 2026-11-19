@@ -1926,10 +1926,13 @@ Where an outcome has two consumers that disagree --- as `ambiguous` did --- the 
 
 ## An allowlist the input can name is not an allowlist
 
-On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) allowed a workflow line to set only the variables that share the prefix of its own `*_BASE_REF` key.
-The workflow being pushed names that key, so a line with `LD_BASE_REF` was allowed `LD_PRELOAD`, and one with `GIT_BASE_REF` was allowed `GIT_EXTERNAL_DIFF`.
-Two review rounds had passed the rule, because each probe kept the check's real prefix (`CAW_`) and varied only the other variable.
-The fix takes the allowed prefix from something the input does not write: the prefix must be a plain upper-case name outside a reserved set, and the gha script that runs must name it.
+On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through four review rounds, and three of them found the same flaw in a new place.
+Each guard took its allowed set from the workflow line it was filtering:
+the allowed variable prefix came from the line's own `*_BASE_REF` key, so `LD_BASE_REF` admitted `LD_PRELOAD`;
+the allowed script was any `.gha/*.py` the line named, so it could pick a gha script that renders the repository;
+and the gha ref came from the workflow, so a commit sha could name a fork's code.
+Probes that kept the check's real prefix (`CAW_`) and script passed every round.
+The fix fixes each allowed value outside the line: the script is `.gha/<name>/<name>.py` for the line's own check name, the line has one prefix outside a reserved set that the script itself names, and the ref must be a named tag or branch.
 
 - **Do:** for every allowlist on untrusted input, trace where each allowed value comes from, and probe with the input choosing that value too.
 - **Don't:** derive the allowed set from the same input it filters.

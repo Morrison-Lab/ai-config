@@ -1,0 +1,80 @@
+# Daily review of tracked outside sources (ai-config#2231, #2067): when a head in
+# memories/tracked-sources.csv has moved, opens a labelled digest issue, which a session sifts
+# and closes as completed. No agent runs here: sifting unattended is ai-config#5937.
+name: Tracked sources digest
+
+on:
+  schedule:
+    - cron: '30 8 * * *' # Daily at 08:30 UTC
+  workflow_dispatch:
+permissions: {}
+
+# Workflow-level, so an overlapping dispatch and schedule never write the digest at once.
+concurrency:
+  group: tracked-sources-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    if: github.repository == 'Morrison-Lab/ai-config'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Build the digest from the state of the last one sifted
+        id: scan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Only a digest closed as completed counts, so commits nobody has sifted yet are
+          # listed again, and a rerun after a sift starts from that sift's state.
+          title="Tracked-sources digest $(date -u +'%F %H:%M') UTC"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+          gh label create tracked-sources-digest --repo "$REPO" --force --color 0e8a16
+          prev="$RUNNER_TEMP/previous.md"
+          # One digest a day, so 1000 reaches back years; with none completed it starts from the baselines.
+          gh issue list --repo "$REPO" --label tracked-sources-digest --state closed --limit 1000 \
+            --json body,stateReason \
+            --jq 'map(select(.stateReason == "COMPLETED"))[0].body // empty' > "$prev"
+          args=(); [ -s "$prev" ] && args=(--previous "$prev")
+          python3 scripts/tracked-sources-digest.py "${args[@]}" \
+            --github-output "$GITHUB_OUTPUT" > "$RUNNER_TEMP/digest.md"
+          cat "$RUNNER_TEMP/digest.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Open the digest issue
+        if: steps.scan.outputs.moved != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TITLE: ${{ steps.scan.outputs.title }}
+        run: |
+          set -euo pipefail
+          body="$RUNNER_TEMP/digest.md"
+          # A digest still open with the same state already lists these commits: post nothing.
+          open_body="$RUNNER_TEMP/open.md"
+          gh issue list --repo "$REPO" --label tracked-sources-digest --state open --limit 1 \
+            --json body --jq '.[0].body // ""' > "$open_body"
+          new=$(python3 scripts/tracked-sources-digest.py --footer "$body")
+          open=$(python3 scripts/tracked-sources-digest.py --footer "$open_body")
+          if [ -n "$new" ] && [ "$new" = "$open" ]; then
+            echo "The newest open digest already has this state."
+            exit 0
+          fi
+          # Otherwise a new issue: rewriting an open one would move its state under a session
+          # that is still sifting the old body.
+          url=$(gh issue create --repo "$REPO" --title "$TITLE" \
+            --label tracked-sources-digest --body-file "$body")
+          number="${url##*/}"
+          [[ "$number" =~ ^[0-9]+$ ]] || { echo "::error::gh issue create printed $url"; exit 1; }
+          # The new digest lists everything since the last completed one, so earlier open ones are covered.
+          gh issue list --repo "$REPO" --label tracked-sources-digest --state open --limit 1000 \
+            --json number --jq ".[].number | select(. != $number)" |
+            while read -r old; do
+              gh issue close "$old" --repo "$REPO" --reason 'not planned' --comment "Superseded by #$number."
+            done

@@ -358,7 +358,7 @@ REFUSED = [
     ("T71 a .. path", CMD, "python3 .gha/../../evil.py", OWN),
     ("T77 another gha script", CMD, "python3 -u .gha/quarto-publish/render-per-file.py . out html", OWN),
     ("T73 PYTHONPATH", FAIL, FAIL + " PYTHONPATH=.", "PYTHONPATH"),
-    ("T75 an LD_ key", FAIL, FAIL + " LD_BASE_REF=m LD_PRELOAD=./x.so", "LD_BASE_REF does not name"),
+    *[(f"T75 a {p} key", FAIL, FAIL + f" {p}BASE_REF=m {p}LIBRARY=x", f"{p}BASE_REF does not") for p in ("LD_", "TCL_", "TK_")],
     ("T80 a GITHUB_ key", FAIL, FAIL + " GITHUB_BASE_REF=x GITHUB_STEP_SUMMARY=/tmp/x", "GITHUB_BASE_REF does not"),
     ("T79 two *_BASE_REF keys", FAIL, FAIL + " OI_BASE_REF=x", "not exactly one"),
     ("T81 a commit-pinned gha ref", "ref: v3", "ref: " + "a" * 40, "not a named tag"),

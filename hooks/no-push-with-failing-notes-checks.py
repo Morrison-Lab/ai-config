@@ -296,7 +296,7 @@ def parse_run_check_lines(text: str) -> list[dict]:
             return "''"
 
         try:
-            # comments=True drops a trailing shell comment (any '#' token, unlike bash: #5955).
+            # comments=True drops a trailing shell comment, but also cuts at a mid-word '#' (#5955).
             argv = shlex.split(EXPR.sub(placeholder, m.group("rest")), comments=True)
         except ValueError:
             continue

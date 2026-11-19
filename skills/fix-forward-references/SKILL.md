@@ -1,6 +1,6 @@
 ---
 name: fix-forward-references
-description: "Fix forward references in text."
+description: "Fix forward references in text. Aliases: ffr."
 user-invocable: true
 allowed-tools:
   - Bash

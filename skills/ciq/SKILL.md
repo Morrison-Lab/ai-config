@@ -1,6 +1,7 @@
 ---
 name: ciq
 description: "→ check-info-quality."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

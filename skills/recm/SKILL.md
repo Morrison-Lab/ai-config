@@ -1,6 +1,6 @@
 ---
 name: recm
-description: "Recommend harness, provider, model, and engine for a repo or task."
+description: "Recommend harness, provider, model, and engine for a repo or task. Aliases: rech, rechme."
 user-invocable: true
 allowed-tools:
   - Bash

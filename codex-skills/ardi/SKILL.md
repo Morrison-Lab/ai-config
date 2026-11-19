@@ -1,6 +1,6 @@
 ---
 name: "ardi"
-description: "Drive one PR to clean."
+description: "Drive one PR to clean. Aliases: adri, clean, dc, drive, iterate."
 ---
 
 # ardi (Codex wrapper)

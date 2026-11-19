@@ -1,6 +1,7 @@
 ---
 name: fcp
 description: "→ fact-check-prose."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

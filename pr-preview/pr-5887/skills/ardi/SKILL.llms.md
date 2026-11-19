@@ -118,10 +118,11 @@ Skip if your most recent comment already says so and is still live — claims ex
     IN=$(python3 scripts/pr-scope.py --user "$ME" --alias "$ALIASES" \
       --requested "$REQUESTED" --excluded "$EXCLUDED" < "$LIST" | jq -c '.included')
     jq --argjson in "$IN" '.[] | select((.number | IN($in[])) and (.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN"))' "$LIST"
+    jq --argjson in "$IN" '[.[] | select((.number | IN($in[]) | not) and .mergeable == "CONFLICTING") | .number]' "$LIST"   # to report
     rm -f "$LIST"
     ```
 
-    The script reads the whole JSON array, so it gets the listing before any filter; its `included` numbers then pick the in-scope candidates from the saved listing, which keeps `mergeable`. The identity flags are the ones `ardia` step 1 defines. A conflicting PR outside `included` is reported to the user and left untouched. Verify each in-scope candidate with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38; see `resolve-conflicts`, “Verify before you act”) before claiming — `UNKNOWN` isn’t proof of a real conflict, and `CONFLICTING` can be stale if a sibling PR merged since GitHub last computed it. Claim and fix confirmed conflicts using the cascade procedure in `post-merge` step 1.5. Re-check after each resolution — new ones can appear at any time. This turns idle wait time into productive conflict prevention.
+    The script reads the whole JSON array, so it gets the listing before any filter; its `included` numbers then pick the in-scope candidates from the saved listing, which keeps `mergeable`. The identity flags are the ones `ardia` step 1 defines. The second `jq` lists the conflicting PRs outside `included`: report them to the user and leave them untouched. Verify each in-scope candidate with `git merge-tree --write-tree origin/main origin/<branch>` (git ≥ 2.38; see `resolve-conflicts`, “Verify before you act”) before claiming — `UNKNOWN` isn’t proof of a real conflict, and `CONFLICTING` can be stale if a sibling PR merged since GitHub last computed it. Claim and fix confirmed conflicts using the cascade procedure in `post-merge` step 1.5. Re-check after each resolution — new ones can appear at any time. This turns idle wait time into productive conflict prevention.
 
 ### Per-round checklist
 

@@ -77,6 +77,12 @@ If you can’t see why a side changed the hunk, you’re not ready to resolve it
 
     **Also check whether the merged result duplicates content that already exists elsewhere in the file — a separate problem from the textual conflict itself.** This can arise two ways: a single incoming PR may internally copy a sentence into a new section (the merge is clean, but the result now says the same thing twice), or both branches may independently add equivalent sentences in different sections (a cross-branch variant with the same symptom). In both cases `git merge`/`merge-tree` reports zero conflicts even though the result contains duplication — sometimes with a pronoun or reference that only made sense in its original location. Grep the merged file for the distinctive phrase from each side’s addition before finishing; if it already appears elsewhere, keep one copy (usually the version with the clearer standalone referent) and drop the redundant one. (ai-config#446: the merge itself was clean, but the incoming PR’s own diff had separately duplicated a CLAUDE.md sentence verbatim into a different section, where “this policy” lost its antecedent — the intra-PR variant, caught by the `@claude` review bot as a distinct finding from the conflict resolution.)
 
+    **Then read each resolved file whole, as one document.** Choosing the better side hunk by hunk can splice two self-consistent halves into an incoherent whole: each side is consistent with itself, so no per-hunk judgment sees that the combination is worse than either. On d-morrison/rme#1138, one side’s opening and the other side’s closing used one name for three different objects. The repair has its own trap: unifying the notation made one symbol stand for both sides of the inequality the sentence compared, a circular definition found two review rounds later.
+
+    - **Do:** read the resolved file top to bottom, and check that every term and symbol means one thing throughout.
+    - **Do:** after unifying notation, check that each comparison still has distinct symbols on its two sides.
+    - **Don’t:** treat a resolution as done because each hunk, judged alone, took the better side.
+
 4.  **Prove no markers (or whitespace damage) slipped through:**
 
     ``` bash

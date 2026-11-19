@@ -23,6 +23,7 @@ from scripts.lib.ai_cli import (
     find_executable,
     is_gh_available,
 )
+from scripts.lib.codex_scope import OVERRIDE_ENV as CODEX_OVERRIDE_ENV, codex_allowed
 from scripts.lib.fences import count_unbalanced_fences, strip_fences
 from scripts.lib.review_payload import (
     extract_structured_review,
@@ -966,9 +967,18 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
     return out if validate_review_output(out, expected_commit_sha=expected_commit_sha) else None
 
 
-def detect_available_engines() -> List[str]:
-    """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy."""
-    return detect_cli_engines(ENGINE_ROTATION_ORDER, use_cache=False)
+def detect_available_engines(codex_ok: Optional[bool] = None) -> List[str]:
+    """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy.
+
+    Codex is dropped outside a UCDH project (ai-config#5084), so `auto` and
+    `alternate` never pick it there.
+    """
+    engines = detect_cli_engines(ENGINE_ROTATION_ORDER, use_cache=False)
+    if codex_ok is None:
+        codex_ok = codex_allowed()
+    if "codex" in engines and not codex_ok:
+        engines.remove("codex")
+    return engines
 
 
 ENGINE_ROTATION_ORDER = DEFAULT_ENGINE_PRIORITY
@@ -1014,7 +1024,7 @@ def record_successful_engine(engine_name: str):
         pass
 
 
-def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sha: str = "", exclude_engine: str = "") -> Tuple[Optional[str], str]:
+def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sha: str = "", exclude_engine: str = "", codex_ok: Optional[bool] = None) -> Tuple[Optional[str], str]:
     """Execute review with specified engine or automatic fallback chain."""
     engine_dispatch = {
         "cursor": (run_cursor_review, "Cursor Agent"),
@@ -1031,7 +1041,7 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
     }
 
     if engine in ["alternate", "round-robin"]:
-        available = detect_available_engines()
+        available = detect_available_engines(codex_ok)
         invokers = set()
         if exclude_engine:
             invokers.add(exclude_engine.lower())
@@ -1109,6 +1119,19 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
             print(f"Engine '{rem_label}' was unavailable, exhausted, or produced invalid output; falling back...")
         return None, "Fallback Chain"
 
+    if engine in ("codex", "dtc") and not (codex_allowed() if codex_ok is None else codex_ok):
+        log_error(
+            "Codex is limited to UCDH projects (bcs, hac) (ai-config#5084). "
+            + (
+                f"{CODEX_OVERRIDE_ENV}=0 refuses it here. "
+                if os.environ.get(CODEX_OVERRIDE_ENV, "").strip() == "0"
+                else "This checkout's origin is not a UCDH remote. "
+            )
+            + f"Choose another engine, or set {CODEX_OVERRIDE_ENV}=1 if this is a UCDH project "
+            "whose remote the check does not recognize."
+        )
+        return None, "OpenAI Codex"
+
     if engine != "auto":
         runner, label = engine_dispatch.get(engine, (None, engine))
         if not runner:
@@ -1117,9 +1140,12 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
         report = runner(prompt, model=model, expected_commit_sha=expected_commit_sha)
         return report, label
 
-    available = detect_available_engines()
+    available = detect_available_engines(codex_ok)
     if not available:
-        log_error("No supported AI CLI found (`claude`, `cursor`, `codex`, `opencode`, `agy`).")
+        log_error(
+            "No supported AI CLI found (`claude`, `cursor`, `codex`, `opencode`, `agy`). "
+            f"Codex counts only in a UCDH project, or with {CODEX_OVERRIDE_ENV}=1 (ai-config#5084)."
+        )
         return None, "None"
 
     for cand in available:
@@ -1290,7 +1316,7 @@ def main():
             "antigravity", "agy", "agy-claude",
         ],
         default="auto",
-        help="AI engine: 'auto' (priority: claude -> cursor -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
+        help="AI engine: 'auto' (priority: claude -> cursor -> codex -> opencode -> agy; codex only in UCDH projects), 'alternate' (round-robin rotation), or specific engine name",
     )
     parser.add_argument(
         "--model",
@@ -1354,6 +1380,9 @@ def main():
     full_prompt = build_review_prompt(diff, ref_name, guidelines, initial_head)
 
     repo_root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True).stdout.strip()
+    # Decide Codex scope here: the sandbox clone below has a local-path origin,
+    # so codex_allowed() run inside it would always refuse (ai-config#5084).
+    codex_ok = codex_allowed(repo_root)
     with tempfile.TemporaryDirectory() as temp_dir:
         original_cwd = os.getcwd()
         try:
@@ -1363,7 +1392,7 @@ def main():
             subprocess.run(["git", "checkout", initial_head], check=True, capture_output=True)
             # Remove branch-controlled agent configs to enforce sandbox isolation
             _clean_sandbox_configs(Path(temp_dir))
-            report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head, exclude_engine=args.exclude_engine)
+            report, engine_label = execute_review(args.engine, full_prompt, model=args.model, expected_commit_sha=initial_head, exclude_engine=args.exclude_engine, codex_ok=codex_ok)
         finally:
             os.chdir(original_cwd)
 

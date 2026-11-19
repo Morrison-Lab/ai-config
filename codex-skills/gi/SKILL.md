@@ -1,6 +1,6 @@
 ---
 name: "gi"
-description: "Grab an issue, implement, and ARDI."
+description: "Grab an issue, implement, and ARDI. Aliases: grab-issue."
 ---
 
 # gi (Codex wrapper)

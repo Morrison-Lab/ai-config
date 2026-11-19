@@ -64,6 +64,14 @@ that a content diff cannot see:
     perfectly well-formed, it just renders wrong.  A structure carrying no
     `m:t` at all is a blank placeholder already present in the source,
     reported for information rather than as a finding.
+  * a display equation (m:oMathPara) that shares its w:p with content on a
+    side it is not broken off from: before it, neither a w:r ending in a
+    break nor an earlier m:oMathPara that closes with one, or, after it, neither an m:r ending in a break closing its m:oMath nor a w:r
+    starting with one (ai-config#3438).  The
+    equation then runs into the neighbouring prose.  This markup is legal
+    and carries no text, so neither a structural validator nor a text diff
+    sees it.  The two sides are independent, so the report counts display
+    equations and defective equations separately from findings.
 
 Every run reports how many parts and elements it actually examined, so a
 run that finds nothing is distinguishable from a run that examined nothing.
@@ -442,6 +450,237 @@ def check_orphaned_math(
     return zones, structs
 
 
+# Siblings of an m:oMathPara inside its w:p that carry no visible content, so
+# they neither need a line break nor supply one (ai-config#3438).
+BREAK_TRANSPARENT_TAGS = frozenset(
+    W + name
+    for name in (
+        "pPr",
+        "bookmarkStart",
+        "bookmarkEnd",
+        "commentRangeStart",
+        "commentRangeEnd",
+        "proofErr",
+        "permStart",
+        "permEnd",
+        "moveFromRangeStart",
+        "moveFromRangeEnd",
+        "moveToRangeStart",
+        "moveToRangeEnd",
+        "customXmlInsRangeStart",
+        "customXmlInsRangeEnd",
+        "customXmlDelRangeStart",
+        "customXmlDelRangeEnd",
+        "customXmlMoveFromRangeStart",
+        "customXmlMoveFromRangeEnd",
+        "customXmlMoveToRangeStart",
+        "customXmlMoveToRangeEnd",
+        "sdtPr",
+        "sdtEndPr",
+        "smartTagPr",
+        "customXmlPr",
+        "fldData",
+    )
+)
+
+# Containers whose children are runs in reading order: a tracked insertion
+# or move, a hyperlink, a smart tag, a content control, a simple field's
+# result, a bidirectional embedding. Their runs count as siblings.
+BREAK_RUN_CONTAINERS = frozenset(
+    W + name
+    for name in (
+        "ins",
+        "moveTo",
+        "hyperlink",
+        "smartTag",
+        "customXml",
+        "sdt",
+        "sdtContent",
+        "fldSimple",
+        "dir",
+        "bdo",
+    )
+)
+# Content the accepted document no longer has: neither its prose nor its
+# breaks count, and an equation inside one is not checked.
+BREAK_REMOVED_CONTAINERS = frozenset(W + name for name in ("del", "moveFrom"))
+LINE_BREAK_TAGS = frozenset((W + "br", W + "cr"))
+TEXT_TAGS = frozenset((W + "t", M + "t"))
+# Run children that render nothing: properties, a comment's anchor, Word's
+# cached page-break hint, and a complex field's markers and hidden code.
+NON_RENDERING_RUN_TAGS = frozenset(
+    (W + "rPr", M + "rPr")
+    + tuple(
+        W + name
+        for name in (
+            "commentReference",
+            "lastRenderedPageBreak",
+            "fldChar",
+            "instrText",
+        )
+    )
+)
+
+
+def flatten_runs(elems) -> list:
+    """Expand run containers into their children, recursively, in order,
+    dropping deleted and moved-away content."""
+    out = []
+    for e in elems:
+        if e.tag in BREAK_REMOVED_CONTAINERS:
+            continue
+        if e.tag in BREAK_RUN_CONTAINERS:
+            out.extend(flatten_runs(list(e)))
+        else:
+            out.append(e)
+    return out
+
+
+def enclosing_paragraph(elem: ET.Element, parents: dict):
+    """The w:p an element sits in through run containers, or None when it
+    sits elsewhere or inside deleted content."""
+    node = parents.get(elem)
+    while node is not None and node.tag in BREAK_RUN_CONTAINERS:
+        node = parents.get(node)
+    if node is None or node.tag != W + "p":
+        return None
+    return node
+
+
+def run_content(run: ET.Element) -> list:
+    """The children of a w:r or m:r that render, leaving out its properties,
+    comment anchors, cached page breaks, field markers and empty text
+    elements (an empty w:t or m:t renders nothing)."""
+    return [
+        c
+        for c in run
+        if c.tag not in NON_RENDERING_RUN_TAGS
+        and not (c.tag in TEXT_TAGS and not c.text)
+    ]
+
+
+def closes_with_break(omp: ET.Element) -> bool:
+    """True if an m:oMathPara's last m:oMath ends with an m:r whose last
+    rendered child is a line break. The m:oMath's children are read as
+    accepted: runs inside a tracked insertion count, deleted runs do not,
+    and a run that renders nothing is skipped."""
+    maths = omp.findall(M + "oMath")
+    if not maths:
+        return False
+    for elem in reversed(flatten_runs(list(maths[-1]))):
+        if elem.tag != M + "r":
+            return False
+        content = run_content(elem)
+        if content:
+            return content[-1].tag in LINE_BREAK_TAGS
+    return False
+
+
+def is_visible(elem: ET.Element) -> bool:
+    """True if a paragraph-level sibling of an m:oMathPara renders anything."""
+    if elem.tag in BREAK_TRANSPARENT_TAGS:
+        return False
+    if elem.tag == W + "r":
+        return bool(run_content(elem))
+    return True
+
+
+def check_display_equation_breaks(
+    root: ET.Element, part: str, findings: list, parents: dict
+) -> tuple:
+    """Flag a display equation that shares its paragraph with content it
+    is not broken off from (ai-config#3438).
+
+    `memories/office-open-xml.md` ("`m:oMathPara` does not claim its own
+    line ...") records that m:oMathPara alone does not put an equation on
+    its own line when prose shares its w:p; two ordinary breaks do:
+
+      * BEFORE: the nearest visible sibling before the m:oMathPara is a w:r
+        whose last rendered child is <w:br/>, or an earlier m:oMathPara
+        that closes with its own break (the AFTER form below);
+      * AFTER: the last m:oMath in the m:oMathPara ends with an m:r whose
+        last rendered child is <w:br/>, or the nearest visible sibling after
+        the m:oMathPara is a w:r whose first rendered child is <w:br/>.
+
+    A break is required only on a side that has visible content in the same
+    w:p, so an equation alone in its paragraph -- Word's own layout -- needs
+    none. A w:cr counts as a break, as w:br does. Bookmarks, comment ranges,
+    proofing marks, change-tracking range markers and properties (of the
+    paragraph, a content control, a smart tag, custom XML or a field) are
+    transparent, and so is a run holding only a comment anchor, a cached
+    page break or field markers. Runs inside tracked insertions, moves,
+    hyperlinks, content controls, simple fields and bidirectional
+    embeddings count as siblings.
+    The paragraph is read as it will be once its changes are accepted: an
+    equation inside a tracked insertion is checked, deleted or moved-away
+    content counts neither as prose nor as a break, and an equation inside
+    a deletion is not checked.
+
+    The two sides are independent, so one equation can produce two
+    findings. Returns (equations_examined, equations_missing_a_break), and
+    the report prints both counts so neither is read as the other.
+    """
+    examined = defective = 0
+    for omp in root.iter(M + "oMathPara"):
+        parent = enclosing_paragraph(omp, parents)
+        if parent is None:
+            continue
+        examined += 1
+        siblings = flatten_runs(list(parent))
+        # flatten_runs keeps the m:oMathPara itself, since it is no container.
+        idx = next((i for i, e in enumerate(siblings) if e is omp), None)
+        if idx is None:
+            continue  # unreachable while flatten_runs mirrors the walk up
+        before = [e for e in siblings[:idx] if is_visible(e)]
+        after = [e for e in siblings[idx + 1:] if is_visible(e)]
+        ctx = "".join(t.text or "" for t in parent.iter(W + "t"))[:60]
+        missing = []
+
+        if before:
+            prev = before[-1]
+            content = run_content(prev) if prev.tag == W + "r" else []
+            broken = bool(content) and content[-1].tag in LINE_BREAK_TAGS
+            # An earlier display equation that closes with its own break
+            # already starts this one on a new line.
+            if prev.tag == M + "oMathPara" and closes_with_break(prev):
+                broken = True
+            if not broken:
+                missing.append("before")
+
+        if after:
+            ends_with_break = closes_with_break(omp)
+            nxt = after[0]
+            content = run_content(nxt) if nxt.tag == W + "r" else []
+            starts_with_break = bool(content) and content[0].tag in LINE_BREAK_TAGS
+            if not (ends_with_break or starts_with_break):
+                missing.append("after")
+
+        if missing:
+            defective += 1
+        for side in missing:
+            where = (
+                "no line break before the m:oMathPara (the nearest visible "
+                "content before it is neither a w:r whose last rendered child "
+                "is a w:br or w:cr nor an earlier m:oMathPara that closes with "
+                "one), so the content before it runs into the equation"
+                if side == "before"
+                else "no line break after it (its last m:oMath does not end "
+                "with an m:r whose last rendered child is a break, and the "
+                "nearest visible content after it is not a w:r whose first "
+                "rendered child is one), so the equation runs into the "
+                "content after it"
+            )
+            findings.append(
+                Finding(
+                    "display-equation-break",
+                    part,
+                    f"display equation shares its paragraph with content "
+                    f"{side} it but has {where} (near {ctx!r})",
+                )
+            )
+    return examined, defective
+
+
 def check_document(path: Path) -> tuple:
     """Run every intra-document check on one .docx. Returns (findings,
     stats-dict, reference_triples_for_this_doc, notes)."""
@@ -455,6 +694,8 @@ def check_document(path: Path) -> tuple:
     ignorable_examined = 0
     math_zones_examined = 0
     math_structs_examined = 0
+    display_eqs_examined = 0
+    display_eqs_missing_break = 0
     id_seen: dict = {}
     all_triples: set = set()
 
@@ -483,6 +724,9 @@ def check_document(path: Path) -> tuple:
         zones, structs = check_orphaned_math(root, name, findings, notes, parents)
         math_zones_examined += zones
         math_structs_examined += structs
+        eqs, missing = check_display_equation_breaks(root, name, findings, parents)
+        display_eqs_examined += eqs
+        display_eqs_missing_break += missing
 
     stats = {
         "parts_examined": parts_examined,
@@ -494,6 +738,8 @@ def check_document(path: Path) -> tuple:
         "triples_examined": len(all_triples),
         "math_zones_examined": math_zones_examined,
         "math_structs_examined": math_structs_examined,
+        "display_eqs_examined": display_eqs_examined,
+        "display_eqs_missing_break": display_eqs_missing_break,
     }
     return findings, stats, all_triples, notes
 
@@ -528,7 +774,9 @@ def report(path: Path, findings: list, stats: dict, notes: list) -> None:
         f"{stats['ignorable_examined']} mc:Ignorable declaration(s), "
         f"{stats['triples_examined']} nesting triple(s), "
         f"{stats['math_zones_examined']} math zone(s), "
-        f"{stats['math_structs_examined']} math structure(s)"
+        f"{stats['math_structs_examined']} math structure(s), "
+        f"{stats['display_eqs_examined']} display equation(s) "
+        f"({stats['display_eqs_missing_break']} missing a line break)"
     )
     for n in notes:
         print(f"  {n}")

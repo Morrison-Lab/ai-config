@@ -28,7 +28,9 @@ A denial is live until one of two things:
     through (the goal was reached, so a further write is a new action), or
   * a typed message from the user, after the denial, that names the number and
     carries a go-ahead word (retry, go ahead, proceed, do it, redo, try again,
-    yes, approve, allow, ok to). The number must be named, so "yes" alone does
+    yes, approve, allow, ok to), or that opens a clause with the denied
+    action's own verb ("post the agy verdict on gha 2115" for a comment,
+    ai-config#5852), with or without "#". The number must be named, so "yes" alone does
     not release every standing denial, and a negated clause ("don't retry
     1631") does not release it. Only a user-role text block counts: not a
     tool result, not the assistant's words, not a system reminder, and not a
@@ -125,6 +127,30 @@ RX_NEGATED = re.compile(
     r"\b(?:don'?t|do\s+not|never|not|won'?t|shouldn'?t|wouldn'?t|can'?t|"
     r"cannot|couldn'?t|isn'?t|aren'?t|without|stop)\b", re.IGNORECASE)
 RX_CLAUSE_START = re.compile(r"[.!?;\n]")
+# The denied action's own verb, typed as an imperative (ai-config#5852).
+ACTION_VERBS = {
+    verb: re.compile(rf"\b(?:{words})\b", re.IGNORECASE)
+    for verb, words in {
+        "comment": r"post|comment|reply|add",
+        "close": r"close",
+        "reopen": r"reopen",
+        "edit": r"edit|update|change",
+        "merge": r"merge",
+        "review": r"review|approve|submit",
+    }.items()
+}
+# What may precede that verb in its clause: nothing, or politeness and
+# sequencing words. Anything else ("did you", "why not") is not an order.
+IMPERATIVE_LEAD_WORDS = frozenset(
+    {"please", "pls", "ok", "okay", "now", "then", "and", "so", "just",
+     "go", "ahead"})
+RX_LEAD_SPLIT = re.compile(r"[\s,]+")
+
+
+def _is_imperative_lead(lead):
+    """True when *lead* holds only politeness and sequencing words."""
+    words = [w for w in RX_LEAD_SPLIT.split(lead.lower()) if w]
+    return all(w in IMPERATIVE_LEAD_WORDS for w in words)
 RX_STRIP = re.compile(
     r"<system-reminder>.*?</system-reminder>"
     r"|<note>.*?</note>"
@@ -137,10 +163,13 @@ DENY_TEXT = (
     "session, through {was}. This call, through `{tool}`, redoes the same "
     "action by another route. Ezra's standing rule is to report a classifier "
     "denial and ask, not to push past it by switching tools (ai-config#5121, "
-    "#4960). Tell the user what was denied and ask for a go-ahead. The deny "
-    "lifts when the user types a message that names {num} with a go-ahead "
-    "word, such as \"retry {num}\"; a relayed description from another agent "
-    "does not count.")
+    "#4960). Tell the user what was denied and ask for a go-ahead, once. The "
+    "deny lifts when the user types a message that names {num} with a "
+    "go-ahead word or opens with the action's own verb (\"{verb} ... {num}\"); "
+    "the number may be written with or without \"#\". If the user has "
+    "already typed such a message, it should have released this deny: "
+    "report the gap rather than asking them to type again (ai-config#5852). "
+    "A relayed description from another agent does not count.")
 
 
 def _num(value):
@@ -319,18 +348,47 @@ def scan(path):
     return denials, allowed, goahead
 
 
-def released(num, after, goahead):
-    """True when a user text after index *after* names *num* with a go-ahead."""
+def _clause_before(text, pos):
+    """The text from the start of *pos*'s clause up to *pos*."""
+    before = text[:pos]
+    starts = [s.end() for s in RX_CLAUSE_START.finditer(before)]
+    return before[starts[-1]:] if starts else before
+
+
+def _imperative(text, verb):
+    """True when a clause of *text* opens with the denied action's own verb.
+
+    "post the agy verdict on gha 2115" names the action and its target, which
+    is as plain a go-ahead as "retry 2115" (ai-config#5852). Only a clause
+    that OPENS with the verb counts (after "please", "ok", "now", "then",
+    "and", "so", "just", "go ahead and"), so "did you close 1631?" and "why
+    not merge 1631" do not release.
+    """
+    rx = ACTION_VERBS.get(verb)
+    if rx is None:
+        return False
+    for m in rx.finditer(text):
+        lead = _clause_before(text, m.start())
+        if _is_imperative_lead(lead):
+            return True
+    return False
+
+
+def released(num, after, goahead, verb=None):
+    """True when a user text after index *after* names *num* with a go-ahead.
+
+    A go-ahead is a go-ahead word in a clause with no negation, or a clause
+    that opens with the denied action's own verb (see ``_imperative``).
+    """
     rx_num = re.compile(rf"(?<!\d){num}(?!\d)")
     for at, text in goahead:
         if at <= after or not rx_num.search(text):
             continue
         for m in RX_GO.finditer(text):
-            before = text[:m.start()]
-            starts = [s.end() for s in RX_CLAUSE_START.finditer(before)]
-            clause = before[starts[-1]:] if starts else before
-            if not RX_NEGATED.search(clause):
+            if not RX_NEGATED.search(_clause_before(text, m.start())):
                 return True
+        if verb and _imperative(text, verb):
+            return True
     return False
 
 
@@ -341,7 +399,7 @@ def live_denial(target, denials, allowed, goahead):
             continue
         if any(i > at and _same(target, t) for i, t in allowed):
             continue
-        if released(denied[1], at, goahead):
+        if released(denied[1], at, goahead, denied[2]):
             continue
         return at, tool, denied
     return None

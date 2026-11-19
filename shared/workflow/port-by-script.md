@@ -1,5 +1,6 @@
 # Port content between repos with a script
 
+When adapting any content (a port, a lab, a deck, a chapter, a snippet, a figure, text from any source), copy it first, algorithmically, and modify after the copy, never the reverse.
 When content moves from one repository to another, copy the source files with a script.
 Keep the ids, wording and citations.
 Edit only what the target repository's style rules require.
@@ -27,7 +28,7 @@ A scripted copy plus targeted edits keeps the diff against the source small, so 
 
 ## Port every item: inventory, map, report
 
-When Ezra asks to incorporate or port a source (a lab, a slide deck, a chapter) into a notes repo, the port covers the whole source, not only its gaps.
+When Ezra asks to incorporate, port or adapt a source (a lab, a slide deck, a chapter, anything) into a repo, the port covers the whole source, not only its gaps.
 
 1. **Inventory** the source item by item with a script or an explicit list: every exercise, example, figure, definition and table.
 2. **Map** each item to its target: an existing equivalent in the target repo (name it), or a new port.

@@ -264,7 +264,7 @@ Learn it only from his own text, never FERPA data.
 Read a request for everything it plainly asks, do every safe step it covers, and bring the user decisions rather than open questions ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
 - **Interpret instructions broadly and maximize safe progress:** unless the user narrows a request, take the broad reading that advances its obvious objective, complete every safe, authorized, relevant step, and apply grants and rules at their stated breadth.
-  Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible ([`read-instructions-fully`](shared/workflow/read-instructions-fully.md), [`AGENTS.cases.md`](AGENTS.cases.md), [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md)).
+  Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible, and record a rule at the scope of the user's words, not the task's nouns ([`read-instructions-fully`](shared/workflow/read-instructions-fully.md), [`AGENTS.cases.md`](AGENTS.cases.md), [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md)).
 - **"Or" always means "and/or", not xor, unless xor is explicitly specified:** address every alternative that applies ([`or-means-and-or`](shared/principles/or-means-and-or.md)).
 - **Silence is not permission:** an unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask ([`silence-is-not-permission`](shared/principles/silence-is-not-permission.md)).
 - **Default to action without asking:** take non-destructive steps, installs, `add_repo` and posted reviews included, and report them in the past tense.
@@ -319,7 +319,8 @@ Verify every push first, and carry work worth keeping through to a PR ([#2889](h
 
 - **Commit, push, and PR any potentially-reusable work you produce:** commit work produced incidentally in any medium to an owning repository
   when reproducing it costs more than a moment **and** something durable cites it, or will ([`commit-reusable-work`](shared/workflow/commit-reusable-work.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
-  [Port content by script](shared/workflow/port-by-script.md): when asked to port a source, inventory it item by item, port every item, and report the source-to-target map (skill `port-source-exercises`).
+  [Port content by script](shared/workflow/port-by-script.md): when adapting any content, copy it first with a script and modify after;
+  when porting a source, also inventory it item by item, port every item, and report the source-to-target map (skill `port-source-exercises`).
 - **Deliver completed implementation work:** when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
   This grants no merge authority: the Strict Merge Control Policy still applies.
 - **Verify changes before pushing:** always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.

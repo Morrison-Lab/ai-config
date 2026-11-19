@@ -17,6 +17,8 @@ CSV = ("kind,source,branch,baseline,fetch,note\ngithub,a/busy,main,b0b0b0b0b0b0b
        "subreddit,r/mcp,,,manual,high tier\n")
 API = {"/repos/a/busy/commits/main": {"sha": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"}, "/repos/a/quiet/commits/main": {"sha": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0"},
        "/repos/a/back/commits/main": {"sha": "c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0"}, "/repos/a/odd/commits/main": {"sha": "main"},
+       "/repos/a/num/commits/main": {"sha": "e2" * 20}, f"/repos/a/num/compare/{'e1' * 20}...{'e2' * 20}": {
+           "ahead_by": 1, "status": "ahead", "html_url": "https://example.test/num", "commits": [{"commit": {"message": 5}}]},
        "/repos/a/back/compare/c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1...c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0": {
            "ahead_by": 0, "status": "behind", "html_url": "https://example.test/back", "commits": []},
        "/repos/a/busy/compare/b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0...b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": {
@@ -128,6 +130,7 @@ class DigestTest(unittest.TestCase):
             (CSV, "<!-- tracked-sources-state: {oops} -->"),
             (CSV, '<!-- tracked-sources-state: {"a/busy": "' + "b2" * 20 + '"} -->\ntrailing'),  # not the last line
             (CSV + "subreddit,r/x,,,manual,note,extra\n", None),  # a row with an extra field
+            (CSV + "github,a/num,main," + "e1" * 20 + ",api,x\n", None),  # a message that is not text
         ):
             with self.subTest(csv=csv_text, previous=previous):
                 code, out, err, _, gh = run(csv_text, previous)

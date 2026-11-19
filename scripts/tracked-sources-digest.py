@@ -66,8 +66,9 @@ MAX_SUBJECT = 200
 
 
 def inert(subject: str) -> str:
-    """Render an outside commit subject so it can neither mention anyone nor forge the state
-    marker, cut to MAX_SUBJECT characters plus "..."."""
+    """Render an outside commit subject for a code span, where GitHub links no @mention: a
+    backtick, which could end the span, becomes a quote, and "<!--" cannot start a marker.
+    A long subject is cut to MAX_SUBJECT characters plus "..."."""
     if len(subject) > MAX_SUBJECT:
         subject = subject[:MAX_SUBJECT] + "..."
     return subject.replace("`", "'").replace("<!--", "< !--")
@@ -121,7 +122,7 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
     ap.add_argument("--token-env", default="GH_TOKEN", help="variable holding the API token")
     ap.add_argument("--max-subjects", type=int, default=20)
     ap.add_argument("--github-output", type=Path,
-                    help="append new_commits=<n> and moved=<repositories> to this file")
+                    help="append new_commits=<n> and moved=<number of repositories> to this file")
     args = ap.parse_args(argv)
     if args.max_subjects < 0:
         ap.error("--max-subjects must be 0 or more")
@@ -138,8 +139,9 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
         if args.github_output:
             with args.github_output.open("a", encoding="utf-8") as fh:
                 fh.write(f"new_commits={total}\nmoved={moved}\n")
-    except (DigestError, OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
-        # TypeError: an API response or CSV row of the wrong shape.
+    except (DigestError, OSError, LookupError, TypeError, ValueError, AttributeError) as exc:
+        # Besides DigestError and OSError: an API response or CSV row of the wrong shape,
+        # bad JSON, or a file that is not UTF-8.
         print(f"tracked-sources-digest: {exc!r}", file=sys.stderr)
         return 2
     sys.stdout.write(text)

@@ -5201,7 +5201,20 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
              "posted a clean verdict on the live head; it still vetoes if it "
              "is on the live head itself (ai-config#5064).",
     )
+    parser.add_argument(
+        "--mwr", action="store_true",
+        help="Skip the review-verdict axis and keep every other gate, for a "
+             "merge under an mwr, mwrs or amwr grant (ai-config#3946). Prints "
+             "a MERGE-READY line, never the FULLY CLEAN line an mwc merge needs.",
+    )
     return parser.parse_args(argv)
+
+
+# Review items that still block under --mwr: a formal objection on the PR.
+MWR_KEPT_REVIEW_PREFIXES = (
+    "PR formal review decision is ",
+    "PR has active formal review state ",
+)
 
 
 def _auto_build_payload(repo: str, pr_number: str) -> str:
@@ -5279,7 +5292,21 @@ def main():
     ci_ok, ci_issues = check_ci_runs(pr)
     threads_ok, thread_issues = check_review_threads(pr)
     feedback_ok, feedback_issues = check_maintainer_feedback(pr)
+    # Under an `mwr` grant (ai-config#3946: "Skip review, keep green CI",
+    # Ezra 2026-11-19) a merge needs no clean review verdict and no quorum.
+    # A formal CHANGES_REQUESTED or REJECTED still blocks: it is somebody's
+    # recorded objection, not a missing approval. Every other axis still
+    # runs: CI, annotations, unresolved threads, a maintainer's unanswered
+    # feedback, base drift and required checks. The pass line differs from
+    # the FULLY CLEAN line on purpose, so no `mwc` gate that keys on that
+    # line can be satisfied by an mwr run.
+    mwr = bool(getattr(args, "mwr", False))
     review_ok, review_issues = check_review_comments(pr, args.quorum)
+    if mwr:
+        review_issues = [i for i in review_issues if i.startswith(MWR_KEPT_REVIEW_PREFIXES)]
+        review_issues.append(
+            "NOTE: --mwr: review verdicts and quorum were not evaluated (ai-config#3946); "
+            "this pass authorizes a merge only under an mwr, mwrs or amwr grant")
     drift_ok, drift_issues = check_base_drift(pr)
     required_ok, required_issues = check_required_checks(pr)
 
@@ -5323,6 +5350,10 @@ def main():
             print(f"  - {issue}")
         sys.exit(1)
 
+    if mwr:
+        print(f"\n\u2705 {repo}#{pr_num} is MERGE-READY under mwr (review not evaluated) "
+              f"on HEAD {sha[:8]}! [stale-base rule]")
+        sys.exit(0)
     print(f"\n\u2705 {repo}#{pr_num} is FULLY CLEAN on HEAD {sha[:8]}! [stale-base rule]")
     sys.exit(0)
 

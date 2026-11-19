@@ -199,6 +199,7 @@ def find_ask(text: str) -> str:
     return ""
 
 
+# transcript-shapes-skip: antigravity -- an Antigravity session runs no Claude Code Stop hook, and the Stop payload's last_assistant_message is read first.
 def transcript_last_text(path: str) -> str:
     """The text blocks of the last assistant message in a JSONL transcript, or ""."""
     last = ""

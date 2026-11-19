@@ -109,7 +109,7 @@ operations:
     cli: gh pr create
     github_mcp: mcp__github__create_pull_request
   - id: EDIT_PR
-    description: Edit a pull request (reviewers, labels, base, etc.).
+    description: Edit a pull request's title, body, base, draft state or reviewers. The MCP tool takes no `assignees` or `labels` and answers "No update parameters provided" when given only those; set them with `mcp__github__issue_write (method=update, assignees=[...])` or `(labels=[...])` on the PR number, since a PR is an issue (see `LABEL_ISSUE`).
     cli: gh pr edit "<N>"
     github_mcp: mcp__github__update_pull_request
   - id: MERGE_PR

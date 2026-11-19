@@ -138,8 +138,12 @@ def run(tool, tool_input, steps):
     try:
         payload = {"tool_name": tool, "tool_input": tool_input,
                    "transcript_path": path}
-        proc = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
-                              capture_output=True, text=True)
+        try:
+            proc = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                                  capture_output=True, text=True, timeout=20)
+        except subprocess.TimeoutExpired:
+            raise AssertionError("FATAL: hook ran over 20 s on one input "
+                                 "(a pattern that backtracks badly?)") from None
         if proc.returncode != 0:
             raise AssertionError("FATAL: hook exited %s\nstderr: %s"
                                  % (proc.returncode, proc.stderr))

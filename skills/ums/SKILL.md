@@ -116,6 +116,16 @@ committed pass.
      commits to *that* repo's own agent docs instead --- see the checklist
      item below for where. This changes step 4's target, not just the
      content.)
+   - **What general principle does it instance?**
+     Write the principle as one sentence before choosing a destination,
+     and give it the scope of the user's words, not the task's nouns
+     ([`read-instructions-fully`](../../shared/workflow/read-instructions-fully.md)).
+     A correction aimed at one sentence ("this sentence is unnecessary")
+     usually instances a rule about a class ("avoid and remove unnecessary content",
+     [ai-config#3157](https://github.com/Morrison-Lab/ai-config/issues/3157)).
+     Record the specific case as evidence for the principle, not as a rule of its own.
+     When the principle needs more than a quick edit to land (a new hook, a sweep, a new fragment),
+     file it as an issue in the same pass rather than recording only the specific case.
 
 3. **Apply updates.** For each item:
    - Read the target file first (skill or memory) to understand current state
@@ -145,6 +155,18 @@ committed pass.
      and a `memories/`-only grep stays outside those paths.
      When the grep finds an existing entry on the subject, extend that entry in place;
      don't add a second bullet.
+   - **Search for the principle from step 2 as well as for the subject.**
+     The subject grep finds entries that name the same tool or error;
+     a rule stating the same principle in other words names neither,
+     and a phrase grep under-detects it
+     ([`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
+     Search the principle's key terms and read the fragments listed under the matching heading of
+     [`shared/principles/README.md`](../../shared/principles/README.md) and `AGENTS.md`.
+     When an existing rule states the principle, revise that rule (a sharper sentence, a Do/Don't pair, a case)
+     rather than adding a new one, so the corpus grows by revision, not by append.
+     - **Do:** add the new case to the existing rule that already states its principle.
+     - **Don't:** add a new bullet for a correction whose principle an existing rule already states,
+       because its tool or error string appeared nowhere in the subject grep.
      (ai-config#689: a `list_workflow_runs` cost bullet went in next to the
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review

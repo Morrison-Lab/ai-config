@@ -461,6 +461,10 @@ The plain run (`--base origin/main`) took over 10 minutes (measured 2026-11-18 i
 - [ ] **The changelog entry and EVERY PR description this round touched were
       re-read** against the new behavior, not just the code --- none is in the
       diff, so no reviewer and no grep will catch a stale one.
+      Update the title and body in the same turn as the push, so they cover
+      every file and entry in the whole diff
+      (lds#2879 drew a NOT CLEAN review because its body named two of three
+      entries; `hooks/no-push-without-pr-body-refresh.py`, ai-config#5871).
       Read "every" literally: a round that corrects a claim appearing in two
       PRs' bodies discharges the *feeling* of having synced bodies as soon as
       one of them is done, and the one most likely to be skipped is your own,

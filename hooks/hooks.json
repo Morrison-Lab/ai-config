@@ -2503,6 +2503,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-pr-body-refresh.py\"",
+            "timeout": 10,
+            "script": "no-push-without-pr-body-refresh.py",
+            "why": "ai-config#5871 -- on 2026-11-19 agy returned NOT CLEAN on lds#2879 because a later push added a third memory entry and the PR body still named two. Blocks the stop once per turn (agent_notice.stop_notice) when the turn's last push (git push, push_files, create_or_update_file, delete_file) has no later PR title or body write (update_pull_request with title or body, create_pull_request, gh pr create, gh pr edit --title/--body/--body-file, gh api PATCH on pulls/N). Blocks once rather than refusing, because whether the body already covers the diff is a judgment; the reply may say so and stop. Fails open."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unchecked-empty-pr-claim.py\"",
             "timeout": 10,
             "script": "no-unchecked-empty-pr-claim.py",

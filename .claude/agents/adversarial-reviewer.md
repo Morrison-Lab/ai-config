@@ -410,3 +410,10 @@ Flag a pass that rests on a label the relaying agent added, or on a heading that
 Read the quoted review yourself.
 Do not report the checker's verdict as your finding.
 See [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
+
+## PR bodies left behind by a later push
+
+On a PR whose head has commits pushed after the body was written, compare the body against the whole diff.
+Report any file, entry or change in the diff that the title and body do not cover, and any change they still describe that the diff no longer holds (lds#2879 drew a NOT CLEAN review because its body named two of three entries).
+`hooks/no-push-without-pr-body-refresh.py` reminds the author at push time, but only you read the body against the diff.
+See [`ardi`](../../shared/workflow/ardi.md) ([ai-config#5871](https://github.com/Morrison-Lab/ai-config/issues/5871)).

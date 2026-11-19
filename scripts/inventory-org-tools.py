@@ -33,6 +33,7 @@ import datetime as dt
 import importlib.util
 import re
 import sys
+import urllib.parse
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set, Tuple
@@ -58,6 +59,11 @@ def classify_tree(paths: Iterable[str]) -> Tuple[Set[str], bool, List[str]]:
     is_package = "DESCRIPTION" in paths and any(p.startswith("R/") for p in paths)
     lua = sorted(p for p in paths if LUA_RE.match(p))
     return extensions, is_package, lua
+
+
+def is_empty_repo_error(message: str) -> bool:
+    """True for the 409 that GitHub returns when a repository has no commits."""
+    return ": 409 " in message and "empty" in message.lower()
 
 
 def description_fields(text: str) -> Dict[str, str]:
@@ -155,12 +161,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     packages: List[Tuple[str, str, str]] = []
     lua: Dict[str, List[str]] = {}
     truncated: List[str] = []
+    empty: List[str] = []
     scanned = 0
     for r in sorted(repos, key=lambda r: r["name"].lower()):
         name, branch = r["name"], r.get("default_branch")
-        if not branch or r.get("size", 0) == 0:
-            continue  # an empty repository has no tree to read
-        tree = rest_get(f"/repos/{args.org}/{name}/git/trees/{branch}?recursive=1", token)
+        if not branch:
+            empty.append(name)
+            continue
+        ref = urllib.parse.quote(branch, safe="")
+        try:
+            tree = rest_get(f"/repos/{args.org}/{name}/git/trees/{ref}?recursive=1", token)
+        except _PAYLOAD.PayloadBuildError as exc:
+            # GitHub answers 409 "Git Repository is empty" for a repository
+            # with no commits; any other failure stops the run (fail fast).
+            if not is_empty_repo_error(str(exc)):
+                raise
+            empty.append(name)
+            continue
         scanned += 1
         if tree.get("truncated"):
             truncated.append(name)
@@ -171,11 +188,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         if filters:
             lua[name] = filters
         if is_package:
-            blob = rest_get(f"/repos/{args.org}/{name}/contents/DESCRIPTION?ref={branch}", token)
+            blob = rest_get(f"/repos/{args.org}/{name}/contents/DESCRIPTION?ref={ref}", token)
             text = base64.b64decode(blob.get("content", "")).decode("utf-8", "replace")
             fields = description_fields(text)
             packages.append((name, fields["Package"], fields["Title"]))
 
+    if empty:
+        print(f"skipped empty repositories (no commits): {', '.join(empty)}", file=sys.stderr)
     now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     sys.stdout.write(render(args.org, extensions, packages, lua, truncated,
                             f"{scanned} non-archived, non-fork repositories' default branches",

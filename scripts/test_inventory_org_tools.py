@@ -54,5 +54,11 @@ check("render reports truncated trees", "## Incomplete" in md and "big" in md)
 check("render omits the Incomplete section when nothing was truncated",
       "## Incomplete" not in inv.render("o", {}, [], {}, [], "nothing", "t"))
 
+check("an empty repository's 409 is recognized",
+      inv.is_empty_repo_error('GET /repos/o/r/git/trees/main failed: 409 {"message":"Git Repository is empty."}'))
+check("any other API failure is not read as an empty repository",
+      not inv.is_empty_repo_error("GET /repos/o/r/git/trees/main failed: 404 Not Found")
+      and not inv.is_empty_repo_error("GET /repos/o/r/git/trees/main failed: 409 Conflict"))
+
 print(f"\n{failures} failed")
 sys.exit(1 if failures else 0)

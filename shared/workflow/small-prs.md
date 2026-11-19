@@ -64,8 +64,8 @@ that issue tracks both.
   ([ai-config#5873](https://github.com/Morrison-Lab/ai-config/issues/5873)),
   and the auto-mode classifier refused that prefix on the layer ("[Undermining Oversight]";
   [#5926](https://github.com/Morrison-Lab/ai-config/pull/5926), stacked on [#5947](https://github.com/Morrison-Lab/ai-config/pull/5947)).
-  The layer went out after #5947 merged: merging `origin/main` into it brought its own diff under the cap, and the push needed no prefix.
-  Until #5873 is fixed, expect each layer of an over-cap stack to wait for the layer below it to merge.
+  So in auto mode the stacked-branch allowance above was not available.
+  The layer's push succeeded only after #5947 merged: merging `origin/main` into it brought its own diff under the cap, and the push needed no prefix.
 - gha's `check-pr-size` ([gha#1188](https://github.com/Morrison-Lab/gha/issues/1188)) fails the same PR in CI.
   The `size-exempt` label lifts it; put it on a mechanical, content-identical PR.
 - The caps are a decision, recorded here: 10 files and 300 lines, tight on purpose after Ezra changed "waves" to "minimal batches".

@@ -25,6 +25,7 @@ from scripts.lib.ai_cli import (
 )
 from scripts.lib.codex_scope import OVERRIDE_ENV as CODEX_OVERRIDE_ENV, codex_allowed
 from scripts.lib.fences import count_unbalanced_fences, strip_fences
+from scripts.lib.pr_view import gh_pr_view
 from scripts.lib.review_payload import (
     extract_structured_review,
     payload_findings,
@@ -53,40 +54,28 @@ def get_git_root() -> str:
     return res.stdout.strip()
 
 
-def get_current_pr() -> Optional[int]:
-    """Auto-detect PR number for current branch if one exists and gh CLI is available."""
+def _pr_field(field: str, pr_number: Optional[int] = None):
+    """One `gh pr view --json` field of a PR (the current branch's by default).
+
+    Reads over REST where a cloud session refuses GraphQL (ai-config#4733).
+    None when gh is missing or the read fails.
+    """
     if not is_gh_available(use_cache=False):
         return None
-    res = subprocess.run(
-        ["gh", "pr", "view", "--json", "number"],
-        capture_output=True,
-        text=True,
-    )
-    if res.returncode == 0:
-        try:
-            data = json.loads(res.stdout)
-            return data.get("number")
-        except Exception:
-            return None
-    return None
+    data, _error = gh_pr_view([field], target=pr_number)
+    if not isinstance(data, dict):
+        return None
+    return data.get(field)
+
+
+def get_current_pr() -> Optional[int]:
+    """Auto-detect PR number for current branch if one exists and gh CLI is available."""
+    return _pr_field("number")
 
 
 def get_pr_base_branch(pr_number: int) -> Optional[str]:
     """Get the target base branch of a GitHub PR."""
-    if not is_gh_available(use_cache=False):
-        return None
-    res = subprocess.run(
-        ["gh", "pr", "view", str(pr_number), "--json", "baseRefName"],
-        capture_output=True,
-        text=True,
-    )
-    if res.returncode == 0:
-        try:
-            data = json.loads(res.stdout)
-            return data.get("baseRefName")
-        except Exception:
-            return None
-    return None
+    return _pr_field("baseRefName", pr_number)
 
 
 def resolve_diff(head_sha: str, pr_number: Optional[int] = None, explicit_base: str = "") -> Tuple[str, str, str, str]:
@@ -168,20 +157,7 @@ def get_repo_guidelines(base_ref: str) -> str:
 
 def get_pr_head_sha(pr_number: int) -> Optional[str]:
     """Get the remote head commit SHA for a GitHub PR."""
-    if not is_gh_available(use_cache=False):
-        return None
-    res = subprocess.run(
-        ["gh", "pr", "view", str(pr_number), "--json", "headRefOid"],
-        capture_output=True,
-        text=True,
-    )
-    if res.returncode == 0:
-        try:
-            data = json.loads(res.stdout)
-            return data.get("headRefOid")
-        except Exception:
-            return None
-    return None
+    return _pr_field("headRefOid", pr_number)
 
 
 REFUSAL_PATTERNS = [

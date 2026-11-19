@@ -86,6 +86,7 @@ its description does not use (ai-config#949).
 | `skills/di/SKILL.md` | -> defer-issue. |  |
 | `skills/difm/SKILL.md` | -> do-it-for-me. |  |
 | `skills/discussions/SKILL.md` | Manage forge discussions. |  |
+| `skills/dissolve-page/SKILL.md` | Dissolve a notes page into its neighbors. |  |
 | `skills/dmmhyh/SKILL.md` | Stop over-asking. |  |
 | `skills/do-as-you-think-best/SKILL.md` | -> daytb. |  |
 | `skills/do-it-for-me/SKILL.md` | Do the step yourself; retry blocks, then lift auto mode. Aliases: difm. |  |

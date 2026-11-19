@@ -64,6 +64,6 @@ Ezra, 2026-11-19, on psw:
 labs should not introduce new expository content, such as definitions or theoretical results,
 and all expository content belongs on the exposition pages.
 In lds a lab page is `chapters/*-lab.qmd` or `chapters/linear-regression-auto.qmd`.
-gha's `check-lab-exposition` fails a PR that adds a definition, result, or remark div to a lab page;
+The gha check `check-lab-exposition` fails a PR that adds a definition, result, or remark div to a lab page;
 a reviewer enforces the rest, since no check can tell an explanation from an instruction.
 Canonical rule: [psw#677](https://github.com/Morrison-Lab/psw/pull/677).

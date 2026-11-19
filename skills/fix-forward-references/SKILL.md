@@ -1,6 +1,6 @@
 ---
 name: fix-forward-references
-description: "Fix forward references in text."
+description: "Fix forward references in text. Aliases: ffr."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -62,8 +62,12 @@ read it before running this skill; the steps below are the short version.
      earlier so it precedes the mention. Update the directional word
      ("below" → "above") or drop it once a working crossref link carries
      the point.
-   - **Reword** --- only when reordering would break the document's
-     narrative logic. Replace the vague pointer with a precise, working
+   - **Reword** --- only when there is no good reordering:
+     none exists, or every one would hurt the material
+     (break the argument's order, split a group the reader needs together).
+     A linked forward reference is then better than no link at all
+     (Ezra, 2026-11-19).
+     Replace the vague pointer with a precise, working
      link/crossref instead of leaving a bare "below".
      For any `@`-crossref (`@def-`, `@sec-`, `@fig-`, `@tbl-`, `@thm-`,
      `@eq-`, ...), keep the link and signpost it

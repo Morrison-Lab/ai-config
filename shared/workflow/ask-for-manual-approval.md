@@ -133,6 +133,13 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
   That is routing around the denial too.
   The one exception is a dispatched subagent returning its denied action up its own dispatch chain, as [When to switch or ask](#when-to-switch-or-ask) says.
   (2026-11-11: after the classifier denied a thread's merge of [gha#1910](https://github.com/Morrison-Lab/gha/pull/1910), the coordinator declined to hand the merge to the project's runner thread.)
+  Recurrence, 2026-11-18 ([ai-config#5799](https://github.com/Morrison-Lab/ai-config/pull/5799)):
+  the classifier denied a child session's `opencode run` and its two merge calls,
+  and the child held the retry because a message from another session cannot authorize it.
+  The parent then started a second session to run the same action.
+  The user's "Yes, retry once" had covered the first child's retry, not a new session.
+- **Do:** when a child session is denied or holds an action, report the denial as measured and stop, or ask for an authorization that names the action and the session that will run it.
+  A seeded opening prompt carrying the user's words is a session handing off a denied action, not a fresh grant.
 - **Don't:** switch or ask to leave auto mode for a hard-prohibited category, or for an action the user has not authorized.
 - **Don't:** tell the user to approve a prompt after a classifier denial;
   the denial shows none.

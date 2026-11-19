@@ -1,6 +1,7 @@
 ---
 name: do-as-you-think-best
 description: "→ daytb."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: delegate-to-codex
-description: "Delegate sidecar task to Codex."
+description: "Delegate sidecar task to Codex. Aliases: dtc."
 user-invocable: true
 allowed-tools:
   - Bash

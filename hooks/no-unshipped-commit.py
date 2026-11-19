@@ -2082,6 +2082,18 @@ def last_assistant_text(path):
     return chosen if chosen.strip() else ""
 
 
+try:
+    sys.path.insert(0, os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"))
+    from session_pause import is_paused
+except Exception as _exc:  # broken install: say so, and behave as unpaused
+    print(f"no-unshipped-commit: cannot load scripts/lib/session_pause.py ({_exc})",
+          file=sys.stderr)
+
+    def is_paused(payload):  # noqa: D103
+        return False
+
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -2090,6 +2102,8 @@ def main():
     path = payload.get("transcript_path") or ""
     if not path:
         return
+    if is_paused(payload):
+        return  # pushing would start the work the pause stopped (ai-config#3911)
     reason = decide(payload.get("cwd") or "", path)
     if not reason:
         return

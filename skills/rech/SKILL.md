@@ -1,6 +1,7 @@
 ---
 name: rech
 description: "→ recm."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

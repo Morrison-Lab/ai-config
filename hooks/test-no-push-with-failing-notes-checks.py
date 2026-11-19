@@ -42,7 +42,7 @@ jobs:
 """
 STUB = """import json, os, sys
 open(os.path.join(os.environ["STUB_LOG"], os.path.basename(__file__) + ".env"), "w", encoding="utf-8").write(
-    json.dumps({k: v for k, v in os.environ.items() if k.startswith(("TERM_LINKS_", "NLB_", "CTR_"))}))
+    json.dumps({k: v for k, v in os.environ.items() if k.startswith(("TERM_LINKS_", "NLB_", "CTR_", "CAW_", "QL_"))}))
 code = int(open(".stub-exit", encoding="utf-8").read().strip()) if os.path.exists(".stub-exit") else 0
 if code:
     print("::error file=chapters/a.qmd,line=3::unlinked-first-use: model")
@@ -72,7 +72,9 @@ def make_repo(workflows):
 def stub_dir():
     g = tempfile.mkdtemp(prefix="npc-gha-")
     for sub, name in (("check-term-links", "check-term-links.py"), ("check-new-line-breaks", "check-new-line-breaks.py"),
-                      ("check-title-references", "check-title-references.py")):
+                      ("check-title-references", "check-title-references.py"),
+                      ("check-avoided-words", "check-avoided-words.py"),
+                      ("check-quarto-links", "check-quarto-links.py")):
         os.makedirs(os.path.join(g, sub))
         open(os.path.join(g, sub, name), "w", encoding="utf-8").write(STUB)
     return g
@@ -276,6 +278,68 @@ expect("T48 the deny names title-references",
 verdict, _ = run("git push origin feat", gated, 0, extra={"CTR_GLOBS": "*.nothing"})
 env_ctr = json.load(open(os.path.join(LOG, "check-title-references.py.env"), encoding="utf-8"))
 expect("T49 caller CTR_ variables do not leak into a check", env_ctr.get("CTR_GLOBS"), None)
+
+# ai-config#4986: lds's cluster-checks.yml runs its diff-scoped checks as run-check.sh lines,
+# not one caller workflow each, so the hook must read those lines too.
+BUNDLED = """name: Cluster checks
+on:
+  pull_request:
+jobs:
+  checks:
+    steps:
+      - name: Check out gha
+        uses: actions/checkout@v7
+        with:
+          repository: Morrison-Lab/gha
+          ref: v3
+          path: .gha
+      - name: Run
+        with:
+          steps: |
+            .gha/run-check/run-check.sh check-avoided-words CAW_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}' CAW_WHOLE_TREE='${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}' CAW_GLOBS='*.qmd *.md' CAW_FAIL=false -- python3 -u .gha/check-avoided-words/check-avoided-words.py
+            .gha/run-check/run-check.sh check-new-line-breaks NLB_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}' NLB_GLOBS='*.bundled' NLB_FAIL=true -- python3 -u .gha/check-new-line-breaks/check-new-line-breaks.py
+            .gha/run-check/run-check.sh check-quarto-links QL_GLOBS='*.qmd' QL_FAIL=true -- python3 -u .gha/check-quarto-links/check-quarto-links.py
+"""
+for name in ("check-avoided-words.py.env", "check-quarto-links.py.env", "check-new-line-breaks.py.env"):
+    if os.path.exists(os.path.join(LOG, name)):
+        os.remove(os.path.join(LOG, name))
+bundled = make_repo({"cluster-checks.yml": BUNDLED})
+verdict, _ = run("git push origin feat", bundled, 0, extra={"CAW_PATHS_IGNORE": "stray"})
+env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))
+expect("T50 a bundled line runs with its own assignments",
+       (env_caw.get("CAW_GLOBS"), env_caw.get("CAW_FAIL")), ("*.qmd *.md", "false"))
+expect("T51 the pull-request expression becomes origin/main, the dispatch one false",
+       (env_caw.get("CAW_BASE_REF"), env_caw.get("CAW_WHOLE_TREE")), ("origin/main", "false"))
+expect("T52 a stray variable with the line's prefix does not leak", "CAW_PATHS_IGNORE" in env_caw, False)
+expect("T53 a whole-tree line (no base ref) is not run",
+       os.path.exists(os.path.join(LOG, "check-quarto-links.py.env")), False)
+expect("T54 passing bundled checks stay silent", verdict, "silent")
+verdict, out = run("git push origin feat", bundled, 1)
+expect("T55 a failing bundled check denies, naming it",
+       (verdict, "check-avoided-words failed" in out["hookSpecificOutput"].get("permissionDecisionReason", "")),
+       ("DENY", True))
+both = make_repo({"cluster-checks.yml": BUNDLED, "check-new-line-breaks.yml": NLB})
+run("git push origin feat", both, 0)
+env_nlb = json.load(open(os.path.join(LOG, "check-new-line-breaks.py.env"), encoding="utf-8"))
+expect("T56 a check with its own caller runs from the caller, not the bundled line",
+       env_nlb.get("NLB_GLOBS"), "*.md *.qmd")
+bundled_gated = make_repo({"cluster-checks.yml": BUNDLED, "annotation-gate.yml": GATE})
+run("git push origin feat", bundled_gated, 0)
+env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))
+expect("T57 an annotation gate makes a bundled warn-only check blocking", env_caw.get("CAW_FAIL"), "true")
+odd = make_repo({"cluster-checks.yml": BUNDLED.replace(
+    "CAW_WHOLE_TREE='${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}'",
+    "CAW_WHOLE_TREE='${{ inputs.whole }}'")})
+verdict, out = run("git push origin feat", odd, 0)
+expect("T58 an unknown expression fails open with a note naming the check",
+       (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
+no_ref = make_repo({"cluster-checks.yml": BUNDLED.replace("repository: Morrison-Lab/gha", "repository: other/gha")})
+verdict, _ = run("git push origin feat", no_ref, 1)
+expect("T59 bundled lines without a gha checkout are not read", verdict, "silent")
+expect("T60 the lds line form parses: name, ref, command",
+       [(c["name"], c["ref"], c["command"][-1]) for c in hook.parse_run_check_lines(BUNDLED)],
+       [("check-avoided-words", "v3", ".gha/check-avoided-words/check-avoided-words.py"),
+        ("check-new-line-breaks", "v3", ".gha/check-new-line-breaks/check-new-line-breaks.py")])
 
 # A moved tag (gha slides v3) must reach the cache on the next push, inside the daily window.
 origin = tempfile.mkdtemp(prefix="npc-gha-origin-")

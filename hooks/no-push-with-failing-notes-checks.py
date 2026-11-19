@@ -17,6 +17,14 @@ What it does, for each `git push` in the command:
      configuration stays the single source; nothing is hard-coded per repo, so
      every repo that calls those workflows is covered (as of 2026-10-26: lds,
      sds, pds, mds and rme; psw and ids once they adopt the two checks).
+     It also reads every `.gha/run-check/run-check.sh <name> VAR=value ... -- <command>`
+     line of a bundled-checks workflow (lds's `cluster-checks.yml` runs some twenty
+     checks that way), with the pull-request base expression replaced by the local
+     base and the manual-run expression by `false` (ai-config#4986: definite
+     antecedents, one div per subfile and avoided words failed CI after this hook
+     passed). Only lines that diff against a base run; a whole-tree line such as
+     check-quarto-links is left to CI. A check with its own caller workflow runs once,
+     from that caller.
   2. Runs gha's own scripts at the ref the workflow pins (`@v3`) from a cached
      shallow clone in `~/.cache/ai-config/gha/` (refetched whenever `git ls-remote`
      shows the tag or branch moved, since `v3` slides; the daily stamp is the
@@ -46,6 +54,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -119,6 +128,15 @@ USES = re.compile(
     re.IGNORECASE,
 )
 KEY_VALUE = re.compile(r"^(?P<indent>\s*)(?P<key>[\w-]+):\s*(?P<value>.*?)\s*$")
+# A bundled-checks workflow (lds's cluster-checks.yml) checks gha out at `.gha` and runs
+# each check as `.gha/run-check/run-check.sh <name> VAR=value ... -- <command>`.
+RUN_CHECK = re.compile(r"^\s*\.gha/run-check/run-check\.sh\s+(?P<rest>\S.*)$")
+GHA_CHECKOUT = re.compile(
+    r"repository:\s*Morrison-Lab/gha\s*\n(?:[ \t]+[\w-]+:.*\n)*?[ \t]+ref:\s*['\"]?(?P<ref>[\w.\-/]+)",
+    re.IGNORECASE,
+)
+EXPR = re.compile(r"'\$\{\{.*?\}\}'")
+BASE_PLACEHOLDER = "@@PUSH_CHECK_BASE@@"
 
 
 _LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
@@ -213,6 +231,7 @@ def find_calls(git_root: str) -> list[dict]:
     if not os.path.isdir(wf_dir):
         return []
     calls: list[dict] = []
+    bundled: list[dict] = []
     gated = False
     for name in sorted(os.listdir(wf_dir)):
         if not name.endswith((".yml", ".yaml")):
@@ -223,9 +242,69 @@ def find_calls(git_root: str) -> list[dict]:
         except OSError:
             continue
         calls.extend(parse_workflow(text))
+        bundled.extend(parse_run_check_lines(text))
         gated = gated or bool(ANNOTATION_GATE.search(text))
+    # A check that has its own caller workflow runs from that caller's inputs, once.
+    named = {c["name"] for c in calls}
+    seen: set[str] = set()
+    for call in bundled:
+        if call["name"] in named or call["name"] in seen:
+            continue
+        seen.add(call["name"])
+        calls.append(call)
     for call in calls:
         call["gated"] = gated
+    return calls
+
+
+def parse_run_check_lines(text: str) -> list[dict]:
+    """Return [{name, ref, kind: "bundled", assigns, command, unhandled}] for each
+    `.gha/run-check/run-check.sh` line of a bundled-checks workflow.
+
+    lds's `cluster-checks.yml` runs some twenty diff-scoped checks this way, one
+    line each, rather than one caller workflow per check (lds#1839), so a parser of
+    `uses:` lines alone missed definite antecedents, one div per subfile, avoided
+    words and the rest (ai-config#4986). The line is the single source of each
+    check's inputs. Only lines that diff against a base (a `*_BASE_REF=`
+    assignment) are kept: a whole-tree check such as check-quarto-links can read
+    generated files that a local render left behind, which CI never sees.
+    """
+    ref_match = GHA_CHECKOUT.search(text)
+    if not ref_match:
+        return []
+    ref = ref_match.group("ref")
+    calls = []
+    for line in text.splitlines():
+        m = RUN_CHECK.match(line)
+        if not m:
+            continue
+        unhandled: list[str] = []
+
+        def placeholder(expr: re.Match) -> str:
+            body = expr.group(0)
+            if "'pull_request'" in body:
+                return BASE_PLACEHOLDER
+            if "'workflow_dispatch'" in body:
+                return "false"  # a local run stands in for a pull request, never a manual run
+            unhandled.append(body)
+            return "''"
+
+        try:
+            argv = shlex.split(EXPR.sub(placeholder, m.group("rest")))
+        except ValueError:
+            continue
+        if not argv or "--" not in argv:
+            continue
+        name, split = argv[0], argv.index("--")
+        assigns = {}
+        for token in argv[1:split]:
+            key, sep, value = token.partition("=")
+            if sep and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+                assigns[key] = value
+        if not any(k.endswith("_BASE_REF") for k in assigns):
+            continue
+        calls.append({"name": name, "ref": ref, "kind": "bundled", "inputs": {},
+                      "assigns": assigns, "command": argv[split + 1:], "unhandled": unhandled})
     return calls
 
 
@@ -365,6 +444,8 @@ def resolve_base(git_root: str) -> str | None:
 
 def run_check(git_root: str, gha_dir: str, call: dict, base: str, terms_dirs: str = ""):
     """Run one check; return (name, status, output) with status ok|fail|error."""
+    if call.get("kind") == "bundled":
+        return run_bundled(git_root, gha_dir, call, base)
     spec = CHECKS[call["name"]]
     script = os.path.join(gha_dir, spec["script"])
     if not os.path.isfile(script):
@@ -385,6 +466,41 @@ def run_check(git_root: str, gha_dir: str, call: dict, base: str, terms_dirs: st
         env["TERM_LINKS_TERMS_DIRS"] = terms_dirs
     try:
         proc = subprocess.run([sys.executable, script], capture_output=True, text=True,
+                              cwd=git_root, env=env, timeout=CHECK_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return call["name"], "error", f"timed out after {CHECK_TIMEOUT}s"
+    except OSError as exc:
+        return call["name"], "error", str(exc)
+    out = (proc.stdout + proc.stderr).strip()
+    return call["name"], ("ok" if proc.returncode == 0 else "fail"), out
+
+
+def run_bundled(git_root: str, gha_dir: str, call: dict, base: str):
+    """Run one `run-check.sh` line's command with its assignments, as the wrapper does.
+
+    The wrapper only adds the assignments to the environment, groups the output and
+    titles the annotations, so the hook runs the command directly, against the cached
+    gha checkout in place of `.gha/`.
+    """
+    if call["unhandled"]:
+        return call["name"], "error", "unhandled workflow expression " + call["unhandled"][0]
+    assigns = {k: v.replace(BASE_PLACEHOLDER, base) for k, v in call["assigns"].items()}
+    if call.get("gated"):
+        # The annotation gate fails CI on a warn-only check's warnings.
+        assigns.update({k: "true" for k in assigns if k.endswith("_FAIL")})
+    prefixes = tuple({k.split("_", 1)[0] + "_" for k in assigns})
+    env = {k: v for k, v in os.environ.items() if not k.startswith(prefixes)}
+    env.update(assigns)
+    command = [os.path.join(gha_dir, a[len(".gha/"):]) if a.startswith(".gha/") else a
+               for a in call["command"]]
+    missing = [a for a in call["command"] if a.startswith(".gha/")
+               and not os.path.isfile(os.path.join(gha_dir, a[len(".gha/"):]))]
+    if missing:
+        return call["name"], "error", f"{missing[0][len('.gha/'):]} not found in gha checkout"
+    if command and command[0] in ("python3", "python"):
+        command[0] = sys.executable
+    try:
+        proc = subprocess.run(command, capture_output=True, text=True,
                               cwd=git_root, env=env, timeout=CHECK_TIMEOUT)
     except subprocess.TimeoutExpired:
         return call["name"], "error", f"timed out after {CHECK_TIMEOUT}s"

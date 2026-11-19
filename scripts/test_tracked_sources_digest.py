@@ -84,6 +84,26 @@ class DigestTest(unittest.TestCase):
         code, out, err, calls, _ = run(previous='<!-- tracked-sources-state: {"a/busy": "main"} -->')
         self.assertEqual((code, out, calls), (2, "", []))
         self.assertIn("non-sha head for ['a/busy']", err)
+        code, _, err, calls, _ = run(previous='<!-- tracked-sources-state: {"a/busy": 7} -->')
+        self.assertEqual((code, calls), (2, []))
+        self.assertIn("non-sha head", err)
+
+    def test_bad_github_row_is_refused_before_any_fetch(self):
+        b0 = "b0" * 20
+        for bad in (CSV.replace(f",main,{b0},", f",,{b0},"),  # no branch
+                    CSV.replace(f",{b0},", ",main,")):  # baseline that is not a sha
+            with self.subTest(csv=bad):
+                code, out, err, calls, _ = run(bad)
+                self.assertEqual((code, out, calls), (2, "", []))
+                self.assertIn("needs a branch and a full-sha baseline", err)
+
+    def test_long_subject_is_cut(self):
+        self.assertEqual(tsd.inert("x" * 500), "x" * 200 + "...")
+        self.assertEqual(tsd.inert("x" * 200), "x" * 200)
+
+    def test_negative_max_subjects_is_refused(self):
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            run(max_subjects="-1")
 
     def test_errors_exit_2_with_no_digest(self):
         for csv_text, previous in (

@@ -44,15 +44,21 @@ def read_sources(path: Path) -> list[dict]:
     with path.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
     for n, row in enumerate(rows, start=2):
-        if row["kind"] == "github" and not (row["branch"] and row["baseline"]):
-            raise DigestError(f"{path}:{n}: a github row needs a branch and a baseline")
+        if row["kind"] == "github" and not (row["branch"] and SHA.fullmatch(row["baseline"])):
+            raise DigestError(f"{path}:{n}: a github row needs a branch and a full-sha baseline")
         if row["kind"] != "github" and row["fetch"] != "manual":
             raise DigestError(f"{path}:{n}: only a github row can be fetched; mark others manual")
     return rows
 
 
+MAX_SUBJECT = 200
+
+
 def inert(subject: str) -> str:
-    """Render an outside commit subject so it can neither mention anyone nor forge the state marker."""
+    """Render an outside commit subject so it can neither mention anyone, forge the state marker,
+    nor push the issue body past GitHub's 65536-character limit."""
+    if len(subject) > MAX_SUBJECT:
+        subject = subject[:MAX_SUBJECT] + "..."
     return subject.replace("`", "'").replace("<!--", "< !--")
 
 

@@ -34,8 +34,8 @@ jobs:
         run: |
           set -euo pipefail
           # Only a digest closed as completed counts, so commits nobody has sifted yet are
-          # listed again, and a rerun after today's sift starts from today's state.
-          title="Tracked-sources digest $(date -u +%F)"
+          # listed again, and a rerun after a sift starts from that sift's state.
+          title="Tracked-sources digest $(date -u +'%F %H:%M') UTC"
           echo "title=$title" >> "$GITHUB_OUTPUT"
           gh label create tracked-sources-digest --repo "$REPO" --force --color 0e8a16
           prev="$RUNNER_TEMP/previous.md"
@@ -47,7 +47,7 @@ jobs:
           python3 scripts/tracked-sources-digest.py "${args[@]}" \
             --github-output "$GITHUB_OUTPUT" > "$RUNNER_TEMP/digest.md"
           cat "$RUNNER_TEMP/digest.md" >> "$GITHUB_STEP_SUMMARY"
-      - name: Open or update the digest issue
+      - name: Open the digest issue
         if: steps.scan.outputs.moved != '0'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -56,16 +56,11 @@ jobs:
         run: |
           set -euo pipefail
           body="$RUNNER_TEMP/digest.md"
-          # Reuse today's issue only while it is open; a closed one was already sifted.
-          number=$(gh issue list --repo "$REPO" --label tracked-sources-digest --state open --limit 50 \
-            --json number,title --jq "map(select(.title == \"$TITLE\"))[0].number // empty")
-          if [ -n "$number" ]; then
-            gh issue edit "$number" --repo "$REPO" --body-file "$body"
-          else
-            url=$(gh issue create --repo "$REPO" --title "$TITLE" \
-              --label tracked-sources-digest --body-file "$body")
-            number="${url##*/}"
-          fi
+          # Always a new issue: rewriting an open one would move its state under a session
+          # that is still sifting the old body.
+          url=$(gh issue create --repo "$REPO" --title "$TITLE" \
+            --label tracked-sources-digest --body-file "$body")
+          number="${url##*/}"
           # Today's digest lists everything since the last completed one, so earlier open ones are covered.
           gh issue list --repo "$REPO" --label tracked-sources-digest --state open --limit 50 \
             --json number --jq ".[].number | select(. != $number)" |

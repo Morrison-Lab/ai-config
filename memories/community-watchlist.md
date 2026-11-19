@@ -50,9 +50,13 @@ the Claude-in-Chrome route is retired): [`reddit-access.md`](reddit-access.md).
 
 ## Scheduled review of tracked sources
 
-The high-yield subreddits above and the outside repositories in [`CREDITS.md`](../CREDITS.md) are listed in [`tracked-sources.csv`](tracked-sources.csv) ([#2231](https://github.com/Morrison-Lab/ai-config/issues/2231), [#2067](https://github.com/Morrison-Lab/ai-config/issues/2067)).
+The high-yield subreddits above, the outside repositories that [`CREDITS.md`](../CREDITS.md) credits under "Borrowed ideas", and the `shared/sembr-skills` submodule are listed in [`tracked-sources.csv`](tracked-sources.csv) ([#2231](https://github.com/Morrison-Lab/ai-config/issues/2231), [#2067](https://github.com/Morrison-Lab/ai-config/issues/2067)).
 The daily [`tracked-sources.yml`](../.github/workflows/tracked-sources.yml) workflow runs [`tracked-sources-digest.py`](../scripts/tracked-sources-digest.py) over it, and opens a `tracked-sources-digest` issue when a tracked repository has new commits.
-A session sifts that issue into issues for ideas worth adopting and closes it as completed, which is what moves the next digest's starting point;
+A session sifts that issue into issues for ideas worth adopting and closes it as completed, which is what moves the next digest's starting point.
+A rerun opens a new digest and closes the earlier open one as not planned, which the next digest covers;
 sifting it unattended waits on [#5937](https://github.com/Morrison-Lab/ai-config/issues/5937).
 To add a repository, add a `github` row with its default branch and the head sha you last reviewed as `baseline` (`git ls-remote <url> HEAD`).
+The first baselines are the heads on 2026-11-19, when tracking started, except `sembr/skills`, whose baseline is the submodule's pinned commit.
+A row's baseline counts only until a completed digest records the repository: from then on the digest's state marker wins.
+So if a run fails every day on one repository (a bad state value, or a base commit lost to a force-push), edit the state marker at the foot of the newest completed digest rather than the CSV.
 A subreddit row is `manual`: Reddit refused this cloud container's proxy on 2026-11-19 and has not been tried from a GitHub runner, so the digest lists it without fetching it.

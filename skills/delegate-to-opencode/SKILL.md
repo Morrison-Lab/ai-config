@@ -222,6 +222,8 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
 
   - **Do:** ask a free reviewer for a reason per changed line, so a verdict comes with the lines it checked.
   - **Don't:** turn on the Go plan's "Extra Usage" when the weekly limit hits: it is pay-as-you-go.
+  - **Do:** post the model, the head sha and the verdict line as a PR comment when another session will merge the PR.
+    The merge gate credits only a read made in the merging session, and the merge runner on [#5898](https://github.com/Morrison-Lab/ai-config/pull/5898) found no read on the PR and ran its own.
 
   Check `/models` for the current free ids and try them before relying on this route.
 - **Make the request with `curl` itself if it is to satisfy the merge gate.**

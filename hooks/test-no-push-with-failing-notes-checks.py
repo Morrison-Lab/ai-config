@@ -357,6 +357,20 @@ expect("T64 checkout keys in another order still give the ref",
        hook.gha_checkout_ref("      with:\n        path: .gha\n        ref: v3\n        repository: Morrison-Lab/gha\n"), "v3")
 expect("T66 a trailing comment on a checkout key is ignored",
        hook.gha_checkout_ref("      with:\n        repository: Morrison-Lab/gha\n        ref: v3 # floating\n        path: .gha # here\n"), "v3")
+expect("T67 a trailing comment on the repository line still finds the checkout",
+       hook.gha_checkout_ref("      with:\n        repository: Morrison-Lab/gha # pinned\n        ref: v3\n        path: .gha\n"), "v3")
+pr_fail = hook.parse_run_check_lines(BUNDLED.replace(
+    "CAW_FAIL=false", "CAW_FAIL='${{ github.event_name == 'pull_request' && 'true' || 'false' }}'"))
+expect("T68 a pull_request test outside *_BASE_REF is not read as the base",
+       any(u.startswith("CAW_FAIL=") for u in pr_fail[0]["unhandled"]), True)
+no_cmd = hook.parse_run_check_lines(BUNDLED.replace(
+    " -- python3 -u .gha/check-avoided-words/check-avoided-words.py", " --"))
+expect("T69 a line with nothing after -- is not runnable, never an empty command",
+       (no_cmd[0]["command"], bool(no_cmd[0]["unhandled"])), ([], True))
+other_cmd = hook.parse_run_check_lines(BUNDLED.replace(
+    "python3 -u .gha/check-avoided-words/check-avoided-words.py", "bash -c true"))
+expect("T70 a command that is not python on a .gha/ script is not run",
+       any("not python on a .gha/ script" in u for u in other_cmd[0]["unhandled"]), True)
 no_fail = make_repo({"cluster-checks.yml": BUNDLED.replace(" CAW_FAIL=false", ""), "annotation-gate.yml": GATE})
 run("git push origin feat", no_fail, 0)
 env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))

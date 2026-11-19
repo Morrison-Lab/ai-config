@@ -131,7 +131,7 @@ KEY_VALUE = re.compile(r"^(?P<indent>\s*)(?P<key>[\w-]+):\s*(?P<value>.*?)\s*$")
 # A bundled-checks workflow (lds's cluster-checks.yml) checks gha out at `.gha` and runs
 # each check as `.gha/run-check/run-check.sh <name> VAR=value ... -- <command>`.
 RUN_CHECK = re.compile(r"^\s*\.gha/run-check/run-check\.sh\s+(?P<rest>\S.*)$")
-GHA_REPOSITORY = re.compile(r"^(?P<indent>\s*)repository:\s*['\"]?Morrison-Lab/gha['\"]?\s*$", re.IGNORECASE)
+GHA_REPOSITORY = re.compile(r"^(?P<indent>\s*)repository:\s*['\"]?Morrison-Lab/gha['\"]?\s*(?:#.*)?$", re.IGNORECASE)
 EXPR = re.compile(r"'\$\{\{.*?\}\}'")
 BASE_PLACEHOLDER = "@@PUSH_CHECK_BASE@@"
 
@@ -332,8 +332,19 @@ def parse_run_check_lines(text: str) -> list[dict]:
                 assigns[key] = value
         if not any(k.endswith("_BASE_REF") for k in assigns):
             continue
+        command = argv[split + 1:]
+        # Only a pull-request base belongs in a *_BASE_REF; a pull_request test anywhere
+        # else (a FAIL switch, an argument) has no local meaning, so it is not guessed.
+        unhandled.extend(f"{k}={v}" for k, v in assigns.items()
+                         if BASE_PLACEHOLDER in v and not k.endswith("_BASE_REF"))
+        unhandled.extend(tok for tok in command if BASE_PLACEHOLDER in tok)
+        # Run only what the wrapper is for: python on a script in the gha checkout.
+        # Anything else in a repo's workflow is not executed at push time.
+        if not (command and command[0] in ("python3", "python")
+                and any(a.startswith(".gha/") for a in command[1:])):
+            unhandled.append("command is not python on a .gha/ script: " + (" ".join(command) or "(empty)"))
         calls.append({"name": name, "ref": ref, "kind": "bundled", "inputs": {},
-                      "assigns": assigns, "command": argv[split + 1:], "unhandled": unhandled})
+                      "assigns": assigns, "command": command, "unhandled": unhandled})
     return calls
 
 
@@ -512,7 +523,7 @@ def run_bundled(git_root: str, gha_dir: str, call: dict, base: str):
     gha checkout in place of `.gha/`.
     """
     if call["unhandled"]:
-        return call["name"], "error", "unhandled workflow expression " + call["unhandled"][0]
+        return call["name"], "error", "line not runnable locally: " + call["unhandled"][0]
     assigns = {k: v.replace(BASE_PLACEHOLDER, base) for k, v in call["assigns"].items()}
     if call.get("gated"):
         # The annotation gate fails CI on a warn-only check's warnings, including a check

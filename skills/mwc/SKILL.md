@@ -664,6 +664,15 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
      the pin being the `headRefOid` recorded before the instrument ran;
      on a base that requires a merge queue, stop and report instead, per
      [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030).
+     In a cloud session, merge with the MCP `merge_pull_request` tool, passing `owner`, `repo`, `pullNumber`, `merge_method: squash` and `expectedHeadSha: <pinned-sha>` ([`AGENTS.md`](../../AGENTS.md)'s "Cloud sessions use MCP tools").
+     `gh pr merge` goes through GraphQL, which the cloud proxy refuses with HTTP 403 before anything merges (measured on Morrison-Lab/lbt#18, 2026-10-05, [#4304](https://github.com/Morrison-Lab/ai-config/issues/4304)).
+     Where no MCP tool is loaded, use the REST endpoint pinned to the same head, which does not go through GraphQL: `gh api -X PUT repos/<owner>/<repo>/pulls/<number>/merge -f merge_method=squash -f sha=<pinned-sha>`.
+     A cloud session cannot delete the merged head branch at all: the REST ref delete and `git push --delete` both return 403 there.
+     Leave the branch, say so in the wrap-up, and do not retry;
+     repository auto-delete of head branches, where it is on, removes it.
+
+     - **Do:** in a cloud session, merge through `merge_pull_request` with `expectedHeadSha`, and report the leftover branch.
+     - **Don't:** run `gh pr merge` or retry a branch delete in a cloud session.
    - **Wrap up**:
      Verify the merge landed on GitHub/GitLab,
      verify CI passed on the merge commit itself (`scripts/check-merge-commit-ci.py`),

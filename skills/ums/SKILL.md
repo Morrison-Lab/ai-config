@@ -472,6 +472,39 @@ committed pass.
    If upstream is not accessible in-session, push and explicitly hand off that
    upstream PR creation is still required.
 
+   **When no branch can be pushed, file the learnings as issues instead of dropping the pass**
+   ([ai-config#2335](https://github.com/Morrison-Lab/ai-config/issues/2335)).
+   The branch-and-PR path can be blocked before any push:
+   no checkout or worktree is reachable,
+   a cloud agent is unavailable (out of quota, rate-limited or down),
+   the session has no write access,
+   or the forge connector is down.
+   A pushed branch that only lacks its PR takes the handoff above instead,
+   since issues would duplicate the pending PR.
+   A blocked path does not cancel the pass.
+   It changes where the pass lands.
+   For each distinct learning that is not already recorded:
+   - Search open and closed issues first
+     ([`issue-first`](../../shared/workflow/issue-first.md)'s all-state search).
+     Link an open match and add the new case to it as a comment.
+     Link a closed match in the report.
+     Ask the user whether to reopen it, file fresh, or treat the matter as settled,
+     as [`defer-issue`](../defer-issue/SKILL.md)'s closed-issue step says,
+     rather than commenting on it or filing fresh unasked.
+   - Skip a learning the step 3 grep already found in `memories/`, `shared/`, `skills/` or `hooks/`.
+   - File one issue per learning with the [`defer-issue`](../defer-issue/SKILL.md) body
+     (Context, What to do, Why not now),
+     naming the file to edit,
+     and for a correction the Do/Don't pair to add,
+     with the `ai-authored`, `model:<model-id>` and priority labels
+     [`issue-first`](../../shared/workflow/issue-first.md) requires.
+   - Report each issue's link in step 5's table in place of a file path.
+     Say that the pass landed as issues, and name what blocked the PR path.
+   If issue filing is blocked too,
+   put each learning in the reply in full and say that filing it is still owed.
+   - **Do:** file each unrecorded learning as an issue when no branch can be pushed, and link the issues in the report.
+   - **Don't:** end the pass with "UMS owed" or "no PR possible" and nothing filed.
+
    **Project-specific items** (a convention or gotcha tied to one repo we
    own): commit to *that* repo's own agent docs (`CLAUDE.md`,
    `.github/agents/*.md`, `.github/instructions/*.md`,

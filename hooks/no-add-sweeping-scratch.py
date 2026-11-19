@@ -94,24 +94,27 @@ def embedded_repo(cwd, rest):
 
 
 def message_file(rest):
-    """The `-F`/`--file` value of a `git commit` argv tail, or None. A short
-    cluster such as `-aF msg` counts; one where a value option comes first
-    (`-mF`) does not."""
+    """The `-F`/`--file` value of a `git commit` argv tail, or None. Git
+    reads the last one when several are given. A short cluster such as
+    `-aF msg` counts; one where a value option comes first (`-mF`) does
+    not."""
+    found = None
     for i, arg in enumerate(rest):
         nxt = rest[i + 1] if i + 1 < len(rest) else None
         if arg == "--":
-            return None
+            break
         if arg == "--file":
-            return nxt
-        if arg.startswith("--file="):
-            return arg[len("--file="):]
-        if arg.startswith("-") and not arg.startswith("--"):
+            found = nxt
+        elif arg.startswith("--file="):
+            found = arg[len("--file="):]
+        elif arg.startswith("-") and not arg.startswith("--"):
             for j, ch in enumerate(arg[1:], 1):
                 if ch == "F":
-                    return arg[j + 1:] or nxt
+                    found = arg[j + 1:] or nxt
+                    break
                 if ch in "mCct":
                     break
-    return None
+    return found
 
 
 def limited_commit(rest):

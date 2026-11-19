@@ -87,6 +87,8 @@ with tempfile.TemporaryDirectory() as root:
             ("git add -A ; git reset -- msg.txt ; git commit -F msg.txt", repo,
              "deny"),
             ("git add -A && git commit --dry-run -F msg.txt", repo, "allow"),
+            ("git add -A && git commit -F /tmp/m -F msg.txt", repo, "deny"),
+            ("git add -A && git commit -F msg.txt -F /tmp/m", repo, "allow"),
             ("git add -A && git commit -F /tmp/msg.txt", repo, "allow"),
             ("git add -A && git commit -F ignored.msg", repo, "allow"),
             ("git add -A && git commit -F -", repo, "allow"),

@@ -176,6 +176,7 @@ Limits: [`context-budget`](shared/workflow/context-budget.md).
 
 Isolate work in a dedicated `git worktree` so parallel sessions never clobber working directory or branch state.
 Never work in a primary branch checkout or share a dirty worktree across tasks.
+Worktrees still share the stash stack and other repository state: see [`shared-git-state`](shared/workflow/shared-git-state.md).
 
 ## No sweeps for new rules by default
 

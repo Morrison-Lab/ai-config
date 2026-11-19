@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Grab an issue, implement, and ARDI.">
+<meta name="description" content="Grab an issue, implement, and ARDI. Aliases: grab-issue.">
 
 <title>skill – ai-config</title>
 <style>
@@ -537,7 +537,7 @@ cookieconsent.run({
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co">#  --paginate walks every page so a cross-reference past the first 30 events isn't missed.)</span></span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api <span class="at">--paginate</span> repos/<span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span>/issues/<span class="op">&lt;</span>N<span class="op">&gt;</span>/timeline <span class="dt">\</span></span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--jq</span> <span class="st">'.[] | select(.event == "cross-referenced") | .source.issue | select(.pull_request != null) | select(.state == "open") | "#\(.number) \(.title) [\(.user.login); assignees: \([.assignees[].login] | join(","))]"'</span> <span class="kw">|</span> <span class="fu">cat</span>   <span class="co"># ISSUE_LINKED_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>If an open PR already exists for the issue: - <strong>Don’t open a competing PR.</strong> The issue is already being worked. - Skip it and grab the next unblocked issue instead. - Or, if the existing PR is stalled/abandoned and it passes <code>memories/reviewing-prs.md</code>’s scope test (opened by or assigned to the invoking user, explicitly requested, or authored by the GitHub Actions app; classify it with <code>python3 scripts/pr-scope.py --repo &lt;owner&gt;/&lt;repo&gt; --number &lt;N&gt; --user &lt;login&gt;</code>), take it over: check it out (use the existing PR branch), claim the PR, and ARDI it rather than starting fresh. - A stalled PR that fails that test is not yours to take over: skip the issue, leave the PR untouched, and report it so the user can assign or name it.</p>
+<p>If an open PR already exists for the issue: - <strong>Don’t open a competing PR.</strong> The issue is already being worked. - Skip it and grab the next unblocked issue instead. - Or, if the existing PR is stalled/abandoned and it passes <code>memories/reviewing-prs.md</code>’s scope test (opened by or assigned to the invoking user, explicitly requested, or authored by the GitHub Actions app; classify it with <code>python3 scripts/pr-scope.py --repo &lt;owner&gt;/&lt;repo&gt; --number &lt;N&gt; --user &lt;login&gt;</code>, adding <code>--alias</code>, <code>--requested</code> and <code>--excluded</code> as <code>ardia</code> step 1 defines them), take it over: check it out (use the existing PR branch), claim the PR, and ARDI it rather than starting fresh. - A stalled PR that fails that test is not yours to take over: skip the issue, leave the PR untouched, and report it so the user can assign or name it.</p>
 </section>
 <section id="check-history-peers-and-research-drw" class="level3">
 <h3 class="anchored" data-anchor-id="check-history-peers-and-research-drw">5. Check history, peers, and research DRW</h3>

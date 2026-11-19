@@ -99,6 +99,7 @@ with tempfile.TemporaryDirectory() as multi_root, \
         ('cd "$X" && git stash pop', multi, "allow"),
         ("git stash pop --help", multi, "allow"),
         ("git stash pop -h", multi, "allow"),
+        ("ALLOW_BARE_STASH_POP=1 sh -c 'git stash pop'", multi, "allow"),
         ("git stash pop 2>&1 stash@{0}", multi, "allow"),
         ("git stash apply 1 > log", multi, "deny"),  # known: 1 reads as an fd
         (f"cd {multi} && sh -c 'git stash pop'", single_root, "deny"),

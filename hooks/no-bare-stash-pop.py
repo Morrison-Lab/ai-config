@@ -98,21 +98,22 @@ def worktree_count(directory):
 
 
 def evaluate(command, cwd, environ=None, depth=0):
-    """The deny reason, or None. A nested `sh -c` line is checked from the
-    directory its shell starts in; `eval`, `xargs`, `$VAR` git are not."""
+    """The deny reason, or None. A nested `sh -c` line (three levels deep at
+    most) is checked from the directory its shell starts in, and inherits an
+    override or redirect prefixed to it; `eval`, `xargs`, `$VAR` git are not."""
     environ = os.environ if environ is None else environ
     if simple_commands_with_scope is None or environ.get(OVERRIDE) == "1":
         return None
     for argv, env, _rest, cur in walk_dirs(
             simple_commands_with_scope(command) or [], cwd):
+        if cur is None or env_value(env, OVERRIDE) == "1" or any(
+                env_value(env, v) is not None for v in ("GIT_DIR", "GIT_WORK_TREE")):
+            continue
         for inner in nested_shell_commands(argv) if depth < 3 else []:
-            reason = cur and evaluate(inner, cur, environ, depth + 1)
+            reason = evaluate(inner, cur, environ, depth + 1)
             if reason:
                 return reason
-        redirected = any(env_value(env, v) is not None
-                         for v in ("GIT_DIR", "GIT_WORK_TREE"))
-        if (cur is None or redirected or env_value(env, OVERRIDE) == "1"
-                or not bare_take(argv)):
+        if not bare_take(argv):
             continue
         dirs, ok = _git_dir_opt(argv)
         for d in dirs:

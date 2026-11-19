@@ -62,11 +62,22 @@ A run that nobody reviews first, such as a scheduled one, adds `--labels-only`:
 it applies the priority labels and leaves every proposed close for this attended pass.
 Add `--ceiling N` to any run to print the open count against the backlog's ceiling.
 
-### 4. Report
+### 4. Plan the worktree and branch sweep
+
+Run [`clean-git`](../clean-git/SKILL.md)'s dry-run plan for each repository
+whose backlog this pass triaged, and delete nothing (ai-config#3517).
+[`post-merge`](../post-merge/SKILL.md) removes a merged PR's own worktree;
+this weekly plan catches the ones a session left behind, and the branches
+that went stale with them.
+Carry out a removal only when the user confirms that plan, through
+`clean-git`'s own confirmation step.
+
+### 5. Report
 
 Post nothing to the tracker beyond the closes' own comments.
 In chat, give the bucket counts, the examined count, every issue closed with
 its one-line reason, and the P1 list, each number linked.
+Add the sweep plan's counts of dead worktrees and dead branches.
 
 ## Checklist
 

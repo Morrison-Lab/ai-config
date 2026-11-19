@@ -49,13 +49,19 @@ def read_sources(path: Path) -> list[dict]:
     return rows
 
 
+def inert(subject: str) -> str:
+    """Render an outside commit subject so it can neither mention anyone nor forge the state marker."""
+    return subject.replace("`", "'").replace("<!--", "< !--")
+
+
 def review(row: dict, base: str, fetch, max_subjects: int) -> dict:
     repo = row["source"]
     head = fetch(f"/repos/{repo}/commits/{row['branch']}")["sha"]
     out = {"repo": repo, "head": head, "count": 0}
     if head != base:
         cmp = fetch(f"/repos/{repo}/compare/{base}...{head}")
-        subjects = [c["commit"]["message"].splitlines()[0] for c in cmp["commits"]]
+        # An empty commit message has no first line; show it as an empty subject.
+        subjects = [(c["commit"]["message"].splitlines() or [""])[0] for c in cmp["commits"]]
         out.update(count=cmp["ahead_by"], status=cmp["status"], url=cmp["html_url"],
                    subjects=subjects[-max_subjects:])
     return out
@@ -71,7 +77,7 @@ def digest(rows: list[dict], state: dict, fetch, max_subjects: int) -> tuple[str
              f"listed {len(manual)} manual sources.", ""]
     for r in (r for r in results if r["count"]):
         lines.append(f"### [{r['repo']}]({r['url']}): {r['count']} new commits ({r['status']})")
-        lines += [f"- `{s.replace('`', chr(39))}`" for s in r["subjects"]]  # inert: no mentions
+        lines += [f"- `{inert(s)}`" for s in r["subjects"]]
         if r["count"] > len(r["subjects"]):
             lines.append(f"- ... and {r['count'] - len(r['subjects'])} more; see the compare link.")
         lines.append("")
@@ -94,10 +100,12 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
     args = ap.parse_args(argv)
     try:
         rows = read_sources(args.sources)
-        match = STATE.search(args.previous.read_text(encoding="utf-8")) if args.previous else None
+        # The footer is the last marker; an earlier one could only come from outside text.
+        markers = STATE.findall(args.previous.read_text(encoding="utf-8")) if args.previous else []
+        match = markers[-1] if markers else None
         if args.previous and not match:
             raise DigestError("the previous digest has no tracked-sources-state marker")
-        state = json.loads(match.group(1)) if match else {}
+        state = json.loads(match) if match else {}
         fetch = fetch or http_fetch(args.api, os.environ.get(args.token_env, ""))
         text, total = digest(rows, state, fetch, args.max_subjects)
     except (DigestError, OSError, KeyError, json.JSONDecodeError) as exc:

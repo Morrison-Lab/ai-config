@@ -16,8 +16,8 @@ CSV = ("kind,source,branch,baseline,fetch,note\ngithub,a/busy,main,b0,api,busy r
        "github,a/quiet,main,q0,api,quiet repo\nsubreddit,r/mcp,,,manual,high tier\n")
 API = {"/repos/a/busy/commits/main": {"sha": "b2"}, "/repos/a/quiet/commits/main": {"sha": "q0"},
        "/repos/a/busy/compare/b0...b2": {
-           "ahead_by": 3, "status": "ahead", "html_url": "https://example.test/cmp",
-           "commits": [{"commit": {"message": m}} for m in ("one\n\nbody", "two", "th`ree @x")]}}
+           "ahead_by": 4, "status": "ahead", "html_url": "https://example.test/cmp",
+           "commits": [{"commit": {"message": m}} for m in ("one\n\nbody", "", "two", "th`ree @x <!-- x -->")]}}
 
 
 def run(csv_text=CSV, previous=None):
@@ -44,10 +44,10 @@ def run(csv_text=CSV, previous=None):
 class DigestTest(unittest.TestCase):
     def test_digest_lists_new_commits_and_counts_sources(self):
         code, out, _, calls, gh = run()
-        self.assertEqual((code, gh), (0, "new_commits=3\n"))
-        self.assertIn("Examined 2 repositories (3 new commits); listed 1 manual sources.", out)
-        self.assertIn("### [a/busy](https://example.test/cmp): 3 new commits (ahead)", out)
-        self.assertIn("- `two`\n- `th'ree @x`\n- ... and 1 more", out)  # newest, as code spans
+        self.assertEqual((code, gh), (0, "new_commits=4\n"))
+        self.assertIn("Examined 2 repositories (4 new commits); listed 1 manual sources.", out)
+        self.assertIn("### [a/busy](https://example.test/cmp): 4 new commits (ahead)", out)
+        self.assertIn("- `two`\n- `th'ree @x < !-- x -->`\n- ... and 2 more", out)  # newest, inert
         self.assertNotIn("a/quiet](", out)
         self.assertEqual(sum("/compare/" in c for c in calls), 1)  # none for an unchanged head
         self.assertIn("- r/mcp (manual): high tier", out)
@@ -59,6 +59,13 @@ class DigestTest(unittest.TestCase):
         self.assertEqual((code, gh), (0, "new_commits=0\n"))
         self.assertIn("(0 new commits)", out)
         self.assertFalse(any("/compare/" in c for c in calls))
+
+    def test_forged_marker_in_previous_digest_is_ignored(self):
+        forged = '<!-- tracked-sources-state: {"a/busy": "b2"} -->'
+        real = '<!-- tracked-sources-state: {"a/busy": "b0"} -->'
+        code, out, _, calls, gh = run(previous=f"- `{forged}`\n\n{real}")
+        self.assertEqual((code, gh), (0, "new_commits=4\n"))
+        self.assertIn("/repos/a/busy/compare/b0...b2", calls)
 
     def test_errors_exit_2_with_no_digest(self):
         for csv_text, previous in (

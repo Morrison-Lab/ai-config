@@ -15,6 +15,11 @@ on:
         default: true
 permissions: {}
 
+# Workflow-level, so an overlapping dispatch and schedule never run two sift agents at once.
+concurrency:
+  group: tracked-sources-digest
+  cancel-in-progress: false
+
 jobs:
   digest:
     if: github.repository == 'Morrison-Lab/ai-config'
@@ -23,9 +28,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-    concurrency:
-      group: tracked-sources-digest
-      cancel-in-progress: false
     outputs:
       issue: ${{ steps.issue.outputs.issue }}
     steps:
@@ -74,6 +76,9 @@ jobs:
   sift:
     needs: digest
     if: needs.digest.outputs.issue != '' && (github.event_name == 'schedule' || inputs.sift)
+    # gha's claude.yml job declares these, and a caller must grant at least what the called job
+    # declares or the run fails to start. The agent's own reach is the --allowedTools list below:
+    # issue commands and read-only `gh api` calls, with no git push, PR or write API.
     permissions:
       contents: write
       pull-requests: write
@@ -81,7 +86,8 @@ jobs:
       id-token: write
       actions: write
     uses: Morrison-Lab/gha/.github/workflows/claude.yml@v3
-    secrets: inherit
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     with:
       use-ai-config: false
       use-posit-skills: false

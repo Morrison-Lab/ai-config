@@ -152,6 +152,10 @@ It is never a license to bypass real, deliberate boundaries:
   Test whether altering an upstream parameter, updating a shared utility,
   or reframing the interface dissolves the complexity before writing
   elaborate workaround code.
+- **After three failed fixes:**
+  When a third fix for the same failure has failed, and each fix moved the symptom somewhere new, stop patching.
+  Treat the repeated failure as evidence about the design, and question the structure before attempting a fourth fix.
+  (Adapted from the `systematic-debugging` skill in [obra/superpowers](https://github.com/obra/superpowers), MIT.)
 - **In review:**
   Look for code that works around a problem rather than solving it at the
   source.

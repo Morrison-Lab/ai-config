@@ -21,6 +21,13 @@ A line number past the file's last line is a failed quote, so drop the finding o
 In [mlg#319](https://github.com/Morrison-Lab/mlg/pull/319) a review cited line 150 of a 53-line file ([ai-config#5254](https://github.com/Morrison-Lab/ai-config/issues/5254)).
 Cite a line of the file you read, not a line of the diff hunk or a count carried over from another file.
 
+## A version said not to exist is a claim about today
+
+A reviewer's knowledge ends at its training cutoff, so a release, tag, package version or model id newer than the cutoff looks made up to it.
+Before posting a finding that a version does not exist, or is not the latest, look it up in its registry or forge (the repository's releases or tags, PyPI, npm, the vendor's model list) at review time.
+Post the finding only when the lookup also fails to find the version, and quote the lookup's answer in the finding.
+(Pattern from the `suppressions.json` of [tag1consulting/claude-comprehensive-review](https://github.com/tag1consulting/claude-comprehensive-review), MIT, which drops such a finding only after the same lookup.)
+
 ## Companion norm
 
 Attack the argument or the data, never the authors.
@@ -35,6 +42,7 @@ Wherever this corpus already produces or verifies review-shaped findings: `ard`/
 - **Do:** run this mechanical check before spending model calls on adversarial verification of the same finding.
 - **Do:** attack the argument or the data in a finding, never the author's standing.
 - **Do:** check that a cited line number is within the file's length at the reviewed commit.
+- **Do:** look up a version in its registry before reporting that it does not exist.
 - **Don't:** post a finding about code or prose that does not exist in the diff or file under review.
 - **Don't:** require a quoted passage for an absence finding -- name the location it belongs at instead.
 

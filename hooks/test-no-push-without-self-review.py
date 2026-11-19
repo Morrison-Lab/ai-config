@@ -15,7 +15,9 @@ permission to the diff rather than merely to the speaker.
 Every case runs against a real throwaway git repository, because the subject
 half of the check is a `git rev-parse HEAD` rather than a transcript fact.
 """
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import re
@@ -2197,6 +2199,27 @@ def external_reviewer_cases() -> tuple[int, int]:
     # The one-shape rule holds for codex too: an extra flag is refused.
     codex_run("codex exec with an extra flag is refused",
               f"codex exec -s read-only '{review}'", "x7", in_scope, True)
+
+    # A helper that raises refuses the credit instead of crashing the hook.
+    subject = _load_subject()  # puts scripts/lib on sys.path
+    import codex_scope
+    real = codex_scope.codex_allowed
+
+    def boom(*_args, **_kwargs):
+        raise ValueError("unparseable remote")
+
+    codex_scope.codex_allowed = boom
+    try:
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            credited = subject._codex_in_scope()
+    except Exception as exc:  # noqa: BLE001 -- the failure being tested for
+        credited = f"raised {type(exc).__name__}"
+    finally:
+        codex_scope.codex_allowed = real
+    check("x8 a codex_allowed() that raises refuses the codex credit",
+          credited is False and "codex_allowed() raised" in stderr.getvalue(),
+          f"credited={credited!r}")
 
     return failures, ran
 

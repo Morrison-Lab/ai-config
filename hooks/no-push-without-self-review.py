@@ -619,7 +619,15 @@ def _codex_in_scope() -> bool:
               f"scripts/lib/codex_scope.py ({exc}); a codex exec review is "
               "not credited", file=sys.stderr)
         return False
-    return codex_allowed(".")
+    # The helper reads a git remote and parses it; any fault in that refuses
+    # the credit, with a stderr line, rather than crashing the push guard.
+    try:
+        return bool(codex_allowed("."))
+    except Exception as exc:  # noqa: BLE001 -- fail closed, reported below
+        print(f"{os.path.basename(__file__)}: codex_allowed() raised "
+              f"{type(exc).__name__}: {exc}; a codex exec review is not "
+              "credited", file=sys.stderr)
+        return False
 
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 

@@ -99,6 +99,7 @@ valid JSON of an unexpected shape. Exit status is 0 in every one of those
 cases --- the guard never blocks and never raises, because a `PreToolUse`
 hook that raises is an outage on a tidy-up flag.
 """
+import functools
 import json
 import os
 import re
@@ -152,6 +153,14 @@ except Exception as _exc:  # broken install: degrade, never block
     def _simple_commands(_cmd):
         """Parse nothing when the shared splitter is missing."""
         return None
+
+try:
+    from pr_view import gh_pr_view as _gh_pr_view
+except Exception as _exc:  # broken install: no head branch can be read
+    print(f"no-delete-branch-under-stacked-pr: cannot load "
+          f"scripts/lib/pr_view.py ({_exc}); "
+          "no PR head branch will be read", file=sys.stderr)
+    _gh_pr_view = None
 
 
 def _gh_pr_argv(argv):
@@ -252,18 +261,15 @@ def find_child_prs(repo, branch):
 
 
 def head_branch_of(repo, target):
-    try:
-        out = subprocess.run(
-            [_gh_cmd(), "pr", "view", str(target), "-R", repo,
-             "--json", "headRefName", "--jq", ".headRefName"],
-            capture_output=True, text=True, timeout=8,
-            **NO_WINDOW,
-        )
-    except Exception:
+    # `gh_pr_view` reads over REST where a cloud session refuses GraphQL
+    # (ai-config#4733).
+    if _gh_pr_view is None:
         return None
-    if out.returncode != 0:
-        return None
-    branch = out.stdout.strip()
+    data, _error = _gh_pr_view(
+        ["headRefName"], target=target, repo=repo, gh=_gh_cmd(), timeout=8,
+        run=functools.partial(subprocess.run, **NO_WINDOW),
+    )
+    branch = str((data or {}).get("headRefName") or "").strip()
     return branch or None
 
 

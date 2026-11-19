@@ -45,6 +45,10 @@ jobs:
         # position, so a cited `#eq-anchor-N` silently renames when an
         # earlier equation is added. This replays that assignment.
         run: python3 scripts/test_resolve_equation_anchors.py
+      - name: Run inventory-org-tools tests
+        # ai-config#3936. The org inventory classifies tree paths into Quarto
+        # extensions, R packages and Lua filters; these pin that, offline.
+        run: python3 scripts/test_inventory_org_tools.py
       - name: Check ASCII punctuation in source files
         # ai-config#2550. The rule covers .md too (ai-config#3284), but this
         # whole-tree scan stays on .py and .R until the .md backlog is cleared
@@ -72,6 +76,8 @@ jobs:
       - name: Run find-psw-rule-overlap tests
         # ai-config#5628: before porting a fragment to psw, find psw lines that quote its example words.
         run: python3 scripts/test_find_psw_rule_overlap.py
+      - name: Run tracked-sources-digest tests
+        run: python3 scripts/test_tracked_sources_digest.py
       - name: Run check-stop-hook-shapes tests
         # ai-config#5055: a Stop hook that reads the final message names its transcript shapes.
         run: python3 scripts/test_check_stop_hook_shapes.py
@@ -330,6 +336,10 @@ jobs:
         # ai-config#4266: scripts/lib/tool_names.py, the shared spellings of
         # the subagent, write and shell tools across harnesses.
         run: python3 scripts/test_tool_names.py
+      - name: Run pr_view library tests
+        # ai-config#4733: scripts/lib/pr_view.py, `gh pr view` with a REST
+        # fallback where a cloud session refuses GraphQL.
+        run: python3 scripts/test_pr_view.py
       - name: Run Codex-scope tests
         # ai-config#5084: Codex runs only in UCDH projects.
         run: python3 scripts/test_codex_scope.py
@@ -355,6 +365,9 @@ jobs:
         # Post-merge CI verification: every workflow run on a merge commit,
         # not only the PR's own CI (Morrison-Lab/mds#19).
         run: python3 scripts/test_check_merge_commit_ci.py
+      - name: Run clean-git-plan tests
+        # ai-config#4170: the read-only worktree and branch sweep classifier.
+        run: python3 scripts/test_clean_git_plan.py
       - name: Check that all scripts/test_*.py test suites are gated
         # ai-config#2540: verify every test suite in scripts/ is gated in CI.
         run: python3 scripts/check-test-suites-covered.py

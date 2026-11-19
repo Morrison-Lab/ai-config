@@ -587,7 +587,9 @@ def gh_stub(body):
 
 
 _NO_PR = gh_stub("exit 1")
-_PR_3107 = gh_stub("echo 3107")
+# `gh pr view --json number` prints a JSON object; the hook reads it through
+# scripts/lib/pr_view.py (ai-config#4733), with no --jq.
+_PR_3107 = gh_stub("echo '{\"number\": 3107}'")
 MINE = {"GITHUB_REPOSITORY": "Morrison-Lab/ai-config",
         "GITHUB_REF": "refs/pull/3107/merge",
         "GITHUB_HEAD_REF": "chore/9901-unrelated",
@@ -691,6 +693,18 @@ for prompt, desc in SM_REMIND:
     print(f"  {v:<7} {desc}")
 for prompt, desc in SM_SILENT:
     v = run(prompt, None, tool_name="SendMessage")
+    wrong += v != "silent"
+    print(f"  {v:<7} {desc}")
+
+# Codex's `spawn_agent` (ai-config#3740): no BRIEF_TOOLS entry, so the brief
+# comes from tool_names.subagent_brief. Before the fix the hook ignored it.
+print("\nspawn_agent (Codex launch tool):")
+for prompt, desc in SM_REMIND[:2]:
+    v = run(prompt, None, tool_name="spawn_agent")
+    wrong += v != "REMIND"
+    print(f"  {v:<7} {desc}")
+for prompt, desc in SM_SILENT[:2]:
+    v = run(prompt, None, tool_name="spawn_agent")
     wrong += v != "silent"
     print(f"  {v:<7} {desc}")
 
@@ -967,7 +981,7 @@ MUTANTS = [
      False, True),
 
     ("clause C: only this session's own agent results arm it",
-     "AGENT_TOOLS", {"Agent", "Task", "Bash"},
+     "AGENT_TOOLS", frozenset({"agent", "task", "bash"}),
      lambda: fires("Address the eleven findings on that other PR.", FOREIGN_PR),
      False, True),
 
@@ -1018,7 +1032,8 @@ print(f"  {'ok   ' if ok else 'WRONG'}  the two windows differ by exactly ',' (g
 
 total = (1 + len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + CONTRACT_EXTRA
          + len(OWN_REPO) + len(seq)
-         + len(SM_REMIND) + len(SM_SILENT) + SM_EXTRA + len(MUTANTS))
+         + len(SM_REMIND) + len(SM_SILENT) + SM_EXTRA + len(MUTANTS)
+         + len(SM_REMIND[:2]) + len(SM_SILENT[:2]))
 print(f"\n{total - wrong}/{total} correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)")
       + ("" if skipped == 0 else f"  ({skipped} SKIPPED)"))

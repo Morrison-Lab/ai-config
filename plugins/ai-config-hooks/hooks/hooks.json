@@ -2226,7 +2226,7 @@
             "script": "require-model-choice.py",
             "why": "Denies a subagent, thread or session launch that records no deliberate model choice, and a message to an existing thread that does not say why a new thread would not be better. Ezra 2026-11-16 (daytb): coordinators pick the best-fit model per task with select-model/recm; a running thread's model cannot be changed, so the choice must be made at launch.",
             "_note_blocks": [
-              "Emits `permissionDecision: deny` only when `model` (or a `Model-fit:` line with a `Fable:` field for thread/session starts, or `Why-not-new-thread:` / `No-new-work:` for message_thread) is missing. Never emits `allow`."
+              "Emits `permissionDecision: deny` only when `model` (or a `Model-fit:` line for thread/session starts, or `Why-not-new-thread:` / `No-new-work:` for message_thread) is missing. Never emits `allow`."
             ]
           }
         ]

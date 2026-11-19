@@ -25,6 +25,28 @@ A scripted copy plus targeted edits keeps the diff against the source small, so 
 - **Don't:** write generatively and call it a port.
   Content with nothing to port is new content, and the PR says so.
 
+## Port every item: inventory, map, report
+
+When Ezra asks to incorporate or port a source (a lab, a slide deck, a chapter) into a notes repo, the port covers the whole source, not only its gaps.
+
+1. **Inventory** the source item by item with a script or an explicit list: every exercise, example, figure, definition and table.
+2. **Map** each item to its target: an existing equivalent in the target repo (name it), or a new port.
+3. **Port every item** unless Ezra agrees to a skip.
+   A kickoff brief that says "leave out what the target already covers" is not that agreement.
+   Map such an item to its equivalent and report the match instead of dropping it silently.
+4. **Copy with a script, then improve.**
+   The scripted copy comes first, and the style edits and improvements come after it as separate steps.
+5. **Report the source-to-target map** before calling the work done, one row per source item.
+   A missing row is the defect.
+
+The method has a skill, `port-source-exercises`.
+
+### Why no hook enforces this
+
+A hook sees tool calls, PR text and diffs.
+Whether a port is complete depends on the source's content, which only an inventory of that source shows, so the check is the map in step 5.
+On 2026-11-18 about 20 of the 32 exercises in the ISLP chapter 7 lab were left unported and unreported, because the brief framed the task as filling gaps ([ai-config#5823](https://github.com/Morrison-Lab/ai-config/issues/5823), lds#2802, lds#2803, lds#2805).
+
 ## Drift: keep improvements, question accidents
 
 Deliberate improvements are fine, and the PR says so.
@@ -45,6 +67,6 @@ For each ported file, diff it against its source.
 Every difference beyond the required edits is either a deliberate improvement or an accidental drift.
 Route the fix for each accidental drift to the PR's own thread, which applies the decision above.
 
-Rule from Ezra, 2026-10-19.
+Rule from Ezra, 2026-10-19; port-every-item section from Ezra, 2026-11-18.
 See [ai-config#4632](https://github.com/Morrison-Lab/ai-config/issues/4632).
 Related: [`send-notes`](../../skills/send-notes/SKILL.md), [`global-by-default`](global-by-default.md), [`reorganize-prose`](../writing/reorganize-prose.md).

@@ -165,6 +165,25 @@ check("PR URL", pr_view.parse_pr_url("https://github.com/o/r/pull/12#x"), ("o/r"
 check("issue URL is not a PR", pr_view.parse_pr_url("https://github.com/o/r/issues/12"), None)
 check("graphql marker matches the measured message", pr_view.graphql_blocked(BLOCKED), True)
 
+# 10. Output is decoded as UTF-8 on both paths, so a non-ASCII PR body is not
+# read with the locale codec (cp1252 on Windows), and a None stdout is an error.
+encodings = []
+
+
+def recording_run(argv, **kwargs):
+    encodings.append((argv[1], kwargs.get("encoding"), kwargs.get("errors")))
+    return subprocess.CompletedProcess(argv, 0, '{"body": "café"}', "")
+
+
+pr_view.gh_pr_view(["body"], target=7, run=recording_run)
+pr_view._run(recording_run, ["gh", "api", "x"], None, 5)
+check("gh pr view decodes UTF-8", encodings[0], ("pr", "utf-8", "replace"))
+check("gh api decodes UTF-8", encodings[1], ("api", "utf-8", "replace"))
+check("None stdout on exit 0 is an error, not a TypeError",
+      pr_view.gh_pr_view(["body"], target=7,
+                         run=lambda argv, **_k: subprocess.CompletedProcess(argv, 0, None, "")),
+      (None, "gh pr view exited 0 with no output"))
+
 if failures:
     print(f"\n{len(failures)} failure(s)")
     sys.exit(1)

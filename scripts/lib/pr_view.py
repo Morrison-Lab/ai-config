@@ -67,10 +67,20 @@ def repo_from_remote_url(url: str) -> Optional[str]:
     return None
 
 
+def _call(run: Runner, argv, cwd, timeout):
+    """Run one command, decoding its output as UTF-8.
+
+    The locale codec (cp1252 on Windows) garbles or fails on non-ASCII
+    PR bodies, as `check-pr-body-figures.py`'s `run_cmd` explains.
+    """
+    return run(argv, capture_output=True, text=True, encoding="utf-8",
+               errors="replace", timeout=timeout, cwd=cwd)
+
+
 def _run(run: Runner, argv, cwd, timeout):
     """(stdout, error) for one command; error is None on exit 0."""
     try:
-        result = run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+        result = _call(run, argv, cwd, timeout)
     except (OSError, subprocess.SubprocessError) as exc:
         return None, f"{argv[0]} {argv[1]} failed to run: {exc}"
     if result.returncode != 0:
@@ -250,10 +260,12 @@ def gh_pr_view(fields: Iterable[str], target=None, repo=None, cwd=None,
         argv += ["-R", repo]
     argv += ["--json", ",".join(fields)]
     try:
-        result = run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+        result = _call(run, argv, cwd, timeout)
     except (OSError, subprocess.SubprocessError) as exc:
         return None, f"gh pr view failed to run: {exc}"
     if result.returncode == 0:
+        if result.stdout is None:
+            return None, "gh pr view exited 0 with no output"
         try:
             return json.loads(result.stdout), None
         except ValueError as exc:

@@ -471,11 +471,15 @@ RX_STRIP = re.compile(
     r"|<cited\b[^>]*author=\"(?!user\")[^\"]*\"[^>]*>.*?</cited>"
     # A wake message that declares a trust other than the principal's (a peer
     # session's, a bot's), or a sender other than the human, is not the user's
-    # words. One that declares neither is kept, as before this rule.
-    r"|<message\b(?=[^>]*\btrust=[\"'](?!principal[\"'])[^\"']*[\"'])[^>]*>"
-    r".*?</message>"
-    r"|<message\b(?=[^>]*\bfrom=[\"'](?!human[\"'])[^\"']*[\"'])[^>]*>"
-    r".*?</message>",
+    # words. One that declares neither is kept, as before this rule. The
+    # attribute may be quoted either way or not at all, with spaces round its
+    # `=`; `data-trust` is a different attribute and is not read.
+    r"|<message\b(?=[^>]*(?<![\w-])trust\s*=)"
+    r"(?![^>]*(?<![\w-])trust\s*=\s*[\"']?principal[\"']?(?=[\s/>]))"
+    r"[^>]*>.*?</message>"
+    r"|<message\b(?=[^>]*(?<![\w-])from\s*=)"
+    r"(?![^>]*(?<![\w-])from\s*=\s*[\"']?human[\"']?(?=[\s/>]))"
+    r"[^>]*>.*?</message>",
     re.IGNORECASE | re.DOTALL)
 # A decision-card tap arrives as a body that reads, in full, `Chose "<label>"
 # on the decision card asking "<question>"`. The agent wrote the label and the

@@ -1,6 +1,6 @@
 ---
 name: "gia"
-description: "Clear PR queue then all issues."
+description: "Clear PR queue then all issues. Aliases: clear-all, giardia."
 ---
 
 # gia (Codex wrapper)

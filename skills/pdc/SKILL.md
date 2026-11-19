@@ -1,6 +1,7 @@
 ---
 name: pdc
 description: "→ prune-dead-code."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

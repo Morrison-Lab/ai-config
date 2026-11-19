@@ -1,6 +1,7 @@
 ---
 name: grab-issues-in-parallel
 description: "→ gip."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

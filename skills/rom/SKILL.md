@@ -1,6 +1,7 @@
 ---
 name: rom
 description: "→ register-oaicopilot-models."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

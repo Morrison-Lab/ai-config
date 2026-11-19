@@ -1,6 +1,6 @@
 ---
 name: resolve-conflicts
-description: "Resolve merge conflicts."
+description: "Resolve merge conflicts. Aliases: rc, rmc."
 user-invocable: true
 allowed-tools:
   - Bash

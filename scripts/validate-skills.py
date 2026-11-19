@@ -211,6 +211,13 @@ def listing_entries(skill_mds: list[Path]) -> list[tuple[str, str]]:
         )
         if fm is None:
             continue
+        # Claude Code leaves a `disable-model-invocation: true` skill's
+        # description out of the model's listing, and the user can still run
+        # it as a slash command (https://code.claude.com/docs/en/skills.md,
+        # "Control who invokes a skill"). Alias redirects carry the flag, so
+        # they cost the listing nothing (ai-config#1852, #5316 step 3).
+        if fm.get("disable-model-invocation") is True:
+            continue
         name = fm.get("name")
         description = fm.get("description")
         if isinstance(name, str) and isinstance(description, str):
@@ -274,7 +281,62 @@ def check_skills() -> None:
         count += 1
         check_skill(child)
     print(f"  checked {count} skills")
+    check_aliases(sorted(skills_dir.glob("*/SKILL.md")))
     check_listing_budget(sorted(skills_dir.glob("*/SKILL.md")), "skills/")
+
+
+ALIAS_DESCRIPTION = re.compile(r"\A→ ([a-z0-9-]+)\.\Z")
+ALIASES_CLAUSE = re.compile(r"Aliases: ([a-z0-9, -]+)\.")
+
+
+def check_aliases(skill_mds: list[Path]) -> None:
+    """Keep alias redirects out of the listing without losing their words.
+
+    An alias is a skill whose description is exactly "-> <canonical>." (with
+    a real arrow). It must set `disable-model-invocation: true`, so it costs
+    the model's listing nothing while `/alias` still works, and its canonical
+    skill's description must name it in an "Aliases: a, b." clause, so a
+    bare alias word in a prompt still routes to the canonical skill
+    (#5316 step 3). The clause must name no skill that is not an alias of
+    that canonical, so a removed alias does not linger in it.
+    """
+    frontmatters = {}
+    for skill_md in skill_mds:
+        fm = parse_frontmatter(
+            skill_md.read_text(encoding="utf-8"), str(skill_md.relative_to(ROOT))
+        )
+        if isinstance(fm, dict):
+            frontmatters[skill_md.parent.name] = fm
+    aliases_of: dict[str, set[str]] = {}
+    for name, fm in frontmatters.items():
+        m = ALIAS_DESCRIPTION.match(str(fm.get("description", "")))
+        if not m:
+            continue
+        canonical = m.group(1)
+        aliases_of.setdefault(canonical, set()).add(name)
+        if fm.get("disable-model-invocation") is not True:
+            errors.append(
+                f"skills/{name}: an alias redirect must set "
+                "`disable-model-invocation: true`, so it stays out of the "
+                "model's skill listing (#5316)"
+            )
+        if canonical not in frontmatters:
+            errors.append(f"skills/{name}: alias of missing skill {canonical!r}")
+    for canonical, fm in frontmatters.items():
+        m = ALIASES_CLAUSE.search(str(fm.get("description", "")))
+        listed = {a.strip() for a in m.group(1).split(",")} if m else set()
+        expected = aliases_of.get(canonical, set())
+        for missing in sorted(expected - listed):
+            errors.append(
+                f"skills/{canonical}: description does not name its alias "
+                f"{missing!r} in an 'Aliases: ...' clause, so a bare "
+                f"{missing!r} in a prompt cannot route here"
+            )
+        for extra in sorted(listed - expected):
+            errors.append(
+                f"skills/{canonical}: 'Aliases:' names {extra!r}, which is "
+                "not an alias redirect to this skill"
+            )
 
 
 TOKEN_PATTERN = re.compile(r"`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)`")

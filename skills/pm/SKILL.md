@@ -1,6 +1,7 @@
 ---
 name: pm
 description: "→ prompt-me."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools: []
 ---

@@ -132,7 +132,78 @@ def run_skills_check(tmpdir: Path):
     finally:
         vs.ROOT = original_root
 
+def write_skills(tmpdir: Path, skills: dict[str, str]) -> list[Path]:
+    """Write skills/<name>/SKILL.md for each name -> frontmatter body."""
+    paths = []
+    for name, frontmatter in skills.items():
+        skill_dir = tmpdir / "skills" / name
+        skill_dir.mkdir(parents=True)
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            f"---\nname: {name}\n{frontmatter}---\n\nbody\n", encoding="utf-8"
+        )
+        paths.append(skill_md)
+    return paths
+
+
+def run_aliases(tmpdir: Path, skills: dict[str, str]) -> list[str]:
+    """Run check_aliases on a synthetic skills/ tree; return its errors."""
+    paths = write_skills(tmpdir, skills)
+    original_root = vs.ROOT
+    vs.ROOT = tmpdir
+    vs.errors.clear()
+    try:
+        vs.check_aliases(paths)
+        return list(vs.errors)
+    finally:
+        vs.ROOT = original_root
+        vs.errors.clear()
+
+
+ARROW = "→"
+HIDDEN = "disable-model-invocation: true\n"
+
+
+def alias_cases(tmp: Path) -> None:
+    """Pin check_aliases and the listing's exclusion of hidden skills."""
+    canonical = 'description: "Drive one PR. Aliases: drive."\n'
+    alias = f'description: "{ARROW} ardi."\n'
+
+    # Negative controls first: each defect the check exists to catch.
+    errs = run_aliases(tmp / "a1", {"ardi": canonical, "drive": alias})
+    check("alias without disable-model-invocation errors", len(errs) == 1
+          and "disable-model-invocation" in errs[0])
+    errs = run_aliases(tmp / "a2", {
+        "ardi": 'description: "Drive one PR."\n', "drive": alias + HIDDEN,
+    })
+    check("canonical missing its alias errors", len(errs) == 1
+          and "does not name its alias 'drive'" in errs[0])
+    errs = run_aliases(tmp / "a3", {
+        "ardi": 'description: "Drive one PR. Aliases: drive, gone."\n',
+        "drive": alias + HIDDEN,
+    })
+    check("canonical naming a non-alias errors", len(errs) == 1
+          and "'gone'" in errs[0])
+    errs = run_aliases(tmp / "a4", {"drive": alias + HIDDEN})
+    check("alias of a missing skill errors", len(errs) == 1
+          and "missing skill 'ardi'" in errs[0])
+
+    errs = run_aliases(tmp / "a5", {"ardi": canonical, "drive": alias + HIDDEN})
+    check("consistent alias and canonical are clean", errs == [])
+
+    paths = write_skills(tmp / "a6", {"ardi": canonical, "drive": alias + HIDDEN})
+    original_root = vs.ROOT
+    vs.ROOT = tmp / "a6"
+    try:
+        names = [name for name, _ in vs.listing_entries(paths)]
+    finally:
+        vs.ROOT = original_root
+    check("hidden alias is left out of the listing", names == ["ardi"])
+
+
 def main() -> int:
+    with tempfile.TemporaryDirectory() as raw:
+        alias_cases(Path(raw))
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
 

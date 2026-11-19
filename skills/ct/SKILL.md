@@ -1,6 +1,7 @@
 ---
 name: ct
 description: "→ cut-tools."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

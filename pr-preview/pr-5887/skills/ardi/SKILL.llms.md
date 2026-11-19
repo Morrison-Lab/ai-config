@@ -117,8 +117,8 @@ Skip if your most recent comment already says so and is still live — claims ex
     gh pr list --state open --limit 100 --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments > "$LIST"   # LIST_PRS
     IN=$(python3 scripts/pr-scope.py --user "$ME" --alias "$ALIASES" \
       --requested "$REQUESTED" --excluded "$EXCLUDED" < "$LIST" | jq -c '.included')
-    jq --argjson in "$IN" '.[] | select((.number | IN($in[])) and (.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN"))' "$LIST"
-    jq --argjson in "$IN" '[.[] | select((.number | IN($in[]) | not) and .mergeable == "CONFLICTING") | .number]' "$LIST"   # to report
+    jq --argjson in "$IN" '.[] | .number as $n | select(any($in[]; . == $n) and (.mergeable == "CONFLICTING" or .mergeable == "UNKNOWN"))' "$LIST"
+    jq --argjson in "$IN" '[.[] | .number as $n | select((any($in[]; . == $n) | not) and .mergeable == "CONFLICTING") | .number]' "$LIST"   # to report
     rm -f "$LIST"
     ```
 

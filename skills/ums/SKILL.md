@@ -116,8 +116,8 @@ committed pass.
      commits to *that* repo's own agent docs instead --- see the checklist
      item below for where. This changes step 4's target, not just the
      content.)
-   - **What general principle does it instance?**
-     Write it down as one sentence,
+   - **What general principle is it a case of?**
+     Write the principle as one sentence in this pass's notes,
      at the scope [`read-instructions-fully`](../../shared/workflow/read-instructions-fully.md)'s
      "Record a rule at the scope of the user's words" sets.
      Step 3 searches for the principle, not only for the subject.

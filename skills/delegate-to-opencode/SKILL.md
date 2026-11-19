@@ -374,6 +374,9 @@ Measured in a claude.ai cloud session on 2026-11-19, reviewing [ai-config#5881](
 - A request sent without the `x-opencode-session` header that the endpoint list above requires came back as a 206-byte `MissingSessionID` error body with curl exit 0, so the stream parser printed nothing.
 - A `kimi-k3` stream stalled mid-reasoning with no content, and the same patch sent to `deepseek-v4-pro` with "keep reasoning brief" returned a full review.
 - The Go reads found real defects on heads that the Claude CI review had already called CLEAN, among them a command allowlist that still ran arbitrary code.
+- Later that day Go returned the weekly `GoUsageLimitError`.
+  `deepseek-v4.1-flash-free` and `beam-free` both returned `FreeUsageLimitError` on a one-word probe.
+  Neither tier could give a read, so the coordinator's router thread was asked for one instead.
 - **Do:** when the parser prints nothing, read the raw body (`out.sse`) for an `error` object before retrying, and resend a stalled `kimi-k3` read to `deepseek-v4-pro`.
 - **Don't:** read an empty parse, or curl exit 0, as an empty model answer, or skip the Go read because the Claude review is already clean.
 

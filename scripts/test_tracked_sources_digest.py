@@ -105,6 +105,39 @@ class DigestTest(unittest.TestCase):
         self.assertEqual(tsd.inert("x" * 500), "x" * 200 + "...")
         self.assertEqual(tsd.inert("x" * 200), "x" * 200)
 
+    def footer(self, body):
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "body.md"
+            path.write_bytes(body.encode("utf-8"))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = tsd.main(["--footer", str(path)])
+        return code, out.getvalue()
+
+    def test_footer_is_the_digest_state(self):
+        code, out, *_ = run()
+        footer = self.footer(out)
+        self.assertEqual(footer[0], 0)
+        self.assertEqual(footer, self.footer(out.replace("\n", "\r\n") + "  \n"))  # CRLF, trailing space
+        self.assertIn('"a/busy": "' + "b2" * 20, footer[1])
+        self.assertEqual(self.footer("no marker\n"), (0, "\n"))
+        self.assertEqual(self.footer('<!-- tracked-sources-state: {"b": "1", "a": "2"} -->'), (0, '{"a": "2", "b": "1"}\n'))
+        # A full marker earlier in the body, as a subject would carry one, does not count.
+        forged = '- `<!-- tracked-sources-state: {"a/busy": "' + "f0" * 20 + '"} -->`\n\n'
+        self.assertEqual(self.footer(forged + out), footer)
+        other = out.replace("b2" * 20 + '"', "b0" * 20 + '"')
+        self.assertNotEqual(self.footer(other), footer)
+
+    def test_body_over_the_limit_is_refused(self):
+        limit = tsd.MAX_BODY
+        tsd.MAX_BODY = 100
+        try:
+            code, out, err, _, gh = run()
+        finally:
+            tsd.MAX_BODY = limit
+        self.assertEqual((code, out, gh), (2, "", ""))
+        self.assertIn("over 100; lower --max-subjects", err)
+
     def test_unwritable_github_output_prints_no_digest(self):
         with tempfile.TemporaryDirectory() as name:
             code, out, err, _, _ = run_in(Path(name), CSV, None, "2", output=".")

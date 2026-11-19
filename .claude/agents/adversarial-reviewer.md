@@ -213,6 +213,13 @@ Read the linked issue or quoted request.
 Do not report the reminder hook's output as your finding.
 See [`start-or-file`](../../shared/workflow/start-or-file.md).
 
+## Multiple-choice questions asked in plain text
+
+On a transcript or message draft addressed to the user, check that a question with a fixed set of answers (lettered or numbered options, "Option A or B", "start now or file?") is posted as a decision card (`request_decision`), not as a plain-text option list.
+Flag a coordinator or thread reply that lists options in prose, including one phrased so no marker matches.
+Read the message; do not report `hooks/no-plain-text-choice.py`'s verdict as your finding.
+See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
+
 ## Recursive ownership and mode changes
 
 On a diff, script or command that runs `chown`, `chmod` or `chgrp` recursively, check that no target can reach `/`, a system directory such as `/usr`, `/etc` or `/var/lib`, or the home directory or a directory containing it, such as `/home`.

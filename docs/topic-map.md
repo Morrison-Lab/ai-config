@@ -130,6 +130,7 @@ its description does not use (ai-config#949).
 | `skills/learn/SKILL.md` | Persist new pattern to memory. |  |
 | `skills/lifecycle/SKILL.md` | Manage R package lifecycle using tidyverse principles. |  |
 | `skills/link-skills/SKILL.md` | Find cross-ref gaps across skills. |  |
+| `skills/lint/SKILL.md` | Lint changed R code with the linters the repo's CI uses. |  |
 | `skills/macroize/SKILL.md` | -> use-math-macros. |  |
 | `skills/manuscript/SKILL.md` | Prepare a paper for a journal. |  |
 | `skills/maw/SKILL.md` | -> mwc. |  |
@@ -216,6 +217,7 @@ its description does not use (ai-config#949).
 | `skills/skill-audit/SKILL.md` | Audit skill usage and prune. |  |
 | `skills/skill-builder/SKILL.md` | Create or update a skill. |  |
 | `skills/slide-tag/SKILL.md` | Move floating Git tag to main. Aliases: ts. |  |
+| `skills/spell/SKILL.md` | Spell-check changed files with the checker the repo's CI uses. |  |
 | `skills/split-concerns/SKILL.md` | Split multi-concern PRs. |  |
 | `skills/spot-skill-opportunities/SKILL.md` | Find opportunities for new skills. |  |
 | `skills/st/SKILL.md` | Start task issue-first. Aliases: start-task. |  |

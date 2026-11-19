@@ -1,6 +1,6 @@
 ---
 name: measure-performance
-description: "Profile and benchmark."
+description: "Profile and benchmark. Aliases: benchmark, perf."
 user-invocable: true
 allowed-tools:
   - Bash

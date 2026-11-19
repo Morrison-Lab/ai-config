@@ -1,6 +1,6 @@
 ---
 name: "rec"
-description: "Provide recommendations for choices."
+description: "Provide recommendations for choices. Aliases: recommend."
 ---
 
 # rec (Codex wrapper)

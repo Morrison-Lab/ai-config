@@ -21,6 +21,8 @@ class TestCodexAllowed(unittest.TestCase):
             "https://github.com/UCDavis/hac.dashboard",
             "git@hc2-gitlab.ucdmc.ucdavis.edu:health-analytics-core/abridge.git",
             "https://hc2-gitlab.ucdmc.ucdavis.edu/bcs/pipeline",
+            "ssh://git@github.com:22/ucdavis/hac.git",
+            "ssh://git@hc2-gitlab.ucdmc.ucdavis.edu:2222/bcs/x.git",
         ):
             with self.subTest(url=url), patch.dict(os.environ, {}, clear=True):
                 self.assertTrue(codex_allowed(remote_url=url))
@@ -35,6 +37,11 @@ class TestCodexAllowed(unittest.TestCase):
             "https://gitlab.com/ucdavis/bcs",
             "https://evil.example.com/ucdavis/hac",
             "https://hc2-gitlab.ucdmc.ucdavis.edu.evil.com/bcs/x",
+            "https://evil.github.com/ucdavis/hac",
+            "https://notgithub.com/ucdavis/hac",
+            "https://evil.com/hc2-gitlab.ucdmc.ucdavis.edu/bcs/x",
+            "https://github.com/ucdavis/bcs/extra",
+            "https://hc2-gitlab.ucdmc.ucdavis.edu/",
             "/home/user/local-clone",
             "",
         ):

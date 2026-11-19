@@ -10,25 +10,41 @@ Any tool that would pick Codex on its own, such as pre-push-review.py's
 import os
 import re
 import subprocess
-from typing import Optional
+import urllib.parse
+from typing import Optional, Tuple
 
-# A UCDH remote: `ucdavis/bcs*` or `ucdavis/hac*` on github.com, or any project
-# on the UCDH GitLab (`hc2-gitlab.ucdmc.ucdavis.edu`), which hosts the `bcs`
-# and `health-analytics-core` (hac) groups.
-UCDH_REMOTE_PATTERN = re.compile(
-    r"(?:github\.com[/:]ucdavis/(?:bcs|hac)[\w.-]*(?:\.git)?/?$)"
-    r"|(?:hc2-gitlab\.ucdmc\.ucdavis\.edu[/:])",
-    re.IGNORECASE,
-)
+# The UCDH GitLab, which hosts the `bcs` and `health-analytics-core` (hac) groups.
+UCDH_GITLAB_HOST = "hc2-gitlab.ucdmc.ucdavis.edu"
+# On github.com, a UCDH project is `ucdavis/bcs*` or `ucdavis/hac*`.
+UCDH_GITHUB_PATH = re.compile(r"^ucdavis/(?:bcs|hac)[\w.-]*$", re.IGNORECASE)
+# scp-like syntax: `[user@]host:path`, with no scheme.
+SCP_LIKE = re.compile(r"^(?:[^@/:]+@)?([^/:]+):(.*)$")
 
 OVERRIDE_ENV = "AI_CONFIG_ALLOW_CODEX"
+
+
+def _host_and_path(url: str) -> Tuple[str, str]:
+    """Split a git remote URL into (lowercase host, path without slashes or .git)."""
+    if "://" in url:
+        parts = urllib.parse.urlsplit(url)
+        host, path = parts.hostname or "", parts.path
+    else:
+        m = SCP_LIKE.match(url)
+        if not m:
+            return "", ""
+        host, path = m.group(1), m.group(2)
+    path = path.strip("/")
+    if path.endswith(".git"):
+        path = path[: -len(".git")]
+    return host.lower(), path
 
 
 def codex_allowed(repo_dir: str = ".", remote_url: Optional[str] = None) -> bool:
     """Return True when Codex may run for the project at repo_dir.
 
     `AI_CONFIG_ALLOW_CODEX=1` allows and `=0` refuses, overriding the
-    inference.  Otherwise the origin remote URL must name a UCDH project.
+    inference.  Otherwise the origin remote must be a UCDH project: any project
+    on the UCDH GitLab, or `ucdavis/bcs*` / `ucdavis/hac*` on github.com.
     An unreadable remote refuses, so an unknown project never reaches Codex.
     """
     override = os.environ.get(OVERRIDE_ENV, "").strip()
@@ -44,4 +60,7 @@ def codex_allowed(repo_dir: str = ".", remote_url: Optional[str] = None) -> bool
         if res.returncode != 0:
             return False
         remote_url = res.stdout.strip()
-    return bool(UCDH_REMOTE_PATTERN.search(remote_url))
+    host, path = _host_and_path(remote_url)
+    if host == UCDH_GITLAB_HOST:
+        return bool(path)
+    return host == "github.com" and bool(UCDH_GITHUB_PATH.match(path))

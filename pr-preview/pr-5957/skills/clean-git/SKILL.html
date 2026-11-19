@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -452,6 +452,7 @@ cookieconsent.run({
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
 <section id="classify-both-passes" class="level3">
 <h3 class="anchored" data-anchor-id="classify-both-passes">1. Classify, both passes</h3>
+<p><a href="../../scripts/clean-git-plan.py"><code>scripts/clean-git-plan.py</code></a> computes both passes’ classification as JSON, read-only, for one repository or for each repository under a directory that is not one (ai-config#4170). Run it after the snapshot and the <code>git fetch --prune</code> below, and build the plan from its rows rather than re-deriving each row by hand. It does not check claim comments (<code>clean-branches</code> step e), so check those for every row it marks for deletion.</p>
 <p>Everything in this step shares a scratch directory, so create it <strong>first</strong>. Several commands write into <code>$TMP</code>, and an undefined <code>$TMP</code> sends each redirect to the filesystem root:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="va">TMP</span><span class="op">=</span><span class="va">$(</span><span class="fu">mktemp</span> <span class="at">-d</span><span class="va">)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p><strong>Snapshot the remote-tracking refs before running either pass.</strong> Both delegates refresh remote-tracking state in their classify steps — <a href="../../skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a> step 3 and <a href="../../skills/clean-branches/SKILL.html"><code>clean-branches</code></a> step 2 each run <code>git fetch --prune origin</code>. <code>--prune</code> deletes remote-tracking refs whose upstream branch is gone, and such a ref can be the last thing in this clone pointing at those commits.</p>

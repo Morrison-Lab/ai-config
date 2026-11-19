@@ -37,13 +37,13 @@ mutates a PR stays serial.
      so a lab member running this corpus from a vendored checkout filters on their own identity rather than the corpus owner's.
      Then classify the listing with [`scripts/pr-scope.py`](../../scripts/pr-scope.py) rather than applying the test by hand ([#2921](https://github.com/Morrison-Lab/ai-config/issues/2921)):
      ```bash
+     LIST=$(mktemp)
      gh pr list --state open --limit 100 \
-       --json number,title,headRefName,baseRefName,isDraft,author,assignees,reviewDecision \
-       | python3 scripts/pr-scope.py --user "$ME" --alias "$ALIASES" \
-           --requested "$REQUESTED" --excluded "$EXCLUDED" --text
+       --json number,title,headRefName,baseRefName,isDraft,author,assignees,reviewDecision > "$LIST"
+     python3 scripts/pr-scope.py --user "$ME" --alias "$ALIASES" \
+       --requested "$REQUESTED" --excluded "$EXCLUDED" --text < "$LIST"
      ```
-     This is the listing above, piped.
-     Save it once and classify that copy rather than listing twice.
+     Run the listing above this way, saving it once to `$LIST`, so the classification and the rest of this step read the same copy.
      `$ME` is the resolved login, and `$ALIASES`, `$REQUESTED` and `$EXCLUDED` are comma-separated lists, empty when there are none.
      `scripts/` is the ai-config checkout's (`$CLAUDE_PLUGIN_ROOT/scripts/` in a plugin install), as for the corpus's other scripts.
      In a remote session, save the `mcp__github__list_pull_requests` result to a file and pipe that in;

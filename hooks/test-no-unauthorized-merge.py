@@ -2097,6 +2097,72 @@ for _desc, _records, _merge, _want in _NG_CASES:
     check(_got == _want)
     print(f"  {_got:<6} {_desc}")
 
+
+# A typed `mwr`/`mwrs` is merge permission (ai-config#3946). A bare one, and
+# `mwrs`, cover every merge; one whose message names a PR covers that PR only.
+# "merge when ready" stays an mwc word and is not an mwr grant.
+_MWR_CASES = [
+    ("bare 'mwr' grants the MCP merge", [_tg_user("mwr")], _ng_mcp(113, "mcsg"), "allow"),
+    ("'/mwr' grants the MCP merge", [_tg_user("/mwr")], _ng_mcp(113, "mcsg"), "allow"),
+    ("'mwrs' grants a Bash merge", [_tg_user("mwrs")],
+     _ng_bash("gh pr merge 114 -R Morrison-Lab/mcsg --squash"), "allow"),
+    ("'mwr #113' grants #113", [_tg_user("mwr #113")], _ng_mcp(113, "mcsg"), "allow"),
+    ("'mwr #113' does not grant #114", [_tg_user("mwr #113")], _ng_mcp(114, "mcsg"), "BLOCK"),
+    ("'mwr mcsg#113' does not grant another repo's #113", [_tg_user("mwr mcsg#113")],
+     _ng_mcp(113, "csci201"), "BLOCK"),
+    ("'mwr' then a revocation", [_tg_user("mwr"), _tg_user("stop merging")],
+     _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("'mwrs' then 'mwr revoke'", [_tg_user("mwrs"), _tg_user("mwr revoke")],
+     _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("a question about mwr is not a grant", [_tg_user("what does mwr mean?")],
+     _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("a mention of mwr is not a grant", [_tg_user("I said mwr earlier")],
+     _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("a quoted mwr is not a grant", [_tg_user("the word `mwr` is new")],
+     _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("the assistant's 'mwr' is not a grant", [_tg_assistant("mwr")],
+     _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("'mwr' does not arm auto-merge", [_tg_user("mwr")],
+     _ng_mcp(113, "mcsg", tool="mcp__github__enable_pr_auto_merge"), "BLOCK"),
+    ("'mwr' does not grant a Bash --auto merge", [_tg_user("mwr")],
+     _ng_bash("gh pr merge 113 -R Morrison-Lab/mcsg --squash --auto"), "BLOCK"),
+    ("'merge when ready' is still an mwc grant", [_tg_user("merge when ready")],
+     _ng_mcp(113, "mcsg"), "allow"),
+]
+print("mwr merge grant:")
+for _desc, _records, _merge, _want in _MWR_CASES:
+    _got = _tg_verdict(_records, _merge)
+    check(_got == _want)
+    print(f"  {_got:<6} {_desc}")
+
+
+def _mwr_grant_direct(records):
+    """transcript_mwr_grant() itself, so 'merge when ready' is shown to be no mwr grant."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_nua_mwr_test", HOOK)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    if records is None:
+        return module.transcript_mwr_grant({"transcript_path": "/nonexistent.jsonl"},
+                                           "Morrison-Lab/mcsg", 113)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "transcript-mwr-test.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            for rec in records:
+                fh.write(json.dumps(rec) + "\n")
+        return module.transcript_mwr_grant({"transcript_path": path}, "Morrison-Lab/mcsg", 113)
+
+
+for _desc, _records, _want in [
+    ("'merge when ready' is not an mwr grant", [_tg_user("merge when ready")], False),
+    ("'mwc' is not an mwr grant", [_tg_user("mwc")], False),
+    ("'mwr' is an mwr grant", [_tg_user("mwr")], True),
+    ("no transcript is no mwr grant (fails closed)", None, False),
+]:
+    _got = _mwr_grant_direct(_records)
+    check(_got is _want)
+    print(f"  {'ok' if _got is _want else 'WRONG':<6} {_desc}")
+
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

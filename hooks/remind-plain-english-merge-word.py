@@ -48,7 +48,7 @@ SLASH_COMMAND = re.compile(
 # A bare "stop", "wait" or "no" withdraws too, but only as a whole clause or
 # before a merge word, so "stop asking for approvals" is not a revocation.
 REVOKE = re.compile(
-    r"(?:^|\W)(?:/?mwc\s+revoke|revoke\s+(?:the\s+)?mwc|disable-mwc|stop\s+merging"
+    r"(?:^|\W)(?:/?mw[cr]s?\s+revoke|revoke\s+(?:the\s+)?mw[cr]s?|disable-mw[cr]s?|stop\s+merging"
     r"|hold\s+off|not\s+yet"
     r"|(?:do\s+not|don't|dont|no\s+more|never)\s+merg(?:e|ing)\b)"
     r"|(?:^|[.!;])\s*(?:stop|wait|no)\b[^\w\n]*(?:$|merg)",
@@ -174,11 +174,93 @@ def named_merge_grants(prompt: str) -> set:
 
 
 def revokes(prompt: str) -> bool:
-    """Whether the user's own words in `prompt` withdraw a merge grant."""
+    """Whether the user's own words in `prompt` withdraw a merge grant.
+
+    A revocation clears every grant before it: `mwc`, a named "merge PR N",
+    and `mwr`/`mwrs` alike.
+    """
     match = SLASH_COMMAND.search(prompt)
     if match and REVOKE.search("/mwc " + (match.group(2) or "")):
         return True
+    match = MWR_SLASH_COMMAND.search(prompt)
+    if match and REVOKE.search("/mwr " + (match.group(2) or "")):
+        return True
     return any(REVOKE.search(typed(body)) for body in user_bodies(prompt))
+
+
+# The `mwr` merge grant (ai-config#3946; Ezra, 2026-11-19, "Skip review, keep
+# green CI"): merge without a clean review (no non-Claude read, no Claude
+# CLEAN verdict), every required check still green. `mwr` covers one PR,
+# `mwrs` the whole session. Only the typed tokens start it: the spelled-out
+# "merge when ready" stays a plain-English `mwc` (merge_word() above; Ezra,
+# 2026-10-23), and nothing here reads it.
+MWR_WORD = re.compile(r"(?<![\w/.#-])/?(mwrs?)(?![\w-])", re.I)
+MWR_SLASH_COMMAND = re.compile(
+    r"<command-name>\s*/?(?:ai-config:)?(mwrs?)\s*</command-name>"
+    r"(?:.*?<command-args>(.*?)</command-args>)?",
+    re.S | re.I,
+)
+# A PR the same message names: "#5940", "ai-config#5940", "PR 5940",
+# ".../pull/5940", or a number right after the word ("mwr 5940").
+MWR_PR_REF = re.compile(
+    r"(?:(?<![\w.-])(?:[\w.-]+/)?(?P<repo>[A-Za-z][\w.-]*))?#(?P<n1>\d+)\b"
+    r"|\bPRs?\s+#?(?P<n2>\d+)\b"
+    r"|/(?:[\w.-]+/)?(?P<repo3>[A-Za-z][\w.-]*)/pull/(?P<n3>\d+)\b",
+    re.I,
+)
+MWR_TRAILING_NUMBER = re.compile(r"\s+(\d+)\b")
+MWR_ALL = "all"
+
+
+def _mwr_scope(word: str, text: str, end: int):
+    """MWR_ALL, or {(repo or None, number)} for the PRs a bare `mwr` names.
+
+    `mwr` grants one PR, the single most relevant one. When the same user
+    message names a PR, that PR is the grant, as a named "merge PR N" is.
+    When it names none, the most relevant PR is not something a hook can
+    decide, so the grant covers the session's merges, the way a bare `/mwc`
+    means `/mwc all` (skills/mwc/SKILL.md); the agent picks the one PR. Every
+    merge still has to pass the checker's MERGE-READY line for its own head.
+    `mwrs` is the session grant, so it is always MWR_ALL.
+    """
+    if word.lower() == "mwrs":
+        return MWR_ALL
+    refs = set()
+    for match in MWR_PR_REF.finditer(text):
+        repo = match.group("repo") or match.group("repo3")
+        num = match.group("n1") or match.group("n2") or match.group("n3")
+        refs.add(((repo or "").lower() or None, int(num)))
+    trailing = MWR_TRAILING_NUMBER.match(text, end)
+    if trailing:
+        refs.add((None, int(trailing.group(1))))
+    return refs or MWR_ALL
+
+
+def mwr_grant(prompt: str):
+    """The `mwr`/`mwrs` grant the user typed in `prompt`: MWR_ALL, a set of
+    (repo or None, number), or None.
+
+    Held to merge_word()'s strict test: the word is the user's own text (not
+    quoted, fenced or a system reminder), opens a clause, and is not part of
+    a question, so "what does mwr mean?" is no grant.
+    """
+    match = MWR_SLASH_COMMAND.search(prompt)
+    if match:
+        args = match.group(2) or ""
+        if REVOKE.search("/mwr " + args):
+            return None
+        return _mwr_scope(match.group(1), args, 0)
+    for body in user_bodies(prompt):
+        text = typed(body)
+        if not text or QUESTION.search(text) or REVOKE.search(text):
+            continue
+        for match in MWR_WORD.finditer(text):
+            if match.start() > 0 and not CLAUSE_START.search(text[: match.start()]):
+                continue
+            if QUESTION_SENTENCE.match(text, match.end()):
+                continue
+            return _mwr_scope(match.group(1), text, match.end())
+    return None
 
 
 def main() -> int:

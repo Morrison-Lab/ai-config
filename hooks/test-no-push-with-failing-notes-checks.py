@@ -380,8 +380,8 @@ REFUSED = [
 for case, before, after, reason in REFUSED:
     refused = hook.parse_run_check_lines(BUNDLED.replace(before, after))
     expect(f"{case} is not run", any(reason in u for u in refused[0]["unhandled"]), True)
-expect("T72 interpreter flags before the .gha/ script are allowed",
-       hook.gha_script_command("python3 -I -u .gha/check-x/check-x.py --flag".split(), "check-x"), True)
+expect("T72 interpreter flags are allowed, and any argument after the script is refused",
+       [hook.gha_script_command(f"python3 -I -u .gha/check-x/check-x.py{a}".split(), "check-x") for a in ("", " -o x")], [True, False])
 expect("T78 a check name not of the form check-<words> runs nothing",
        hook.gha_script_command("python3 .gha/quarto-publish/quarto-publish.py".split(), "quarto-publish"), False)
 no_fail = make_repo({"cluster-checks.yml": BUNDLED.replace(" CAW_FAIL=false", ""), "annotation-gate.yml": GATE})

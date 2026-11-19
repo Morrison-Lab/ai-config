@@ -317,7 +317,7 @@ def parse_run_check_lines(text: str) -> list[dict]:
             continue
         command = argv[split + 1:]
         # The pushed repo writes this line: run only .gha/<name>/<name>.py from a named
-        # gha ref, with one prefix and only the fixed VALUE_SAFE_KEYS under it (run_bundled).
+        # gha ref, with no arguments, one prefix and only the VALUE_SAFE_KEYS under it.
         if not SAFE_REF.fullmatch(ref or "") or re.fullmatch(r"[0-9a-f]{40}", ref or ""):
             unhandled.append(f"gha ref {ref} is not a named tag or branch")
         prefixes = check_prefixes(assigns)
@@ -361,8 +361,8 @@ def check_prefixes(assigns: dict) -> tuple:
 
 
 def gha_script_command(command: list, name: str) -> bool:
-    """True only for `python3 [-u|-I|-B ...] .gha/<name>/<name>.py [args]`, with
-    `<name>` the line's own `check-<words>` name: no other gha script, `-c` or `-m`."""
+    """True only for `python3 [-u|-I|-B ...] .gha/<name>/<name>.py`, with `<name>` the line's
+    own `check-<words>` name: no other script, `-c`, `-m`, or argument such as `--output-json`."""
     if not re.fullmatch(r"check-[a-z0-9]+(?:-[a-z0-9]+)*", name):
         return False
     if not command or command[0] not in ("python3", "python"):
@@ -370,7 +370,7 @@ def gha_script_command(command: list, name: str) -> bool:
     rest = command[1:]
     while rest and rest[0] in SAFE_PYTHON_FLAGS:
         rest = rest[1:]
-    return bool(rest) and rest[0] == f".gha/{name}/{name}.py"
+    return rest == [f".gha/{name}/{name}.py"]
 
 
 def remote_moved(dest: str, ref: str) -> bool | None:

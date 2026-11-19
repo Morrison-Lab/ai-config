@@ -116,7 +116,8 @@ committed pass.
      commits to *that* repo's own agent docs instead --- see the checklist
      item below for where. This changes step 4's target, not just the
      content.)
-   - **What general principle is it a case of?**
+   - **For a correction, what general principle is it a case of?**
+     A plain fact, such as a tool quirk, needs none.
      Write the principle as one sentence in your working list for this pass, not yet in any file,
      at the scope [`read-instructions-fully`](../../shared/workflow/read-instructions-fully.md)'s
      "Record a rule at the scope of the user's words" sets,
@@ -535,8 +536,8 @@ committed pass.
    | Poll for new reviews | `iterate/SKILL.md` | Added explicit polling procedure |
    | glab has no --state flag | `/memories/gitlab.md` | New bullet |
 
-   Under the table, give each learning's principle sentence from step 2.
-   Say whether it extended an existing rule or went into a new entry,
+   Under the table, give each correction's principle sentence from step 2.
+   Say whether it extended an existing rule or went into the entry this pass wrote,
    and link the issue when step 3 also filed one.
 
 ## What to look for (checklist)

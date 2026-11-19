@@ -341,6 +341,25 @@ expect("T60 the lds line form parses: name, ref, command",
        [("check-avoided-words", "v3", ".gha/check-avoided-words/check-avoided-words.py"),
         ("check-new-line-breaks", "v3", ".gha/check-new-line-breaks/check-new-line-breaks.py")])
 
+unquoted = make_repo({"cluster-checks.yml": BUNDLED.replace(
+    "CAW_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}'",
+    "CAW_BASE_REF=origin/main CAW_EXTRA=${{ github.base_ref }}")})
+verdict, out = run("git push origin feat", unquoted, 0)
+expect("T61 an unquoted expression fails open with a note, never runs as text",
+       (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
+commented = hook.parse_run_check_lines(BUNDLED.replace(
+    "check-avoided-words.py\n", "check-avoided-words.py # trailing note\n"))
+expect("T62 a trailing YAML comment is not passed as arguments",
+       commented[0]["command"], ["python3", "-u", ".gha/check-avoided-words/check-avoided-words.py"])
+expect("T63 a gha checkout at another path is not read as .gha",
+       hook.parse_run_check_lines(BUNDLED.replace("path: .gha", "path: tools/gha")), [])
+expect("T64 checkout keys in another order still give the ref",
+       hook.gha_checkout_ref("      with:\n        path: .gha\n        ref: v3\n        repository: Morrison-Lab/gha\n"), "v3")
+no_fail = make_repo({"cluster-checks.yml": BUNDLED.replace(" CAW_FAIL=false", ""), "annotation-gate.yml": GATE})
+run("git push origin feat", no_fail, 0)
+env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))
+expect("T65 under a gate, a line without its FAIL variable is made blocking", env_caw.get("CAW_FAIL"), "true")
+
 # A moved tag (gha slides v3) must reach the cache on the next push, inside the daily window.
 origin = tempfile.mkdtemp(prefix="npc-gha-origin-")
 git(origin, "init", "-q", "-b", "main")

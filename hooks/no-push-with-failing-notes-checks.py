@@ -131,10 +131,7 @@ KEY_VALUE = re.compile(r"^(?P<indent>\s*)(?P<key>[\w-]+):\s*(?P<value>.*?)\s*$")
 # A bundled-checks workflow (lds's cluster-checks.yml) checks gha out at `.gha` and runs
 # each check as `.gha/run-check/run-check.sh <name> VAR=value ... -- <command>`.
 RUN_CHECK = re.compile(r"^\s*\.gha/run-check/run-check\.sh\s+(?P<rest>\S.*)$")
-GHA_CHECKOUT = re.compile(
-    r"repository:\s*Morrison-Lab/gha\s*\n(?:[ \t]+[\w-]+:.*\n)*?[ \t]+ref:\s*['\"]?(?P<ref>[\w.\-/]+)",
-    re.IGNORECASE,
-)
+GHA_REPOSITORY = re.compile(r"^(?P<indent>\s*)repository:\s*['\"]?Morrison-Lab/gha['\"]?\s*$", re.IGNORECASE)
 EXPR = re.compile(r"'\$\{\{.*?\}\}'")
 BASE_PLACEHOLDER = "@@PUSH_CHECK_BASE@@"
 
@@ -257,6 +254,35 @@ def find_calls(git_root: str) -> list[dict]:
     return calls
 
 
+def gha_checkout_ref(text: str) -> str | None:
+    """The `ref:` of the step that checks Morrison-Lab/gha out at `path: .gha`, or None.
+
+    Reads the sibling keys of each `repository: Morrison-Lab/gha` line (the `with:`
+    mapping, in any order), so a checkout to another path is not taken for `.gha`.
+    """
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        m = GHA_REPOSITORY.match(line)
+        if not m:
+            continue
+        indent = len(m.group("indent"))
+        siblings: dict[str, str] = {}
+        for step in (-1, 1):
+            j = i + step
+            while 0 <= j < len(lines):
+                cur = lines[j]
+                if cur.strip() and not cur.lstrip().startswith("#"):
+                    if len(cur) - len(cur.lstrip()) != indent:
+                        break
+                    kv = KEY_VALUE.match(cur)
+                    if kv:
+                        siblings[kv.group("key")] = kv.group("value").strip("'\"")
+                j += step
+        if siblings.get("path", "").rstrip("/") in (".gha", "./.gha") and siblings.get("ref"):
+            return siblings["ref"]
+    return None
+
+
 def parse_run_check_lines(text: str) -> list[dict]:
     """Return [{name, ref, kind: "bundled", assigns, command, unhandled}] for each
     `.gha/run-check/run-check.sh` line of a bundled-checks workflow.
@@ -269,10 +295,9 @@ def parse_run_check_lines(text: str) -> list[dict]:
     assignment) are kept: a whole-tree check such as check-quarto-links can read
     generated files that a local render left behind, which CI never sees.
     """
-    ref_match = GHA_CHECKOUT.search(text)
-    if not ref_match:
+    ref = gha_checkout_ref(text)
+    if not ref:
         return []
-    ref = ref_match.group("ref")
     calls = []
     for line in text.splitlines():
         m = RUN_CHECK.match(line)
@@ -290,9 +315,12 @@ def parse_run_check_lines(text: str) -> list[dict]:
             return "''"
 
         try:
-            argv = shlex.split(EXPR.sub(placeholder, m.group("rest")))
+            # comments=True drops a trailing YAML comment rather than passing it as arguments.
+            argv = shlex.split(EXPR.sub(placeholder, m.group("rest")), comments=True)
         except ValueError:
             continue
+        # An expression outside single quotes is not one EXPR can read; never run it as text.
+        unhandled.extend(tok for tok in argv if "${{" in tok)
         if not argv or "--" not in argv:
             continue
         name, split = argv[0], argv.index("--")
@@ -486,8 +514,12 @@ def run_bundled(git_root: str, gha_dir: str, call: dict, base: str):
         return call["name"], "error", "unhandled workflow expression " + call["unhandled"][0]
     assigns = {k: v.replace(BASE_PLACEHOLDER, base) for k, v in call["assigns"].items()}
     if call.get("gated"):
-        # The annotation gate fails CI on a warn-only check's warnings.
-        assigns.update({k: "true" for k in assigns if k.endswith("_FAIL")})
+        # The annotation gate fails CI on a warn-only check's warnings, including a check
+        # whose line leaves its FAIL variable to the script's default.
+        fail_keys = [k for k in assigns if k.endswith("_FAIL")]
+        if not fail_keys:
+            fail_keys = [k[:-len("BASE_REF")] + "FAIL" for k in assigns if k.endswith("_BASE_REF")]
+        assigns.update({k: "true" for k in fail_keys})
     prefixes = tuple({k.split("_", 1)[0] + "_" for k in assigns})
     env = {k: v for k, v in os.environ.items() if not k.startswith(prefixes)}
     env.update(assigns)

@@ -76,7 +76,8 @@ Prompt as of 2026-11-07:
 > Standing limits apply: issue first, small PRs, no merges without mwc or a standing grant, FERPA, no browser use, never Codex, never force-push or push to main.
 > Reply "no action" only after step 1 restarted nothing and step 2 found nothing to start.
 
-"No browser use" in that prompt means the Claude in Chrome plugin (Ezra, 2026-11-19: "i meant the claude in browser plugin").
+"No browser use" in that prompt means the Claude in Chrome plugin (Ezra, 2026-11-19: "i meant the claude in browser plugin");
+the next edit of the live task should say "no Claude in Chrome" instead.
 
 Hooks do not run in cloud sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)), so the scheduled task is the only enforcement there.
 Update or delete that task rather than adding a second one.

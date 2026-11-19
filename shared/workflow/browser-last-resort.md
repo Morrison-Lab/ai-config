@@ -24,7 +24,7 @@ Ezra narrowed its reading on 2026-11-19: "that's not what I meant by no-browser"
 A headless browser that an agent runs in its own environment (Playwright, Chromium or Lighthouse in a cloud container) is not the Claude in Chrome plugin, and it is fine for checking renders.
 It drives nothing of the user's, so the Chrome exception does not cover it.
 `hooks/warn-browser-without-route-check.py` still warns on the Claude in Chrome tools, which are never to be used,
-and on the `Claude_Browser` and computer-use tools, which act on the user's own browser or screen and stay a last resort.
+and on the `Claude_Browser` and computer-use tools, which stay a last resort.
 
 A task that still needs the browser gets logged per [`deterministic-tools`](../principles/deterministic-tools.md#browser-work-leaves-no-artifact-so-keep-a-log-of-it).
 

@@ -11,14 +11,17 @@ allowed-tools:
 
 The user wants the session to stop starting new work for now:
 no new agents, pushes, reviews, issues or hooks to write.
-A bare `pause`, `/pause`, or `pause` followed by a short note
-(at most 80 characters) all count.
+A bare `pause` or `/pause` counts.
+So does a short note (at most 80 characters) after `/pause`, or after `pause` and a punctuation mark (`pause, back after lunch`).
+`pause the video` is an ordinary request, not a pause.
 
 ## What the pause switches off
 
-While the user's most recent prompt is a pause command, every Stop hook stops
+While the user's most recent prompt is a pause command, the Stop hooks below stop
 asking the agent to act
 ([ai-config#3911](https://github.com/Morrison-Lab/ai-config/issues/3911)).
+Eighteen other Stop hooks still block on their own while paused;
+[ai-config#5901](https://github.com/Morrison-Lab/ai-config/issues/5901) tracks them.
 `scripts/lib/session_pause.py` decides this from the transcript,
 so there is no marker to write and nothing to clean up.
 

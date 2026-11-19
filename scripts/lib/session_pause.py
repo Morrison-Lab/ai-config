@@ -20,7 +20,9 @@ import json
 import re
 
 # A bare "pause" prompt, with at most a short note after it.
-_BARE = re.compile(r"\A\s*/?(?:ai-config:)?pause\b[\s,.:;!-]*(?P<rest>.*)\Z", re.I | re.S)
+_BARE = re.compile(
+    r"\A\s*(?P<slash>/)?(?:ai-config:)?pause\b(?P<sep>[\s,.:;!-]*)(?P<rest>.*)\Z", re.I | re.S
+)
 # The same command invoked as a skill, as Claude Code records a slash command.
 _SLASH = re.compile(r"<command-name>\s*/?(?:ai-config:)?pause\s*</command-name>", re.I)
 MAX_NOTE = 80
@@ -31,7 +33,17 @@ def is_pause_command(prompt: str) -> bool:
     if _SLASH.search(prompt):
         return True
     match = _BARE.match(prompt)
-    return bool(match) and len(match.group("rest").strip()) <= MAX_NOTE
+    if not match:
+        return False
+    rest = match.group("rest").strip()
+    if not rest:
+        return True
+    if len(rest) > MAX_NOTE:
+        return False
+    # A bare word followed by more words is an ordinary request ("pause the
+    # docker container"), so a note after a bare "pause" needs punctuation
+    # between them ("pause, back in 10"). After "/pause" any short note counts.
+    return bool(match.group("slash")) or bool(match.group("sep").strip())
 
 
 def _prompt_text(entry: dict) -> str | None:

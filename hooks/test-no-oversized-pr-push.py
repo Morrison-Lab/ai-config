@@ -315,6 +315,14 @@ def main():
                               {"base": {"ref": "lower-renamed"}})
     fails += check("the PR base is preferred to the nearest remote branch",
                    got == ["origin/lower-renamed"])
+    got = mod.stacked_parents(stacked_pr, "upper", "origin/main",
+                              {"base": {"ref": "main"}})
+    fails += check("a PR based on the default branch has no stacked parent",
+                   got == [])
+    got = mod.stacked_parents(stacked_pr, "upper", "origin/main",
+                              {"base": {"ref": "not-on-server"}})
+    fails += check("a PR base found nowhere is no parent, not the nearest branch",
+                   got == [])
     got = mod.stacked_parents(stacked_pr, "upper", "origin/main", None)
     fails += check("with no PR the nearest remote branch is the parent",
                    got == ["origin/nearer"])
@@ -322,7 +330,7 @@ def main():
                               "b": ([], ["}", ":::", "x = compute(y)"])})
     fails += check("braces and fences never count as moved",
                    dict(budget) == {"x = compute(y)": 1})
-    total = len(cases) + 4 + len(new_path_cases())
+    total = len(cases) + 6 + len(new_path_cases())
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

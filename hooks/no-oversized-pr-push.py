@@ -339,9 +339,15 @@ def stacked_parents(cwd, branch, default, pr):
     that the default branch lacks], else []. Measuring a stack against main
     counted its lower layers too (lds#2896, 215 lines, needed an override)."""
     ref = ((pr or {}).get("base") or {}).get("ref")
-    if ref and f"origin/{ref}" != default and git(
-            cwd, "rev-parse", "--verify", "-q", f"origin/{ref}^{{commit}}"):
-        return [f"origin/{ref}"]
+    if ref:
+        # CI measures against the PR's base and nothing else, so an open PR
+        # settles the parent: the default branch means no stack at all.
+        if f"origin/{ref}" == default:
+            return []
+        if git(cwd, "rev-parse", "--verify", "-q", f"origin/{ref}^{{commit}}"):
+            return [f"origin/{ref}"]
+        tip = server_tip(cwd, ref)
+        return [tip] if tip else []
     out = git(cwd, "for-each-ref", "--merged", "HEAD", "--no-merged", default,
               "--format=%(refname:short)", "refs/remotes/origin/")
     skip = {default, "origin/HEAD", "origin", f"origin/{branch}"}
@@ -354,6 +360,16 @@ def stacked_parents(cwd, branch, default, pr):
         if n and (best is None or int(n) < best[0]):
             best = (int(n), r)
     return [best[1]] if best else []
+
+
+def server_tip(cwd, ref):
+    """The server's tip of branch `ref` when that commit is local (a
+    single-branch clone has no origin/<ref>), else None."""
+    line = git(cwd, "ls-remote", "--heads", "origin", f"refs/heads/{ref}")
+    sha = (line or "").split()[0] if (line or "").split() else ""
+    if sha and git(cwd, "rev-parse", "--verify", "-q", f"{sha}^{{commit}}"):
+        return sha
+    return None
 
 
 def server_parents(cwd, branch, default):
@@ -402,7 +418,11 @@ def decide(command, cwd):
         pr = None
     if pr_exempt(pr):
         return None
-    for parent in stacked_parents(where, branch, base, pr):
+    try:
+        parents = stacked_parents(where, branch, base, pr)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        parents = []  # no parent found: the base measurement stands
+    for parent in parents:
         stacked = measure(where, parent)
         if stacked is not None and not over_cap(stacked):
             return None

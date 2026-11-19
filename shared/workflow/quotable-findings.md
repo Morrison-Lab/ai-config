@@ -25,7 +25,8 @@ Cite a line of the file you read, not a line of the diff hunk or a count carried
 
 A reviewer's knowledge ends at its training cutoff, so a release, tag, package version or model id newer than the cutoff looks made up to it.
 Before posting a finding that a version does not exist, or is not the latest, look it up in its registry or forge (the repository's releases or tags, PyPI, npm, the vendor's model list) at review time.
-Post the finding only when the lookup also fails to find the version, and quote the lookup's answer in the finding.
+Post the finding only when the lookup confirms it (the version is absent, or a newer one is listed), and quote the lookup's answer in the finding.
+Making the lookup a tool rather than a step is [ai-config#5911](https://github.com/Morrison-Lab/ai-config/issues/5911).
 (Pattern from the `suppressions.json` of [tag1consulting/claude-comprehensive-review](https://github.com/tag1consulting/claude-comprehensive-review), MIT, which drops such a finding only after the same lookup.)
 
 ## Companion norm
@@ -42,7 +43,7 @@ Wherever this corpus already produces or verifies review-shaped findings: `ard`/
 - **Do:** run this mechanical check before spending model calls on adversarial verification of the same finding.
 - **Do:** attack the argument or the data in a finding, never the author's standing.
 - **Do:** check that a cited line number is within the file's length at the reviewed commit.
-- **Do:** look up a version in its registry before reporting that it does not exist.
+- **Do:** look up a version in its registry before reporting that it does not exist or is not the latest.
 - **Don't:** post a finding about code or prose that does not exist in the diff or file under review.
 - **Don't:** require a quoted passage for an absence finding -- name the location it belongs at instead.
 

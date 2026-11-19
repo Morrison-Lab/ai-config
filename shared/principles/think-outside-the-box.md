@@ -153,8 +153,10 @@ It is never a license to bypass real, deliberate boundaries:
   or reframing the interface dissolves the complexity before writing
   elaborate workaround code.
 - **After three failed fixes:**
-  When a third fix for the same failure has failed, and each fix moved the symptom somewhere new, stop patching.
+  When a third fix for the same failure has failed, stop patching.
   Treat the repeated failure as evidence about the design, and question the structure before attempting a fourth fix.
+  This count is for debugging a failure.
+  A matcher whose bypass moves with each patch stops earlier, at the second patch ([`least-flexible-tool`](../coding/least-flexible-tool.md), [`learn-from-review-findings`](../workflow/learn-from-review-findings.md)).
   (Adapted from the `systematic-debugging` skill in [obra/superpowers](https://github.com/obra/superpowers), MIT.)
 - **In review:**
   Look for code that works around a problem rather than solving it at the

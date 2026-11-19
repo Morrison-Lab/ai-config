@@ -120,8 +120,8 @@ committed pass.
      Write it down as one sentence,
      at the scope [`read-instructions-fully`](../../shared/workflow/read-instructions-fully.md)'s
      "Record a rule at the scope of the user's words" sets.
-     Step 3 searches for that sentence, not only for the subject.
-     When the principle needs more than a quick edit to land (a new hook, a sweep, a new fragment),
+     Step 3 searches for the principle, not only for the subject.
+     When the principle is not trivial to implement at once (for example, it needs a new hook, a sweep or a new fragment),
      file it with [`defer-issue`](../defer-issue/SKILL.md) in the same pass
      ([ai-config#3157](https://github.com/Morrison-Lab/ai-config/issues/3157)).
 
@@ -158,11 +158,12 @@ committed pass.
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
    - **Search for the principle from step 2 as well as for the subject.**
-     A rule stating the same principle in other words names neither the tool nor the error,
-     so the subject grep misses it
+     A rule stating the same principle in other words need not contain the subject the grep above used,
+     so that grep misses it
      ([`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
-     Grep the principle's key terms over the same paths,
-     and read the fragments [`shared/principles/README.md`](../../shared/principles/README.md) lists for it.
+     Grep the principle's key terms over the same paths.
+     Then find the principle in [`shared/principles/README.md`](../../shared/principles/README.md)'s catalog
+     and read the rules it links under that principle.
      When an existing rule states the principle,
      add the new case to that rule rather than writing a new one.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the

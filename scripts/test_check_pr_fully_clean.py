@@ -4538,6 +4538,21 @@ def main() -> int:
         relay_clean, createdAt="2026-11-19T05:38:44Z",
         body=relay_clean["body"].replace("Cross-model re-review",
                                          "Fresh cross-model re-review"))
+    # ai-config#5858 (Ezra's card, 2026-11-19: "Pass only reviewer-labelled
+    # no-action"): the reviewer's own "no action needed" on the heading line
+    # passes; anything less, or an item marked blocking, does not.
+    relay_noaction = dict(
+        relay_clean_nits, createdAt="2026-11-19T05:38:44Z",
+        body=relay_clean_nits["body"].replace(
+            "(not bugs)", "(no action needed)"))
+    relay_noaction_blocking = dict(
+        relay_noaction, body=relay_noaction["body"].replace(
+            "**Fixture verification:**",
+            "**Fixture verification (blocking):**"))
+    relay_noaction_unrelayed = dict(
+        relay_noaction, author={"login": "github-actions[bot]"},
+        authorAssociation="CONTRIBUTOR",
+        body=relay_noaction["body"].replace(relay_footer, ""))
     relay_other_model = dict(relay_clean, body=relay_clean["body"].replace(
         "`kimi-k3`", "`glm-5.3`"))
     relay_no_footer = dict(relay_clean, body=relay_clean["body"].replace(
@@ -4566,6 +4581,12 @@ def main() -> int:
          "earlier relay with findings (gha#2115)",
          [relay_notclean, relay_clean_nits, relay_fresh_clean, relay_bot],
          True),
+        ("a relayed CLEAN whose non-blocking heading says 'no action needed' "
+         "passes (ai-config#5858)",
+         [relay_notclean, relay_noaction, relay_bot], True),
+        ("a 'no action needed' section that marks an item blocking still "
+         "fails (negative control)",
+         [relay_notclean, relay_noaction_blocking, relay_bot], False),
     ):
         mock_relay = json.dumps({"comments": rounds, "reviews": []})
         with patch.object(checker, "run_cmd", return_value=mock_relay):
@@ -4582,6 +4603,12 @@ def main() -> int:
     check("relay identity is keyed on the model",
           checker._reviewer_identity(relay_clean["body"], "d-morrison")
           == "relay:kimi-k3")
+    check("the no-action exemption is relay-only: the same body outside a "
+          "relay is still a finding (negative control)",
+          checker._unresolved_finding_pattern(relay_noaction_unrelayed["body"])
+          is not None
+          and checker._unresolved_finding_pattern(relay_noaction["body"])
+          is None)
     check("relay identity reads a header with a leading word ('Fresh')",
           checker._reviewer_identity(relay_fresh_clean["body"], "d-morrison")
           == "relay:kimi-k3")

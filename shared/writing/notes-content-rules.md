@@ -49,3 +49,21 @@ Ezra, 2026-11-04, on the logistic regression lab in lds.
 No check for it exists yet, so this is a prose rule for now.
 Canonical rule: [psw#478](https://github.com/Morrison-Lab/psw/pull/478).
 Tracked in [ai-config#4938](https://github.com/Morrison-Lab/ai-config/issues/4938).
+
+## Keep expository content out of labs
+
+- **Do:** put every definition, theorem, lemma, proposition, corollary, remark,
+  and explanation of a concept on the exposition page for its topic,
+  and link to it from the lab step that uses it.
+  When a lab needs a concept no exposition page covers,
+  add it to an exposition page first.
+- **Don't:** introduce a definition, a result, or an explanation in a lab page,
+  or in a subfile a lab page includes.
+
+Ezra, 2026-11-19, on psw:
+labs should not introduce new expository content, such as definitions or theoretical results,
+and all expository content belongs on the exposition pages.
+In lds a lab page is `chapters/*-lab.qmd` or `chapters/linear-regression-auto.qmd`.
+gha's `check-lab-exposition` fails a PR that adds a definition, result, or remark div to a lab page;
+a reviewer enforces the rest, since no check can tell an explanation from an instruction.
+Canonical rule: [psw#677](https://github.com/Morrison-Lab/psw/pull/677).

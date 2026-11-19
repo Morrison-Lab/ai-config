@@ -15,7 +15,8 @@ ones that did not.
 
 ## What it decides
 
-For an `Agent` launch (also reported as `Task` or `invoke_subagent`):
+For an `Agent` launch (also reported as `Task`, `invoke_subagent`, Codex's
+`spawn_agent`, or any other name `scripts/lib/tool_names.py` lists):
 
   - `model` names Fable (`fable` anywhere in the value, case-insensitive)
     -> DENY, unless `FABLE_SUBAGENT_OK=1` is set.
@@ -53,12 +54,20 @@ import sys
 from pathlib import Path
 
 OVERRIDE_ENV = "FABLE_SUBAGENT_OK"
-# The subagent-launch tool is reported under three names across harnesses;
-# `remind-ums-after-error.py` and `docs/cursor-hook-mapping.md` carry the same set.
-# Only `Agent` and `Task` are registered in hooks.json: the cross-harness
-# adapter relabels an Antigravity `invoke_subagent` launch as `Agent` before
-# matching, so a dedicated matcher for it would never fire.
-AGENT_TOOLS = ("Agent", "Task", "invoke_subagent")
+# The subagent-launch tool has a different name in each harness, and the
+# adapters forward the payload's own `tool_name` unchanged, so a Codex
+# `spawn_agent` reaches this hook as `spawn_agent`. The names live in one place,
+# scripts/lib/tool_names.py (ai-config#3740): a hard-coded set here omitted
+# `spawn_agent`, and the prohibition was silently off in Codex sessions.
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from tool_names import is_subagent_tool
+except Exception:  # broken install: the launch tools named in ai-config#3740
+    def is_subagent_tool(name):  # noqa: D103
+        return str(name or "").lower() in {
+            "agent", "task", "invoke_subagent", "spawn_agent", "collaboration.spawn_agent"}
 TAIL_BYTES = 400_000
 
 
@@ -120,7 +129,7 @@ def decide(payload):
     tool = payload.get("tool_name") or ""
     inp = payload.get("tool_input")
     inp = inp if isinstance(inp, dict) else {}
-    if tool in AGENT_TOOLS:
+    if is_subagent_tool(tool):
         model = inp.get("model")
         if isinstance(model, str) and model.strip():
             if not is_fable(model):

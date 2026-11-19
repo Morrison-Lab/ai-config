@@ -91,6 +91,10 @@ the conservative reading is the one that keeps it.
 
 ### 1. Classify, both passes
 
+[`scripts/clean-git-plan.py`](../../scripts/clean-git-plan.py) computes both passes' classification as JSON, read-only, for one repository or for each repository under a directory that is not one (ai-config#4170).
+Run it after the snapshot and the `git fetch --prune` below, and build the plan from its rows rather than re-deriving each row by hand.
+It does not check claim comments (`clean-branches` step e), so check those for every row it marks for deletion.
+
 Everything in this step shares a scratch directory, so create it **first**.
 Several commands write into `$TMP`, and an undefined `$TMP` sends each redirect
 to the filesystem root:

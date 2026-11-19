@@ -25,6 +25,9 @@ single just-merged PR rather than the whole session.)
 - "wrap up", "wrap up the session", "finish up", "let's close out", "done",
   "all done", "are we done?"
 - The end of a multi-PR / multi-issue session.
+- A bare "wrap up?" fires it too:
+  run the procedure, UMS pass included, rather than answering with a status summary
+  (2026-11-19: a status-only reply drew "`wrap up` should include a final ums").
 
 ## Procedure
 

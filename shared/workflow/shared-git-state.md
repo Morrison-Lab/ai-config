@@ -41,6 +41,6 @@ A `git checkout -B <branch>` run from the wrong directory left the main checkout
 - **Do:** leave a checkout on its branch while a background job or subagent you started is still reading it.
 - **Don't:** run `git switch` or a branch-changing `git checkout` in the main worktree of a repository that has linked worktrees.
 
-`hooks/no-switch-in-main-checkout.py` denies `git switch` and a branch-changing `git checkout` (a commit, `-`, `-b`, `-B`, `--orphan`, `--detach`) in the main worktree while more than one worktree exists.
+`hooks/no-switch-in-main-checkout.py` denies `git switch` and a branch-changing `git checkout` (a branch or other commit, a branch name only a remote has, `-`, `-b`, `-B`, `--orphan`, `--detach`) in the main worktree while more than one worktree exists.
 Restoring paths (`--`, `-p`, a name that is not a commit) passes.
 `ALLOW_MAIN_CHECKOUT_SWITCH=1` clears one command.

@@ -8,9 +8,10 @@ state. A `git checkout -B <b>` run from the wrong directory left the main
 checkout on a fixer's branch with a stale index (ai-config#4233), and a
 switch under a running subagent put a commit on the wrong branch
 (ai-config#3204). Denies `git switch` and a branch-changing `git checkout`
-(a ref, `-`, `-b`, `-B`, `--orphan`, `--detach`), run (after `cd`, `git -C`
-and inside `sh -c`) in the main worktree while more than one live worktree
-exists. Path checkouts (`--`, `-p`, a name that is not a commit) pass.
+(a ref, a name only a remote has, `-`, `-b`, `-B`, `--orphan`,
+`--detach`), run (after `cd`, `git -C` and inside `sh -c`) in the main
+worktree while more than one live worktree exists. Path checkouts (`--`,
+`-p`, a name that is neither a commit nor a remote branch) pass.
 `ALLOW_MAIN_CHECKOUT_SWITCH=1` clears one command. Fails open when a helper
 cannot load, the line does not parse, the repository is redirected, or git
 fails. Rule: [`shared-git-state`](../shared/workflow/shared-git-state.md).

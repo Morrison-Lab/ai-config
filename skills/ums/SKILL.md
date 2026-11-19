@@ -168,7 +168,7 @@ committed pass.
      add the new case to that rule rather than writing a new one.
      When no rule states it, write the principle into the entry this pass writes for the learning,
      whether a new rule or an addition to an existing file.
-     When the principle needs more than that rule (for example, a new hook, a sweep or a new fragment),
+     When the principle needs more than that entry (for example, a new hook, a sweep or a new fragment),
      still write it into that entry,
      and file the rest with [`defer-issue`](../defer-issue/SKILL.md) in the same pass.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the
@@ -534,6 +534,9 @@ committed pass.
    |------|-------|--------|
    | Poll for new reviews | `iterate/SKILL.md` | Added explicit polling procedure |
    | glab has no --state flag | `/memories/gitlab.md` | New bullet |
+
+   Under the table, give each correction's principle sentence from step 2,
+   and say whether it extended an existing rule, went into a new entry, or was also filed as an issue.
 
 ## What to look for (checklist)
 

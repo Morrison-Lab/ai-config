@@ -157,10 +157,10 @@ exception a function RAISES is a signature change that fails silently":
 swapping the type can route an error into a handler written for something else,
 making it quieter rather than louder, with nothing red to show for it.
 
-A named class has to cover every way the input text can be unreadable, not only the usual one.
+The named classes have to cover every way the input text can be unreadable, not only the usual one.
 `json.loads` reports malformed text as `ValueError`,
 but a record nested too deeply for it raises `RecursionError`, which is a `RuntimeError`.
-A transcript reader that caught only `ValueError` crashed every Stop hook that called it,
+A transcript reader that caught only `ValueError` crashed every Stop hook that called it on such a record,
 and only the hook suite's per-record fail-open fixture showed it (ai-config#5900).
 
 - **Do:** list the classes a decoder raises on hostile input

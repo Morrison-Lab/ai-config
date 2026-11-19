@@ -38,6 +38,13 @@
             "timeout": 120,
             "script": "refresh-stale-plugin-pin-cloud.py",
             "why": "A cloud container installs the plugin once at setup and a thread session reuses it for days; a repo's own refresh hook runs only when the session starts in that repo, and warn-stale-plugin-pin.py compares against a marketplace clone that is equally old. Measured 2026-11-04: a pin from 2026-11-03T19:43Z lacked block-project-memory-write.py (#4931), so the memory write it refuses went through. In CLAUDE_CODE_REMOTE sessions, updates the marketplace and, when the user-scope pin lags, runs claude plugin update and reports the move. Opt out with AI_CONFIG_NO_AUTO_REFRESH=1."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/sync-auto-mode-approvals.py\"",
+            "timeout": 10,
+            "script": "sync-auto-mode-approvals.py",
+            "why": "ai-config#5853 -- Ezra's standing autoMode approvals (#5623, #5682, #5752) reached a local machine only when bootstrap.sh ran, so a lab machine lacked the verdict-post rule and its classifier denied a cross-model verdict post on gha#2115 until Ezra typed the approval. On a local (non-remote) machine, applies wire-user-config.py's three autoMode steps in write mode (add-only, the exact approved text) and reports any write, which takes effect next session. Ezra chose this on 2026-11-19. Opt out with AI_CONFIG_NO_APPROVAL_SYNC=1."
           }
         ]
       },
@@ -456,20 +463,6 @@
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-headless-browser-in-bash.py\"",
-            "timeout": 10,
-            "script": "no-headless-browser-in-bash.py",
-            "why": "Ezra's standing rule is no Chrome, no browser and no computer use, ever. The rule was enforced only for the browser tools (warn-browser-without-route-check.py watches mcp__claude-in-chrome__*, mcp__Claude_Browser__*, mcp__computer-use__*). On 2026-10-28 an agent checked a hash redirect on the live lds site with a headless Chromium launched from Bash through the container's preinstalled Playwright (`node redir.js`), and the coordinator caught it afterwards. Denies a Bash command that invokes a browser binary, a browser-automation CLI, or an interpreter whose inline code or script file imports a browser-automation library; the escape valve is ALLOW_HEADLESS_BROWSER=1 plus a stated reason.",
-            "_note_invocation_not_mention": [
-              "Matches the invocation position, not the token anywhere, so",
-              "`grep -rn playwright .` and `pip install playwright` pass. A script",
-              "file named on an interpreter's command line is read for a",
-              "browser-automation import, because the incident's command line was",
-              "just `node redir.js` and carried no browser word at all."
-            ]
-          },
-          {
-            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-rm-live-render-intermediate.py\"",
             "timeout": 10,
             "script": "no-rm-live-render-intermediate.py",
@@ -611,6 +604,20 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-bare-stash-pop.py\"",
+            "timeout": 15,
+            "script": "no-bare-stash-pop.py",
+            "why": "ai-config#1907 and #3584: the stash stack is shared by every worktree, so a bare `git stash pop` or `apply` takes whatever entry is on top, often another session's; a clean pop drops it into the wrong worktree and exits 0. DENIES `git stash pop|apply` naming no entry (redirections are not entries) when the repository it runs in (cwd moved by cd and git -C, nested sh -c lines included) lists more than one live worktree; an explicit ref or SHA, -h and --help are allowed; eval, xargs and a $VAR git are not followed. Override: ALLOW_BARE_STASH_POP=1. Fails open when shellcmd cannot load, the command does not parse, --git-dir, --work-tree, GIT_DIR or GIT_WORK_TREE redirect the repository, or git worktree list fails."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-add-sweeping-scratch.py\"",
+            "timeout": 20,
+            "script": "no-add-sweeping-scratch.py",
+            "why": "ai-config#3884: `git add -A` staged a worktree-isolated agent's `.claude/worktrees/agent-*` as an unresolvable gitlink. DENIES a `git add` (cwd moved by cd and git -C) when `git ls-files -o --exclude-standard` (without the exclude for a forced add, -f) on its own pathspecs lists a directory holding `.git`; read-only, so it takes no index lock. -u, -n/--dry-run and --pathspec-from-file are not checked. Override: ALLOW_SCRATCH_ADD=1. Fails open when shellcmd or no-bare-stash-pop.py cannot load, the command does not parse, --git-dir, --work-tree, GIT_DIR or GIT_WORK_TREE redirect the repository, or git fails."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-delete-branch-under-stacked-pr.py\"",
             "timeout": 25,
             "script": "no-delete-branch-under-stacked-pr.py",
@@ -649,7 +656,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unrequested-sweep-pr.py\"",
             "timeout": 10,
             "script": "no-unrequested-sweep-pr.py",
-            "why": "ai-config#5773. Ezra, 2026-11-17: \"how did a sweep get started without my authorization?\" after a spelling-check thread opened about 25 unrequested fix PRs, none titled \"sweep\". DENIES a PR creation once 3 PRs were opened since the user's latest message, unless a message the user wrote (not a coordinator note) asks for a sweep. See shared/workflow/no-sweeps-by-default.md. Fails open on a missing transcript."
+            "why": "ai-config#5773. Ezra, 2026-11-17: \"how did a sweep get started without my authorization?\" after a spelling-check thread opened about 25 unrequested fix PRs, none titled \"sweep\". DENIES a PR creation once 10 PRs were opened since the user's latest message, unless a message the user wrote (not a coordinator note) asks for a sweep. See shared/workflow/no-sweeps-by-default.md. Fails open on a missing transcript."
           },
           {
             "type": "command",
@@ -1845,18 +1852,6 @@
         ]
       },
       {
-        "matcher": "mcp__.*laywright.*|mcp__.*uppeteer.*|mcp__.*elenium.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-headless-browser-in-bash.py\"",
-            "timeout": 10,
-            "script": "no-headless-browser-in-bash.py",
-            "why": "ai-config#5123, 2026-11-08: a thread checked MathJax output in headless Chromium through Playwright. The Bash binding of this script denies a browser launched from a command; an MCP server that drives a browser (mcp__playwright__*, mcp__puppeteer__*, mcp__selenium__*) is the same act through a tool name that says nothing about Bash, and returned early. DENIES such a tool with no escape variable, since ALLOW_HEADLESS_BROWSER=1 is a Bash command prefix. The message points to curl, node with mathjax-full, and pdflatex."
-          }
-        ]
-      },
-      {
         "matcher": "mcp__claude-in-chrome__javascript_tool",
         "hooks": [
           {
@@ -1957,6 +1952,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-plain-text-choice.py\"",
+            "timeout": 10,
+            "script": "no-plain-text-choice.py",
+            "why": "ai-config#5826. Ezra, 2026-11-18: \"anytime you ask me a multiple choice question, can you use a multiple choice card?\" Denies a user-visible post_message, reply, update_message or edit_message in any session that holds a question plus two or more lettered or numbered option lines, two Option labels, or a 'start now or file' choice, and says to post it with request_decision (one question, 2 to 4 options, one recommended). A deny, not a reminder, because the failing shape is lexical (ai-config#4741). Open-ended questions and fenced code are left alone. ALLOW_PLAIN_CHOICE=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-bare-for-now-limit.py\"",
             "timeout": 10,
             "script": "no-bare-for-now-limit.py",
@@ -2010,6 +2012,13 @@
             "timeout": 10,
             "script": "no-manual-step-ask.py",
             "why": "Ezra, 2026-10-29 (ai-config#4842): also denies a reply that tells the user to type or run a shell command (ask permission and run it yourself; a message naming a secret, token, password or credential is exempt). ai-config#4698. Ezra, 2026-10-23: \"don't make me intervene manually to prompt threads to 'go' if there's any other way\"; no merge buttons or manual steps. Blocks (deny) a user-visible reply tool call that asks the user to type go into a Remote Control session or to click a Merge button, or asks the user to paste or hand-add text into a file (Ezra, 2026-10-26: \"never ask me to paste anything into a file; always give me a script-based command to run that does it for me\"), and points at the substitutes (fresh session on an approved environment; plain mwc; an idempotent script run by one command). See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-leftover-cleanup-ask.py\"",
+            "timeout": 10,
+            "script": "no-leftover-cleanup-ask.py",
+            "why": "ai-config#5843. Ezra, 2026-11-18: \"cai: always clean up after yourself after installs etc\". After installing ONLYOFFICE on a lab machine, a session left the 426 MB AppImage download in ~/.local/opt/onlyoffice-dl and told Ezra he could delete it. Blocks (deny) a user-visible reply tool call whose sentence names an install or setup leftover (download, installer, AppImage, archive, tarball, scratch or temp directory, package file) and hands its removal to the user (you can delete, safe to remove, can be deleted, I left ...). A sentence naming a secret or key, or saying the agent already removed it, is exempt. ALLOW_LEFTOVER_HANDOFF=1 overrides. Fails open on parse trouble."
           },
           {
             "type": "command",
@@ -2134,6 +2143,13 @@
             "timeout": 10,
             "script": "require-ums-before-resolve.py",
             "why": "A resolved thread loses its message box, so UMS must run first. Denies the first set_thread_resolved(true) of a thread when no UMS tool call follows the last user message; the retry is allowed (ai-config#4480)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-pr-read-before-resolve.py\"",
+            "timeout": 10,
+            "script": "require-pr-read-before-resolve.py",
+            "why": "A thread with an open PR must not be resolved (ai-config#5806; lds#2623 was open when its thread was resolved on 2026-11-17). Denies set_thread_resolved(true) unless list_threads with include_pull_requests ran since the last user turn, and when its result row for the thread shows an open or draft PR."
           }
         ]
       },
@@ -2219,7 +2235,7 @@
             "script": "require-model-choice.py",
             "why": "Denies a subagent, thread or session launch that records no deliberate model choice, and a message to an existing thread that does not say why a new thread would not be better. Ezra 2026-11-16 (daytb): coordinators pick the best-fit model per task with select-model/recm; a running thread's model cannot be changed, so the choice must be made at launch.",
             "_note_blocks": [
-              "Emits `permissionDecision: deny` only when `model` (or a `Model-fit:` line for thread/session starts, or `Why-not-new-thread:` / `No-new-work:` for message_thread) is missing. Never emits `allow`."
+              "Emits `permissionDecision: deny` only when `model` (or a `Model-fit:` line with a `Fable:` field for thread/session starts, or `Why-not-new-thread:` / `No-new-work:` for message_thread) is missing. Never emits `allow`."
             ]
           }
         ]
@@ -2498,6 +2514,13 @@
             "timeout": 10,
             "script": "no-unread-started-ci-job.py",
             "why": "ai-config#4873 -- a turn that starts a CI job (actions_run_trigger, gh run rerun, gh workflow run) must read a run before it ends, because a scheduled check as the only follow-up was delivered 69 minutes late on 2026-11-02 and the session had promised to read short jobs in the same turn with nothing enforcing it. A scheduling call does not count as a read. Blocks once per turn (agent_notice.stop_notice) and allows a longer job when the reply names the wake that re-invokes the session; fails open."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-pr-body-refresh.py\"",
+            "timeout": 10,
+            "script": "no-push-without-pr-body-refresh.py",
+            "why": "ai-config#5871 -- on 2026-11-19 agy returned NOT CLEAN on lds#2879 because a later push added a third memory entry and the PR body still named two. Blocks the stop once per turn (agent_notice.stop_notice) when the turn's last push (git push, push_files, create_or_update_file, delete_file) has no later PR title or body write (update_pull_request with title or body, create_pull_request, gh pr create, gh pr edit --title/--body/--body-file, gh api PATCH on pulls/N). Blocks once rather than refusing, because whether the body already covers the diff is a judgment; the reply may say so and stop. Fails open."
           },
           {
             "type": "command",

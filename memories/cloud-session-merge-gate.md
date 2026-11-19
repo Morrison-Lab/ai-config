@@ -24,7 +24,7 @@ this file holds the cloud-specific quirks that stalled merges.
   Nothing was lost (CI green, Claude review clean), but the project rule was broken.
   **Do:** when a PR in such a thread is ready, report it to the coordinator and wait for Ezra's word.
   **Don't:** read a repo's standing grant as covering a Hearth thread, or merge before `check-pr-fully-clean.py` has run.
-  The scorer cannot run in these sessions (it calls `gh pr view`, which needs GraphQL, blocked here), so verify readiness by REST and say so.
+  The scorer does run in these sessions: with GraphQL blocked it falls back to the CCR `review_threads` REST route by itself (ai-config#4830, [`fully-clean.md`](../shared/workflow/fully-clean.md)).
 - The merge words are unchanged while the cross-harness reviewer is out;
   only the review changes (see "Cross-harness review" below).
 
@@ -65,8 +65,8 @@ Do not retry or work around a denial.
 
 - The hook only warns afterwards; it does not gate.
   On ai-config#4538 (2026-10-15) a merge went through on hand-read verdicts without `check-pr-fully-clean.py`, which is a procedural miss even though a later run found the PR clean.
-- In a cloud session GraphQL is blocked, so the bare checker exits 1 with a traceback and no finding bullets.
-  That is a data failure, not a verdict.
+- In a cloud session GraphQL is blocked, and the checker falls back to the CCR `review_threads` REST route by itself, so the bare run gives a verdict (ai-config#4830).
+  If it still exits 1 with a traceback and no finding bullets, that is a data failure, not a verdict.
   Run `python3 scripts/build-pr-payload.py OWNER/REPO N OUT.json`, then `python3 scripts/check-pr-fully-clean.py -R OWNER/REPO --from-json OUT.json N`, and read the exit status unpiped (0 clean, 1 not clean, other is a data problem).
   Build the payload only after the `build` job finishes, since an in-progress build is itself a failure.
 - Re-run it on the current head after any push or branch update.

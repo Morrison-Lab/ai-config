@@ -62,6 +62,8 @@ OFFERS = [
     r"shall i\b",
     r"should i (go ahead|proceed)",
     r"i can .{0,60}\bif you(('d| would) (like|prefer)| want)\b",
+    # The condition-first order, "If you want, I can open a PR" (lds, 2026-11-18).
+    r"\bif you(('d| would) (like|prefer)| want),? i (can|could|'ll|will)\b",
     r"happy to .{0,40}\bif you\b",
     r"i'?d be glad to\b",
     r"unless you'?d rather",

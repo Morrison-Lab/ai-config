@@ -51,6 +51,28 @@ until someone makes that decision and retires the graded item.
 "and not just from mlg; from any evaluation-material repo (e.g. epi204)";
 "we just need to be intentional about what we migrate, and not do it accidentally".)
 
+## Redundant examples and exercises: one example, one exercise, the rest to the bank
+
+When a notes repo holds several examples or exercises that teach the same idea with different numbers or data, keep two and bank the rest.
+Keep one version as a worked example (`#exm-`) and one as an in-notes exercise (`#exr-`).
+Move every other version to the evaluation repo's exercise bank (`exercises/` in `mlg`) for homeworks and exams.
+
+- The move is intentional in the sense of the section above: the PR says so, the item and its solution leave the notes, and the item joins the question bank.
+- Never bank the version that stays in the notes, and never leave a banked item's solution in the notes.
+- Removing a solution from the notes does not withdraw it from the published site or git history.
+  A banked version whose solution the notes already showed needs new numbers or data before any assessment grades it.
+  Only a version that never had a solution in the notes may be graded as it stands
+  (Claude review of Morrison-Lab/lds#2878, 2026-11-19).
+- Apply it to a passage you are editing anyway, not as a sweep ([`no-sweeps-by-default`](../shared/workflow/no-sweeps-by-default.md)).
+  List other candidates in one issue for Ezra to release.
+- A parallel pair that teaches two different things (LDA and QDA discriminant functions) is not redundant.
+- No exact detector exists, since a repeat need not share a slug, a source item or a heading.
+  lds has `tools/check_redundant_examples.py`, a warn-only list that compares wording after masking numbers, math and code.
+  The rule also covers ISL-lab ports, where one lab step repeats across data sets: `port-source-exercises` keeps one data set in the notes and banks the rest.
+
+(Ezra, 2026-11-19: "if we have redundant examples or exercises in notes with different example numbers or data, pick one version as an example, one version as an in-notes exercise, and put the rest into the exercise bank for homeworks and exams".
+Tracked in ai-config#5862 and lds#2876.)
+
 ## An overlap is fixed in the notes, and standard results stay
 
 When a graded item in an evaluation repo overlaps a notes repo, the notes repo changes and the graded item does not.

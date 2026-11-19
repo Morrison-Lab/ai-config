@@ -1,6 +1,6 @@
 ---
 name: "clean-branches"
-description: "Clean dead or stale Git branches."
+description: "Clean dead or stale Git branches. Aliases: cb, prune."
 ---
 
 # clean-branches (Codex wrapper)

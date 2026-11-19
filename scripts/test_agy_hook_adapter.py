@@ -633,7 +633,13 @@ class TestAgyHookAdapter(unittest.TestCase):
     def test_pre_invocation_multi_message_steps(self, mock_run, mock_stderr, mock_stdout, mock_stdin, mock_file, mock_exists):
         res1 = MagicMock(returncode=0, stdout="Message 1\n", stderr="")
         res2 = MagicMock(returncode=0, stdout=json.dumps({"systemMessage": "Message 2"}), stderr="")
-        mock_run.side_effect = [res1, res2]
+        # Key each result on the command, not the call order: the adapter runs
+        # UserPromptSubmit hooks on a thread pool, so the order in which they
+        # reach subprocess.run is nondeterministic (ai-config#5792).
+        by_cmd = {"test-prompt1.py": res1, "test-prompt2.py": res2}
+        mock_run.side_effect = lambda cmd, *a, **kw: next(
+            res for key, res in by_cmd.items() if key in cmd
+        )
         
         payload = {"invocationNum": 1, "transcriptPath": "/tmp/transcript.jsonl"}
         mock_stdin.write(json.dumps(payload))
@@ -750,6 +756,17 @@ class TestAgyHookAdapter(unittest.TestCase):
         # 30000 bytes, then hooks returning 2-byte UTF-8 characters
         # ("e" with an acute accent, U+00E9) that cannot fit in the
         # single remaining byte.
+        # The adapter reads these caps from AGY_ADAPTER_* env vars at import;
+        # this test depends on the defaults exactly, so pin them.
+        for name, value in (
+            ("PRE_INVOCATION_MSG_BYTE_CAP", 10000),
+            ("PRE_INVOCATION_TOTAL_BYTE_CAP", 30000),
+            ("PRE_INVOCATION_MSG_CAP", 20),
+            ("MAX_WORKERS", 16),
+        ):
+            patcher = patch.object(self.adapter, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         five_hooks = {
             "hooks": {
                 "UserPromptSubmit": [
@@ -767,7 +784,12 @@ class TestAgyHookAdapter(unittest.TestCase):
             MagicMock(returncode=0, stdout=multibyte_chunk, stderr=""),  # overflows by 1 byte mid-char
             MagicMock(returncode=0, stdout="Z", stderr=""),  # ASCII: fits the 1 leftover byte
         ]
-        mock_run.side_effect = results
+        # Key each result on its command, not the call order: hooks run on a
+        # thread pool, so they reach subprocess.run in a nondeterministic
+        # order, and a positional side_effect list permuted the outputs
+        # (ai-config#5792).
+        by_cmd = {f"cmd_{i}": res for i, res in enumerate(results)}
+        mock_run.side_effect = lambda cmd, *a, **kw: by_cmd[cmd]
 
         payload = {"invocationNum": 1, "prompt": "test"}
         mock_stdin.write(json.dumps(payload))
@@ -3089,6 +3111,104 @@ class TestWarnOnlyPreToolUseSurfacing(unittest.TestCase):
         self.assertIn("holder:released", events)
         self.assertIn("contender:acquired", events)
         self.assertLess(events.index("holder:releasing"), events.index("contender:acquired"))
+
+class TestNoPositionalSubprocessMocks(unittest.TestCase):
+    def test_mocks_do_not_use_positional_side_effect_sequences(self):
+        # Scope: this file only. The adapter runs hooks on a thread pool, so
+        # a positional `side_effect` sequence hands results to whichever
+        # thread calls first and the test flakes under load (ai-config#5792).
+        # The guard targets that positional-sequence pattern: a List or Tuple
+        # literal, a list()/tuple()/sorted()/iter() call, or a `.copy()` of
+        # a sequence, as the value of a `side_effect` attribute assignment
+        # (plain or annotated) or a `side_effect=` keyword. A bare Name
+        # value is flagged when an enclosing scope binds that name (plain or
+        # annotated assignment) to such a sequence; a Name bound to a def, a
+        # lambda or anything else is left alone. Direct sequences are
+        # flagged at any depth (module, class, function). It does not check
+        # single-hook paths specially: a one-element sequence is flagged too.
+        #
+        # It errs toward over-flagging, the safe direction: name resolution
+        # walks nested functions too, and a module-level name is visible in
+        # every function, so an unrelated same-named binding can flag a
+        # `side_effect` that is not a sequence. Rename it or key on the
+        # command.
+        import ast
+        tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+        factories = ("iter", "list", "tuple", "sorted")
+
+        def literal(node, names):
+            if isinstance(node, (ast.List, ast.Tuple)):
+                return True
+            if not isinstance(node, ast.Call):
+                return False
+            func = node.func
+            if isinstance(func, ast.Name):
+                return func.id in factories
+            return (
+                isinstance(func, ast.Attribute)
+                and func.attr == "copy"
+                and (
+                    literal(func.value, names)
+                    or (isinstance(func.value, ast.Name) and func.value.id in names)
+                )
+            )
+
+        def assignments(nodes):
+            # (targets, value) for every Assign and valued AnnAssign.
+            for n in nodes:
+                if isinstance(n, ast.Assign):
+                    yield n.targets, n.value
+                elif isinstance(n, ast.AnnAssign) and n.value is not None:
+                    yield [n.target], n.value
+
+        bad = set()
+        # The module scope walks the whole tree, so the direct forms are
+        # caught anywhere. Names are resolved against the module-level
+        # assignments there, and per enclosing function in each function
+        # scope.
+        scopes = [(tree, tree.body)] + [
+            (n, list(ast.walk(n)))
+            for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        for scope, binding_nodes in scopes:
+            seq_names = set()
+            for _ in range(2):  # the second pass resolves `b = a.copy()`
+                seq_names |= {
+                    t.id
+                    for targets, value in assignments(binding_nodes)
+                    if literal(value, seq_names)
+                    for t in targets
+                    if isinstance(t, ast.Name)
+                }
+
+            def positional(node):
+                return literal(node, seq_names) or (
+                    isinstance(node, ast.Name) and node.id in seq_names
+                )
+
+            for node in ast.walk(scope):
+                if isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                    if (
+                        node.value is not None
+                        and positional(node.value)
+                        and any(
+                            isinstance(t, ast.Attribute) and t.attr == "side_effect"
+                            for t in targets
+                        )
+                    ):
+                        bad.add(node.lineno)
+                elif isinstance(node, ast.Call):
+                    bad.update(
+                        kw.value.lineno
+                        for kw in node.keywords
+                        if kw.arg == "side_effect" and positional(kw.value)
+                    )
+        self.assertEqual(
+            sorted(bad), [],
+            f"positional side_effect at lines {sorted(bad)}: use a command-keyed function",
+        )
 
 if __name__ == "__main__":
     unittest.main()

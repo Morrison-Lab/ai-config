@@ -367,6 +367,11 @@ written and rots nothing.
 - **Don't:** rely on the recipient's premise check to catch it --- that check
   is discretionary, and your brief carries the authority that argues against
   running it.
+- **Do:** paste the source, or label the claim unverified, when a brief states a fact about a tool's source.
+  A GIA wave-3 brief said "per glab's root.go, --help and --version are booleans" without root.go having been read, and the implementer built on it
+  ([#5821](https://github.com/Morrison-Lab/ai-config/pull/5821), session record, 2026-11-18).
+  A reviewer later confirmed it, but only because the claim happened to be true.
+- **Don't:** cite a source file in a brief you have not opened.
 - **Don't:** hand over the conclusion in place of the measurement --- the
   recipient cannot re-derive a number you did not supply, so the check this
   fragment prescribes for a supplied measurement has nothing to run on.

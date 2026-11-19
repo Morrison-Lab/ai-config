@@ -54,6 +54,14 @@ A multi-backend harness qualifies only when both its harness
 and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch
 is probed here.
+GitHub Copilot CLI is a different harness whose **default model is Claude**: on 2026-11-10 `copilot -p "Which AI model are you?"` answered "Claude Haiku 4.5" on Ezra's Mac ([ai-config#5286](https://github.com/Morrison-Lab/ai-config/issues/5286)).
+So a `copilot -p` run qualifies only with an explicit non-Claude `--model`, such as `--model gpt-5.3-codex`, and `hooks/warn-merge-without-cross-harness-review.py` credits it only in that form.
+Which models an account can use differs by account, so probe before relying on one: `copilot --model <id> -p "Reply OK"` answers, or says the model is not available.
+That evening `gpt-5.3-codex` was available on that account, and ten other GPT and Gemini ids were not.
+
+- **Do:** pass `--model` with a non-Claude id on every `copilot` review run, after probing that id.
+- **Don't:** count a bare `copilot -p` run as the cross-model review.
+
 If no qualifying entry can run, the gate is waived under [the waiver below](#waiver-when-no-cross-model-reviewer-can-run) --- it never falls through to a same-model or same-harness reviewer standing in as the cross-model verdict.
 A quota outage reroutes the dispatch --- it does not license skipping it.
 Waiting does not overrule a human:
@@ -888,6 +896,36 @@ that demoting a disclosure marker changes `_reviewer_identity()`, when the Claud
 that a non-conforming payload is rejected, when nothing validates it;
 and that the pre-push guard accepts two verdict phrasings, when it accepts three.)
 
+## Run the cross-model review on a prose PR too
+
+A cross-model review is evidence-backed for prose PRs, not only code.
+On 2026-11-18 ([ai-config#5801](https://github.com/Morrison-Lab/ai-config/pull/5801)) cross-model reviews found four prose defects across two rounds,
+after the Claude review bot had already returned [a CLEAN verdict at `850bc12`](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6971793033):
+
+- [round 1](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972000136) found three defects;
+- [round 2](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6973224729) found the fourth, plus three more wording findings;
+- [round 3](https://github.com/Morrison-Lab/ai-config/pull/5801#issuecomment-6972147426) was CLEAN and confirmed the fixes.
+
+The four defects were:
+an unscoped "every attempt";
+the same PR cited as both success evidence and a waiver case;
+an ambiguous "that day";
+and one timestamp covering two events.
+
+- **Do:** dispatch the cross-model reviewer on a docs-only or prose-heavy PR before merge, exactly as for code.
+- **Don't:** skip it because a Claude review of the prose was already clean.
+
+## Run both reviewers on a hook change
+
+On [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) at `2de2419` (2026-11-18), the cross-model reviewer (kimi-k3) and the Claude review bot both passed a regression: an expansion counted as exactly one path segment, so `"repos/$R/pulls"` passed silently.
+The Claude adversarial reviewer caught it.
+At the later head `ca77cdf`, kimi-k3 caught an input-controlled recursion depth ([comment](https://github.com/Morrison-Lab/ai-config/pull/5821#issuecomment-6990696509)).
+The adversarial reviewer had measured that it failed open with a note and judged it non-blocking, and the depth was bounded anyway.
+So one reviewer alone would have shipped the regression, and the two disagreed on how severe the recursion was.
+
+- **Do:** run both the cross-model reviewer and the Claude adversarial reviewer on every hook change.
+- **Don't:** treat one reviewer's pass as covering the other's class of defect, or skip the second because the first was clean.
+
 ## Require detailed and holistic review passes
 
 Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:
@@ -1570,6 +1608,34 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 - **Don't:** rely on "all findings addressed in <sha>" inside the not-clean comment, or on later bot verdicts, to clear a not-clean you relayed.
 
 (Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)
+
+A cross-model relay (for example OpenCode kimi-k3) owes the same close.
+[ai-config#5802](https://github.com/Morrison-Lab/ai-config/issues/5802) records two independent causes of a relay reading not clean to `check-pr-fully-clean.py` (2026-11-18, a GIA session):
+(a) the model's verbatim output carried its own `### Findings (all non-blocking)` heading inside the envelope;
+(b) the closing `### Verdict` block was dropped.
+The full [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md) envelope cures (b) only.
+Any findings section in the verbatim review, non-blocking included, leaves the gate not clean until the same model re-reviews after your dispositions and returns a clean verdict.
+That re-review is what cleared [#5800](https://github.com/Morrison-Lab/ai-config/pull/5800): [its re-review comment](https://github.com/Morrison-Lab/ai-config/pull/5800#issuecomment-6972138604) made `check-pr-fully-clean.py` exit 0.
+Editing the posted review to clear the gate is not a remedy: the auto-mode classifier denied that edit as undermining oversight, and it was right.
+
+The re-review rule has one exception (Ezra, 2026-11-19, on [ai-config#5858](https://github.com/Morrison-Lab/ai-config/issues/5858)'s decision card: "Pass only reviewer-labelled no-action"): a relayed CLEAN verdict passes when the reviewer's own heading for its non-blocking section says "no action needed" (or "requested" or "required") and no item in that section is called blocking.
+The label has to be the reviewer's, quoted verbatim.
+A section headed only "Non-blocking" or "(not bugs)" still needs the re-review.
+`check-pr-fully-clean.py` applies this to relays only, and the adversarial reviewer checks the same thing.
+Still disposition each observation in the relay, as [`address-every-comment`](address-every-comment.md) requires.
+
+- **Do:** post the full envelope, closing verdict block included, in the first relay of a cross-model review (cause b).
+- **Do:** re-request the same model with your dispositions when the verbatim review carried a findings section, and post its new verdict (cause a).
+- **Don't:** edit a posted review to make the gate pass.
+
+Posting order matters too.
+On #5801 (2026-11-18), an earlier round's NOT CLEAN cross-model review was posted late, for the record, after the same login had posted that model's CLEAN round.
+`check-pr-fully-clean.py` read the PR as not clean again: the late post became that login's newest verdict-bearing statement, and its verbatim "VERDICT: NOT CLEAN" matched the findings pattern for the head it names.
+Recovering needed another same-model re-review.
+
+- **Do:** post every review round when it runs.
+- **Don't:** post an old round after a clean one.
+  If an old round has to go on the record late, expect to re-run the model on the head afterwards.
 
 ## Post every independent review on the PR or MR it reviewed
 

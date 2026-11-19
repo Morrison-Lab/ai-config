@@ -427,6 +427,10 @@ Run `python3 scripts/run-local-validation.py --changed` to execute the local che
 Under `--changed`, `scripts/test_hooks.py` runs only the hook suites the change can affect.
 A plain run, like CI, runs all of them.
 Run `python3 scripts/run-local-validation.py --changed --list` to see them without execution.
+The plain run (`--base origin/main`) took over 10 minutes (measured 2026-11-18 in a cloud container), so start it as a background job, not under a foreground timeout shorter than the run.
+
+- **Do:** launch the validation run as a background job and read its tail when it exits.
+- **Don't:** wrap it in a foreground `timeout 580`, which killed it.
 
 - [ ] **A separate `adversarial-reviewer` subagent reviewed this diff and returned a clean verdict** --- dispatched in the foreground against `git diff origin/<default-branch>...HEAD`, briefed with the standards rather than with your rationale for the change, with every finding Addressed, Rebutted, or Deferred to a tracked issue, and re-dispatched after the last commit so its `Reviewed-Commit:` fingerprint names the commits the push would ship ([`adversarial-self-review`](adversarial-self-review.md)).
   An inline pass under a reviewer framing does not satisfy this, and reads identically in the output --- the test is whether an `Agent` call was made.
@@ -457,6 +461,10 @@ Run `python3 scripts/run-local-validation.py --changed --list` to see them witho
 - [ ] **The changelog entry and EVERY PR description this round touched were
       re-read** against the new behavior, not just the code --- none is in the
       diff, so no reviewer and no grep will catch a stale one.
+      Update the title and body in the same turn as the push, so they cover
+      every file and entry in the whole diff
+      (lds#2879 drew a NOT CLEAN review because its body named two of three
+      entries; `hooks/no-push-without-pr-body-refresh.py`, ai-config#5871).
       Read "every" literally: a round that corrects a claim appearing in two
       PRs' bodies discharges the *feeling* of having synced bodies as soon as
       one of them is done, and the one most likely to be skipped is your own,

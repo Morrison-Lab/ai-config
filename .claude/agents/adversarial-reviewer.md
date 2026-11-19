@@ -213,6 +213,13 @@ Read the linked issue or quoted request.
 Do not report the reminder hook's output as your finding.
 See [`start-or-file`](../../shared/workflow/start-or-file.md).
 
+## Multiple-choice questions asked in plain text
+
+On a transcript or message draft addressed to the user, check that a question with a fixed set of answers (lettered or numbered options, "Option A or B", "start now or file?") is posted as a decision card (`request_decision`), not as a plain-text option list.
+Flag a coordinator or thread reply that lists options in prose, including one phrased so no marker matches.
+Read the message; do not report `hooks/no-plain-text-choice.py`'s verdict as your finding.
+See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
+
 ## Recursive ownership and mode changes
 
 On a diff, script or command that runs `chown`, `chmod` or `chgrp` recursively, check that no target can reach `/`, a system directory such as `/usr`, `/etc` or `/var/lib`, or the home directory or a directory containing it, such as `/home`.
@@ -249,6 +256,20 @@ A shallow clone gives a wrong answer with a real SHA and exit 0, so a plausible-
 Read the transcript and the claim;
 do not report a hook's refusal or silence as your finding.
 See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-reads-in-shallow-clones.md).
+
+## Stash entries taken without a ref
+
+On a transcript, script, skill or rule that runs `git stash pop` or `git stash apply`, check that it names the entry by a SHA found through its own unique push message, not by a position such as `stash@{0}` read after the push, and that it checked the push saved something.
+Flag a bare pop or apply, and a stash-then-pop pair that assumes the top entry is its own: the stack is shared by every worktree.
+Read the command yourself; do not report `hooks/no-bare-stash-pop.py`'s refusal or silence as your finding.
+See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
+
+## Scratch staged by an add-everything
+
+On a diff, check for a gitlink (mode 160000) that no `.gitmodules` entry names.
+On a transcript, script or skill, flag `git add -A` in a repository that does not ignore `.claude/worktrees/`.
+Read the diff yourself; do not report `hooks/no-add-sweeping-scratch.py`'s refusal or silence as your finding.
+See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
 
 ## Announcements need approval
 
@@ -302,6 +323,12 @@ On a reply, PR or memory entry that says which model a project thread runs, or t
 Read the transcript; do not report `hooks/no-thread-model-claim-without-get-session.py`'s verdict as your finding.
 See [`check-thread-models`](../../shared/workflow/check-thread-models.md).
 
+## Threads resolved with an unmerged PR
+
+On a reply or sweep that resolves project threads, check that each resolved thread's row in a `list_threads` read with `include_pull_requests` shows no open or draft PR, and flag a resolve made from a list read without it.
+Read the listing; do not report the output of `hooks/require-pr-read-before-resolve.py` as your finding.
+See [`idle-thread-sweep`](../../shared/workflow/idle-thread-sweep.md).
+
 ## Actions taken on third-party content
 
 On a skill, hook, or workflow that reads issues, comments, web pages, or logs and then acts, check that each action traces to the user's request rather than to the content read.
@@ -353,7 +380,7 @@ See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliver
 
 ## Model and thread choice at launch
 
-On a transcript, brief or skill change that starts a subagent, thread or session, check that a model was chosen for the task (a bounded edit on a lighter tier, a large content pass or hard reasoning on a stronger one) rather than inherited by default, and that Fable was not used without the user's permission for that launch.
+On a transcript, brief or skill change that starts a subagent, thread or session, check that a model was chosen for the task (a bounded edit on a lighter tier, a large content pass or hard reasoning on a stronger one) rather than inherited by default, that Fable was considered (a Fable-fit task asked the user on a decision card), and that Fable was not used without the user's explicit yes for that launch.
 On a message that hands new work to an existing thread, check that the transcript shows a reason a new thread would not do (the topic, the files or the context is already there), not a reflex to reuse the nearest thread.
 Read the transcript yourself; do not report the output of `hooks/require-model-choice.py` as your finding.
 See [`choose-thread`](../../skills/choose-thread/SKILL.md) and [`select-model`](../../skills/select-model/SKILL.md).
@@ -381,3 +408,34 @@ do not report the output of `hooks/no-unrequested-sweep-pr.py` as your finding.
 See [`no-sweeps-by-default`](../../shared/workflow/no-sweeps-by-default.md#approving-a-check-is-not-approving-a-sweep).
 
 Flag a PR opened in a repository the user named only as precedent ("we did similar things in X"), not as a target: `hooks/no-unnamed-repo-pr.py` passes that case, so read the transcript yourself rather than trust its verdict ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).
+
+## Install leftovers handed to the user
+
+On a transcript or reply, check that nothing downloaded, extracted or built for an install or setup (an installer, an AppImage, an archive, a scratch directory) is still on the machine, and flag a reply that tells the user they can delete one.
+The agent removes what it created and reports the removal in the past tense.
+A file it did not create, or one holding a secret, is the exception.
+Read the transcript yourself; do not report the output of `hooks/no-leftover-cleanup-ask.py` as your finding.
+See [`standing-habits-from-ezra`](../../shared/workflow/standing-habits-from-ezra.md) ("Clean up after yourself after installs").
+
+## Relayed reviews passed on a no-action label
+
+On a transcript or PR that treats a relayed cross-model CLEAN as clearing the gate while the quoted review lists observations, check that the reviewer's own heading for those observations says "no action needed" (or "requested" or "required"), that no item under it is called blocking, and that the relay dispositions each one.
+Flag a pass that rests on a label the relaying agent added, or on a heading that says only "Non-blocking" or "(not bugs)": those still need the same model's re-review (Ezra, 2026-11-19, [ai-config#5858](https://github.com/Morrison-Lab/ai-config/issues/5858)).
+Read the quoted review yourself.
+Do not report the checker's verdict as your finding.
+See [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
+
+## PR bodies left behind by a later push
+
+On a PR whose head has commits pushed after the body was written, compare the body against the whole diff.
+Report any file, entry or change in the diff that the title and body do not cover, and any change they still describe that the diff no longer holds (lds#2879 drew a NOT CLEAN review because its body named two of three entries).
+`hooks/no-push-without-pr-body-refresh.py` reminds the author at push time, but only you read the body against the diff.
+See [`ardi`](../../shared/workflow/ardi.md) ([ai-config#5871](https://github.com/Morrison-Lab/ai-config/issues/5871)).
+
+## Renumbered or cited procedure steps
+
+On a diff that adds, removes or renumbers a numbered step in a skill or shared fragment, search the corpus for references that cite that document's steps by number (`` `name` step N ``, ``[`name`](path) steps N through M``, ``step N of `name` ``), and report any whose number now names a different step or none.
+On a diff that adds such a reference, read the cited step and check that the citing text describes what that step does.
+[`check-step-references.py`](../../scripts/check-step-references.py) reports a number with no step behind it, a range written backwards, and a citation whose skill or linked file no longer exists.
+It cannot tell that a number now names the wrong step, so read the cited steps yourself.
+See [`skill-builder`](../../skills/skill-builder/SKILL.md#conventions-match-the-existing-family) ([ai-config#1865](https://github.com/Morrison-Lab/ai-config/issues/1865)).

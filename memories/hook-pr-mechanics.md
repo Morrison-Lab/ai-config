@@ -27,3 +27,9 @@ The comment's "Reviewed commit" line and the PR's check runs name the real head.
 
 - **Do:** write every PR as `[owner/repo#N](url)`, link the coordinator session, and read the PR in the same turn before saying it is open.
 - **Don't:** draft a status message from the previous turn's state.
+
+The same hook also fires on the plain words "the thread" and "coordinator" when no session or thread link sits in the same paragraph or list item, and on a bare `repo#N` inside the Stopping Point line (measured 2026-11-18, ai-config#5830).
+Other first-try refusals from that run: a Python heredoc with a backslash, and `update_pull_request` with `reviewers` on a PR whose author is the requested reviewer.
+
+- **Do:** link the session once per paragraph or rephrase ("this work", "the brief"), link every PR even in the Stopping Point line, edit scripts with Edit or Write instead of a heredoc, and assign (not request review from) a PR author.
+- **Don't:** retry the same wording or form after a refusal.

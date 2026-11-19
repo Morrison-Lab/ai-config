@@ -1,6 +1,6 @@
 ---
 name: clean-worktrees
-description: "Clean stale git worktrees."
+description: "Clean stale git worktrees. Aliases: cw."
 user-invocable: true
 allowed-tools:
   - Bash

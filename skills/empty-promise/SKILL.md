@@ -1,6 +1,6 @@
 ---
 name: empty-promise
-description: "Investigate and correct empty promises."
+description: "Investigate and correct empty promises. Aliases: ep."
 user-invocable: true
 allowed-tools:
   - Bash

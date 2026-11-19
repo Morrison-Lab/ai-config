@@ -34,3 +34,14 @@ Apply grants and rules at the breadth stated, without adding unstated conditions
 
 (Directives from the user, 2026-10-02: "assume that nothing I write is filler";
 after having to add "(that is, give me the link)" and "(always)" to a request for a referee report: "something I write to you parenthetically should be obvious to you", and "take it as a correction if it's not obvious".)
+
+## Record a rule at the scope of the user's words
+
+When you save a rule from a correction, state it at the breadth of the user's own words, not the breadth of the task it came up in.
+On 2026-11-18 Ezra said "copy algorithmically, not generatively, then make any improvements needed after the copy", and the rule was first written for exercises, the case at hand.
+He then said "generalize beyond exercises;
+when adapting any content, copy first, then modify", and "I didn't say anything specifically about exercises, did I?"
+([ai-config#5823](https://github.com/Morrison-Lab/ai-config/issues/5823)).
+
+- **Do:** before writing the rule, list the nouns in the user's sentence and the nouns in your draft, and drop any noun the user did not say.
+- **Don't:** carry the task's nouns (exercises, a lab, a repo) into the rule's wording or scope.

@@ -45,6 +45,19 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   Test the script on a scratch copy, including a second run that changes nothing, and get an adversarial review of it before you hand it over.
   Limit it to the blocked step: it never merges, force-pushes, or touches another repository.
 - **Do:** ask Ezra for a manual step only when another rule reserves it to him: a secret or credential, a hard-prohibited category, or merge words.
+- **Don't:** offer a hand-merge or a typed merge word as the way out of a blocked merge.
+  The merge-words reservation covers the grant he chooses to type.
+  It is not a route the agent recommends.
+  Recurrence, 2026-11-17 ([Morrison-Lab/lds#2772](https://github.com/Morrison-Lab/lds/pull/2772),
+  [#2785](https://github.com/Morrison-Lab/lds/pull/2785),
+  [#2786](https://github.com/Morrison-Lab/lds/pull/2786)):
+  while two merge gates refused a cloud session,
+  the agent twice recommended "merge them in the GitHub UI" and "type `mwc all` in a local session".
+  Ezra: "I don't want to do things by hand", then "do not tell me to do this" and "nor this".
+  Report the refusal as a measured fact, then fix or coordinate on the blocker, as the [ai-config#4304](https://github.com/Morrison-Lab/ai-config/issues/4304) work does.
+  `hooks/no-manual-step-ask.py` is wired to the `mcp__hearthbot__` reply tools only,
+  and its merge pattern has no UI or typed-word phrasing,
+  so this prose carries the rule until that gap is closed ([ai-config#5797](https://github.com/Morrison-Lab/ai-config/issues/5797)).
 - **Don't:** list the steps for him to perform, or ask him to hand-edit a file.
   Ezra, 2026-10-26, after a reply asked him to paste an `autoMode.allow` entry into `~/.claude/settings.json`: "never ask me to paste anything into a file;
   always give me a script-based command to run that does it for me".
@@ -58,6 +71,17 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   A general wish for scripts, including the quotation above, is not that sanction.
   Ask first, wait for his answer, then write it.
   This is the one exception to the `ask-for-manual-approval` Don't on handing the user a script in place of the approval.
+
+## Clean up after yourself after installs
+
+- **Do:** after an install or other setup task, delete your own temporary downloads, installers, extracted archives, scratch directories and similar leftovers, without asking.
+  Report what you removed and how much space it freed.
+- **Don't:** leave a leftover in place and tell Ezra he can delete it.
+  Ezra, 2026-11-18, after a session left the 426 MB ONLYOFFICE AppImage download in `~/.local/opt/onlyoffice-dl` on a lab machine and told him he could delete it:
+  "always clean up after yourself after installs etc" ([ai-config#5843](https://github.com/Morrison-Lab/ai-config/issues/5843)).
+- **Do:** leave a file in place only when it is not yours to delete (something you did not create), and say whose it is.
+- `hooks/no-leftover-cleanup-ask.py` denies a reply that hands such a removal to the user.
+  No hook can see a leftover the agent never mentions, so that half of the rule is this prose.
 
 ## Read a question as the asker framed it
 

@@ -32,6 +32,14 @@ if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 
 try:
+    from session_pause import is_paused
+except Exception as _exc:  # broken install: say so, and behave as unpaused
+    print(f"agent_notice: cannot load session_pause.py ({_exc})", file=sys.stderr)
+
+    def is_paused(payload: dict) -> bool:  # noqa: D103
+        return False
+
+try:
     from turn_id import extract_turn_id
 except Exception:  # broken install: fall back to a per-message key
     def extract_turn_id(payload: dict) -> str:  # noqa: D103
@@ -66,7 +74,13 @@ def _first_block_this_turn(payload: dict, hook: str, message: str) -> bool:
 
 
 def stop_notice(payload: dict, message: str, hook: str) -> str:
-    """JSON for a Stop hook: block once per turn so the agent sees `message`."""
+    """JSON for a Stop hook: block once per turn so the agent sees `message`.
+
+    Never blocks while the user has paused the session (ai-config#3911):
+    the note still reaches the user, but the agent is not asked to act on it.
+    """
+    if is_paused(payload):
+        return json.dumps({"systemMessage": message})
     if not payload.get("stop_hook_active") and _first_block_this_turn(payload, hook, message):
         return json.dumps({"decision": "block", "reason": message, "systemMessage": message})
     return json.dumps({"systemMessage": message})

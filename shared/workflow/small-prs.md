@@ -46,6 +46,10 @@ that issue tracks both.
   ([ai-config#5369](https://github.com/Morrison-Lab/ai-config/pull/5369)).
 - **Do:** plan a rule change and the hook that enforces it as two PRs from the start.
   [ai-config#5676](https://github.com/Morrison-Lab/ai-config/pull/5676) carried both, reached 11 files and 310 lines, and had to drop the hook into a follow-up after its first push (2026-11-14).
+- **Do:** when a branch is over the cap, `git revert` the overflow commits on that branch, so its tree matches an earlier head that was already reviewed clean.
+  Then cut a new branch from the reverted tip and cherry-pick the original overflow commits onto it, not the revert commits.
+  It worked for [#5814](https://github.com/Morrison-Lab/ai-config/pull/5814) (the tree matched [`59be24d`](https://github.com/Morrison-Lab/ai-config/commit/59be24d6a2163a412cc71c7c8e6a7dff2128ae01)) and [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) (2026-11-18).
+- **Don't:** reset or force-push the branch to drop the overflow commits, which erases the later heads' review record and breaks anyone tracking the branch.
 - **Don't:** leave the size check to the push.
 - **Don't:** run `git checkout <commit> -- <file>` to carry a change onto a newer base.
   It carries the whole old file, so it silently reverts what `main` changed since the branch point

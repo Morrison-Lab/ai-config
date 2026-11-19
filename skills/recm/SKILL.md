@@ -1,6 +1,6 @@
 ---
 name: recm
-description: "Recommend harness, provider, model, and engine for a repo or task."
+description: "Recommend harness, provider, model, and engine for a repo or task. Aliases: rech, rechme."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -180,6 +180,8 @@ When evaluating a repository, issue, or task, follow these steps:
 
 ## Relationship to Other Skills
 
+- Always consider Fable in the Claude tier, and ask Ezra on a decision card when it would be the best fit;
+  it needs his explicit yes for each launch ([`no-fable-subagents`](../../shared/workflow/no-fable-subagents.md)).
 - **[`select-model`](../select-model/SKILL.md)**: Focuses narrowly on choosing among Claude model tiers (Fable, Haiku, Sonnet, Opus).
 - **[`assess-model-fit`](../assess-model-fit/SKILL.md)**: Assesses whether the active model tier is struggling and warrants escalation.
 - **[`delegate-to-codex`](../delegate-to-codex/SKILL.md) (`dtc`)**: Operationalizes background dispatch, schema enforcement, and fallback mechanics for Codex.

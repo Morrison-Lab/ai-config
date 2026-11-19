@@ -485,9 +485,10 @@ Nothing parallelizable should ever sit "queued" --- writing "queued", "next up",
 Sidecar delegation (independent investigation, verification, a disjoint slice, an owed UMS pass, a routed `cai`) is pre-authorized and never worth asking about; keep only the blocking critical-path edit local.
 Research and reading are dispatchable too, sized by how much comprehension the result needs rather than by how small the fetch looks --- the fragment above covers why that category of work is easy to route wrong without anything in the artifact showing it.
 
-## Never launch a subagent on Fable without explicit, specific permission
+## Consider Fable for every model choice; launch on it only with explicit, specific permission
 
-Pass `model` on every `Agent` call and `Workflow` `agent()` call, and never launch a subagent on Fable without the user's explicit permission for that launch (`hooks/no-fable-subagent.py`;
+Pass `model` on every `Agent` call and `Workflow` `agent()` call, always consider Fable, and when it would be the best fit ask the user on a decision card whether to use it;
+launch a subagent on Fable only with the user's explicit permission for that launch (`hooks/no-fable-subagent.py`;
 `FABLE_SUBAGENT_OK=1` on the approved command only).
 Detail, rationale, and cases: [`shared/workflow/no-fable-subagents.md`](shared/workflow/no-fable-subagents.md).
 
@@ -495,7 +496,7 @@ Detail, rationale, and cases: [`shared/workflow/no-fable-subagents.md`](shared/w
 
 When you start a subagent, thread or session, pick the best-fit model with `select-model` and `recm` (Sonnet or Haiku for bounded edits and lookups, Opus for large content passes and hard reasoning).
 A message cannot change a running thread's model, so before giving new work to an existing thread, decide whether a new thread would fit better (Ezra, 2026-11-16).
-`hooks/require-model-choice.py` denies a launch with no `model` (or `Model-fit:` line) and a `message_thread` with neither a `Why-not-new-thread:` line (new work) nor a `No-new-work:` line (a relay or a sha).
+`hooks/require-model-choice.py` denies a launch with no `model` (or a `Model-fit:` line naming Fable) and a `message_thread` with neither a `Why-not-new-thread:` line (new work) nor a `No-new-work:` line (a relay or a sha).
 
 ## Derive a set of work items; never hand over an enumeration of it
 
@@ -1155,6 +1156,9 @@ A display equation running into its own introducing sentence is ambiguous betwee
 check the markup before changing anything.
 Format-general: applies to `$...$` versus `$$...$$`/an `equation` environment in Quarto/LaTeX,
 exactly as it applies to `<m:oMath>` versus `<m:oMathPara>` in Word/OOXML.
+Parenthesize to make operator precedence explicit:
+`\set{x : (x \in A) \lor (x \in B)}`, not `\set{x : x \in A \lor x \in B}` (Ezra, 2026-11-19);
+gha's `check-precedence-parens` enforces it on added lines.
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
 math, apply this in addition to the fact-check above.

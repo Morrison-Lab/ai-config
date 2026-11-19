@@ -10,8 +10,9 @@ for a mechanism (`shared/workflow/algorithmatize-checks.md`).
 What it does, for each `git push` in the command:
 
   1. Reads the repo's own caller workflows (`.github/workflows/*.yml`) for jobs
-     that `uses:` Morrison-Lab/gha's `check-term-links.yml` or
-     `check-new-line-breaks.yml`, and takes their literal `with:` inputs (globs,
+     that `uses:` Morrison-Lab/gha's `check-term-links.yml`,
+     `check-new-line-breaks.yml` or `check-title-references.yml` (added after
+     lds#2793 failed CI on it, 2026-11-18), and takes their literal `with:` inputs (globs,
      paths-ignore, terms-file, allow-file, clause settings). The repo's CI
      configuration stays the single source; nothing is hard-coded per repo, so
      every repo that calls those workflows is covered (as of 2026-10-26: lds,
@@ -21,7 +22,9 @@ What it does, for each `git push` in the command:
      shows the tag or branch moved, since `v3` slides; the daily stamp is the
      offline fallback; override with `GHA_CHECKS_DIR` for a checkout), against
      `origin/main`.
-  3. DENIES the push when either check exits non-zero, naming the findings.
+  3. DENIES the push when any check exits non-zero, naming the findings. A
+     check's `fail: false` is honored, except in a repo that also calls gha's
+     annotation gate, which fails CI on the warnings a non-failing check emits.
 
 `check-term-links` also learns terms from the prerequisite sites (mds, pds, sds, ...),
 as CI does through its `terms-dirs` input. The hook picks the same sites per repository
@@ -78,7 +81,23 @@ CHECKS = {
         "fail": "FAIL",
         "extra": {"NLB_SCOPE": "committed"},
     },
+    "check-title-references": {
+        "script": "check-title-references/check-title-references.py",
+        "prefix": "CTR_",
+        "inputs": {"globs": "GLOBS", "paths-ignore": "PATHS_IGNORE"},
+        "base": "BASE_REF",
+        "fail": "FAIL",
+    },
 }
+CHECK_PREFIXES = tuple(spec["prefix"] for spec in CHECKS.values())
+
+# gha's annotation gate fails a run on any warning or error annotation, so in a repo
+# that calls it a check's `fail: false` still turns CI red (lds#2793, 2026-11-18:
+# check-title-references is warn-only there, and the gate failed the PR on its warnings).
+ANNOTATION_GATE = re.compile(
+    r"^\s*uses:\s*Morrison-Lab/gha/\.github/workflows/annotation-gate[\w-]*\.yml@",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 # Mirrors the default of `terms-from` in gha's check-term-links.yml: the sites before
 # the calling repository in the course sequence. Keep in sync with that workflow.
@@ -194,14 +213,19 @@ def find_calls(git_root: str) -> list[dict]:
     if not os.path.isdir(wf_dir):
         return []
     calls: list[dict] = []
+    gated = False
     for name in sorted(os.listdir(wf_dir)):
         if not name.endswith((".yml", ".yaml")):
             continue
         try:
             with open(os.path.join(wf_dir, name), encoding="utf-8") as fh:
-                calls.extend(parse_workflow(fh.read()))
+                text = fh.read()
         except OSError:
             continue
+        calls.extend(parse_workflow(text))
+        gated = gated or bool(ANNOTATION_GATE.search(text))
+    for call in calls:
+        call["gated"] = gated
     return calls
 
 
@@ -345,15 +369,17 @@ def run_check(git_root: str, gha_dir: str, call: dict, base: str, terms_dirs: st
     script = os.path.join(gha_dir, spec["script"])
     if not os.path.isfile(script):
         return call["name"], "error", f"{spec['script']} not found in gha checkout"
-    # Start from a clean slate: a stray TERM_LINKS_* or NLB_* in the caller's shell is not CI.
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("TERM_LINKS_", "NLB_"))}
+    # Start from a clean slate: a stray TERM_LINKS_*, NLB_* or CTR_* in the caller's shell is not CI.
+    env = {k: v for k, v in os.environ.items() if not k.startswith(CHECK_PREFIXES)}
     for k, v in call["inputs"].items():
         suffix = spec["inputs"].get(k)
         if suffix:
             env[spec["prefix"] + suffix] = v
     env[spec["prefix"] + spec["base"]] = base
-    # CI's default is blocking; a repo that sets `fail: false` is not predicted to fail, so honor it.
-    env[spec["prefix"] + spec["fail"]] = call["inputs"].get("fail", "true")
+    # CI's default is blocking; a repo that sets `fail: false` is not predicted to fail, so honor
+    # it, unless the repo runs the annotation gate, which fails CI on the check's warnings anyway.
+    fail = "true" if call.get("gated") else call["inputs"].get("fail", "true")
+    env[spec["prefix"] + spec["fail"]] = fail
     env.update(spec.get("extra", {}))
     if terms_dirs and call["name"] == "check-term-links":
         env["TERM_LINKS_TERMS_DIRS"] = terms_dirs

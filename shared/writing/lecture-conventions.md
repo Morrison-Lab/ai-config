@@ -101,6 +101,10 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   See [`media-links-beside-content`](media-links-beside-content.md).
 - **Place each topic in the earliest course site whose readers need it.**
   See [`course-sequence`](course-sequence.md).
+- **Keep one example, one exercise, and bank the rest** (Ezra, 2026-11-19).
+  When examples or exercises repeat one idea with different numbers or data, keep one as a worked `#exm-` and one as an in-notes `#exr-`, and move the rest to the exercise bank for homeworks and exams.
+  See [`course-repos`](../../memories/course-repos.md) for where the bank lives and how to move an item.
+  Apply it to a passage you are editing, not as a sweep.
 - **Do not answer graded work in student-facing notes.**
   Check the grading repository before writing a solution, and use a different example when an exercise is graded.
 - **Never name a private repository or its paths on a student-facing page, not even in an HTML comment.**

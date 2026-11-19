@@ -149,14 +149,10 @@ Before starting work, update the current checkout and relevant submodules (`git 
 
 On moving to native agent plugins, [remove submodules that duplicated them](shared/workflow/remove-redundant-plugin-submodules.md).
 
-## WIP cap
-
-At three open PRs per repo, open no fourth ([`wip-cap`](shared/workflow/wip-cap.md)).
-
 ## A freeze stops new work, not issue filing
 
 "a freeze shouldn't prevent you from filing issues" (Ezra, 2026-11-12).
-A scope freeze, the WIP cap, `finish-wave` or any other freeze stops grabbing and working issues, never filing them: file in the same turn and leave the issue unclaimed, unless it is urgent and you filed it yourself, which you may work ([`freezes-allow-filing`](shared/workflow/freezes-allow-filing.md)).
+A scope freeze, `finish-wave` or any other freeze stops grabbing and working issues, never filing them: file in the same turn and leave the issue unclaimed, unless it is urgent and you filed it yourself, which you may work ([`freezes-allow-filing`](shared/workflow/freezes-allow-filing.md)).
 
 ## Canonical sources vs generated output
 
@@ -180,6 +176,7 @@ Limits: [`context-budget`](shared/workflow/context-budget.md).
 
 Isolate work in a dedicated `git worktree` so parallel sessions never clobber working directory or branch state.
 Never work in a primary branch checkout or share a dirty worktree across tasks.
+Worktrees still share the stash stack and other repository state: see [`shared-git-state`](shared/workflow/shared-git-state.md).
 
 ## No sweeps for new rules by default
 
@@ -212,9 +209,11 @@ Use no robot emoji anywhere in the footer, since review parsers can misinterpret
 When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
 Follow [`file-formatting-and-links`](shared/writing/file-formatting-and-links.md) for the rest: markdown flavour, liberal hyperlinking of tools, forge items and policies, links to files and symbols, the displayed-`#NNN` exception, and line breaks.
 
-## Never dispatch a worker on Fable without explicit, specific permission
+## Consider Fable for every model choice, and launch on it only with explicit, specific permission
 
-Workers without an explicit model inherit the conductor's: never dispatch a worker on Fable without explicit, specific permission.
+Workers without an explicit model inherit the conductor's, so name the model on every dispatch.
+Always consider Fable when choosing;
+when it would be the best fit, ask Ezra on a decision card whether to use it, and dispatch on Fable only after his explicit, specific yes for that launch (Ezra, 2026-11-18: "you can and should ask me whether to use Fable when it would be the best fit for a task" and "you should always consider using it").
 Name the model on every dispatch, defaulting to cheaper tiers for mechanical work.
 See [`no-fable-subagents`](shared/workflow/no-fable-subagents.md).
 
@@ -231,7 +230,9 @@ See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravit
 
 Before opening a browser, look for a CLI, MCP, or API that can do the task, and say what you found.
 Use a browser only if none can (or could be set up), or the task is visual.
-Never use Chrome or Claude in Chrome (Ezra, 2026-10-22).
+Never use the Claude in Chrome plugin (`mcp__claude-in-chrome__*`), or drive the user's own Chrome by any other route (Ezra, 2026-10-22: "no chrome ever").
+Ezra narrowed that rule to the user's own Chrome on 2026-11-19.
+A headless browser in your own environment (Playwright, Chromium) is fine for checking renders (Ezra, 2026-11-19: "i meant the claude in browser plugin").
 See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
 
 ## Cloud sessions use MCP tools, not Bash, wherever one exists
@@ -264,7 +265,8 @@ Learn it only from his own text, never FERPA data.
 Read a request for everything it plainly asks, do every safe step it covers, and bring the user decisions rather than open questions ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
 - **Interpret instructions broadly and maximize safe progress:** unless the user narrows a request, take the broad reading that advances its obvious objective, complete every safe, authorized, relevant step, and apply grants and rules at their stated breadth.
-  Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible ([`read-instructions-fully`](shared/workflow/read-instructions-fully.md), [`AGENTS.cases.md`](AGENTS.cases.md), [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md)).
+  Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible.
+  When you save a rule from one, give it the scope of the user's words, not the task's nouns ([`read-instructions-fully`](shared/workflow/read-instructions-fully.md), [`AGENTS.cases.md`](AGENTS.cases.md), [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md)).
 - **"Or" always means "and/or", not xor, unless xor is explicitly specified:** address every alternative that applies ([`or-means-and-or`](shared/principles/or-means-and-or.md)).
 - **Silence is not permission:** an unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask ([`silence-is-not-permission`](shared/principles/silence-is-not-permission.md)).
 - **Default to action without asking:** take non-destructive steps, installs, `add_repo` and posted reviews included, and report them in the past tense.
@@ -317,9 +319,9 @@ Have your work reviewed independently before it ships or reaches a person, and k
 
 Verify every push first, and carry work worth keeping through to a PR ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-- **Commit, push, and PR any potentially-reusable work you produce:** commit work produced incidentally in any medium to an owning repository
-  when reproducing it costs more than a moment **and** something durable cites it, or will ([`commit-reusable-work`](shared/workflow/commit-reusable-work.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
-  [Port content by script](shared/workflow/port-by-script.md).
+- **Commit, push, and PR any potentially-reusable work you produce:** commit work produced incidentally in any medium to an owning repository when reproducing it costs more than a moment **and** something durable cites it, or will ([`commit-reusable-work`](shared/workflow/commit-reusable-work.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
+  [Port content by script](shared/workflow/port-by-script.md): when adapting any content, copy it first with a script and modify after;
+  when porting a source, also inventory it item by item, port every item, and report the source-to-target map.
 - **Deliver completed implementation work:** when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
   This grants no merge authority: the Strict Merge Control Policy still applies.
 - **Verify changes before pushing:** always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.

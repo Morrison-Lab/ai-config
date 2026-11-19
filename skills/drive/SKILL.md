@@ -1,6 +1,7 @@
 ---
 name: drive
 description: "→ ardi."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

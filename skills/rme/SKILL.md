@@ -1,6 +1,7 @@
 ---
 name: rme
 description: "→ send-notes."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

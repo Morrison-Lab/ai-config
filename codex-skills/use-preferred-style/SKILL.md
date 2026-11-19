@@ -1,6 +1,6 @@
 ---
 name: "use-preferred-style"
-description: "Apply preferred writing style."
+description: "Apply preferred writing style. Aliases: style."
 ---
 
 # use-preferred-style (Codex wrapper)

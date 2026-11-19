@@ -102,6 +102,10 @@ including whether `spot-skill-opportunities` flagged a recurring pattern
 during the session that's still unbuilt; update the relevant memory files and
 skill definitions; commit via a **branch + PR** (not direct to `main`). If
 nothing durable emerged, say so explicitly rather than manufacturing edits.
+When no branch can be pushed,
+file each unrecorded learning as an issue, as `ums` step 4's fallback says,
+and merge no PR from that wrap-up
+([ai-config#2335](https://github.com/Morrison-Lab/ai-config/issues/2335)).
 
 #### Closing checklist
 

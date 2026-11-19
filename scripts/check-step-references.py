@@ -22,7 +22,9 @@ A step reference names its target explicitly, immediately before the word
 - a backticked skill name, `` `ardi` step 2 `` or `` `ardi`'s step 2 ``,
   which resolves to ``skills/<name>/SKILL.md``;
 - a Markdown link, ``[`ums`](../ums/SKILL.md) step 3``, which resolves to the
-  linked ``.md`` file.
+  linked ``.md`` file, or to the citing document for a bare ``#anchor``.
+  A shared fragment is cited this way, since a backticked name only ever
+  names a skill.
 
 An optional "own" may sit between the name and "step". A backticked name that
 is not a skill, and a local link to anything but an existing ``.md`` file, are
@@ -40,7 +42,8 @@ What counts as a step
 
 A target defines a step id by either form, outside fenced code:
 
-- a heading whose text starts with the id, optionally after "Step", followed
+- a heading whose text starts with the id, optionally after "Step" or
+  "step", followed
   by punctuation, a space or the end of the line:
   ``### 4b. Reply ...``, ``### 1.25. Check ...``, ``## Step 0 -- Extend``,
   ``### 3 Validation``;
@@ -87,7 +90,7 @@ SPLIT_RE = re.compile(rf"({STEP_ID})|({SEP})")
 RANGE_WORDS = {"to", "through", "--", "\u2013", "\u2014", "-"}
 
 HEADING_RE = re.compile(
-    rf"^#{{1,6}}\s+(?:\*\*)?(?:Step\s+)?(?P<id>{STEP_ID})(?:\*\*)?(?:[.:)]|\s|$)"
+    rf"^#{{1,6}}\s+(?:\*\*)?(?:[Ss]tep\s+)?(?P<id>{STEP_ID})(?:\*\*)?(?:[.:)]|\s|$)"
 )
 # An inline code span that itself contains "step" and a number is an example of the
 # syntax, not a citation: skill-builder's own illustration is one.
@@ -186,6 +189,8 @@ def resolve(match: re.Match[str], source: Path, root: Path) -> tuple[Path | None
     link = match.group("lpath").split("#", 1)[0]
     if "://" in link:
         return None, None
+    if not link:
+        return source, None  # an anchor in the citing document itself
     target = (source.parent / link).resolve()
     if not link.endswith(".md"):
         return None, f"link {link} is not a Markdown file"

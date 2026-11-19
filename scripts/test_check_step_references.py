@@ -37,6 +37,8 @@ TARGET = """\
 
 ## Step 6 -- Extend
 
+## step 12 -- Lower-case prefix
+
 ### 10 Heading with no punctuation
 
 ### 11.9. Ninth part
@@ -113,6 +115,9 @@ CASES = [
     ("local non-Markdown link is reported", "Run [`x`](../../shared/x.txt) step 1.\n", 1, "not a Markdown file"),
     ("decimal step is not its parent", "Run [`d`](../../shared/decimal.md) step 1.\n", 1, "no step 1"),
     ("corpus with no resolved reference fails", "Then do step 99.\n", 1, ""),
+    ("lower-case Step prefix", "Run `target` step 12.\n", 0, ""),
+    ("same-document anchor link", "### 1. Only\n\nSee [`here`](#only) step 1.\n", 0, ""),
+    ("same-document anchor, missing step", "### 1. Only\n\nSee [`here`](#only) step 2.\n", 1, "no step 2"),
     ("heading with a space after the id", "Run `target` step 10.\n", 0, ""),
     ("componentwise range order", "Run `target` steps 11.9 through 11.10.\n", 0, ""),
     ("example code span is skipped", ANCHOR + "Write ``Run `target` step 99`` like this.\n", 0, ""),

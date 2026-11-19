@@ -203,6 +203,7 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
   (`` `ardi`'s step 2 ``, ``[`ums`](../ums/SKILL.md) steps 2 through 3``) or
   after it (``step 3 of `ums` ``),
   and the number matches a `### N.` heading or a column-0 `N.` item in that skill.
+  A backticked name means a skill, so cite a shared fragment by its link.
   When you add, remove or renumber a step, search for `` `<this-skill>` step ``
   and fix every citer in the same PR, since the citing file is the one that
   goes wrong and your diff never shows it.

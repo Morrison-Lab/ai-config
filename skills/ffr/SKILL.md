@@ -1,6 +1,7 @@
 ---
 name: ffr
 description: "→ fix-forward-references."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: ums
-description: "Update memories and skills."
+description: "Update memories and skills. Aliases: update-memories-and-skills."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -116,6 +116,15 @@ committed pass.
      commits to *that* repo's own agent docs instead --- see the checklist
      item below for where. This changes step 4's target, not just the
      content.)
+   - **What general principle is it a case of?**
+     Answer for a correction, a preference or a missing workflow step.
+     A plain fact, such as a tool quirk, needs none.
+     Write the principle as one sentence in your working list for this pass, not yet in any file,
+     at the scope [`read-instructions-fully`](../../shared/workflow/read-instructions-fully.md)'s
+     "Record a rule at the scope of the user's words" sets,
+     and carry the sentence into step 3's search and step 5's report.
+     Step 3 searches for the principle, not only for the subject
+     ([ai-config#3157](https://github.com/Morrison-Lab/ai-config/issues/3157)).
 
 3. **Apply updates.** For each item:
    - Read the target file first (skill or memory) to understand current state
@@ -149,6 +158,23 @@ committed pass.
      related `get_check_runs` guidance while an entry on the same tool already
      sat ~2000 lines below in the write-access cluster -- caught by the review
      bot, not by the author.)
+   - **For each item that has a principle from step 2, search for the principle as well as for the subject,
+     even when the subject grep found an entry.**
+     A rule stating the same principle in other words need not contain the subject the grep above used,
+     so that grep misses it
+     ([`grep-is-not-coverage`](../../shared/workflow/grep-is-not-coverage.md)).
+     Grep each key term of the principle separately over the same paths.
+     Then find the principle in [`shared/principles/README.md`](../../shared/principles/README.md)'s catalog
+     and read the rules it links under that principle.
+     Match by meaning, not by heading words, since the catalog may name the principle differently.
+     When no catalog heading means the same thing, the greps are the whole search.
+     When an existing rule states the principle,
+     add the new case to that rule rather than writing a new one,
+     or change nothing when the rule already holds the case.
+     When no rule states it, write the principle into the entry this pass writes or extends for the learning.
+     Whether or not a rule already states it, when the principle is not trivial to implement in this pass
+     (for example, it needs a new hook, a sweep, a new fragment or a rewrite of several rules),
+     file that work with [`defer-issue`](../defer-issue/SKILL.md) in the same pass.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the
      append, and read its warning band, not only its pass/fail line.**
      The band names every memory file near the cap and how many lines each
@@ -545,6 +571,11 @@ committed pass.
    |------|-------|--------|
    | Poll for new reviews | `iterate/SKILL.md` | Added explicit polling procedure |
    | glab has no --state flag | `/memories/gitlab.md` | New bullet |
+
+   Under the table, give each principle sentence from step 2.
+   Say whether an existing rule already held the case, the pass added the case to an existing rule,
+   or the principle went into the entry this pass wrote or extended,
+   and link the issue when step 3 also filed one.
 
 ## What to look for (checklist)
 

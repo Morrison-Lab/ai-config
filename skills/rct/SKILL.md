@@ -1,6 +1,7 @@
 ---
 name: rct
 description: "→ refresh-claude-token."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

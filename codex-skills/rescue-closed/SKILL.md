@@ -1,6 +1,6 @@
 ---
 name: "rescue-closed"
-description: "Revive worthy closed issues/PRs."
+description: "Revive worthy closed issues/PRs. Aliases: revive-closed."
 ---
 
 # rescue-closed (Codex wrapper)

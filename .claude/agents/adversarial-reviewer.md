@@ -264,6 +264,13 @@ Flag a bare pop or apply, and a stash-then-pop pair that assumes the top entry i
 Read the command yourself; do not report `hooks/no-bare-stash-pop.py`'s refusal or silence as your finding.
 See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
 
+## Scratch staged by an add-everything
+
+On a diff, check for a gitlink (mode 160000) that no `.gitmodules` entry names.
+On a transcript, script or skill, flag `git add -A` in a repository that does not ignore `.claude/worktrees/`.
+Read the diff yourself; do not report `hooks/no-add-sweeping-scratch.py`'s refusal or silence as your finding.
+See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
+
 ## Announcements need approval
 
 On a transcript, brief or script that posts or edits a class announcement, check that the user's own message approved that exact text before the post.
@@ -424,3 +431,11 @@ On a PR whose head has commits pushed after the body was written, compare the bo
 Report any file, entry or change in the diff that the title and body do not cover, and any change they still describe that the diff no longer holds (lds#2879 drew a NOT CLEAN review because its body named two of three entries).
 `hooks/no-push-without-pr-body-refresh.py` reminds the author at push time, but only you read the body against the diff.
 See [`ardi`](../../shared/workflow/ardi.md) ([ai-config#5871](https://github.com/Morrison-Lab/ai-config/issues/5871)).
+
+## Renumbered or cited procedure steps
+
+On a diff that adds, removes or renumbers a numbered step in a skill or shared fragment, search the corpus for references that cite that document's steps by number (`` `name` step N ``, ``[`name`](path) steps N through M``, ``step N of `name` ``), and report any whose number now names a different step or none.
+On a diff that adds such a reference, read the cited step and check that the citing text describes what that step does.
+[`check-step-references.py`](../../scripts/check-step-references.py) reports a number with no step behind it, a range written backwards, and a citation whose skill or linked file no longer exists.
+It cannot tell that a number now names the wrong step, so read the cited steps yourself.
+See [`skill-builder`](../../skills/skill-builder/SKILL.md#conventions-match-the-existing-family) ([ai-config#1865](https://github.com/Morrison-Lab/ai-config/issues/1865)).

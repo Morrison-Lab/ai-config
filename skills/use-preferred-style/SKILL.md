@@ -1,6 +1,6 @@
 ---
 name: use-preferred-style
-description: "Apply preferred writing style."
+description: "Apply preferred writing style. Aliases: style."
 user-invocable: true
 allowed-tools:
   - Bash

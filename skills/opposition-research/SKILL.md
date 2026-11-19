@@ -1,6 +1,6 @@
 ---
 name: opposition-research
-description: "Mine competitor community demand."
+description: "Mine competitor community demand. Aliases: oppo."
 user-invocable: true
 allowed-tools:
   - WebSearch

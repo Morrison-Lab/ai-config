@@ -1,6 +1,6 @@
 ---
 name: config-ai
-description: "Route AI capability requests."
+description: "Route AI capability requests. Aliases: ca, cai."
 user-invocable: true
 allowed-tools:
   - Bash

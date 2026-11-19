@@ -1,6 +1,6 @@
 ---
 name: "recover-followups"
-description: "Recover untracked follow-ups."
+description: "Recover untracked follow-ups. Aliases: rfu."
 ---
 
 # recover-followups (Codex wrapper)

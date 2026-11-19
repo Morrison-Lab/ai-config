@@ -27,13 +27,13 @@ On 2026-11-17 Ezra approved a British-spelling check, and the thread that built 
 A new check reads changed lines, so existing violations do not trip it, and a relayed "yes" covers the check, not a pass over existing content.
 
 - **Do:** ship the check alone.
-- **Do:** ask the user before a fourth PR on one ask.
+- **Do:** ask the user before an 11th PR on one ask.
 - **Don't:** clear a new check's existing violations because you expect it to flag them.
 - **Don't:** read a coordinator's note, or your own reading of the ask, as the user saying "sweep".
 
 ## The mechanisms
 
-- `hooks/no-unrequested-sweep-pr.py` denies a PR creation (`gh pr create` or `mcp__github__create_pull_request`) once three PRs were opened since the user's latest message, unless a sentence the user wrote asks for a sweep.
+- `hooks/no-unrequested-sweep-pr.py` denies a PR creation (`gh pr create` or `mcp__github__create_pull_request`) once ten PRs were opened since the user's latest message, unless a sentence the user wrote asks for a sweep.
   Only the user's words count, never a coordinator's `<note>`, a question ("did I say to sweep?") or a negation ("don't sweep").
   A typed `gia`, `gii`, `gip` or `gmd` also allows more.
   There is no agent-side bypass; the user's next message resets the count.

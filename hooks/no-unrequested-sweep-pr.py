@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""PreToolUse deny: a fourth PR on one ask with no sweep ask (ai-config#4829, #5773).
+"""PreToolUse deny: an 11th PR on one ask with no sweep ask (ai-config#4829, #5773).
 
-DENIES a PR create once LIMIT (default 3) PRs succeeded since the user's latest
+DENIES a PR create once LIMIT (default 10) PRs succeeded since the user's latest
 message, unless a clause the user wrote asks to sweep (not a question, no
 negation before the word) or they typed gia, gii, gip or gmd; the grant lasts until
 the next user message. Only the user's
@@ -18,7 +18,7 @@ import re
 import sys
 from pathlib import Path
 
-DEFAULT_LIMIT = 3
+DEFAULT_LIMIT = 10
 # "sweep", or a typed backlog-run skill that opens many PRs by design.
 SWEEP = re.compile(r"\bsweep(?:s|ing)?\b|(?:^|\s)/?(?:gia|gii|gip|gmd|giardia)\b", re.I)
 NEGATED = re.compile(r"\b(?:don'?t|do\s+not|never|no|not|stop|without|isn'?t)\b", re.I)

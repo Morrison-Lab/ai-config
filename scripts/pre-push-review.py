@@ -23,6 +23,7 @@ from scripts.lib.ai_cli import (
     find_executable,
     is_gh_available,
 )
+from scripts.lib.codex_scope import OVERRIDE_ENV as CODEX_OVERRIDE_ENV, codex_allowed
 from scripts.lib.fences import count_unbalanced_fences, strip_fences
 from scripts.lib.review_payload import (
     extract_structured_review,
@@ -967,8 +968,15 @@ def run_opencode_review(prompt: str, model: str = "", expected_commit_sha: str =
 
 
 def detect_available_engines() -> List[str]:
-    """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy."""
-    return detect_cli_engines(ENGINE_ROTATION_ORDER, use_cache=False)
+    """Return available local engines in preferred fallback priority: claude -> cursor -> codex -> opencode -> agy.
+
+    Codex is dropped outside a UCDH project (ai-config#5084), so `auto` and
+    `alternate` never pick it there.
+    """
+    engines = detect_cli_engines(ENGINE_ROTATION_ORDER, use_cache=False)
+    if "codex" in engines and not codex_allowed():
+        engines.remove("codex")
+    return engines
 
 
 ENGINE_ROTATION_ORDER = DEFAULT_ENGINE_PRIORITY
@@ -1108,6 +1116,14 @@ def execute_review(engine: str, prompt: str, model: str = "", expected_commit_sh
                 return rem_report, rem_label
             print(f"Engine '{rem_label}' was unavailable, exhausted, or produced invalid output; falling back...")
         return None, "Fallback Chain"
+
+    if engine in ("codex", "dtc") and not codex_allowed():
+        log_error(
+            "Codex is limited to UCDH projects (bcs, hac); this checkout's origin is not one. "
+            f"Choose another engine, or set {CODEX_OVERRIDE_ENV}=1 if this is a UCDH project "
+            "whose remote the check does not recognize (ai-config#5084)."
+        )
+        return None, "OpenAI Codex"
 
     if engine != "auto":
         runner, label = engine_dispatch.get(engine, (None, engine))
@@ -1290,7 +1306,7 @@ def main():
             "antigravity", "agy", "agy-claude",
         ],
         default="auto",
-        help="AI engine: 'auto' (priority: claude -> cursor -> codex -> opencode -> agy), 'alternate' (round-robin rotation), or specific engine name",
+        help="AI engine: 'auto' (priority: claude -> cursor -> codex -> opencode -> agy; codex only in UCDH projects), 'alternate' (round-robin rotation), or specific engine name",
     )
     parser.add_argument(
         "--model",

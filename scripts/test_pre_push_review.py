@@ -762,8 +762,33 @@ class TestPrePushReview(unittest.TestCase):
     @patch("os.path.isfile", return_value=True)
     @patch("shutil.which", return_value=True)
     def test_detect_available_engines(self, mock_which, mock_isfile):
-        engines = reviewer.detect_available_engines()
+        with patch.object(reviewer, "codex_allowed", return_value=True):
+            engines = reviewer.detect_available_engines()
         self.assertEqual(engines, ["claude", "cursor", "codex", "opencode", "antigravity"])
+
+    @patch("os.path.isfile", return_value=True)
+    @patch("shutil.which", return_value=True)
+    def test_detect_available_engines_drops_codex_outside_ucdh(self, mock_which, mock_isfile):
+        # ai-config#5084: auto and alternate must never pick Codex outside a UCDH project.
+        with patch.object(reviewer, "codex_allowed", return_value=False):
+            engines = reviewer.detect_available_engines()
+        self.assertEqual(engines, ["claude", "cursor", "opencode", "antigravity"])
+
+    @patch.object(reviewer, "run_codex_review")
+    def test_explicit_codex_engine_refused_outside_ucdh(self, mock_codex):
+        for name in ("codex", "dtc"):
+            with patch.object(reviewer, "codex_allowed", return_value=False):
+                report, label = reviewer.execute_review(name, "prompt")
+            self.assertIsNone(report)
+            self.assertEqual(label, "OpenAI Codex")
+        mock_codex.assert_not_called()
+
+    @patch.object(reviewer, "run_codex_review", return_value="report")
+    def test_explicit_codex_engine_allowed_in_ucdh(self, mock_codex):
+        with patch.object(reviewer, "codex_allowed", return_value=True):
+            report, label = reviewer.execute_review("codex", "prompt")
+        self.assertEqual(report, "report")
+        mock_codex.assert_called_once()
 
 
     @patch.object(reviewer, "run_claude_review")

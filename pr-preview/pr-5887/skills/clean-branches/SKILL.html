@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -462,8 +462,8 @@ cookieconsent.run({
 </tr>
 <tr class="odd">
 <td><strong>Active</strong></td>
-<td>Has an open MR, linked issue, recent commits (&lt;30 days), or a claim comment</td>
-<td>Skip — don’t touch</td>
+<td>Has an open MR, is the base (target branch) of another open MR, has a linked issue, recent commits (&lt;30 days), or a claim comment</td>
+<td>Skip; don’t touch</td>
 </tr>
 <tr class="even">
 <td><strong>New</strong></td>
@@ -529,8 +529,9 @@ cookieconsent.run({
 <p>If an open MR exists → <strong>Active</strong>, skip.</p>
 <p><strong>Fetch every PR once and match locally, rather than querying per branch.</strong> A sweep of N branches costs N API round-trips this way, which is slow and rate-limit-prone at repo scale; one call answers for all of them, and it also supplies the <em>merged</em> and <em>closed-unmerged</em> states that b and f need.</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> pr list <span class="at">--state</span> all <span class="at">--limit</span> 2000 <span class="dt">\</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--json</span> number,headRefName,state,mergedAt,url,title <span class="op">&gt;</span> /tmp/all-prs.json   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--json</span> number,headRefName,baseRefName,state,mergedAt,url,title <span class="op">&gt;</span> /tmp/all-prs.json   <span class="co"># LIST_PRS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Then index by <code>headRefName</code> and look each branch up in memory. Raise <code>--limit</code> above the repo’s total PR count and check the returned length against it — a silently truncated list marks live branches as having no PR, which is the one error in this sweep that deletes something.</p>
+<p><strong>Index the same list by <code>baseRefName</code> too, and keep every open PR’s base.</strong> A stacked PR targets another branch rather than <code>main</code>, and that base can pass every other test here: no open PR of its own, no linked issue, weeks old, nothing ahead of <code>main</code>. Deleting it closes or retargets the stacked PR, whose diff then changes to something nobody reviewed, and nothing in this sweep’s output shows it (<a href="https://github.com/Morrison-Lab/ai-config/issues/3515">#3515</a>). So a branch that is the <code>baseRefName</code> of any <strong>open</strong> PR is <strong>Active</strong>, whatever its age, commits or own PR state, the same short-circuit an open PR on the branch gets. On GitLab the field is the MR’s <code>target_branch</code> (<code>glab mr list --output json</code>). <a href="../../hooks/no-delete-branch-under-stacked-pr.py"><code>no-delete-branch-under-stacked-pr.py</code></a> guards the merge-time form of this hazard (<code>--delete-branch</code> on a stacked PR’s parent). No hook sees a sweep’s own deletions, so this check is their only guard.</p>
 </section>
 <section id="d.-check-for-linked-issues" class="level4">
 <h4 class="anchored" data-anchor-id="d.-check-for-linked-issues">d.&nbsp;Check for linked issues</h4>

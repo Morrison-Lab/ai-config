@@ -92,6 +92,7 @@ Fails OPEN on any parse trouble, and fires at most once per distinct message
 per transcript, so it cannot wedge a session.
 """
 import datetime
+import functools
 import hashlib
 import json
 import os
@@ -119,6 +120,13 @@ except Exception as _exc:  # broken install: degrade, never block
     # `no-push-without-self-review.py` then treats this detector as missing.
     SHELLCMD_ERROR = f"cannot load scripts/lib/shellcmd.py ({_exc})"
 
+try:
+    from pr_view import gh_pr_view
+except Exception as _exc:  # broken install: the live check reads nothing
+    print(f"no-unreviewed-pr: cannot load scripts/lib/pr_view.py ({_exc}); "
+          "live PR state will not be read", file=sys.stderr)
+    gh_pr_view = None
+
 NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
              if sys.platform == "win32" else {})
 
@@ -145,25 +153,18 @@ def _check_live_pr(num, repo=None):
         return False
     if not num:
         return False
-    cmd = [_gh_cmd(), "pr", "view", str(num), "--json", "state,closed,headRefOid,reviews"]
-    if repo and "/" in str(repo):
-        cmd.extend(["-R", str(repo)])
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            **NO_WINDOW,
-        )
-    except Exception:
+    if gh_pr_view is None:
         return False
-    if proc.returncode != 0 or not proc.stdout:
-        return False
-    try:
-        data = json.loads(proc.stdout)
-    except Exception:
-        return False
+    # `gh_pr_view` falls back to REST where a cloud session refuses GraphQL
+    # (ai-config#4733).
+    data, _error = gh_pr_view(
+        ["state", "closed", "headRefOid", "reviews"],
+        target=num,
+        repo=str(repo) if repo and "/" in str(repo) else None,
+        gh=_gh_cmd(),
+        timeout=5,
+        run=functools.partial(subprocess.run, **NO_WINDOW),
+    )
     if not isinstance(data, dict):
         return False
 

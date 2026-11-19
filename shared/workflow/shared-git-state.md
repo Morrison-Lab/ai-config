@@ -31,3 +31,16 @@ The message file of `git add -A && git commit -F msg.txt` is staged before the c
 
 `hooks/no-add-sweeping-scratch.py` refuses an add that would stage an embedded repository, and a commit whose `-F` file is staged or would be swept in by an earlier add-everything on the same line.
 `ALLOW_SCRATCH_ADD=1` clears one command.
+
+## The main checkout's branch
+
+A repository's main worktree is the checkout other sessions, subagents and background jobs open by default, so its branch and index are shared even when everyone else works in a linked worktree.
+A `git checkout -B <branch>` run from the wrong directory left the main checkout on a fixer's branch with a stale index ([ai-config#4233](https://github.com/Morrison-Lab/ai-config/issues/4233)), and a switch under a running subagent put a commit on the wrong branch ([ai-config#3204](https://github.com/Morrison-Lab/ai-config/issues/3204)).
+
+- **Do:** give each branch its own worktree (`git worktree add <dir> <branch>`) and run its git commands there, with `git -C <dir>` or after `cd <dir>`.
+- **Do:** leave a checkout on its branch while a background job or subagent you started is still reading it.
+- **Don't:** run `git switch` or a branch-changing `git checkout` in the main worktree of a repository that has linked worktrees.
+
+`hooks/no-switch-in-main-checkout.py` denies `git switch` and a branch-changing `git checkout` (a branch or other commit, a branch name only a remote has, `-`, `-b`, `-B`, `--orphan`, `--detach`) in the main worktree while more than one worktree exists.
+Restoring paths (`--`, `-p`, a name that is not a commit) passes.
+`ALLOW_MAIN_CHECKOUT_SWITCH=1` clears one command.

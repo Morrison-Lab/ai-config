@@ -14,7 +14,7 @@ And a wall of questions invites a partial reply that leaves the rest silently un
 
 Mechanics:
 
-- Rank by how blocking each decision is, most pressing first (the same ranking `prompt-me` uses), and pose only the top one --- via a single-question `AskUserQuestion` call for a real either/or, or one boxed ❓ **QUESTION** otherwise.
+- Rank by how blocking each decision is, most pressing first (the same ranking `prompt-me` uses), and pose only the top one --- always via a single-question `AskUserQuestion` card (Ezra, 2026-11-19), and via one boxed ❓ **QUESTION** only where that tool is unavailable.
 - Say how many more are queued behind it ("2 more decisions after this one"), so the backlog is visible without being posed.
 - Fold each answer into the framing of the next question, and silently drop any queued question the answer mooted.
 - Keep working on whatever the pending decision doesn't block while waiting.

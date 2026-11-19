@@ -783,6 +783,27 @@ class TestPrePushReview(unittest.TestCase):
             self.assertEqual(label, "OpenAI Codex")
         mock_codex.assert_not_called()
 
+    @patch.object(reviewer, "detect_cli_engines", return_value=["codex", "opencode"])
+    @patch.object(reviewer, "run_opencode_review", return_value="oc report")
+    @patch.object(reviewer, "run_codex_review", return_value="codex report")
+    def test_auto_and_alternate_never_run_codex_outside_ucdh(self, mock_codex, mock_oc, mock_cli):
+        # ai-config#5084: drive the real chains, not only detect_available_engines.
+        with patch.dict(os.environ, {"AGENT_NAME": "claude"}, clear=True):
+            for engine in ("auto", "alternate"):
+                with patch.object(reviewer, "get_next_alternate_engine", side_effect=lambda a: a[0]):
+                    report, _ = reviewer.execute_review(engine, "prompt", codex_ok=False)
+                self.assertEqual(report, "oc report")
+        mock_codex.assert_not_called()
+
+    @patch.object(reviewer, "run_codex_review", return_value="report")
+    def test_codex_ok_argument_overrides_the_cwd_check(self, mock_codex):
+        # main() decides codex_ok before it clones the sandbox, whose origin is
+        # a local path; execute_review must use that decision, not re-check.
+        with patch.object(reviewer, "codex_allowed", return_value=False) as mock_allowed:
+            report, _ = reviewer.execute_review("codex", "prompt", codex_ok=True)
+        self.assertEqual(report, "report")
+        mock_allowed.assert_not_called()
+
     @patch.object(reviewer, "run_codex_review", return_value="report")
     def test_explicit_codex_engine_allowed_in_ucdh(self, mock_codex):
         with patch.object(reviewer, "codex_allowed", return_value=True):
@@ -1298,6 +1319,24 @@ class TestPrePushReview(unittest.TestCase):
         print_idx = called_args.index("--print")
         self.assertEqual(called_args[print_idx + 1], "-")
 
+
+    @patch.object(reviewer, "verify_working_state", return_value=(True, "clean"))
+    @patch.object(reviewer, "_clean_sandbox_configs")
+    @patch("subprocess.run")
+    def test_main_decides_codex_scope_before_sandbox(self, mock_run, mock_clean, mock_verify):
+        # ai-config#5084: the sandbox clone's origin is a local path, so the
+        # scope must come from the real checkout and reach execute_review.
+        import subprocess
+        mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="/repo\n")
+        with patch("os.chdir"), patch.object(reviewer, "codex_allowed", return_value=True) as mock_allowed:
+            with patch.object(reviewer, "execute_review", return_value=("report", "label")) as mock_exec:
+                with patch("sys.argv", ["pre-push-review.py", "--engine", "codex"]):
+                    try:
+                        reviewer.main()
+                    except SystemExit:
+                        pass
+        mock_allowed.assert_called_once_with("/repo")
+        self.assertIs(mock_exec.call_args.kwargs.get("codex_ok"), True)
 
     @patch.object(reviewer, "verify_working_state", return_value=(True, "clean"))
     @patch.object(reviewer, "_clean_sandbox_configs")

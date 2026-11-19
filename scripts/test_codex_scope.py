@@ -32,6 +32,10 @@ class TestCodexAllowed(unittest.TestCase):
             "https://github.com/ucdavis/other-repo",
             "https://github.com/someone/hac",
             "https://gitlab.com/bcs/project",
+            "https://gitlab.com/ucdavis/bcs",
+            "https://evil.example.com/ucdavis/hac",
+            "https://hc2-gitlab.ucdmc.ucdavis.edu.evil.com/bcs/x",
+            "/home/user/local-clone",
             "",
         ):
             with self.subTest(url=url), patch.dict(os.environ, {}, clear=True):
@@ -44,7 +48,9 @@ class TestCodexAllowed(unittest.TestCase):
             self.assertFalse(codex_allowed(remote_url="https://github.com/ucdavis/bcs"))
 
     def test_unreadable_remote_refuses(self):
-        with patch.dict(os.environ, {}, clear=True):
+        # Scrub only the override, so `git` stays on PATH.
+        env = {k: v for k, v in os.environ.items() if k != OVERRIDE_ENV}
+        with patch.dict(os.environ, env, clear=True):
             self.assertFalse(codex_allowed(repo_dir="/nonexistent-dir-for-codex-scope-test"))
 
 

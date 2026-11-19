@@ -188,6 +188,27 @@ def alias_cases(tmp: Path) -> None:
     check("alias of a missing skill errors", len(errs) == 1
           and "missing skill 'ardi'" in errs[0])
 
+    errs = run_aliases(tmp / "a7", {"ardi": canonical + HIDDEN, "drive": alias + HIDDEN})
+    check("a hidden canonical errors", len(errs) == 1
+          and "routes nowhere" in errs[0])
+    errs = run_aliases(tmp / "a8", {
+        "ardi": canonical, "drive": 'description: "-> ardi."\n',
+    })
+    check("an ASCII-arrow alias is still held to the flag", len(errs) == 1
+          and "disable-model-invocation" in errs[0])
+    errs = run_aliases(tmp / "a9", {
+        "ardi": 'description: "Drive one PR. Aliases: drive more."\n',
+        "drive": alias + HIDDEN,
+    })
+    check("a malformed Aliases clause does not count", len(errs) == 1
+          and "does not name its alias 'drive'" in errs[0])
+    errs = run_aliases(tmp / "a10", {
+        "ardi": 'description: "Aliases: drive. Drive one PR."\n',
+        "drive": alias + HIDDEN,
+    })
+    check("an Aliases clause must end the description", len(errs) == 1
+          and "does not name its alias 'drive'" in errs[0])
+
     errs = run_aliases(tmp / "a5", {"ardi": canonical, "drive": alias + HIDDEN})
     check("consistent alias and canonical are clean", errs == [])
 

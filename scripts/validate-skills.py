@@ -285,8 +285,11 @@ def check_skills() -> None:
     check_listing_budget(sorted(skills_dir.glob("*/SKILL.md")), "skills/")
 
 
-ALIAS_DESCRIPTION = re.compile(r"\A→ ([a-z0-9-]+)\.\Z")
-ALIASES_CLAUSE = re.compile(r"Aliases: ([a-z0-9, -]+)\.")
+# An alias redirect's whole description; an ASCII "->" is accepted too, so a
+# hand-typed alias is still held to the rules below rather than missed.
+ALIAS_DESCRIPTION = re.compile(r"\A(?:→|->) ([a-z0-9-]+)\.\Z")
+# The canonical's clause ends its description: "Aliases: a, b-c."
+ALIASES_CLAUSE = re.compile(r"\bAliases: ([a-z0-9-]+(?:, [a-z0-9-]+)*)\.\s*\Z")
 
 
 def check_aliases(skill_mds: list[Path]) -> None:
@@ -322,6 +325,12 @@ def check_aliases(skill_mds: list[Path]) -> None:
             )
         if canonical not in frontmatters:
             errors.append(f"skills/{name}: alias of missing skill {canonical!r}")
+        elif frontmatters[canonical].get("disable-model-invocation") is True:
+            errors.append(
+                f"skills/{canonical}: is the target of alias {name!r} but sets "
+                "`disable-model-invocation: true`, so its Aliases clause never "
+                "reaches the model and the alias routes nowhere"
+            )
     for canonical, fm in frontmatters.items():
         m = ALIASES_CLAUSE.search(str(fm.get("description", "")))
         listed = {a.strip() for a in m.group(1).split(",")} if m else set()

@@ -54,12 +54,6 @@ def source_skills() -> list[tuple[str, str]]:
         if not skill_md.is_file():
             continue
         fm = parse_frontmatter(skill_md)
-        # An alias redirect carries `disable-model-invocation: true`, and its
-        # canonical skill's description names it, so Codex routes the alias
-        # word to the canonical wrapper. A wrapper per alias would spend a
-        # listing entry apiece on Codex's own budget (#5316 step 3).
-        if fm.get("disable-model-invocation") is True:
-            continue
         name = collapse(fm.get("name", ""))
         description = collapse(fm.get("description", ""))
         if name != skill_dir.name:
@@ -68,6 +62,12 @@ def source_skills() -> list[tuple[str, str]]:
             )
         if not description:
             raise ValueError(f"{skill_md.relative_to(ROOT)}: missing description")
+        # An alias redirect carries `disable-model-invocation: true`, and its
+        # canonical skill's description names it, so Codex routes the alias
+        # word to the canonical wrapper. A wrapper per alias would spend a
+        # listing entry apiece on Codex's own budget (#5316 step 3).
+        if fm.get("disable-model-invocation") is True:
+            continue
         skills.append((name, description))
     return skills
 

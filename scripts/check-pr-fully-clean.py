@@ -5301,12 +5301,15 @@ def main():
     # the FULLY CLEAN line on purpose, so no `mwc` gate that keys on that
     # line can be satisfied by an mwr run.
     mwr = bool(getattr(args, "mwr", False))
-    review_ok, review_issues = check_review_comments(pr, args.quorum)
+    # The verdict below comes from the non-NOTE entries of all_issues, not
+    # from the boolean check_review_comments returns, so filtering the issue
+    # list is the whole of the --mwr change.
+    _, review_issues = check_review_comments(pr, args.quorum)
     if mwr:
         review_issues = [i for i in review_issues if i.startswith(MWR_KEPT_REVIEW_PREFIXES)]
         review_issues.append(
             "NOTE: --mwr: review verdicts and quorum were not evaluated (ai-config#3946); "
-            "this pass authorizes a merge only under an mwr, mwrs or amwr grant")
+            "a pass under --mwr authorizes a merge only under an mwr, mwrs or amwr grant")
     drift_ok, drift_issues = check_base_drift(pr)
     required_ok, required_issues = check_required_checks(pr)
 

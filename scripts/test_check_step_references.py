@@ -108,6 +108,8 @@ CASES = [
     ("link form", "Run [`f`](../../shared/fragment.md) step 1.\n", 0, ""),
     ("of form", "See step 2 of [`target`](../target/SKILL.md).\n", 0, ""),
     ("unknown skill is reported", "Run `nonexistent` step 99.\n", 1, "no skill named nonexistent"),
+    ("missing Markdown link is reported as missing", "Run [`x`](../../shared/gone.md) step 1.\n", 1, "names no file"),
+    ("a skill name containing step is not an example", "Run `step-runner` step 1.\n", 1, "no skill named step-runner"),
     ("local non-Markdown link is reported", "Run [`x`](../../shared/x.txt) step 1.\n", 1, "not a Markdown file"),
     ("decimal step is not its parent", "Run [`d`](../../shared/decimal.md) step 1.\n", 1, "no step 1"),
     ("corpus with no resolved reference fails", "Then do step 99.\n", 1, ""),

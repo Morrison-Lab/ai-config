@@ -27,7 +27,7 @@ A step reference names its target explicitly, immediately before the word
 An optional "own" may sit between the name and "step". A backticked name that
 is not a skill, and a local link to anything but an existing ``.md`` file, are
 reported, since that is how a renamed or removed target shows; an external
-link is skipped. An inline code span that itself contains "step" is an example
+link is skipped. An inline code span that itself contains "step" and a number is an example
 of the syntax and is skipped. A bare
 "step 4" with no named target is a same-document reference and out of scope,
 since a document may run several numbered procedures.
@@ -54,7 +54,7 @@ group; a decimal step such as ``1.25`` does not make ``1`` a step.
 Ranges are ordered componentwise, so ``1.9`` comes before ``1.10``.
 
 Exit status is 1 when any reference fails, or when a corpus run (no paths
-given) resolves no reference at all, 0 otherwise.
+given) finds no reference at all, 0 otherwise.
 """
 from __future__ import annotations
 
@@ -89,7 +89,7 @@ RANGE_WORDS = {"to", "through", "--", "\u2013", "\u2014", "-"}
 HEADING_RE = re.compile(
     rf"^#{{1,6}}\s+(?:\*\*)?(?:Step\s+)?(?P<id>{STEP_ID})(?:\*\*)?(?:[.:)]|\s|$)"
 )
-# An inline code span that itself contains "step" is an example of the
+# An inline code span that itself contains "step" and a number is an example of the
 # syntax, not a citation: skill-builder's own illustration is one.
 EXAMPLE_SPAN_RE = re.compile(r"(`+)(?!`)(.+?)(?<!`)\1(?!`)")
 LIST_RE = re.compile(rf"^(?P<id>\d+)\.\s")
@@ -113,10 +113,11 @@ def blank_fences(text: str) -> str:
 
 
 def blank_examples(text: str) -> str:
-    """Blank inline code spans that contain the word "step", keeping offsets."""
+    """Blank inline code spans that contain "step" followed by a number,
+    keeping offsets. A name such as `step-runner` is not blanked."""
 
     def blank(m: re.Match[str]) -> str:
-        if re.search(r"\b[Ss]teps?\b", m.group(2)):
+        if re.search(r"\b[Ss]teps?\s+\d", m.group(2)):
             return re.sub(r"[^\n]", " ", m.group(0))
         return m.group(0)
 
@@ -186,15 +187,18 @@ def resolve(match: re.Match[str], source: Path, root: Path) -> tuple[Path | None
     if "://" in link:
         return None, None
     target = (source.parent / link).resolve()
-    if link.endswith(".md") and target.is_file():
-        return target, None
-    return None, f"link {link} is not a Markdown file in this repository"
+    if not link.endswith(".md"):
+        return None, f"link {link} is not a Markdown file"
+    if not target.is_file():
+        return None, f"link {link} names no file in this repository"
+    return target, None
 
 
 def check_file(
     path: Path, root: Path, cache: dict[Path, set[str]]
 ) -> tuple[list[Finding], int]:
-    """Check one document; return its findings and how many references it resolved."""
+    """Check one document; return its findings and how many local references
+    it found, whether or not their targets still exist."""
     raw = path.read_text(encoding="utf-8")
     text = blank_examples(blank_fences(raw))
     flat = text.replace("\n", " ")
@@ -203,13 +207,13 @@ def check_file(
     matches = [m for pattern in REF_RES for m in pattern.finditer(flat)]
     for m in sorted(matches, key=lambda m: m.start()):
         target, missing = resolve(m, path, root)
+        if target is None and missing is None:
+            continue  # an external link
+        resolved += 1
         if missing:
             line = text.count("\n", 0, m.start()) + 1
             findings.append(Finding(path, line, m.group(0), missing))
             continue
-        if target is None:
-            continue
-        resolved += 1
         if target not in cache:
             cache[target] = defined_steps(target)
         defined = cache[target]
@@ -234,6 +238,7 @@ def check_file(
 
 def iter_documents(root: Path) -> list[Path]:
     docs = sorted((root / "skills").rglob("*.md")) + sorted((root / "shared").rglob("*.md"))
+    docs += sorted((root / ".claude" / "agents").glob("*.md"))
     docs += [p for p in (root / "AGENTS.md", root / "CLAUDE.md") if p.is_file()]
     return docs
 
@@ -266,9 +271,9 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
     if not args.paths and references == 0:
-        # A corpus run that resolves nothing means the reference pattern or
-        # the resolver broke, not that the corpus is clean.
-        print("check-step-references: resolved no references in the corpus", file=sys.stderr)
+        # A corpus run that finds nothing means the reference pattern broke,
+        # not that the corpus is clean.
+        print("check-step-references: found no references in the corpus", file=sys.stderr)
         return 1
     return 1 if findings else 0
 

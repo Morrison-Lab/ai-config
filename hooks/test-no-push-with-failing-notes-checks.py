@@ -341,7 +341,7 @@ expect("T61 an unquoted expression fails open with a note, never runs as text",
        (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
 commented = hook.parse_run_check_lines(BUNDLED.replace(
     "check-avoided-words.py\n", "check-avoided-words.py # trailing note\n"))
-expect("T62 a trailing YAML comment is not passed as arguments",
+expect("T62 a trailing shell comment is not passed as arguments",
        " ".join(commented[0]["command"]), "python3 -u .gha/check-avoided-words/check-avoided-words.py")
 for case, before, after in (("T59 another repository", "repository: Morrison-Lab/gha", "repository: other/gha"),
                             ("T63 another path", "path: .gha", "path: tools/gha")):

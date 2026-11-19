@@ -296,7 +296,7 @@ def parse_run_check_lines(text: str) -> list[dict]:
             return "''"
 
         try:
-            # comments=True drops a trailing YAML comment rather than passing it as arguments.
+            # comments=True drops a trailing shell comment (any '#' token, unlike bash: #5955).
             argv = shlex.split(EXPR.sub(placeholder, m.group("rest")), comments=True)
         except ValueError:
             continue
@@ -321,7 +321,7 @@ def parse_run_check_lines(text: str) -> list[dict]:
         unhandled.extend(f"{p}BASE_REF does not name a check's variables" for p in prefixes
                          if not re.fullmatch(r"[A-Z][A-Z0-9]*_(?:[A-Z0-9]+_)*", p)
                          or p.startswith(RESERVED_PREFIXES))
-        unhandled.extend(f"{k} is not one of the check's own value-safe variables"
+        unhandled.extend(f"{k} is not the line's prefix with a value-safe suffix"
                          for k in assigns if not any(k == p + s for p in prefixes for s in VALUE_SAFE_KEYS))
         unhandled.extend(f"{k}={v}" for k, v in assigns.items() if unsafe_value(k, v))
         # Run only what the wrapper is for: python on this check's own script.
@@ -343,7 +343,7 @@ SAFE_REF = re.compile(r"(?!.*\.\.)[A-Za-z0-9][\w.\-/]*")
 # Prefixes whose variables change how a loader, interpreter or git behaves.
 # A check's own prefix is never one of these.
 RESERVED_PREFIXES = ("LD_", "DYLD_", "GIT_", "GITHUB_", "RUNNER_", "ACTIONS_", "PYTHON", "BASH",
-                     "XDG_", "SSH_", "GCONV_", "MALLOC_", "PERL", "RUBY", "NODE_", "JAVA_")
+                     "XDG_", "SSH_", "GCONV_", "MALLOC_", "PERL", "RUBY", "NODE_", "JAVA_", "TCL_", "TK_")
 # A piece of a path or glob value: relative, with no "..", and no leading "-", "." or "~".
 SAFE_PIECE = re.compile(r"(?!.*\.\.)[\w*?][\w.*?/\-]*")
 
@@ -362,7 +362,7 @@ def unsafe_value(key: str, value: str) -> bool:
 
 
 def check_prefixes(assigns: dict) -> tuple:
-    """The prefixes of a line's *_BASE_REF keys: the check's own variable names."""
+    """The prefixes of a line's *_BASE_REF keys, not yet tied to the named check (#5955)."""
     return tuple(k[:-len("BASE_REF")] for k in assigns if k.endswith("_BASE_REF"))
 
 

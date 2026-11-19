@@ -70,7 +70,9 @@ Do not edit before the answer.
 - Move includes, not text: the subfile stays where it is and the destination page includes it, so every `#id` survives.
   Renaming the subfile folder is a later, separate PR.
 - Keep a heading's explicit id when its section moves (`# The anatomy of a learning system {#sec-anatomy}`).
-- Retarget every link that named a moved id on its old page (`<page>.qmd#fig-x` to `<new-page>.qmd#fig-x`), and add the moved ids to the redirect script's map and its hidden `<span id>` list.
+- Add the ids this PR moves to the redirect script's map and its hidden `<span id>` list.
+  Retarget the links that name those ids (`<page>.qmd#fig-x` to `<new-page>.qmd#fig-x`), which are few because the ids are new to the map.
+  Links to ids that earlier splits already moved off the page keep working through the redirect and wait for step 5.
 - Turn the page into a stub: `format: html: default` only (a deck with one slide fails the site check, and the handout has no content), `search: false`, the redirect include, and a short list of the pages that now hold the content.
   Keep it in the render list, because old links from other repositories and course sites still reach it.
   Remove it from the navbar and the sidebar.

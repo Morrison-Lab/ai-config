@@ -362,20 +362,20 @@ rm -f "$PAYLOAD_FILE"
 
 Measured in a claude.ai cloud session on 2026-11-12, while merging [ai-config#5482](https://github.com/Morrison-Lab/ai-config/pull/5482):
 - `hooks/warn-merge-without-cross-harness-review.py` did not recognise an OpenCode Go review whose `curl` ran inside a Python wrapper script.
-  The merge went through only after `curl -sS -N --max-time 1500 https://opencode.ai/zen/go/v1/chat/completions -H "x-opencode-session: <uuid>" ... --data-binary @req.json -o out.sse` ran directly in a Bash call.
+  The merge went through only after `curl -sS -N --max-time 1500 https://opencode.ai/zen/go/v1/chat/completions ... --data-binary @req.json -o out.sse` ran directly in a Bash call.
 - The same hook counts only a cross-harness review run in the merging session's own transcript, so a Gemini Flash read that another session posted on the PR did not satisfy it.
 - The merge gate that requires a `check-pr-fully-clean.py` pass did not accept a run whose output was filtered through `grep`, and accepted it once the output was unpiped.
 - With every Go model at its weekly `GoUsageLimitError`, `iceman-contributor-free` returned a bare `VERDICT: CLEAN`, `beam-free` returned no text, and `longcat-2.5-free` spent all 30,000 `max_tokens` on reasoning with no text.
   Treat the bare verdict as weak evidence and the empty answers as no verdict.
-
-- On 2026-11-19 the endpoint began rejecting a request with no `x-opencode-session` header.
-  It answers `{"type":"error","error":{"type":"MissingSessionID",...}}` as a 206-byte body with curl exit 0, so the stream parser prints nothing.
-
-- **Do:** send `-H "x-opencode-session: <uuid>"` on every direct `curl` to the Go endpoint, because the header is required.
-  When the parser prints nothing, read the raw body (`out.sse`) for an `error` object before retrying.
-- **Don't:** read an empty parse, or curl exit 0, as an empty model answer.
 - **Do:** run the OpenCode `curl` directly in Bash, and run `check-pr-fully-clean.py` unpiped, before a merge.
 - **Don't:** wrap the `curl` in a script, or count another session's posted read, as the merge hook's cross-harness review.
+
+Measured in a claude.ai cloud session on 2026-11-19, reviewing [ai-config#5881](https://github.com/Morrison-Lab/ai-config/pull/5881), [#5887](https://github.com/Morrison-Lab/ai-config/pull/5887) and [#5888](https://github.com/Morrison-Lab/ai-config/pull/5888):
+- A request sent without the `x-opencode-session` header that the endpoint list above requires came back as a 206-byte `MissingSessionID` error body with curl exit 0, so the stream parser printed nothing.
+- A `kimi-k3` stream stalled mid-reasoning with no content, and the same patch sent to `deepseek-v4-pro` with "keep reasoning brief" returned a full review.
+- The Go reads found real defects on heads that the Claude CI review had already called CLEAN, among them a command allowlist that still ran arbitrary code.
+- **Do:** when the parser prints nothing, read the raw body (`out.sse`) for an `error` object before retrying, and resend a stalled `kimi-k3` read to `deepseek-v4-pro`.
+- **Don't:** read an empty parse, or curl exit 0, as an empty model answer, or skip the Go read because the Claude review is already clean.
 
 Reuse one UUID across the turns of a conversation.
 Prefer Go models for bulk and mechanical work while Claude quota is low.

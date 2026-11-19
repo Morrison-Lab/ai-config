@@ -262,8 +262,10 @@ merges: `git merge-tree "$(git merge-base origin/main origin/<sibling-branch>)" 
 cleanly.
 That check reads the sibling branch and edits nothing, so it runs for every
 sibling PR.
-Then apply `memories/reviewing-prs.md`'s scope test, with `scripts/pr-scope.py`, before preparing
-anything: for a sibling PR that fails it, report the conflict to the user and
+Then apply `memories/reviewing-prs.md`'s scope test before preparing anything:
+save `gh pr list --state open --limit 100 --json number,title,author,assignees,headRefName` unfiltered to a file
+and pipe it into `python3 scripts/pr-scope.py` with the `--user`, `--alias`, `--requested` and `--excluded` flags `ardia` step 1 defines.
+For a sibling PR that fails the test, report the conflict to the user and
 leave the PR untouched, since they can assign or name it first.
 For one that passes, re-apply the sibling PR's actual semantic change (not a
 mechanical `--theirs`) to the new location, verify with a direct diff that

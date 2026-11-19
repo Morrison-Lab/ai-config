@@ -127,11 +127,11 @@ Reserve the scan-and-fix subagent above for branches with NO active owning agent
 A squash-merge on `main` can knock previously-mergeable open PRs into conflict. Scan right after the merge is confirmed:
 
 ``` bash
-gh pr list --state open \
+gh pr list --state open --limit 100 \
   --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus,comments   # LIST_PRS
 ```
 
-Filter that list by `memories/reviewing-prs.md`’s scope test first, with `python3 scripts/pr-scope.py` as `ardia` step 1 does (opened by or assigned to the invoking user, on the explicitly authorized list from the brief, or authored by the GitHub Actions app (`github-actions`)), and report the PRs dropped. A conflict on an out-of-scope PR is reported to the user and the PR left untouched (no comment, no push); a claim comment does not bring it into scope.
+Filter that list by `memories/reviewing-prs.md`’s scope test first (opened by or assigned to the invoking user, on the explicitly authorized list from the brief, or authored by the GitHub Actions app (`github-actions`)): save that list unfiltered to a file and pipe it into `python3 scripts/pr-scope.py` with the `--user`, `--alias`, `--requested` and `--excluded` flags `ardia` step 1 defines, and report the PRs dropped. Keep the saved list, since the script’s output has no `mergeable` field. A conflict on an out-of-scope PR is reported to the user and the PR left untouched (no comment, no push); a claim comment does not bring it into scope.
 
 For each in-scope PR where `mergeable == "CONFLICTING"` **or `"UNKNOWN"`** (GitHub can take minutes to finish computing mergeability after a push — a genuinely conflicting PR can sit in `UNKNOWN` and get missed if you filter for `CONFLICTING` alone):
 

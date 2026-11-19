@@ -25,8 +25,10 @@ A step reference names its target explicitly, immediately before the word
   linked ``.md`` file.
 
 An optional "own" may sit between the name and "step". A backticked name that
-is not a skill, and a link to anything but an existing ``.md`` file, are
-skipped: the reference names no document this checker can read. A bare
+is not a skill, and a local link to anything but an existing ``.md`` file, are
+reported, since that is how a renamed or removed target shows; an external
+link is skipped. An inline code span that itself contains "step" is an example
+of the syntax and is skipped. A bare
 "step 4" with no named target is a same-document reference and out of scope,
 since a document may run several numbered procedures.
 
@@ -38,16 +40,21 @@ What counts as a step
 
 A target defines a step id by either form, outside fenced code:
 
-- a heading whose text starts with the id, optionally after "Step":
-  ``### 4b. Reply ...``, ``### 1.25. Check ...``, ``## Step 0 -- Extend``;
+- a heading whose text starts with the id, optionally after "Step", followed
+  by punctuation, a space or the end of the line:
+  ``### 4b. Reply ...``, ``### 1.25. Check ...``, ``## Step 0 -- Extend``,
+  ``### 3 Validation``;
 - a numbered list item at column 0, ``3. **Merge ...**``.
 
 The defined set is the union over the whole target. That is lenient on
 purpose: a target with two numbered procedures defines both sets of numbers,
 and a reference into either passes. A reference to ``8`` also passes when only
-``8a`` is defined, since ``8`` then names the group.
+lettered sub-steps such as ``8a`` are defined, since ``8`` then names the
+group; a decimal step such as ``1.25`` does not make ``1`` a step.
+Ranges are ordered componentwise, so ``1.9`` comes before ``1.10``.
 
-Exit status is 1 when any reference fails, 0 otherwise.
+Exit status is 1 when any reference fails, or when a corpus run (no paths
+given) resolves no reference at all, 0 otherwise.
 """
 from __future__ import annotations
 
@@ -80,8 +87,11 @@ SPLIT_RE = re.compile(rf"({STEP_ID})|({SEP})")
 RANGE_WORDS = {"to", "through", "--", "\u2013", "\u2014", "-"}
 
 HEADING_RE = re.compile(
-    rf"^#{{1,6}}\s+(?:\*\*)?(?:Step\s+)?(?P<id>{STEP_ID})(?:\*\*)?(?:[.:)]|\s+[\u2014\u2013-]|\s*$)"
+    rf"^#{{1,6}}\s+(?:\*\*)?(?:Step\s+)?(?P<id>{STEP_ID})(?:\*\*)?(?:[.:)]|\s|$)"
 )
+# An inline code span that itself contains "step" is an example of the
+# syntax, not a citation: skill-builder's own illustration is one.
+EXAMPLE_SPAN_RE = re.compile(r"(`+)(?!`)(.+?)(?<!`)\1(?!`)")
 LIST_RE = re.compile(rf"^(?P<id>\d+)\.\s")
 
 
@@ -102,6 +112,17 @@ def blank_fences(text: str) -> str:
     return "\n".join(lines)
 
 
+def blank_examples(text: str) -> str:
+    """Blank inline code spans that contain the word "step", keeping offsets."""
+
+    def blank(m: re.Match[str]) -> str:
+        if re.search(r"\b[Ss]teps?\b", m.group(2)):
+            return re.sub(r"[^\n]", " ", m.group(0))
+        return m.group(0)
+
+    return EXAMPLE_SPAN_RE.sub(blank, text)
+
+
 def defined_steps(path: Path) -> set[str]:
     """Collect the step ids a document defines."""
     text = blank_fences(path.read_text(encoding="utf-8"))
@@ -118,13 +139,14 @@ def step_exists(step: str, defined: set[str]) -> bool:
     """Say whether a cited id is defined, or names a group of sub-steps."""
     if step in defined:
         return True
-    group = re.compile(rf"{re.escape(step)}[a-z.]")
+    group = re.compile(rf"{re.escape(step)}[a-z]")
     return any(group.match(d) for d in defined)
 
 
-def sort_key(step: str) -> tuple[float, str]:
+def sort_key(step: str) -> tuple[tuple[int, ...], str]:
+    """Order ids componentwise, so 1.9 comes before 1.10."""
     m = re.match(r"(\d+(?:\.\d+)?)([a-z]?)", step)
-    return float(m.group(1)), m.group(2)
+    return tuple(int(part) for part in m.group(1).split(".")), m.group(2)
 
 
 def parse_ids(ids: str) -> tuple[list[str], list[tuple[str, str]]]:
@@ -147,16 +169,26 @@ def parse_ids(ids: str) -> tuple[list[str], list[tuple[str, str]]]:
     return steps, ranges
 
 
-def resolve(match: re.Match[str], source: Path, root: Path) -> Path | None:
-    """Return the document a reference names, or None when it names none."""
+def resolve(match: re.Match[str], source: Path, root: Path) -> tuple[Path | None, str | None]:
+    """Return the document a reference names, or why it names none.
+
+    An external link returns (None, None) and is skipped. A backticked name
+    that is no skill, or a local link to no Markdown file, returns a reason,
+    which the caller reports: that is how a renamed or removed target shows.
+    """
     if match.group("bname"):
-        target = root / "skills" / match.group("bname") / "SKILL.md"
-        return target if target.is_file() else None
+        name = match.group("bname")
+        target = root / "skills" / name / "SKILL.md"
+        if target.is_file():
+            return target, None
+        return None, f"no skill named {name}"
     link = match.group("lpath").split("#", 1)[0]
-    if not link.endswith(".md") or "://" in link:
-        return None
+    if "://" in link:
+        return None, None
     target = (source.parent / link).resolve()
-    return target if target.is_file() else None
+    if link.endswith(".md") and target.is_file():
+        return target, None
+    return None, f"link {link} is not a Markdown file in this repository"
 
 
 def check_file(
@@ -164,13 +196,17 @@ def check_file(
 ) -> tuple[list[Finding], int]:
     """Check one document; return its findings and how many references it resolved."""
     raw = path.read_text(encoding="utf-8")
-    text = blank_fences(raw)
+    text = blank_examples(blank_fences(raw))
     flat = text.replace("\n", " ")
     findings: list[Finding] = []
     resolved = 0
     matches = [m for pattern in REF_RES for m in pattern.finditer(flat)]
     for m in sorted(matches, key=lambda m: m.start()):
-        target = resolve(m, path, root)
+        target, missing = resolve(m, path, root)
+        if missing:
+            line = text.count("\n", 0, m.start()) + 1
+            findings.append(Finding(path, line, m.group(0), missing))
+            continue
         if target is None:
             continue
         resolved += 1
@@ -229,6 +265,11 @@ def main(argv: list[str] | None = None) -> int:
         f"across {checked} file(s), {len(cache)} target(s) read",
         file=sys.stderr,
     )
+    if not args.paths and references == 0:
+        # A corpus run that resolves nothing means the reference pattern or
+        # the resolver broke, not that the corpus is clean.
+        print("check-step-references: resolved no references in the corpus", file=sys.stderr)
+        return 1
     return 1 if findings else 0
 
 

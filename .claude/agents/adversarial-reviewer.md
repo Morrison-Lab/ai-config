@@ -422,5 +422,6 @@ See [`ardi`](../../shared/workflow/ardi.md) ([ai-config#5871](https://github.com
 
 On a diff that adds, removes or renumbers a numbered step in a skill or shared fragment, search the corpus for references that cite that document's steps by number (`` `name` step N ``, ``[`name`](path) steps N through M``, ``step N of `name` ``), and report any whose number now names a different step or none.
 On a diff that adds such a reference, read the cited step and check that the citing text describes what that step does.
-[`check-step-references.py`](../../scripts/check-step-references.py) catches only a number with no step behind it, not a number that now names the wrong step, so read the cited steps yourself.
+[`check-step-references.py`](../../scripts/check-step-references.py) reports a number with no step behind it, a range written backwards, and a citation whose skill or linked file no longer exists.
+It cannot tell that a number now names the wrong step, so read the cited steps yourself.
 See [`skill-builder`](../../skills/skill-builder/SKILL.md#conventions-match-the-existing-family) ([ai-config#1865](https://github.com/Morrison-Lab/ai-config/issues/1865)).

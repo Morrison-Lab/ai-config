@@ -207,8 +207,9 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
   and fix every citer in the same PR, since the citing file is the one that
   goes wrong and your diff never shows it.
   `python3 scripts/check-step-references.py` reports a number that names no
-  step (ai-config#1865); it cannot tell that a number now names a different
-  step, so read each citer.
+  step, a backwards range, and a citation of a skill or file that no longer
+  exists (ai-config#1865);
+  it cannot tell that a number now names a different step, so read each citer.
 - **No registry to update.** Skills are auto-discovered from `skills/` (the
   bootstrap symlink and the plugin root both read the directory) — adding the
   directory is enough.

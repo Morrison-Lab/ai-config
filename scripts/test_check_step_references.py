@@ -10,6 +10,7 @@ quiet.
 import contextlib
 import importlib.util
 import io
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -36,6 +37,12 @@ TARGET = """\
 
 ## Step 6 -- Extend
 
+### 10 Heading with no punctuation
+
+### 11.9. Ninth part
+
+### 11.10. Tenth part
+
 ```bash
 ### 9. Not a step: inside a fence
 ```
@@ -50,6 +57,15 @@ FRAGMENT = """\
 """
 
 
+DECIMAL = """\
+# decimal
+
+### 1.25. Only a decimal step
+"""
+
+ANCHOR = "Anchor: `target` step 1.\n"
+
+
 def make_repo(tmp: Path, citing: str) -> Path:
     (tmp / "skills" / "target").mkdir(parents=True)
     (tmp / "skills" / "target" / "SKILL.md").write_text(TARGET, encoding="utf-8")
@@ -58,17 +74,18 @@ def make_repo(tmp: Path, citing: str) -> Path:
     path.write_text(citing, encoding="utf-8")
     (tmp / "shared").mkdir()
     (tmp / "shared" / "fragment.md").write_text(FRAGMENT, encoding="utf-8")
+    (tmp / "shared" / "decimal.md").write_text(DECIMAL, encoding="utf-8")
     return path
 
 
-def run(citing: str) -> tuple[int, str]:
+def run(citing: str) -> tuple[int, str, str]:
     with tempfile.TemporaryDirectory() as d:
         tmp = Path(d)
         make_repo(tmp, citing)
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = csr.main(["--root", str(tmp)])
-        return code, out.getvalue()
+        return code, out.getvalue(), err.getvalue()
 
 
 CASES = [
@@ -90,18 +107,27 @@ CASES = [
     ("range and list", "Run `target` steps 1 through 2, 3.5 and 7.\n", 0, ""),
     ("link form", "Run [`f`](../../shared/fragment.md) step 1.\n", 0, ""),
     ("of form", "See step 2 of [`target`](../target/SKILL.md).\n", 0, ""),
-    ("unknown skill is skipped", "Run `nonexistent` step 99.\n", 0, ""),
-    ("bare same-document reference is out of scope", "Then do step 99.\n", 0, ""),
-    ("reference inside a fence is skipped", "```\n`target` step 99\n```\n", 0, ""),
-    ("external link is skipped", "See [`x`](https://example.com/x.md) step 99.\n", 0, ""),
+    ("unknown skill is reported", "Run `nonexistent` step 99.\n", 1, "no skill named nonexistent"),
+    ("local non-Markdown link is reported", "Run [`x`](../../shared/x.txt) step 1.\n", 1, "not a Markdown file"),
+    ("decimal step is not its parent", "Run [`d`](../../shared/decimal.md) step 1.\n", 1, "no step 1"),
+    ("corpus with no resolved reference fails", "Then do step 99.\n", 1, ""),
+    ("heading with a space after the id", "Run `target` step 10.\n", 0, ""),
+    ("componentwise range order", "Run `target` steps 11.9 through 11.10.\n", 0, ""),
+    ("example code span is skipped", ANCHOR + "Write ``Run `target` step 99`` like this.\n", 0, ""),
+    ("bare same-document reference is out of scope", ANCHOR + "Then do step 99.\n", 0, ""),
+    ("reference inside a fence is skipped", ANCHOR + "```\n`target` step 99\n```\n", 0, ""),
+    ("external link is skipped", ANCHOR + "See [`x`](https://example.com/x.md) step 99.\n", 0, ""),
 ]
 
 
 def main() -> int:
     failures = 0
     for name, citing, want_code, want_text in CASES:
-        code, out = run(citing)
+        code, out, err = run(citing)
         ok = code == want_code and want_text in out
+        if ok and want_code == 0:
+            # A pass must have resolved something, or it proves nothing.
+            ok = re.search(r" in [1-9]\d* reference", err) is not None
         if not ok:
             failures += 1
             print(f"FAIL {name}: exit {code} (want {want_code}), output {out!r}")

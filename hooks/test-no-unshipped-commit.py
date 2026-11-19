@@ -574,6 +574,15 @@ try:
     # main() end-to-end: the payload's cwd drives the verdict, and the
     # sentinel keys on the derived reason (fires once, skips the repeat).
     # Runs before the detach below, which un-defines this repo's upstream.
+    # Paused (ai-config#3911): the same unpushed state, with the user's latest
+    # prompt "pause", stays silent, so the session can end without a push.
+    # Runs first, so the sentinel below has not yet been written.
+    _paused = transcript(["git commit -m hook"])
+    with open(_paused, "a", encoding="utf-8") as _fh:
+        _fh.write(json.dumps({"type": "user", "message": {"content": "pause"}}) + "\n")
+    assert run_hook({"transcript_path": _paused, "cwd": unpushed_root}).stdout.strip() == "", \
+        "a paused session must not be asked to push (ai-config#3911)"
+    os.unlink(_paused)
     _payload = {"transcript_path": commit_only, "cwd": unpushed_root}
     _out = run_hook(_payload)
     _block = json.loads(_out.stdout)

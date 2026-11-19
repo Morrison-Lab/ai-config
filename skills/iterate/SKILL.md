@@ -1,6 +1,7 @@
 ---
 name: iterate
 description: "→ ardi."
+disable-model-invocation: true
 user-invocable: true
 ---
 

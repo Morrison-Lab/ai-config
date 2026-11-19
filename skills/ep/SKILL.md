@@ -1,6 +1,7 @@
 ---
 name: ep
 description: "→ empty-promise."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

@@ -235,6 +235,13 @@ jobs:
         run: python3 scripts/check-leadin-counts.py
       - name: Run check-leadin-counts tests
         run: python3 scripts/test_check_leadin_counts.py
+      - name: Check cross-document step references
+        # ai-config#1865. A renumbered step breaks the documents that cite it
+        # while the PR's diff touches only the cited one, and a wrong step
+        # number still reads as an instruction.
+        run: python3 scripts/check-step-references.py
+      - name: Run check-step-references tests
+        run: python3 scripts/test_check_step_references.py
       - name: Run check-doi-bib tests
         run: python3 scripts/test_check_doi_bib.py
       - name: Run test_pull_request tests
@@ -305,6 +312,10 @@ jobs:
         # discriminates a loaded skill's body from a scheduled check-in
         # continuation, both of which carry isMeta: true.
         run: python3 scripts/test_transcript_meta.py
+      - name: Run session-pause library tests
+        # ai-config#3911: scripts/lib/session_pause.py reads a pause from the
+        # transcript, and agent_notice.stop_notice never blocks while paused.
+        run: python3 scripts/test_session_pause.py
       - name: Run transcript-meta fallback-messaging tests
         # ai-config#3860 (fail-fast.md follow-up): each of the six consuming
         # hooks must print an observable stderr message, naming itself and

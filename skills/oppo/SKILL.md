@@ -1,6 +1,7 @@
 ---
 name: oppo
 description: "→ opposition-research."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - WebSearch

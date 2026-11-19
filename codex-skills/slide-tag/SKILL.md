@@ -1,6 +1,6 @@
 ---
 name: "slide-tag"
-description: "Move floating Git tag to main."
+description: "Move floating Git tag to main. Aliases: ts."
 ---
 
 # slide-tag (Codex wrapper)

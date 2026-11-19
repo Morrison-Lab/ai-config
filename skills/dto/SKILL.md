@@ -1,6 +1,7 @@
 ---
 name: dto
 description: "→ delegate-to-opencode."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

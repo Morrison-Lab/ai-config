@@ -60,6 +60,7 @@ its description does not use (ai-config#949).
 | `skills/compress-session/SKILL.md` | Distill context before compacting. |  |
 | `skills/config-ai/SKILL.md` | Route AI capability requests. Aliases: ca, cai. |  |
 | `skills/configure-gitattributes/SKILL.md` | Configure file merge/diff attributes. |  |
+| `skills/configure-repo/SKILL.md` | Set up a repo for agent work with ai-config. |  |
 | `skills/consolidate-memory/SKILL.md` | Merge redundant memories. |  |
 | `skills/consolidate-skills/SKILL.md` | Merge overlapping skills. |  |
 | `skills/convert-repo-format/SKILL.md` | Convert repo format. Aliases: crf. |  |

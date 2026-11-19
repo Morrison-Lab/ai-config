@@ -390,6 +390,21 @@ escape_call = {"name": "escape", "unhandled": [], "assigns": {"X_BASE_REF": "mai
 expect("T74 a .gha/ path that a symlink takes outside the gha checkout is not run",
        hook.run_bundled(gha_tmp, gha_tmp, escape_call, "origin/main")[1:],
        ("error", "line not runnable locally: a .gha/ path leaves the gha checkout"))
+for line in ("LD_BASE_REF=origin/main LD_PRELOAD=./evil.so", "GIT_BASE_REF=origin/main GIT_EXTERNAL_DIFF=./x",
+             "XDG_BASE_REF=origin/main XDG_CONFIG_HOME=./cfg", "BASH_BASE_REF=origin/main BASH_ENV=./x",
+             "_BASE_REF=origin/main _X=1"):
+    named = hook.parse_run_check_lines(BUNDLED.replace("CAW_FAIL=false", "CAW_FAIL=false " + line))
+    expect(f"T75 a *_BASE_REF key the workflow names cannot widen the allowed prefix: {line}",
+           any("does not name a check's variables" in u for u in named[0]["unhandled"]), True)
+gha_src = tempfile.mkdtemp(prefix="npc-gha-src-")
+os.makedirs(os.path.join(gha_src, "x"))
+with open(os.path.join(gha_src, "x", "x.py"), "w", encoding="utf-8") as fh:
+    fh.write('PREFIX = "CAW_"\n')
+foreign_call = {"name": "foreign", "unhandled": [], "assigns": {"ZZZ_BASE_REF": "main"},
+                "command": "python3 .gha/x/x.py".split()}
+expect("T76 a prefix the gha script never names is not run",
+       hook.run_bundled(gha_src, gha_src, foreign_call, "origin/main")[1:],
+       ("error", "line not runnable locally: the gha script does not read ZZZ_* variables"))
 expect("T72 interpreter flags before the .gha/ script are allowed",
        hook.gha_script_command("python3 -I -u .gha/x/x.py --flag".split()), True)
 no_fail = make_repo({"cluster-checks.yml": BUNDLED.replace(" CAW_FAIL=false", ""), "annotation-gate.yml": GATE})

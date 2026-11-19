@@ -334,9 +334,14 @@ def parse_run_check_lines(text: str) -> list[dict]:
             continue
         command = argv[split + 1:]
         # The line sets the check's environment, so only the check's own variables
-        # (the prefix of its *_BASE_REF key) may be set: PYTHONPATH, PATH, LD_PRELOAD
-        # or GIT_* would run code from the repository being pushed.
-        prefixes = tuple(k[:-len("BASE_REF")] for k in assigns if k.endswith("_BASE_REF"))
+        # (the prefix of its *_BASE_REF key) may be set. The workflow names that key,
+        # so a prefix such as LD_ or GIT_ is refused here, and run_bundled also
+        # requires the gha script itself to name the prefix: LD_PRELOAD, PYTHONPATH
+        # or GIT_EXTERNAL_DIFF would run code from the repository being pushed.
+        prefixes = check_prefixes(assigns)
+        unhandled.extend(f"{p}BASE_REF does not name a check's variables" for p in prefixes
+                         if not re.fullmatch(r"[A-Z][A-Z0-9]*_(?:[A-Z0-9]+_)*", p)
+                         or p.startswith(RESERVED_PREFIXES))
         unhandled.extend(f"{k} is not one of the check's own variables"
                          for k in assigns if not k.startswith(prefixes))
         # Only a pull-request base belongs in a *_BASE_REF; a pull_request test anywhere
@@ -354,6 +359,15 @@ def parse_run_check_lines(text: str) -> list[dict]:
 
 
 SAFE_PYTHON_FLAGS = ("-u", "-I", "-B")
+# Prefixes whose variables change how a loader, interpreter or git behaves.
+# A check's own prefix is never one of these.
+RESERVED_PREFIXES = ("LD_", "DYLD_", "GIT_", "PYTHON", "BASH", "XDG_", "SSH_", "GCONV_",
+                     "MALLOC_", "PERL", "RUBY", "NODE_", "JAVA_")
+
+
+def check_prefixes(assigns: dict) -> tuple:
+    """The prefixes of a line's *_BASE_REF keys: the check's own variable names."""
+    return tuple(k[:-len("BASE_REF")] for k in assigns if k.endswith("_BASE_REF"))
 
 
 def gha_script_command(command: list) -> bool:
@@ -557,7 +571,9 @@ def run_bundled(git_root: str, gha_dir: str, call: dict, base: str):
         if not fail_keys:
             fail_keys = [k[:-len("BASE_REF")] + "FAIL" for k in assigns if k.endswith("_BASE_REF")]
         assigns.update({k: "true" for k in fail_keys})
-    prefixes = tuple({k.split("_", 1)[0] + "_" for k in assigns})
+    # Inherited variables with the check's own prefix are dropped, by the same rule
+    # the parser allows assignments by, so nothing else (LD_LIBRARY_PATH) is touched.
+    prefixes = check_prefixes(call["assigns"])
     env = {k: v for k, v in os.environ.items() if not k.startswith(prefixes)}
     env.update(assigns)
     command = [os.path.join(gha_dir, a[len(".gha/"):]) if a.startswith(".gha/") else a
@@ -570,6 +586,13 @@ def run_bundled(git_root: str, gha_dir: str, call: dict, base: str):
                and not os.path.isfile(os.path.join(gha_dir, a[len(".gha/"):]))]
     if missing:
         return call["name"], "error", f"{missing[0][len('.gha/'):]} not found in gha checkout"
+    script = next(c for a, c in zip(call["command"], command) if a.startswith(".gha/"))
+    with open(script, encoding="utf-8", errors="replace") as fh:
+        source = fh.read()
+    unread = [p for p in prefixes if not re.search("[\"']" + re.escape(p), source)]
+    if unread:
+        return call["name"], "error", (f"line not runnable locally: the gha script does not "
+                                       f"read {unread[0]}* variables")
     if command and command[0] in ("python3", "python"):
         command[0] = sys.executable
     try:

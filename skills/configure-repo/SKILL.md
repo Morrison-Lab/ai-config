@@ -54,7 +54,8 @@ Run these from an ai-config checkout, against a branch of the target repository.
    For the review pair, follow
    [`claude-review-workflow`](../claude-review-workflow/SKILL.md) and
    [`claude-agent-workflow`](../claude-agent-workflow/SKILL.md).
-   Skip any workflow the repository already has; upgrade a hand-maintained one per `upgrade-to-gha`.
+   Skip any workflow the repository already has,
+   and upgrade a hand-maintained one per `upgrade-to-gha`.
 4. **Write what is specific to this repository** in its own `AGENTS.md` or `CLAUDE.md`,
    outside the managed block:
    how to build and test, what the directories hold, and any rule that applies only here.

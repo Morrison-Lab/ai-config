@@ -1957,6 +1957,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-plain-text-choice.py\"",
+            "timeout": 10,
+            "script": "no-plain-text-choice.py",
+            "why": "ai-config#5826. Ezra, 2026-11-18: \"anytime you ask me a multiple choice question, can you use a multiple choice card?\" Denies a user-visible post_message, reply, update_message or edit_message in any session that holds a question plus two or more lettered or numbered option lines, two Option labels, or a 'start now or file' choice, and says to post it with request_decision (one question, 2 to 4 options, one recommended). A deny, not a reminder, because the failing shape is lexical (ai-config#4741). Open-ended questions and fenced code are left alone. ALLOW_PLAIN_CHOICE=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-bare-for-now-limit.py\"",
             "timeout": 10,
             "script": "no-bare-for-now-limit.py",

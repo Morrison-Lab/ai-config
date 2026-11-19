@@ -19,6 +19,9 @@ The rest are prose because no condition in the transcript can decide them.
 
 ## Deliverables and approvals
 
+- Ask every multiple-choice question on a decision card (`request_decision`), never as a plain-text option list: "start now or file?", "which option?", lettered or numbered options (Ezra, 2026-11-18, ai-config#5826: "anytime you ask me a multiple choice question, can you use a multiple choice card?").
+  This holds for every agent, coordinator and thread alike.
+  Enforced by `hooks/no-plain-text-choice.py`; an open-ended question with no fixed answers stays plain text.
 - An ask for a deliverable (for example "post the key") authorizes its whole follow-through, including re-uploads and replacements of the same item.
   Never ask again for each step.
   Enforced by `hooks/no-stepwise-approval-ask.py` (ai-config#4726).

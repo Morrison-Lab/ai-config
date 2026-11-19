@@ -346,7 +346,7 @@ def check_aliases(skill_mds: list[Path]) -> None:
             errors.append(f"skills/{name}: alias of missing skill {canonical!r}")
         elif frontmatters[canonical].get("disable-model-invocation") is True:
             errors.append(
-                f"skills/{canonical}: is the target of alias {name!r} but sets "
+                f"skills/{canonical}: the target of alias {name!r} sets "
                 "`disable-model-invocation: true`, so its Aliases clause never "
                 "reaches the model and the alias routes nowhere"
             )

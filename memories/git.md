@@ -427,6 +427,16 @@ by fetching `refs/pull/3060/head` live from origin and walking it.)
   (Verified on git 2.x;
 a review bot suggested the broken form on Morrison-Lab/gha#58.)
 
+## Squash a branch onto its merge base, not onto `origin/main`
+`git reset --soft origin/main` squashes correctly only while `origin/main` still sits at the branch's fork point.
+Once `main` has moved on, the soft reset keeps the branch's tree,
+so the squashed commit also reverts everything `main` gained since the fork.
+
+- **Do:** squash with `git reset --soft "$(git merge-base HEAD origin/main)"`, then check `git diff --stat "$(git merge-base HEAD origin/main)"` lists only the branch's own files.
+- **Don't:** squash with `git reset --soft origin/main` after a fetch has moved `origin/main` past the fork point.
+
+(Banked from ai-config#3349, an `ardia` sweep over `d-morrison/rme` on 2026-09-07.)
+
 ## Git --- `merge --continue` takes no arguments
 - `git merge --continue --no-edit` fails with `fatal: --continue expects no arguments`.
 - After resolving conflicts and staging (`git add <files>`), use `git merge --continue` alone.

@@ -8,10 +8,14 @@ state. A `git checkout -B <b>` run from the wrong directory left the main
 checkout on a fixer's branch with a stale index (ai-config#4233), and a
 switch under a running subagent put a commit on the wrong branch
 (ai-config#3204). Denies `git switch` and a branch-changing `git checkout`
-(a ref, `-`, `-b`, `-B`, `--orphan`, `--detach`), run (after `cd`, `git -C`
-and inside `sh -c`) in the main worktree while more than one live worktree
-exists. Path checkouts (`--`, `-p`, a name that is not a commit) pass.
-`ALLOW_MAIN_CHECKOUT_SWITCH=1` clears one command. Fails open when a helper
+(a commit, a remote-only branch name git would create, `-`, `-b`, `-B`,
+`-d`, `--orphan`, `--detach`, stuck or clustered as in `-qb`), run (after
+`cd`, `git -C` and inside `sh -c`) in the main worktree while more than one
+live worktree exists. Redirections such as `2>&1` are ignored. Path
+checkouts (paths after `--`, `-p`, two or more names, one name that is no
+commit) and a checkout of the current branch pass. Backtick substitution
+and `env -C` are not followed. `ALLOW_MAIN_CHECKOUT_SWITCH=1` clears one
+command. Fails open when a helper
 cannot load, the line does not parse, the repository is redirected, or git
 fails. Rule: [`shared-git-state`](../shared/workflow/shared-git-state.md).
 """
@@ -34,7 +38,6 @@ except Exception as _exc:  # broken install: degrade, never block
 
 SHELL_TOOLS = {"Bash", "bash", "run_command", "execute_command", "terminal", "shell"}
 OVERRIDE = "ALLOW_MAIN_CHECKOUT_SWITCH"
-BRANCH_OPTS = frozenset({"-b", "-B", "--orphan", "--detach", "-"})
 DENY = (
     "Refused: `{segment}` changes the branch of `{top}`, the main worktree of "
     "a repository with {count} worktrees. Other sessions and subagents read "
@@ -53,18 +56,84 @@ def git(cwd, *args):
     return p.stdout.strip() if p.returncode == 0 else None
 
 
+def without_redirections(rest):
+    """`rest` with shell redirections (`2>/dev/null`, `> out`, `2>&1`) and
+    their targets removed, since the shell, not git, consumes them."""
+    out, i = [], 0
+    while i < len(rest):
+        redir = _STASH.REDIR.match(rest[i])
+        nxt = rest[i + 1] if i + 1 < len(rest) else ""
+        if rest[i].isdigit() and _STASH.REDIR.match(nxt):
+            i += 1
+        elif redir:
+            i += 1 if redir.group(1) else 2
+        else:
+            out.append(rest[i])
+            i += 1
+    return out
+
+
+def checkout_option(arg):
+    """'branch' when a `git checkout` option changes the branch (`-b`, `-B`,
+    `-d`, `--orphan`, `--detach`, alone, stuck or in a cluster such as
+    `-qb`), 'paths' when it makes the command a path checkout or help, and
+    None otherwise."""
+    if arg == "-":
+        return "branch"
+    if arg.startswith("--"):
+        name = arg.split("=", 1)[0]
+        if name in ("--orphan", "--detach"):
+            return "branch"
+        if name in ("--patch", "--help", "--pathspec-from-file"):
+            return "paths"
+        return None
+    for ch in arg[1:]:
+        if ch in "bBd":
+            return "branch"
+        if ch in "ph":
+            return "paths"
+    return None
+
+
+def remote_only_branch(cwd, name):
+    """True when `name` is no local ref and no path, but names exactly one
+    remote-tracking branch, so `git checkout <name>` creates and switches to
+    it (git's DWIM guess)."""
+    if os.path.exists(os.path.join(cwd, name)):
+        return False
+    refs = git(cwd, "for-each-ref", "--format=%(refname)",
+               f"refs/remotes/*/{name}")
+    return bool(refs) and len(refs.splitlines()) == 1
+
+
+def is_current(cwd, name):
+    """True when checking out `name` keeps HEAD where it is: `HEAD`, or the
+    name of the branch already checked out."""
+    return name == "HEAD" or git(cwd, "symbolic-ref", "-q", "--short",
+                                 "HEAD") == name
+
+
 def changes_branch(sub, rest, cwd):
     """True when `git <sub> <rest>` would move HEAD to another branch."""
+    rest = without_redirections(rest)
     if sub == "switch":
         return not {"-h", "--help"} & set(rest)
-    if sub != "checkout" or {"--", "-p", "--patch", "-h", "--help"} & set(rest):
+    if sub != "checkout":
         return False
-    if BRANCH_OPTS & set(rest):
+    cut = rest.index("--") if "--" in rest else len(rest)
+    kinds = {checkout_option(a) for a in rest[:cut] if a.startswith("-")}
+    if "paths" in kinds:
+        return False
+    if "branch" in kinds:
         return True
-    args = [a for a in rest if not a.startswith("-")]
+    if rest[cut + 1:]:  # `checkout [<tree-ish>] -- <path>...` restores files
+        return False
+    args = [a for a in rest[:cut] if not a.startswith("-")]
     # `checkout <tree-ish> <path>...` restores files and keeps the branch.
-    return len(args) == 1 and git(cwd, "rev-parse", "--verify", "-q",
-                              args[0] + "^{commit}") is not None
+    if len(args) != 1 or is_current(cwd, args[0]):
+        return False
+    return (git(cwd, "rev-parse", "--verify", "-q", args[0] + "^{commit}")
+            is not None or remote_only_branch(cwd, args[0]))
 
 
 def main_worktree(cwd):

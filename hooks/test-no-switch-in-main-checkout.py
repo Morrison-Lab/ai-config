@@ -56,7 +56,23 @@ with tempfile.TemporaryDirectory() as root:
 
     wt = os.path.join(root, "wt")
     git("worktree", "add", "-q", "-b", "other", wt, cwd=main)
+    git("update-ref", "refs/remotes/origin/remfeat", "HEAD", cwd=main)
     for command, cwd, want in [
+            ("git checkout feature 2>/dev/null", main, "deny"),
+            ("git checkout feature > /dev/null", main, "deny"),
+            ("git checkout -q feature 2>&1 | tail -1", main, "deny"),
+            ("git checkout remfeat", main, "deny"),
+            ("git checkout feature --", main, "deny"),
+            ("git checkout -b new --", main, "deny"),
+            ("git checkout -qb new", main, "deny"),
+            ("git checkout -bnew", main, "deny"),
+            ("git checkout -Bfeature", main, "deny"),
+            ("git checkout --orphan=new", main, "deny"),
+            ("git checkout -d", main, "deny"),
+            ("git checkout HEAD", main, "allow"),
+            ("git checkout main", main, "allow"),
+            ("git checkout -- a.txt 2>/dev/null", main, "allow"),
+            ("git checkout --ours a.txt", main, "allow"),
             ("git switch feature", main, "deny"),
             ("git switch -c new", main, "deny"),
             ("git checkout feature", main, "deny"),

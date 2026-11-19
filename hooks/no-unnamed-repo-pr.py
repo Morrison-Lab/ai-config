@@ -10,6 +10,8 @@
 - Allowed with no user message naming it: a repo the project configures ("Repositories configured for this
   project:" in the first prompt) or one the coordinator's relay `<note>` in the first prompt names (Ezra,
   2026-11-18, decision card "Allow project and named repos"). Only the first prompt counts.
+- A verified decision-card tap counts as the user's words: the card's question, the chosen option and its
+  consequence (scripts/lib/card_answer.py, ai-config#5839); a declining option counts for nothing.
 - Also denies `gh api repos/<o>/<r>/pulls` and `glab api projects/<o>%2F<r>/merge_requests` sent as POST
   (explicit method or a body flag), and notes `gh api graphql` `createPullRequest` (node id; ai-config#5784 part A).
 - Known limits: a repo named only as precedent passes; new-branch pushes are not guarded (a push opens
@@ -28,6 +30,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath
 from shellcmd import (COMMAND_WRAPPERS, ENV_ASSIGNMENT, SHELL_KEYWORDS, env_value,  # noqa: E402
                       shell_c_expansions, simple_commands_with_scope, walk_dirs)
 from sibling import load_sibling  # noqa: E402
+import card_answer  # noqa: E402
 
 MCP_CREATE = ("mcp__github__create_pull_request", "mcp__github__create_pull_request_with_copilot")
 LOOKS_LIKE_CREATE = re.compile(r"\b(?:gh\s+pr|glab\s+mr)\s+(?:create|new)\b")
@@ -285,7 +288,7 @@ def creations(command, start):
 
 def read_session(path, prompt_text, user_bodies):
     """(texts the user wrote, first record's cwd, first prompt) from the transcript at `path`."""
-    texts, prompts, first_cwd = [], [], None
+    texts, prompts, first_cwd, cards_pending, cards, card_texts = [], [], None, {}, {}, []
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -298,14 +301,19 @@ def read_session(path, prompt_text, user_bodies):
                     and (att.get("origin") or {}).get("kind") != "peer":
                 prompts.append(str(att.get("prompt") or ""))
             msg = rec.get("message")
+            if not rec.get("isSidechain"):
+                card_answer.track_cards(rec, cards_pending, cards)
             if rec.get("type") != "user" or rec.get("isMeta") or rec.get("isSidechain") \
                     or rec.get("isCompactSummary") or not isinstance(msg, dict):
                 continue
             prompts.append(prompt_text(msg.get("content")) or "")
+            card_texts += card_answer.answers_in_record(rec, cards)
     for text in (PASTED.sub(" ", p) for p in prompts):  # a typed slash command's args, else the user's bodies
         texts += (re.findall(r"<command-args>(.*?)</command-args>", text, re.S)
                   if re.match(r"\s*<command-(?:message|name)>", text) else user_bodies(text) if text.strip() else [])
-    return [t for t in texts if t.strip()], first_cwd, (prompts[:1] or [""])[0]
+    # A card answer counts through card_answer (verified, declines dropped, consequence added), not as raw text.
+    texts = [t for t in texts if t.strip() and not card_answer.CHOSE.match(html.unescape(t))] + card_texts
+    return texts, first_cwd, (prompts[:1] or [""])[0]
 
 
 PROJECT_REPOS = re.compile(r"Repositories configured for this project:[ \t]*\n((?:[ \t]*-[ \t]*\S+[ \t]*(?:\n|\Z))+)", re.I)

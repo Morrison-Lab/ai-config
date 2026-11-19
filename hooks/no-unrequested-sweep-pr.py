@@ -7,7 +7,9 @@ negation before the word) or they typed gia, gii, gip or gmd; the grant lasts un
 the next user message. Only the user's
 words count (user_bodies() in remind-plain-english-merge-word.py: a principal
 wake message, a relay's cited user entries, never a `<note>`); a relay citing an
-old message again does not reset the count. No agent-side bypass. Not seen:
+old message again does not reset the count. A verified decision-card tap whose
+option, question or consequence mentions PRs or a sweep is the user's word too
+(scripts/lib/card_answer.py, ai-config#5839). No agent-side bypass. Not seen:
 creates in subagent transcripts; a slow sweep across many user messages. Fails
 open on a missing transcript or helper.
 """
@@ -18,12 +20,17 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"))
+import card_answer  # noqa: E402
+
 DEFAULT_LIMIT = 10
 # "sweep", or a typed backlog-run skill that opens many PRs by design.
 SWEEP = re.compile(r"\bsweep(?:s|ing)?\b|(?:^|\s)/?(?:gia|gii|gip|gmd|giardia)\b", re.I)
 NEGATED = re.compile(r"\b(?:don'?t|do\s+not|never|no|not|stop|without|isn'?t)\b", re.I)
 SENTENCE = re.compile(r"[^.!?\n]+[.!?]*")
 CLAUSE = re.compile(r"[,;:]")
+# A card tap grants when the act it chose is about PRs (ai-config#5839).
+CARD_PRS = re.compile(r"\bPRs?\b|\bpull\s+requests?\b|\bsweep", re.I)
 GH_CREATE = re.compile(r"\bgh\s+pr\s+create\b")
 
 REASON = (
@@ -77,7 +84,7 @@ def prompt_text(content):
 
 def scan(transcript_path, user_bodies, typed):
     """(PRs opened since the user's latest message, whether the user asked to sweep)."""
-    pending = []
+    pending, cards_pending, cards = [], {}, {}
     count, granted, seen = 0, False, set()
     with open(transcript_path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -89,6 +96,8 @@ def scan(transcript_path, user_bodies, typed):
                 continue
             msg = rec.get("message")
             content = msg.get("content") if isinstance(msg, dict) else None
+            if not rec.get("isSidechain"):
+                card_answer.track_cards(rec, cards_pending, cards)
             if rec.get("type") == "assistant" and isinstance(content, list):
                 for b in content:
                     if isinstance(b, dict) and b.get("type") == "tool_use" \
@@ -116,6 +125,7 @@ def scan(transcript_path, user_bodies, typed):
             seen.update(b.strip() for b in bodies)
             count = 0
             granted = any(asks_for_sweep(b, typed) for b in bodies)  # lasts until the next message
+            granted = granted or any(CARD_PRS.search(t) for t in card_answer.answers_in_record(rec, cards))
     return count, granted
 
 

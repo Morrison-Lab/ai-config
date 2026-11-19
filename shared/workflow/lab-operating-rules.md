@@ -27,6 +27,15 @@ The rest are prose because no condition in the transcript can decide them.
   Enforced by `hooks/no-stepwise-approval-ask.py` (ai-config#4726).
 - Decide reversible choices yourself, as `daytb` does.
   Ask only for a merge (plain `mwc`) and for an irreversible student-facing change.
+- A decision-card tap is Ezra's word for the act the card named: its question, the option he chose and that option's consequence.
+  So is a coordinator relay whose `<cited author="user">` entry is his card answer.
+  Never ask him to type that act again ("sweep", "open the PR in X") after he tapped it (Ezra, 2026-11-18: "you're asking for too much work from me", ai-config#5839).
+  The PR hooks read verified taps through `scripts/lib/card_answer.py`;
+  a merge still needs his typed `mwc`, and card text never counts as one.
+- When a thread is blocked only because its session predates a hook fix (a hook reaches only sessions started after the merge, from the synced plugin snapshot), restart the work in a fresh thread session instead of asking Ezra to type the old hook's word.
+  The coordinator does the restart, with the blocked thread's state in the new brief.
+  Collect every typed ask that is still unavoidable (a classifier line, an `mwc` line) into one post, in one fenced block, rather than one post per thread.
+  Prose only: no hook can see whether another session's hooks are stale.
 - Any approval ask is one line that covers the entire remaining job.
 - One approval ask per message.
   A bare "yes" covers only the primary ask, and any use of a credential or key (ssh key, token, secret) is its own single-question ask (Ezra, 2026-11-02, ai-config#4875).

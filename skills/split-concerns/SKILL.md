@@ -86,20 +86,24 @@ and earlier ones can merge while later ones are still in review.
    with `git restore -p --source=<original-branch> -- <path>`.
 3. **Prove nothing was lost or added:**
    `git diff <original-branch> <top-of-stack>` must be empty.
-4. **Open a PR for each layer except the first**, against the branch below it, following
-   [`stack-prs`](../stack-prs/SKILL.md),
-   with a `> [!IMPORTANT]` alert naming the PR that has to merge first.
-5. **Turn the original PR into the first layer.**
+4. **Turn the original PR into the first layer.**
    Force-push the first layer's branch tip to the original PR's branch
    (`git push --force-with-lease origin <layer-1>:<original-branch>`),
    so the original PR, its review history and its number carry the first layer,
    and no layer gets two PRs.
    It targets the base branch, so it needs no merge-order alert.
-   Edit its description to cover only that layer and to link every later PR in merge order.
    A force-push rewrites a shared branch, so confirm it with the user
    unless a standing grant covers it.
    If the user would rather not rewrite it, open the first layer as a new PR against the base
    and close the original with a comment linking every PR in the stack.
+5. **Open a PR for each later layer**, following
+   [`stack-prs`](../stack-prs/SKILL.md),
+   with a `> [!IMPORTANT]` alert naming the PR that has to merge first.
+   The second layer's PR targets the branch that now carries the first layer:
+   `<original-branch>`, or the new first-layer PR's branch if step 4 opened one.
+   Each layer after that targets the layer below it.
+   Then edit the first layer's PR description to cover only that layer
+   and to link every later PR in merge order.
 
 ## Benefits to communicate
 

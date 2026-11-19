@@ -76,8 +76,8 @@ def latest_prompt(transcript_path: str) -> str | None:
         for line in fh:
             try:
                 entry = json.loads(line)
-            except ValueError:
-                continue
+            except (ValueError, RecursionError):
+                continue  # an unreadable record is not a prompt
             if isinstance(entry, dict):
                 text = _prompt_text(entry)
                 if text is not None:

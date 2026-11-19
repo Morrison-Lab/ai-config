@@ -77,6 +77,15 @@ for entries, expected, label in cases:
     finally:
         os.unlink(path)
 
+# A record too deeply nested for json to decode is skipped, not raised.
+path = transcript(user("pause"))
+with open(path, "a", encoding="utf-8") as fh:
+    fh.write("[" * 100000 + "]" * 100000 + "\n")
+try:
+    check("a too-deep record is skipped", is_paused({"transcript_path": path}) is True)
+finally:
+    os.unlink(path)
+
 check("no transcript path means unpaused", is_paused({}) is False)
 check("a missing transcript means unpaused",
       is_paused({"transcript_path": "/nonexistent/t.jsonl"}) is False)

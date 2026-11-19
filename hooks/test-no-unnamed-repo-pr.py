@@ -41,6 +41,10 @@ def verdict(tool, inp, tpath, cwd=HOME):
 
 
 GO, NAMED = transcript("go"), transcript("Adopt it in csci201; see mlg#423.")
+PROJECT_BRIEF = ("<session-context>\nProject: P\nRepositories configured for this project:\n"
+                 "- https://github.com/Morrison-Lab/mlg\n- https://github.com/morrison-lab/csci201\n\nMore text</session-context>")
+RELAY_BRIEF = ('<coordinator-relay><relay from="coordinator" session="s"><cited author="user">epi205</cited>'
+               "<note>Open the PR in Morrison-Lab/epi204.</note></relay></coordinator-relay>")
 CASES = [
     ("repo#N names the repo", MCP, "mlg", NAMED, "pass"),
     ("an unnamed repo is denied", MCP, "epi204", NAMED, "deny"),
@@ -204,6 +208,18 @@ CASES = [
      'gh api -X POST "' + "/".join(["$X"] * 2000) + '" -f t=x', GO, "note"),
     ("a path longer than the cap with a literal gives a note", "Bash",
      'gh api -X POST "' + "/".join(["$X"] * 65 + ["issues"]) + '" -f t=x', GO, "note"),
+    ("a project-configured repo passes unnamed", MCP, "mlg", transcript(PROJECT_BRIEF, "go"), "pass"),
+    ("a project-configured repo passes by URL case", MCP, "MLG", transcript(PROJECT_BRIEF, "go"), "pass"),
+    ("a repo outside the project list is denied", MCP, "epi204", transcript(PROJECT_BRIEF, "go"), "deny"),
+    ("a same-name repo of another owner is denied", "Bash", "gh pr create -R other/mlg", transcript(PROJECT_BRIEF, "go"), "deny"),
+    ("a repo the coordinator's note names passes", MCP, "epi204", transcript(RELAY_BRIEF, "go"), "pass"),
+    ("a repo the user's cited message names passes", MCP, "epi205", transcript(RELAY_BRIEF, "go"), "pass"),
+    ("a repo the relay never names is denied", MCP, "epi206", transcript(RELAY_BRIEF, "go"), "deny"),
+    ("a project list in a later prompt does not count", MCP, "mlg", transcript("go", PROJECT_BRIEF), "deny"),
+    ("a relay note in a later prompt does not count", MCP, "epi204", transcript("go", RELAY_BRIEF), "deny"),
+    ("a note outside a coordinator relay does not count", MCP, "epi204",
+     transcript('<relay from="agent" session="x"><note>Open it in epi204</note></relay>', "go"), "deny"),
+    ("an html-escaped project list counts", MCP, "mlg", transcript(PROJECT_BRIEF.replace("<", "&lt;"), "go"), "pass"),
     ("a missing transcript gives a note", MCP, "mlg", os.path.join(TMP, "none.jsonl"), "note"),
     ("no user message gives a note", MCP, "mlg", transcript({"type": "assistant", "message": {}}), "note"),
 ]
@@ -259,6 +275,10 @@ MUTATIONS = [  # each must fail this suite; skipped inside a mutant run
     ("unknown placeholder passes", 'if any(x.startswith(":") and x not in fills for x in elems):', "if False:"),
     ("fragment not cut", 'else re.split(r"[?#]", endpoint', 'else re.split(r"[?]", endpoint'),
     ("glab graphql mutation name", 'else "mergeRequestCreate"', 'else "createPullRequest"'),
+    ("project keys ignored", "k != home and k not in project and", "k != home and"),
+    ("relay notes ignored", "texts = texts + brief", "texts = texts"),
+    ("any prompt counts as the first", '(prompts[:1] or [""])[0]', '" ".join(prompts)'),
+    ("any relay author counts", r'\bfrom=\"coordinator\"', r'\bfrom=\"[a-z]+\"'),
     ("payload cwd is home", "gh_target(first_cwd or payload.get(\"cwd\"))", "gh_target(payload.get(\"cwd\"))"),
 ]
 if not os.environ.get("NURP_MUTANT"):

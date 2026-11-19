@@ -34,6 +34,12 @@ and requiring consensus clean verdicts at the current HEAD.
   GitHub puts a platform notice on every Actions job, so the checker cannot tell a notice you can ignore from a warning you cannot).
 - **Do:** before that rerun, post a PR comment beginning `Annotation dispositions for head <sha7>:` that names each warning or failure annotation as fixed or as a false positive, with the reason, and may group routine notices (Ezra, 2026-11-12, ai-config#4893).
   The checker fails while runs are marked read and no such comment, newer than the head commit, names the head.
+- **Do:** run `python3 scripts/check-pr-fully-clean.py <pr> -R <owner/repo>` in a cloud session too, and take its exit status as the verdict (Ezra, 2026-11-19, ai-config#4830).
+  Slip, 2026-11-19, lds project: a thread called [lds#2858](https://github.com/Morrison-Lab/lds/pull/2858) "clean on its current head" from a Clean review comment and MCP `get_check_runs`, believing the checker cannot run in cloud.
+  The checker exited 1 on that head, because `build / build` was still queued.
+  The belief was wrong: when GraphQL is blocked the checker falls back to the CCR `review_threads` REST route by itself and gives a verdict.
+- **Do:** in cloud, read annotations with `ALLOW_BASH_OVER_MCP=1 gh api repos/<owner>/<repo>/check-runs/<id>/annotations`, since the GitHub MCP server has no annotation reader.
+- **Don't:** call a PR clean from a Clean review comment plus MCP `get_check_runs`, which sees neither a queued build nor an unread annotation.
 - **Don't:** judge a warning a false positive and merge with the reason written nowhere, as mds#770 did: `--annotations-read` is only your word that you read it.
 - **Do:** when you compare a head's annotations with the base branch's tip, run `scripts/diff-annotations-vs-base.py --repo <owner/repo> --base <sha> --head <sha>` (ai-config#5281).
   It reads every page of check runs and annotations on both commits, compares per check-run name after normalizing temp paths, shas and run ids, exits 1 on any difference you have not traced and named with `--explained <run name>`, and exits 2 until every run on both commits has finished.

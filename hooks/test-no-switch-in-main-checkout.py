@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory() as root:
     git("commit", "-q", "-m", "init", cwd=main)
     git("branch", "feature", cwd=main)
     git("update-ref", "refs/remotes/origin/remote-only", "HEAD", cwd=main)
-    sub =os.path.join(main, "sub")
+    sub = os.path.join(main, "sub")
     os.makedirs(sub)
 
     # One worktree: nothing else reads the checkout, so a switch passes.

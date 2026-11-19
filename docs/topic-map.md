@@ -378,7 +378,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/notes-pre-review-pass.md` | A notes PR (psw, rme, mds, lds, pds, sds, win, araomm) reaches the maintainer already checked against the notes rules, so he reviews the ideas and not the wo... |  |
 | `shared/workflow/parse-data-files.md` | Parse every data file a change touches with a real parser before calling a PR ready or reporting a head as final: a CSV with a CSV reader (every row's field... |  |
 | `shared/workflow/persistent-pr-loop.md` | When you open, push to, or are handed a PR, arm a persistent monitoring loop if one is not already running. Keep it running until the PR merges, closes, or t... |  |
-| `shared/workflow/port-by-script.md` | When content moves from one repository to another, copy the source files with a script. Keep the ids, wording and citations. Edit only what the target reposi... |  |
+| `shared/workflow/port-by-script.md` | When adapting any content (a port, a lab, a deck, a chapter, a snippet, a figure, text from any source), copy it first, algorithmically, and modify after the... |  |
 | `shared/workflow/post-feedback-to-pr.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/pr-on-claim.md` | When an agent claims an issue it's about to work --- in `gi`, `gii`, `gip`, or `st` --- open the PR **immediately**, before writing any code, and keep it a *... |  |
 | `shared/workflow/pr-prioritization.md` | When picking which PR or issue to work on next  ---  choosing among several open PRs to review, iterate (ARDI), or pick up first in a queue, or triaging whic... |  |

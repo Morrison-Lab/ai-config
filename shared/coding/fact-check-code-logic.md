@@ -1926,13 +1926,16 @@ Where an outcome has two consumers that disagree --- as `ambiguous` did --- the 
 
 ## An allowlist the input can name is not an allowlist
 
-On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through four review rounds, and three of them found the same flaw in a new place.
+On 2026-11-19 the push hook's runner for bundled checks ([#5881](https://github.com/Morrison-Lab/ai-config/pull/5881)) went through five review rounds, and four of them found the same flaw in a new place.
 Each guard took its allowed set from the workflow line it was filtering:
 the allowed variable prefix came from the line's own `*_BASE_REF` key, so `LD_BASE_REF` admitted `LD_PRELOAD`;
 the allowed script was any `.gha/*.py` the line named, so it could pick a gha script that renders the repository;
-and the gha ref came from the workflow, so a commit sha could name a fork's code.
+the gha ref came from the workflow, so a commit sha could name a fork's code, and `..` named a directory the cache cleanup then deleted;
+and once the line could only pick its own check, it still picked every variable that check reads, so `TYPOS_BIN_DIR=tools` ran a binary from the pushed repository.
 Probes that kept the check's real prefix (`CAW_`) and script passed every round.
-The fix fixes each allowed value outside the line: the script is `.gha/<name>/<name>.py` for the line's own check name, the line has one prefix outside a reserved set that the script itself names, and the ref must be a named tag or branch.
+The fix holds each allowed value in the hook itself: the script is `.gha/<name>/<name>.py` for the line's own check name, each variable is the line's one prefix followed by a suffix from a fixed list, and the ref must start with a letter or digit, contain no `..` and not be a commit sha.
+Limiting variable names was not enough while the line chose which program read them.
 
 - **Do:** for every allowlist on untrusted input, trace where each allowed value comes from, and probe with the input choosing that value too.
+- **Do:** when an allowlist limits names, ask what each allowed name does in the program that reads it.
 - **Don't:** derive the allowed set from the same input it filters.

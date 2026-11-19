@@ -3,7 +3,7 @@
 Ezra, 2026-11-12: "a freeze shouldn't prevent you from filing issues" ([ai-config#5574](https://github.com/Morrison-Lab/ai-config/issues/5574)).
 
 A freeze is any instruction that stops new work.
-Examples are his scope freeze of 2026-11-11 ([ai-config#5530](https://github.com/Morrison-Lab/ai-config/issues/5530)), the [WIP cap](wip-cap.md), [`finish-wave`](../../skills/finish-wave/SKILL.md), and a "don't start anything new" in a thread.
+Examples are his scope freeze of 2026-11-11 ([ai-config#5530](https://github.com/Morrison-Lab/ai-config/issues/5530)), [`finish-wave`](../../skills/finish-wave/SKILL.md), and a "don't start anything new" in a thread.
 It stops grabbing, claiming, assigning and working issues.
 It never stops filing them.
 

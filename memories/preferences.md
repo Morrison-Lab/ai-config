@@ -7,9 +7,9 @@
   keep honest flags of unverified facts.
   See [`dont-hedge-gratuitously`](../shared/writing/dont-hedge-gratuitously.md).
 
-- WIP cap: with three open PRs in a repo, open no fourth there (ai-config#5213).
-  The 3 is Ezra's daytb on the coordinator's recommendation, 2026-11-10.
-  See [`wip-cap`](../shared/workflow/wip-cap.md).
+- No cap on open PRs per repo.
+  Ezra, 2026-11-18: "the 3-pr cap seems way too small?", then "start it" on the recommendation to remove it ([ai-config#5825](https://github.com/Morrison-Lab/ai-config/issues/5825)).
+  The PR size limits, the clean-review gate and the per-message `no-unrequested-sweep-pr` hook still bound the work.
 - A freeze stops new work, not issue filing.
   Ezra, 2026-11-12: "a freeze shouldn't prevent you from filing issues" ([ai-config#5574](https://github.com/Morrison-Lab/ai-config/issues/5574)).
   File what you find during any freeze and leave it unclaimed.

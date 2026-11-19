@@ -81,6 +81,9 @@ tool calls, so a deny is decidable and costs at most the waiver's probe pass.
 * `gemini` and `cursor-agent` are credited although the gate fragment's
   ladder does not list them as active yet: a successful run of either in
   the transcript is itself the probe that ladder is waiting on.
+* `copilot` is credited only as `copilot -p/--prompt ... --model <id>` with a
+  non-Claude id, since its default model is Claude (ai-config#5286). It is
+  not in the waiver's probe set, so a host without it is not slowed down.
 
 A false deny from the script case is discharged by running the reviewer in the
 foreground, or by the probe pass. There is no escape variable. The hook fails
@@ -111,6 +114,14 @@ REVIEW_FLAGS = {
     "cursor-agent": frozenset({"-p", "--print"}),
     "gemini": frozenset({"-p", "--prompt"}),
 }
+# Reviewer CLIs whose default model is Claude, so a run counts only with an
+# explicit non-Claude `--model` (ai-config#5286): GitHub Copilot CLI answered
+# "Claude Haiku 4.5" with no `--model` on 2026-11-10. They are credited but
+# left out of the waiver's probe set, and map to their prompt flags.
+MODEL_GATED_CLIS = {
+    "copilot": frozenset({"-p", "--prompt"}),
+}
+MODEL_FLAG = "--model"
 # `timeout` options that take a separate argument (`-s KILL`, `-k 5`).
 TIMEOUT_ARG_OPTS = frozenset({"-s", "--signal", "-k", "--kill-after"})
 # A help or version flag anywhere in the call (`codex exec --help`).
@@ -196,6 +207,8 @@ NOTE = (
     "model fallback per delegate-to-opencode) on the shipping head first, "
     "in a review form: `codex exec`, `opencode run`, or `-p`/`--print` "
     "(`claude -p`); a subcommand comes before any option with a value. "
+    "A `copilot -p` run counts only with an explicit non-Claude `--model` "
+    "(its default model is Claude), and copilot is never needed for the waiver. "
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
     "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone, unredirected (exit 1); "
@@ -272,6 +285,7 @@ def _peel_wrappers(rest):
                 rest = rest[2:] if takes_arg else rest[1:]
             if rest and not rest[0].startswith("-") and (
                     os.path.basename(rest[0]) not in CROSS_HARNESS_CLIS
+                    and os.path.basename(rest[0]) not in MODEL_GATED_CLIS
                     and os.path.basename(rest[0]) != "curl"):
                 rest = rest[1:]  # the duration
         else:
@@ -375,12 +389,27 @@ def _is_review_call(base, args):
     if base in REVIEW_SUBCOMMANDS:
         first = next((a for a in words if not a.startswith("-")), None)
         return first in REVIEW_SUBCOMMANDS[base]
-    flags = REVIEW_FLAGS.get(base, frozenset())
+    if base in MODEL_GATED_CLIS:
+        model = _model_value(words)
+        if not model or "claude" in model.lower():
+            return False
+    flags = REVIEW_FLAGS.get(base) or MODEL_GATED_CLIS.get(base, frozenset())
     # A long flag may carry `=value`; a short one `=value` or an attached
     # value (`agy -p="..."`, memories/antigravity.md).
     return any(a.split("=", 1)[0] in flags if a.startswith("--")
                else any(a.startswith(f) for f in flags if len(f) == 2)
                for a in words)
+
+
+def _model_value(words):
+    """The value of the last `--model X` / `--model=X` in *words*, or None."""
+    model = None
+    for i, a in enumerate(words):
+        if a == MODEL_FLAG and i + 1 < len(words):
+            model = words[i + 1]
+        elif a.startswith(MODEL_FLAG + "="):
+            model = a.split("=", 1)[1]
+    return model
 
 
 def _review_route(rest, clis):
@@ -389,7 +418,7 @@ def _review_route(rest, clis):
     if not rest:
         return None
     base = os.path.basename(rest[0])
-    if len(rest) > 1 and base in clis:
+    if len(rest) > 1 and (base in clis or base in MODEL_GATED_CLIS):
         return base if _is_review_call(base, rest[1:]) else None
     if base == "curl":
         route = _curl_route(rest)

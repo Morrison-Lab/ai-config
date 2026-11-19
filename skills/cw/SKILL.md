@@ -1,6 +1,7 @@
 ---
 name: cw
 description: "→ clean-worktrees."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

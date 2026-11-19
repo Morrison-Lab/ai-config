@@ -1,6 +1,6 @@
 ---
 name: "do-it-for-me"
-description: "Do the step yourself; retry blocks, then lift auto mode."
+description: "Do the step yourself; retry blocks, then lift auto mode. Aliases: difm."
 ---
 
 # do-it-for-me (Codex wrapper)

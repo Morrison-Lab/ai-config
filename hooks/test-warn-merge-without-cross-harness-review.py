@@ -138,6 +138,31 @@ def main():
               [])[0])
     check("warns when a claude CLI run is this harness's own",
           run(MERGE, [step("claude -p 'review'")])[0])
+    # ai-config#5286: Copilot CLI's default model is Claude, so a run counts
+    # only with an explicit non-Claude --model.
+    check("warns on a bare copilot -p run (default model is Claude)",
+          run(MERGE, [step("copilot -p 'review the diff'")])[0])
+    check("warns on a copilot run with a Claude --model",
+          run(MERGE, [step("copilot --model claude-sonnet-4.5 -p 'review'")])[0])
+    check("warns on a copilot --model run with no prompt flag",
+          run(MERGE, [step("copilot --model gpt-5.3-codex")])[0])
+    check("warns on copilot --help even with a model",
+          run(MERGE, [step("copilot --model gpt-5.3-codex -p x --help")])[0])
+    check("silent on copilot -p with a non-Claude --model",
+          not run(MERGE, [step("copilot --model gpt-5.3-codex -p 'review'")])[0])
+    check("silent on copilot --model=<id> --prompt form",
+          not run(MERGE, [step("copilot --prompt 'review' --model=gpt-5.3-codex")])[0])
+    check("silent on a timeout-wrapped copilot review",
+          not run(MERGE, [step("timeout 600 copilot -p 'r' --model gpt-5.3-codex")])[0])
+    check("warns when the copilot review predates the last push",
+          run(MERGE, [step("copilot -p 'r' --model gpt-5.3-codex"), PUSH])[0])
+    fired, out = run(MERGE, [])
+    reason = ((out or {}).get("hookSpecificOutput") or {}).get(
+        "permissionDecisionReason", "")
+    probe_list = reason.split("attempt each of ", 1)[-1].split(" as a reviewer", 1)[0]
+    check("copilot stays out of the waiver's probe list",
+          "attempt each of " in reason and "opencode" in probe_list
+          and "copilot" not in probe_list)
     check("warns when the reviewer word is only echoed",
           run(MERGE, [step("echo codex exec review")])[0])
     check("warns when a skill was only loaded, with no reviewer call",

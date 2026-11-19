@@ -757,5 +757,359 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
         rc == 1 and "orphaned-math" in out,
     )
 
+
+    # -- display equations missing their surrounding w:br (#3438) -------------
+    # memories/office-open-xml.md: m:oMathPara alone does not put an equation
+    # on its own line when prose shares its w:p. A w:r ending in <w:br/>
+    # before it, and an m:r ending in <w:br/> closing its m:oMath, do.
+    def para(inner):
+        return DOC_HEADER + f"<w:p>{inner}</w:p>\n" + DOC_FOOTER
+
+    PROSE_BEFORE = "<w:r><w:t>The model is</w:t></w:r>"
+    PROSE_AFTER = "<w:r><w:t>where x is the input.</w:t></w:r>"
+    BR_RUN = "<w:r><w:br/></w:r>"
+    BODY = "<m:r><m:t>y=x</m:t></m:r>"
+    CLOSE_BR = "<m:r><w:br/></m:r>"
+
+    def omp(close_break=True):
+        return f"<m:oMathPara><m:oMath>{BODY}{CLOSE_BR if close_break else ''}</m:oMath></m:oMathPara>"
+
+    def breaks_run(name, inner):
+        return run_check([make_docx(tmp_path, name, para(inner))])
+
+    # Negative control first: both breaks missing, prose on both sides.
+    rc, out = breaks_run("eq-no-breaks.docx", PROSE_BEFORE + omp(close_break=False) + PROSE_AFTER)
+    check("display equation with neither break, prose on both sides, fails the run", rc == 1)
+    check(
+        "both sides are reported, as two findings for one equation",
+        out.count("[display-equation-break]") == 2,
+    )
+    check(
+        "the stats line counts equations and defective equations separately",
+        "1 display equation(s) (1 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run("eq-no-before.docx", PROSE_BEFORE + omp() + PROSE_AFTER)
+    check(
+        "missing only the break before is reported as the before side",
+        rc == 1 and out.count("[display-equation-break]") == 1 and "content before it" in out,
+    )
+
+    rc, out = breaks_run("eq-no-after.docx", PROSE_BEFORE + BR_RUN + omp(close_break=False) + PROSE_AFTER)
+    check(
+        "missing only the closing break is reported as the after side",
+        rc == 1 and out.count("[display-equation-break]") == 1 and "content after it" in out,
+    )
+
+    rc, out = breaks_run("eq-both-breaks.docx", PROSE_BEFORE + BR_RUN + omp() + PROSE_AFTER)
+    check(
+        "an equation with both breaks is clean",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run("eq-alone.docx", "<w:pPr/>" + omp(close_break=False))
+    check(
+        "an equation alone in its paragraph needs no break (Word's own layout)",
+        rc == 0 and "display-equation-break" not in out,
+    )
+    check("the alone equation is still counted as examined", "1 display equation(s) (0 missing" in out)
+
+    rc, out = breaks_run(
+        "eq-prose-only-before.docx", PROSE_BEFORE + BR_RUN + omp(close_break=False)
+    )
+    check(
+        "with no content after the equation, a missing closing break is not required",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-break-in-prose-run.docx",
+        "<w:r><w:t>The model is</w:t><w:br/></w:r>" + omp(close_break=False),
+    )
+    check(
+        "a prose run that itself ends in <w:br/> supplies the break before",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-commented.docx",
+        PROSE_BEFORE
+        + BR_RUN
+        + '<w:commentRangeStart w:id="1"/><w:bookmarkStart w:id="2" w:name="eq"/>'
+        + omp()
+        + '<w:bookmarkEnd w:id="2"/><w:commentRangeEnd w:id="1"/>'
+        + PROSE_AFTER,
+    )
+    check(
+        "comment ranges and bookmarks between the break and the equation are transparent",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-tracked-break.docx",
+        PROSE_BEFORE
+        + '<w:ins w:id="5" w:author="A" w:date="2026-01-01T00:00:00Z">'
+        + BR_RUN
+        + "</w:ins>"
+        + omp()
+        + PROSE_AFTER,
+    )
+    check(
+        "a break run inside a tracked insertion still counts as the break before",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-following-break.docx",
+        PROSE_BEFORE + BR_RUN + omp(close_break=False) + "<w:r><w:br/><w:t>where</w:t></w:r>",
+    )
+    check(
+        "a following run that starts with <w:br/> supplies the break after",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-empty-run-before.docx", PROSE_BEFORE + BR_RUN + "<w:r><w:rPr/></w:r>" + omp()
+    )
+    check(
+        "an empty run (properties only) between the break and the equation is transparent",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-break-not-last.docx", "<w:r><w:br/><w:t>The model is</w:t></w:r>" + omp()
+    )
+    check(
+        "a run whose break comes before its text does not supply the break before",
+        rc == 1 and "content before it" in out,
+    )
+
+    INS = '<w:ins w:id="1" w:author="a" w:date="2026-01-01T00:00:00Z">{}</w:ins>'
+    DEL = '<w:del w:id="2" w:author="a" w:date="2026-01-01T00:00:00Z">{}</w:del>'
+
+    rc, out = breaks_run(
+        "eq-inserted.docx", PROSE_BEFORE + INS.format(omp(close_break=False)) + PROSE_AFTER
+    )
+    check(
+        "an equation inside a tracked insertion is checked",
+        rc == 1 and "1 display equation(s) (1 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-inserted-broken.docx",
+        PROSE_BEFORE + BR_RUN + INS.format(omp()) + PROSE_AFTER,
+    )
+    check(
+        "an inserted equation with both breaks passes",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-deleted.docx", PROSE_BEFORE + DEL.format(omp(close_break=False)) + PROSE_AFTER
+    )
+    check(
+        "an equation inside a deletion is not checked",
+        rc == 0 and "0 display equation(s)" in out,
+    )
+
+    deleted_prose = DEL.format("<w:r><w:delText>The model is</w:delText></w:r>")
+    rc, out = breaks_run("eq-deleted-prose.docx", deleted_prose + omp(close_break=False))
+    check(
+        "deleted prose beside an equation demands no break",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    deleted_break = DEL.format(BR_RUN)
+    rc, out = breaks_run("eq-deleted-break.docx", PROSE_BEFORE + deleted_break + omp())
+    check(
+        "a deleted break does not supply the break before",
+        rc == 1 and "content before it" in out,
+    )
+
+    sdt = "<w:sdt><w:sdtPr/><w:sdtContent>{}</w:sdtContent></w:sdt>"
+    rc, out = breaks_run(
+        "eq-sdt-break.docx",
+        sdt.format("<w:r><w:t>The model is</w:t><w:br/></w:r>") + omp(),
+    )
+    check(
+        "a break inside a content control supplies the break before",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-cr.docx", "<w:r><w:t>The model is</w:t><w:cr/></w:r>" + omp()
+    )
+    check(
+        "a w:cr supplies the break before, as w:br does",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-hyperlink-break.docx",
+        '<w:hyperlink w:anchor="eq"><w:r><w:t>The model is</w:t><w:br/></w:r></w:hyperlink>'
+        + omp(),
+    )
+    check(
+        "a break inside a hyperlink supplies the break before",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-fldsimple-break.docx",
+        '<w:fldSimple w:instr="REF eq"><w:r><w:t>The model is</w:t><w:br/></w:r></w:fldSimple>'
+        + omp(),
+    )
+    check(
+        "a break inside a simple field's result supplies the break before",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-deleted-prose-after.docx",
+        PROSE_BEFORE
+        + BR_RUN
+        + omp(close_break=False)
+        + DEL.format("<w:r><w:delText>where x is the input.</w:delText></w:r>"),
+    )
+    check(
+        "deleted prose after an equation demands no closing break",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-comment-anchor-after.docx",
+        PROSE_BEFORE
+        + BR_RUN
+        + omp(close_break=False)
+        + '<w:r><w:rPr/><w:commentReference w:id="1"/></w:r>'
+        + "<w:r><w:lastRenderedPageBreak/></w:r>",
+    )
+    check(
+        "a run holding only a comment anchor or a cached page break is not prose",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-customxml-range.docx",
+        PROSE_BEFORE
+        + BR_RUN
+        + '<w:customXmlInsRangeStart w:id="7" w:author="a"/>'
+        + '<w:customXmlInsRangeEnd w:id="7"/>'
+        + omp(),
+    )
+    # The run still fails, on duplicate-id alone: that check wrongly flags a
+    # range End sharing its Start's w:id (ai-config#5918). When #5918 is
+    # fixed, this becomes rc == 0 and the duplicate-id count becomes 0.
+    check(
+        "custom-XML change-tracking range markers are transparent",
+        rc == 1
+        and out.count("[duplicate-id]") == 1
+        and out.count("] ") == 1
+        and "1 display equation(s) (0 missing a line break)" in out
+        and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-two-equations.docx",
+        PROSE_BEFORE + BR_RUN + omp() + omp() + PROSE_AFTER,
+    )
+    check(
+        "a display equation that closes with a break starts the next on a new line",
+        rc == 0 and "2 display equation(s) (0 missing a line break)" in out,
+    )
+    rc, out = breaks_run(
+        "eq-two-equations-unbroken.docx",
+        PROSE_BEFORE + BR_RUN + omp(close_break=False) + omp() + PROSE_AFTER,
+    )
+    check(
+        "an earlier equation with no closing break leaves the next one unbroken",
+        rc == 1 and "content before it" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-container-props.docx",
+        PROSE_BEFORE
+        + BR_RUN
+        + "<w:customXml><w:customXmlPr/></w:customXml>"
+        + "<w:smartTag><w:smartTagPr/></w:smartTag>"
+        + omp(),
+    )
+    check(
+        "smart-tag and custom-XML properties are transparent",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-empty-omath.docx",
+        PROSE_BEFORE + BR_RUN + "<m:oMathPara><m:oMath/></m:oMathPara>" + PROSE_AFTER,
+    )
+    check(
+        "an empty m:oMath supplies no closing break",
+        rc == 1 and "content after it" in out,
+    )
+
+    INS_OPEN = '<w:ins w:id="7" w:author="A" w:date="2026-01-01T00:00:00Z">'
+    DEL_OPEN = '<w:del w:id="8" w:author="A" w:date="2026-01-01T00:00:00Z">'
+    rc, out = breaks_run(
+        "eq-closing-break-inserted.docx",
+        PROSE_BEFORE + BR_RUN
+        + f"<m:oMathPara><m:oMath>{BODY}{INS_OPEN}{CLOSE_BR}</w:ins></m:oMath></m:oMathPara>"
+        + PROSE_AFTER,
+    )
+    check(
+        "a closing break inside a tracked insertion in the m:oMath counts",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-closing-break-then-deleted.docx",
+        PROSE_BEFORE + BR_RUN
+        + f"<m:oMathPara><m:oMath>{BODY}{CLOSE_BR}{DEL_OPEN}<m:r><m:t>z</m:t></m:r></w:del>"
+        + "</m:oMath></m:oMathPara>"
+        + PROSE_AFTER,
+    )
+    check(
+        "deleted math after the closing break does not hide the break",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-closing-break-deleted.docx",
+        PROSE_BEFORE + BR_RUN
+        + f"<m:oMathPara><m:oMath>{BODY}{DEL_OPEN}{CLOSE_BR}</w:del></m:oMath></m:oMathPara>"
+        + PROSE_AFTER,
+    )
+    check(
+        "a deleted closing break supplies no break",
+        rc == 1 and "content after it" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-empty-text-run-before.docx",
+        PROSE_BEFORE + BR_RUN + "<w:r><w:t></w:t></w:r>" + omp() + PROSE_AFTER,
+    )
+    check(
+        "a run holding only an empty w:t between the break and the equation is transparent",
+        rc == 0 and "display-equation-break" not in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-after-closed-equation.docx",
+        PROSE_BEFORE + BR_RUN + omp() + omp() + PROSE_AFTER,
+    )
+    check(
+        "an earlier equation that closes with a break supplies the break before",
+        rc == 0 and "2 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
+        "eq-after-open-equation.docx",
+        PROSE_BEFORE + BR_RUN + omp(close_break=False) + omp() + PROSE_AFTER,
+    )
+    check(
+        "the before-side message names the earlier-equation form",
+        rc == 1 and "earlier m:oMathPara that closes" in out,
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

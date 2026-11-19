@@ -1,6 +1,6 @@
 ---
 name: "refresh-claude-token"
-description: "Rotate CLAUDE_CODE_OAUTH_TOKEN."
+description: "Rotate CLAUDE_CODE_OAUTH_TOKEN. Aliases: rct."
 ---
 
 # refresh-claude-token (Codex wrapper)

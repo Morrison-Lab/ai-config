@@ -1,6 +1,6 @@
 ---
 name: "prune-dead-code"
-description: "Detect and remove dead code, orphaned configs, stale docs."
+description: "Detect and remove dead code, orphaned configs, stale docs. Aliases: pdc."
 ---
 
 # prune-dead-code (Codex wrapper)

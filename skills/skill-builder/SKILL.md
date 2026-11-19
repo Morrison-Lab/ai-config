@@ -173,11 +173,17 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
   acronym/short name (`gi`, `sup`, `ums`, `dc`), also create the spelled-out
   alias dir (`grab-issue`, `send-upstream`, `update-memories-and-skills`) — and
   give a memorable short alias to a spelled-out canonical where it helps. The
-  alias file is thin and only redirects:
+  alias file is thin and only redirects.
+  It sets `disable-model-invocation: true`, so it spends nothing from the
+  model's skill listing while `/<alias>` still works,
+  and the canonical's description ends with an `Aliases: <alias>, ...` clause,
+  so a bare alias word in a prompt still routes to the canonical
+  (`scripts/validate-skills.py` checks both, ai-config#5316):
   ```markdown
   ---
   name: <alias>
-  description: "Alias for `<canonical>`. <one-line>. Use when asked to '<trigger>'."
+  description: "→ <canonical>."
+  disable-model-invocation: true
   user-invocable: true
   allowed-tools:        # mirror the canonical's allowed-tools exactly
     - Bash
@@ -341,13 +347,14 @@ python3 scripts/check-links.py                 # relative markdown links resolve
 python3 scripts/check-vendored-drift.py        # shared-fragment vendored-content drift check
 npx --yes markdownlint-cli2@0.22.1             # markdown style (config in .markdownlint-cli2.jsonc)
 git add skills/<name>/SKILL.md codex-skills/<name> \
-        skills/<alias>/SKILL.md codex-skills/<alias> \
         memories/preferences.md                             # stage the files you
                                                             # touched (incl. the
-                                                            # generated wrappers, and
-                                                            # the alias dir if you made
-                                                            # one) — NOT `-A`, which
-                                                            # sweeps in unrelated edits
+                                                            # generated wrapper), not
+                                                            # `-A`, which sweeps in
+                                                            # unrelated edits
+# For a new alias instead, stage the alias and its canonical skill.
+# An alias has no wrapper of its own, and the canonical's "Aliases:" clause and wrapper change:
+# git add skills/<alias>/SKILL.md skills/<canonical>/SKILL.md codex-skills/<canonical>
 git commit -m "skills: add <name> — <summary>"   # COMMIT
 ```
 
@@ -375,7 +382,9 @@ gh pr create --fill   # CREATE_PR
 log reads `Codex skill wrappers are out of sync:`). After writing the skill (and
 any alias dir), run
 `python3 scripts/sync-codex-skill-wrappers.py`, then `git add` the new
-`codex-skills/<name>/` (and `codex-skills/<alias>/`) alongside the source.
+`codex-skills/<name>/` alongside the source.
+An alias gets no wrapper of its own: Codex reaches it through the canonical's
+`Aliases:` clause.
 The `validate` CI job runs four checks — `scripts/validate-skills.py`
 (frontmatter + wrapper sync + manifests), `scripts/check-links.py` (relative
 markdown links), `scripts/check-vendored-drift.py` (shared-fragment drift), and

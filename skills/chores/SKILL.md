@@ -1,6 +1,6 @@
 ---
 name: chores
-description: "Handle chore and bump PRs."
+description: "Handle chore and bump PRs. Aliases: dependabot."
 user-invocable: true
 allowed-tools:
   - Bash

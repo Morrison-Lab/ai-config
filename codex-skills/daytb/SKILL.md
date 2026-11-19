@@ -1,6 +1,6 @@
 ---
 name: "daytb"
-description: "Decide current question yourself."
+description: "Decide current question yourself. Aliases: do-as-you-think-best."
 ---
 
 # daytb (Codex wrapper)

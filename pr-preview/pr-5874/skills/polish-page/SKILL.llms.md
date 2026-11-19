@@ -91,6 +91,7 @@ Every correction Ezra or a reviewer makes on the page is a candidate rule. Recor
 ## Relationship to other skills
 
 - [`send-notes`](../../skills/send-notes/SKILL.llms.md): routes new content to a repo; this skill reworks an existing page.
+- [`dissolve-page`](../../skills/dissolve-page/SKILL.llms.md): when the overlap survey says every piece of the page belongs elsewhere, dissolve it into its neighbors instead of polishing it.
 - [`find-overlap`](../../skills/find-overlap/SKILL.llms.md): overlap between skills and memory, not notes pages.
 - [`use-preferred-style`](../../skills/use-preferred-style/SKILL.llms.md), [`use-math-macros`](../../skills/use-math-macros/SKILL.llms.md), [`fact-check-prose`](../../skills/fact-check-prose/SKILL.llms.md): the rule skills this one calls.
 - `defer-issue`, `st`, `stack-prs`, `ardi`, `mwc`: the PR workflow around it.

@@ -138,8 +138,11 @@ Two options, in order of preference:
    directional word ("below" → "above", or drop it if a working crossref
    link already carries the point). This is the strong fix: the reader
    never has to hold an unresolved pointer.
-2. **Reword**, when reordering would break the document's narrative logic
-   (e.g., a result genuinely depends on setup that must come first). Turn
+2. **Reword**, when there is no good reordering:
+   none exists, or every reordering would hurt the material
+   (e.g., a result genuinely depends on setup that must come first,
+   or moving a div would split a group the reader needs together).
+   Turn
    the vague pointer into a precise, working link (a real crossref or
    anchor) instead of a bare "below" --- this doesn't remove the forward
    reference, but at least lets the reader jump to it rather than search.
@@ -149,8 +152,13 @@ Two options, in order of preference:
 ### Keep the crossref
 
 Removing the link is not a third option.
+When there is no good way to reorder the material,
+a forward reference with a working link is better than no link at all
+(Ezra, 2026-11-19: "when there's no good way to reorder materials to avoid a forward reference,
+it's better to allow one than to avoid linking at all").
 When a forward pointer is an `@`-crossref of any kind ---
 `@def-x`, `@sec-x`, `@fig-x`, `@tbl-x`, `@thm-x`, `@eq-x`, and so on ---
+or a Markdown link to a later anchor (`[term](#def-x)`, `[term](page.qmd#def-x)`),
 and reordering is not the fix,
 keep the crossref and signpost it,
 so the reader knows the target is coming and can jump to it.

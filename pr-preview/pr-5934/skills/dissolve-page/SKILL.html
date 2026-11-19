@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -454,7 +454,7 @@ cookieconsent.run({
 <ul>
 <li>Move includes, not text: the subfile stays where it is and the destination page includes it, so every <code>#id</code> survives. Renaming the subfile folder is a later, separate PR.</li>
 <li>Keep a heading’s explicit id when its section moves (<code># The anatomy of a learning system {#sec-anatomy}</code>).</li>
-<li>Retarget every link that named a moved id on its old page (<code>&lt;page&gt;.qmd#fig-x</code> to <code>&lt;new-page&gt;.qmd#fig-x</code>), and add the moved ids to the redirect script’s map and its hidden <code>&lt;span id&gt;</code> list.</li>
+<li>Add the ids this PR moves to the redirect script’s map and its hidden <code>&lt;span id&gt;</code> list. Retarget the links that name those ids (<code>&lt;page&gt;.qmd#fig-x</code> to <code>&lt;new-page&gt;.qmd#fig-x</code>), which are few because the ids are new to the map. Links to ids that earlier splits already moved off the page keep working through the redirect and wait for step 5.</li>
 <li>Turn the page into a stub: <code>format: html: default</code> only (a deck with one slide fails the site check, and the handout has no content), <code>search: false</code>, the redirect include, and a short list of the pages that now hold the content. Keep it in the render list, because old links from other repositories and course sites still reach it. Remove it from the navbar and the sidebar.</li>
 <li>Retarget the links to the page itself (no anchor) in this PR: the index, syllabus, calendar and study guide are few, and a reader should not land on the stub from inside the site. Check the calendar’s map file, because a lecture link to a page with an anchor may not resolve there.</li>
 <li>Moved text counts as changed lines, so the diff-scoped checks re-read it in full. Expect <code>check-term-links</code>, <code>check-title-references</code>, <code>check-definite-antecedents</code> and the calendar-order check to flag moved prose, and fix it in the same PR.</li>

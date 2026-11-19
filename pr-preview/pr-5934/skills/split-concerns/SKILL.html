@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Split multi-concern PRs.">
+<meta name="description" content="Split multi-concern PRs. Aliases: split-pr.">
 
 <title>skill – ai-config</title>
 <style>
@@ -51,9 +51,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -354,6 +354,7 @@ cookieconsent.run({
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
   <li><a href="#what-counts-as-independent-concerns" id="toc-what-counts-as-independent-concerns" class="nav-link" data-scroll-target="#what-counts-as-independent-concerns">What counts as “independent concerns”</a></li>
   <li><a href="#process" id="toc-process" class="nav-link" data-scroll-target="#process">Process</a></li>
+  <li><a href="#splitting-an-open-pr-into-a-stacked-series" id="toc-splitting-an-open-pr-into-a-stacked-series" class="nav-link" data-scroll-target="#splitting-an-open-pr-into-a-stacked-series">Splitting an open PR into a stacked series</a></li>
   <li><a href="#benefits-to-communicate" id="toc-benefits-to-communicate" class="nav-link" data-scroll-target="#benefits-to-communicate">Benefits to communicate</a></li>
   <li><a href="#when-not-to-split" id="toc-when-not-to-split" class="nav-link" data-scroll-target="#when-not-to-split">When NOT to split</a></li>
   <li><a href="#when-unsure-how-finely-to-split-split-finer" id="toc-when-unsure-how-finely-to-split-split-finer" class="nav-link" data-scroll-target="#when-unsure-how-finely-to-split-split-finer">When unsure how finely to split, split finer</a></li>
@@ -406,6 +407,17 @@ and won't block each other during review.</code></pre></li>
 <li>Open separate MRs with focused descriptions</li>
 <li>Cross-reference them (“Related: #25, #26”)</li>
 </ul></li>
+</ol>
+</section>
+<section id="splitting-an-open-pr-into-a-stacked-series" class="level2">
+<h2 class="anchored" data-anchor-id="splitting-an-open-pr-into-a-stacked-series">Splitting an open PR into a stacked series</h2>
+<p>When one large PR is already open and its concerns depend on each other, split it into a stack of narrower PRs rather than into independent ones (<a href="https://github.com/Morrison-Lab/ai-config/issues/3598">ai-config#3598</a>). Each PR in the stack is small enough to review on its own, and earlier ones can merge while later ones are still in review.</p>
+<ol type="1">
+<li><strong>Order the concerns</strong> so that each one needs only the ones before it: refactors and renames first, then the substantive change, then docs that cover it (<a href="../../shared/principles/refactor-before-modifying-substance.md">refactor-before-modifying-substance</a>). Keep each change’s tests in the same layer as the change, so every layer passes CI on its own.</li>
+<li><strong>Build each layer from the original branch’s diff.</strong> Start the first branch from the commit the original branch forked from, <code>git merge-base &lt;base-branch&gt; &lt;original-branch&gt;</code>, not from the base’s current tip, so that step 3’s comparison is not polluted by commits the base gained since. Start each later branch from the tip of the one before it. Bring in a layer’s whole files with <code>git checkout &lt;original-branch&gt; -- &lt;paths&gt;</code>, or with <code>git cherry-pick</code> when the original commits already follow the split. When two layers change the same file, take only this layer’s hunks with <code>git restore -p --source=&lt;original-branch&gt; -- &lt;path&gt;</code>.</li>
+<li><strong>Prove nothing was lost or added:</strong> <code>git diff &lt;original-branch&gt; &lt;top-of-stack&gt;</code> must be empty.</li>
+<li><strong>Turn the original PR into the first layer.</strong> Force-push the first layer’s branch tip to the original PR’s branch (<code>git push --force-with-lease origin &lt;layer-1&gt;:&lt;original-branch&gt;</code>), so the original PR, its review history and its number carry the first layer, and no layer gets two PRs. It targets the base branch, so it needs no merge-order alert. A force-push rewrites a shared branch, so confirm it with the user unless a standing grant covers it. If the user would rather not rewrite it, open the first layer as a new PR against the base, and close the original once step 5 has opened the rest, with a comment linking every PR in the stack.</li>
+<li><strong>Open a PR for each later layer</strong>, following <a href="../../skills/stack-prs/SKILL.html"><code>stack-prs</code></a>, with a <code>&gt; [!IMPORTANT]</code> alert naming the PR that has to merge first. The second layer’s PR targets the branch that now carries the first layer: the force-pushed <code>&lt;original-branch&gt;</code>, or, if step 4 opened a new PR instead, that PR’s branch (never the unrewritten <code>&lt;original-branch&gt;</code>). Each layer after that targets the layer below it. Then edit the first layer’s PR description to cover only that layer and to link every later PR in merge order.</li>
 </ol>
 </section>
 <section id="benefits-to-communicate" class="level2">

@@ -17,3 +17,14 @@ A clean pop applies it in your worktree and drops it, and the command exits 0 ([
 
 `hooks/no-bare-stash-pop.py` denies a bare pop or apply in a repository with more than one worktree.
 `ALLOW_BARE_STASH_POP=1` clears one command.
+
+## Untracked scratch swept in by `git add -A`
+
+An add-everything (`git add -A`, `git add --all`, `git add .`) stages whatever untracked files sit in the work tree, including ones another session or your own tooling left there.
+A worktree-isolated agent's checkout under `.claude/worktrees/` holds its own `.git`, so it is staged as a gitlink that no clone can resolve ([ai-config#3884](https://github.com/Morrison-Lab/ai-config/issues/3884)).
+
+- **Do:** ignore `.claude/worktrees/` in every repository where agents run with worktree isolation, and name the paths you mean to add.
+- **Don't:** run `git add -A` in a tree you have not just read with `git status --short`.
+
+`hooks/no-add-sweeping-scratch.py` refuses an add that would stage an embedded repository.
+`ALLOW_SCRATCH_ADD=1` clears one command.

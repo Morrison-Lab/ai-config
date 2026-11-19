@@ -604,6 +604,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-add-sweeping-scratch.py\"'",
+            "timeout": 20,
+            "script": "no-add-sweeping-scratch.py",
+            "why": "ai-config#3884: `git add -A` staged a worktree-isolated agent's `.claude/worktrees/agent-*` as an unresolvable gitlink. DENIES a `git add` (cwd moved by cd and git -C) when `git ls-files -o --exclude-standard` on its own pathspecs lists a directory holding `.git`; read-only, so it takes no index lock. -u, -n/--dry-run and --pathspec-from-file are not checked. Override: ALLOW_SCRATCH_ADD=1. Fails open when shellcmd or no-bare-stash-pop.py cannot load, the command does not parse, --git-dir, --work-tree, GIT_DIR or GIT_WORK_TREE redirect the repository, or git fails."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-delete-branch-under-stacked-pr.py\"'",
             "timeout": 25,
             "script": "no-delete-branch-under-stacked-pr.py",

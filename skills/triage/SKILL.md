@@ -64,12 +64,13 @@ Add `--ceiling N` to any run to print the open count against the backlog's ceili
 
 ### 4. Plan the worktree and branch sweep
 
-For each repository this pass triaged that has a local checkout, run
-[`clean-git`](../clean-git/SKILL.md) up to its confirmation gate and stop
-there (ai-config#3517).
-That run is not mutation-free: its classify steps run `git fetch --prune` and
-`git worktree prune`, so take `clean-git`'s pre-prune snapshot of the
-remote-tracking refs first, as that skill requires.
+For each repository this pass triaged that has a local checkout,
+first take [`clean-git`](../clean-git/SKILL.md)'s pre-prune snapshot of the
+remote-tracking refs, as that skill requires.
+Then run `clean-git` up to its confirmation gate and stop there
+(ai-config#3517).
+The snapshot comes first because that run is not mutation-free: its classify
+steps run `git fetch --prune` and `git worktree prune`.
 Skip a repository with no local checkout, and every repository in a run that
 nobody reviews first, and say which were skipped.
 [`post-merge`](../post-merge/SKILL.md) removes a merged PR's own worktree;

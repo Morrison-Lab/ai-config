@@ -125,7 +125,9 @@ gh pr edit <dependent-N> --base main                     # retarget
 git push origin --delete <deleted-base>                  # re-delete
 ```
 
-The order is forced: `gh pr reopen` fails while the base is missing, and `gh pr edit --base` fails on a closed PR (`Cannot change the base branch of a closed pull request`). Expect `reviewDecision: REVIEW_REQUIRED` afterward — retargeting resets the review state even though the head commit never moved. Retargeting also starts no new `pull_request` CI run. A run that began before the retarget still diffs against the old base, and fails outright once that base branch is deleted (ai-config#5900: `couldn't find remote ref` for the merged base). So merge `main` into the dependent after retargeting, even when nothing conflicts, to get CI that runs against `main`. (UCD-SERG/serocalculator \#633/#635, 2026-08-07. PR \#635 closed two seconds after \#633 merged, and that timing is what establishes the cause.)
+The order is forced: `gh pr reopen` fails while the base is missing, and `gh pr edit --base` fails on a closed PR (`Cannot change the base branch of a closed pull request`). Expect `reviewDecision: REVIEW_REQUIRED` afterward — retargeting resets the review state even though the head commit never moved. (UCD-SERG/serocalculator \#633/#635, 2026-08-07. PR \#635 closed two seconds after \#633 merged, and that timing is what establishes the cause.)
+
+Retargeting also starts no new `pull_request` CI run, unless the workflow lists `edited` among its `pull_request` types. A run that began before the retarget still diffs against the old base, and fails outright once that base branch is deleted (ai-config#5900: `couldn't find remote ref` for the merged base). So merge `main` into the dependent after retargeting, even when nothing conflicts, to get CI that runs against `main`.
 
 Keep an issue or PR reference off the start of a line when you break these sentences: markdownlint reads a leading `#` as a malformed ATX heading and fails `validate` with MD018.
 

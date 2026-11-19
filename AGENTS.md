@@ -229,7 +229,8 @@ See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravit
 
 Before opening a browser, look for a CLI, MCP, or API that can do the task, and say what you found.
 Use a browser only if none can (or could be set up), or the task is visual.
-Never use Chrome or Claude in Chrome (Ezra, 2026-10-22).
+Never use the Claude in Chrome plugin (`mcp__claude-in-chrome__*`) (Ezra, 2026-10-22).
+A headless browser in your own environment (Playwright, Chromium) is fine for checking renders (Ezra, 2026-11-19: "i meant the claude in browser plugin").
 See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
 
 ## Cloud sessions use MCP tools, not Bash, wherever one exists

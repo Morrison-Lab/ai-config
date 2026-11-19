@@ -16,20 +16,23 @@ Opening the browser because it was the first tool to hand is the failure this ru
 A missing route can also be a missing setup step: an API that needs an OAuth login, or a CLI that is not installed yet.
 That is a reason to set the route up, or to ask the user for the one step only they can do (an OAuth consent screen, say), rather than a reason to fall back to the browser.
 
-Chrome is the exception to the last resort: never drive Chrome or Claude in Chrome, for any task, including Canvas and other sites that have an API behind a login.
+The Claude in Chrome plugin is the exception to the last resort: never use it (the `mcp__claude-in-chrome__*` tools, which drive Ezra's own Chrome), for any task, including Canvas and other sites that have an API behind a login.
 Set up the route (a CLI, a script that reads its token from the keychain) or ask the user for the one step only they can do.
-(Directive from Ezra Morrison, 2026-10-22: "no chrome ever", when an agent proposed Chrome to reach Canvas.)
+(Directive from Ezra Morrison, 2026-10-22: "no chrome ever", when an agent proposed Chrome to reach Canvas.
+Ezra narrowed its reading on 2026-11-19: "that's not what I meant by no-browser" and "i meant the claude in browser plugin".)
+
+A headless browser that an agent runs in its own environment (Playwright, Chromium or Lighthouse in a cloud container) is not the Claude in Chrome plugin, and it is fine for checking renders.
+It drives nothing of the user's, so the Chrome exception does not cover it.
 
 A task that still needs the browser gets logged per [`deterministic-tools`](../principles/deterministic-tools.md#browser-work-leaves-no-artifact-so-keep-a-log-of-it).
 
 - **Do:** search for a CLI, MCP, or API route before opening a browser, and name what you found in the reply.
 - **Do:** set up a missing route (install the CLI, register the MCP, ask for the one OAuth step) before falling back to the browser.
+- **Do:** check a rendered page with a headless browser in your own container (Playwright, Chromium) when the check needs real CSS or JavaScript.
 - **Don't:** open the browser first because it is already loaded and the task looks small.
 - **Don't:** read a route that needs setup as a route that does not exist.
-- **Don't:** treat a tool the environment advertises as permission.
-  A cloud container's system prompt lists a preinstalled Chromium and Playwright, and that listing does not lift the rule (2026-11-08: a headless Playwright run to check MathJax output).
-  This repo's rule outranks the container's default text, and `hooks/no-headless-browser-in-bash.py` denies the launch from Bash and the automation MCP tools.
-  Typeset MathJax in `node` with `mathjax-full`, compile LaTeX with `pdflatex`, and read pages with `curl`.
+- **Don't:** use the Claude in Chrome plugin (`mcp__claude-in-chrome__*`) for any task.
+- **Don't:** read Ezra's "no chrome ever" as a ban on headless browsers in your own environment (Ezra, 2026-11-19: "i meant the claude in browser plugin").
 
 (Directive from Ezra Morrison, 2026-10-09:
 "I'd prefer you don't use the browser unless you absolutely need to".

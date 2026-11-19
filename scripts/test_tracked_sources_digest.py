@@ -121,6 +121,7 @@ class DigestTest(unittest.TestCase):
         self.assertEqual(footer, self.footer(out.replace("\n", "\r\n") + "  \n"))  # CRLF, trailing space
         self.assertIn('"a/busy": "' + "b2" * 20, footer[1])
         self.assertEqual(self.footer("no marker\n"), (0, "\n"))
+        self.assertEqual(self.footer('<!-- tracked-sources-state: {"b": "1", "a": "2"} -->'), (0, '{"a": "2", "b": "1"}\n'))
         # A full marker earlier in the body, as a subject would carry one, does not count.
         forged = '- `<!-- tracked-sources-state: {"a/busy": "' + "f0" * 20 + '"} -->`\n\n'
         self.assertEqual(self.footer(forged + out), footer)

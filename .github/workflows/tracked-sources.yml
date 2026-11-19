@@ -71,8 +71,9 @@ jobs:
           url=$(gh issue create --repo "$REPO" --title "$TITLE" \
             --label tracked-sources-digest --body-file "$body")
           number="${url##*/}"
+          [[ "$number" =~ ^[0-9]+$ ]] || { echo "::error::gh issue create printed $url"; exit 1; }
           # The new digest lists everything since the last completed one, so earlier open ones are covered.
-          gh issue list --repo "$REPO" --label tracked-sources-digest --state open --limit 50 \
+          gh issue list --repo "$REPO" --label tracked-sources-digest --state open --limit 1000 \
             --json number --jq ".[].number | select(. != $number)" |
             while read -r old; do
               gh issue close "$old" --repo "$REPO" --reason 'not planned' --comment "Superseded by #$number."

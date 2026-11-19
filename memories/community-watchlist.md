@@ -53,7 +53,7 @@ the Claude-in-Chrome route is retired): [`reddit-access.md`](reddit-access.md).
 The high-yield subreddits above, the outside repositories that [`CREDITS.md`](../CREDITS.md) credits under "Borrowed ideas", and the `shared/sembr-skills` submodule are listed in [`tracked-sources.csv`](tracked-sources.csv) ([#2231](https://github.com/Morrison-Lab/ai-config/issues/2231), [#2067](https://github.com/Morrison-Lab/ai-config/issues/2067)).
 The daily [`tracked-sources.yml`](../.github/workflows/tracked-sources.yml) workflow runs [`tracked-sources-digest.py`](../scripts/tracked-sources-digest.py) over it, and opens a `tracked-sources-digest` issue when a tracked repository's head has moved since the last sifted digest.
 A session sifts that issue into issues for ideas worth adopting and closes it as completed, which is what moves the next digest's starting point.
-A run whose heads differ from the newest open digest's opens a new digest and closes the earlier open ones as not planned, since the new digest lists their commits too;
+A run whose heads have moved since the last sifted digest, and differ from the newest open digest's, opens a new digest and closes the earlier open ones as not planned, since the new digest lists their commits too;
 a run with the same heads posts nothing,
 and so does a run whose heads are back at the last sifted digest's, which leaves any open digest for a session to close.
 Sifting the digests unattended waits on [#5937](https://github.com/Morrison-Lab/ai-config/issues/5937).

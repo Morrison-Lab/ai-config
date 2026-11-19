@@ -82,7 +82,7 @@ TARGET = (
 IDS = rf"(?P<ids>{STEP_ID}(?:{SEP}{STEP_ID})*)(?![\w.]\d)"
 REF_RES = (
     # `ardi`'s step 2, [`ums`](../ums/SKILL.md) steps 2 through 4
-    re.compile(TARGET + r"(?:'s)?\s+(?:own\s+)?steps?\s+" + IDS),
+    re.compile(TARGET + r"(?:'s)?\s+(?:own\s+)?[Ss]teps?\s+" + IDS),
     # step 3 of [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md)
     re.compile(r"\b[Ss]teps?\s+" + IDS + r"\s+(?:of|in)\s+(?:the\s+)?" + TARGET),
 )
@@ -238,6 +238,20 @@ def check_file(
                 findings.append(
                     Finding(path, line, m.group(0), f"range {start} to {end} is not ascending")
                 )
+                continue
+            if not (start.isdigit() and end.isdigit()):
+                continue  # only a whole-number range has a well-defined interior
+            for inner in range(int(start) + 1, int(end)):
+                if not step_exists(str(inner), defined) and not any(
+                    d.startswith(f"{inner}.") for d in defined
+                ):
+                    findings.append(
+                        Finding(
+                            path, line, m.group(0),
+                            f"{shown_target} defines no step {inner}, "
+                            f"inside range {start} to {end}",
+                        )
+                    )
     return findings, resolved
 
 

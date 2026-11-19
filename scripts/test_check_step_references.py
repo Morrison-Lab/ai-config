@@ -114,7 +114,13 @@ CASES = [
     ("a skill name containing step is not an example", "Run `step-runner` step 1.\n", 1, "no skill named step-runner"),
     ("local non-Markdown link is reported", "Run [`x`](../../shared/x.txt) step 1.\n", 1, "not a Markdown file"),
     ("decimal step is not its parent", "Run [`d`](../../shared/decimal.md) step 1.\n", 1, "no step 1"),
-    ("corpus with no resolved reference fails", "Then do step 99.\n", 1, ""),
+    ("corpus with no resolved reference fails", "Then do step 99.\n", 1, "found no references"),
+    ("capital Step after the name", "Run `target` Step 1.\n", 0, ""),
+    ("capital Step after the name, missing", "Run `target` Step 5.\n", 1, "defines no step 5"),
+    ("range interior is checked", "Run `target` steps 4 through 7.\n", 1, "no step 5, inside range 4 to 7"),
+    ("range interior met by a decimal step", "Run `target` steps 1 through 4.\n", 0, ""),
+    ("backticked of form", "See step 2 of `target`.\n", 0, ""),
+    ("backticked of form, missing", "See step 8 of `target`.\n", 1, "defines no step 8"),
     ("lower-case Step prefix", "Run `target` step 12.\n", 0, ""),
     ("same-document anchor link", "### 1. Only\n\nSee [`here`](#only) step 1.\n", 0, ""),
     ("same-document anchor, missing step", "### 1. Only\n\nSee [`here`](#only) step 2.\n", 1, "no step 2"),
@@ -131,7 +137,7 @@ def main() -> int:
     failures = 0
     for name, citing, want_code, want_text in CASES:
         code, out, err = run(citing)
-        ok = code == want_code and want_text in out
+        ok = code == want_code and want_text in out + err
         if ok and want_code == 0:
             # A pass must have resolved something, or it proves nothing.
             ok = re.search(r" in [1-9]\d* reference", err) is not None

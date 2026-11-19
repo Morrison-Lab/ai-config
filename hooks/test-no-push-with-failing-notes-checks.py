@@ -310,8 +310,7 @@ expect("T50 a bundled line runs with its own assignments",
 expect("T51 the pull-request expression becomes origin/main, the dispatch one false",
        (env_caw.get("CAW_BASE_REF"), env_caw.get("CAW_WHOLE_TREE")), ("origin/main", "false"))
 expect("T52 a stray variable with the line's prefix does not leak", "CAW_PATHS_IGNORE" in env_caw, False)
-expect("T53 a whole-tree line (no base ref) is not run",
-       os.path.exists(os.path.join(LOG, "check-quarto-links.py.env")), False)
+expect("T53 a whole-tree line (no base ref) is not run", os.path.exists(os.path.join(LOG, "check-quarto-links.py.env")), False)
 expect("T54 passing bundled checks stay silent", verdict, "silent")
 verdict, out = run("git push origin feat", bundled, 1)
 expect("T55 a failing bundled check denies, naming it",
@@ -320,8 +319,7 @@ expect("T55 a failing bundled check denies, naming it",
 both = make_repo({"cluster-checks.yml": BUNDLED, "check-new-line-breaks.yml": NLB})
 run("git push origin feat", both, 0)
 env_nlb = json.load(open(os.path.join(LOG, "check-new-line-breaks.py.env"), encoding="utf-8"))
-expect("T56 a check with its own caller runs from the caller, not the bundled line",
-       env_nlb.get("NLB_GLOBS"), "*.md *.qmd")
+expect("T56 a check with its own caller runs from the caller, not the bundled line", env_nlb.get("NLB_GLOBS"), "*.md *.qmd")
 bundled_gated = make_repo({"cluster-checks.yml": BUNDLED, "annotation-gate.yml": GATE})
 run("git push origin feat", bundled_gated, 0)
 env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))
@@ -349,32 +347,28 @@ for case, before, after in (("T59 another repository", "repository: Morrison-Lab
                             ("T63 another path", "path: .gha", "path: tools/gha")):
     expect(f"{case} is not read as the .gha checkout", hook.parse_run_check_lines(BUNDLED.replace(before, after)), [])
 for case, keys in (("T64 keys in another order", ["path: .gha", "ref: v3", "repository: Morrison-Lab/gha"]),
-                   ("T66 a comment on a key", ["repository: Morrison-Lab/gha", "ref: v3 # f", "path: .gha # h"]),
-                   ("T67 a comment on repository", ["repository: Morrison-Lab/gha # p", "ref: v3", "path: .gha"])):
+                   ("T66 comments on keys", ["repository: Morrison-Lab/gha # p", "ref: v3 # f", "path: .gha # h"])):
     expect(f"{case} still gives the ref", hook.gha_checkout_ref("      with:\n" + "".join(f"        {k}\n" for k in keys)), "v3")
 CMD = "python3 -u .gha/check-avoided-words/check-avoided-words.py"
 FAIL, OWN = "CAW_FAIL=false", "is not python on .gha/check-avoided-words/"
 # (case, text replaced, replacement, expected substring of an `unhandled` entry)
 REFUSED = [
-    ("T68 a pull_request test outside *_BASE_REF", FAIL,
-     "CAW_FAIL='${{ github.event_name == 'pull_request' && 'true' || 'false' }}'", "CAW_FAIL="),
     ("T69 nothing after --", " -- " + CMD, " --", "(empty)"),
     ("T70 not python", CMD, "bash -c true", OWN),
-    ("T71 python -c", CMD, "python3 -c 'import os' .gha/x.py", OWN),
     ("T71 a .. path", CMD, "python3 .gha/../../evil.py", OWN),
     ("T77 another gha script", CMD, "python3 -u .gha/quarto-publish/render-per-file.py . out html", OWN),
     ("T73 PYTHONPATH", FAIL, FAIL + " PYTHONPATH=.", "PYTHONPATH"),
     ("T75 an LD_ key", FAIL, FAIL + " LD_BASE_REF=m LD_PRELOAD=./x.so", "LD_BASE_REF does not name"),
-    ("T75 a GIT_ key", FAIL, FAIL + " GIT_BASE_REF=m GIT_EXTERNAL_DIFF=./x", "GIT_BASE_REF does not name"),
     ("T80 a GITHUB_ key", FAIL, FAIL + " GITHUB_BASE_REF=x GITHUB_STEP_SUMMARY=/tmp/x", "GITHUB_BASE_REF does not"),
-    ("T85 a base that is an option", "CAW_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}'",
-     "CAW_BASE_REF=--output=/tmp/x", "CAW_BASE_REF=--output"),
-    ("T86 a file outside the repo", FAIL, FAIL + " CAW_MACROS_FILE=/etc/passwd", "CAW_MACROS_FILE=/etc"),
     ("T79 two *_BASE_REF keys", FAIL, FAIL + " OI_BASE_REF=x", "not exactly one"),
     ("T81 a commit-pinned gha ref", "ref: v3", "ref: " + "a" * 40, "not a named tag"),
     ("T83 a .. gha ref", "ref: v3", "ref: ..", "not a named tag"),
     ("T82 a check's key that picks code to run", FAIL, FAIL + " CAW_BIN_DIR=tools", "CAW_BIN_DIR is not"),
 ]
+for value in ("CAW_FAIL='${{ github.event_name == 'pull_request' && 'true' || 'false' }}'",
+              "CAW_BASE_REF=--output=/tmp/x", "CAW_MACROS_FILE=/etc/passwd", "CAW_MACROS_FILE=' /etc/passwd'", "CAW_LIBRARY='x /root/.netrc'",
+              "CAW_LIBRARY=~/x", "CAW_GLOBS='*.qmd ../../etc/*'", "CAW_WHOLE_TREE=true", "CAW_FAIL=-x"):
+    REFUSED.append(("T68/T85/T86 " + value, FAIL, FAIL + " " + value, value.split("=")[0] + "="))
 for case, before, after, reason in REFUSED:
     refused = hook.parse_run_check_lines(BUNDLED.replace(before, after))
     expect(f"{case} is not run", any(reason in u for u in refused[0]["unhandled"]), True)

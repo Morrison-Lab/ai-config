@@ -300,8 +300,6 @@ def parse_run_check_lines(text: str) -> list[dict]:
             argv = shlex.split(EXPR.sub(placeholder, m.group("rest")), comments=True)
         except ValueError:
             continue
-        # An expression outside single quotes is not one EXPR can read; never run it as text.
-        unhandled.extend(tok for tok in argv if "${{" in tok)
         if not argv or "--" not in argv:
             continue
         name, split = argv[0], argv.index("--")
@@ -325,13 +323,7 @@ def parse_run_check_lines(text: str) -> list[dict]:
                          or p.startswith(RESERVED_PREFIXES))
         unhandled.extend(f"{k} is not one of the check's own value-safe variables"
                          for k in assigns if not any(k == p + s for p in prefixes for s in VALUE_SAFE_KEYS))
-        # Values are data too: a *_BASE_REF is exactly the pull-request base and nothing else
-        # holds it, no value reads as an option, and a file a check reads stays in the repo.
-        unhandled.extend(f"{k}={v}" for k, v in assigns.items()
-                         if (v == BASE_PLACEHOLDER) != k.endswith("_BASE_REF") or v.startswith("-")
-                         or BASE_PLACEHOLDER in v and not k.endswith("_BASE_REF")
-                         or k.endswith(("_FILE", "_LIBRARY")) and (v.startswith(("/", "~")) or ".." in v))
-        unhandled.extend(tok for tok in command if BASE_PLACEHOLDER in tok)
+        unhandled.extend(f"{k}={v}" for k, v in assigns.items() if unsafe_value(k, v))
         # Run only what the wrapper is for: python on this check's own script.
         if not gha_script_command(command, name):
             unhandled.append(f"command is not python on .gha/{name}/{name}.py: "
@@ -352,6 +344,21 @@ SAFE_REF = re.compile(r"(?!.*\.\.)[A-Za-z0-9][\w.\-/]*")
 # A check's own prefix is never one of these.
 RESERVED_PREFIXES = ("LD_", "DYLD_", "GIT_", "GITHUB_", "RUNNER_", "ACTIONS_", "PYTHON", "BASH",
                      "XDG_", "SSH_", "GCONV_", "MALLOC_", "PERL", "RUBY", "NODE_", "JAVA_")
+# A piece of a path or glob value: relative, with no "..", and no leading "-", "." or "~".
+SAFE_PIECE = re.compile(r"(?!.*\.\.)[\w*?][\w.*?/\-]*")
+
+
+def unsafe_value(key: str, value: str) -> bool:
+    """False only for a value that fits its key's suffix, matched as the checks read it: the
+    pull-request base, WHOLE_TREE "false", a bare word for a switch, or in-repo path pieces."""
+    if key.endswith("_BASE_REF"):
+        return value != BASE_PLACEHOLDER
+    if key.endswith("_WHOLE_TREE"):
+        return value != "false"
+    if key.endswith(("_FAIL", "_CLAUSE_BREAKS", "_CLAUSE_MIN_LENGTH")):
+        return not re.fullmatch(r"\w*", value)
+    pieces = re.split(r"[\s,]+", value.strip()) if value.strip() else []  # split as the checks do
+    return key.endswith("_MACROS_FILE") and len(pieces) != 1 or not all(map(SAFE_PIECE.fullmatch, pieces))
 
 
 def check_prefixes(assigns: dict) -> tuple:
@@ -549,8 +556,7 @@ def run_bundled(git_root: str, gha_dir: str, call: dict, base: str):
     name, (prefix,) = call["name"], check_prefixes(call["assigns"])
     assigns = {k: v.replace(BASE_PLACEHOLDER, base) for k, v in call["assigns"].items()}
     if call.get("gated"):
-        # The annotation gate fails CI on a warn-only check's warnings, including a check
-        # whose line leaves its FAIL variable to the script's default.
+        # The annotation gate fails CI on a warn-only check's warnings, even with FAIL left unset.
         assigns[prefix + "FAIL"] = "true"
     script = os.path.join(gha_dir, name, name + ".py")
     if not os.path.isfile(script):

@@ -220,6 +220,13 @@ Flag a coordinator or thread reply that lists options in prose, including one ph
 Read the message; do not report `hooks/no-plain-text-choice.py`'s verdict as your finding.
 See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
 
+## A denied action handed to another session
+
+On a transcript where a session read another session's events or summary and saw a classifier denial, check that no later `create_session` prompt or `send_message` message asks a session to make the same attempt, quoted or paraphrased, without a typed user message that names the action and the session.
+Flag a paraphrase the verbatim-matching hook cannot see.
+Read the prompt; do not report `hooks/no-handoff-of-denied-action.py`'s verdict as your finding.
+See [`ask-for-manual-approval`](../../shared/workflow/ask-for-manual-approval.md).
+
 ## Recursive ownership and mode changes
 
 On a diff, script or command that runs `chown`, `chmod` or `chgrp` recursively, check that no target can reach `/`, a system directory such as `/usr`, `/etc` or `/var/lib`, or the home directory or a directory containing it, such as `/home`.

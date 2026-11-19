@@ -44,7 +44,14 @@ The superseded reply must carry a disposition word (rebut, defer, decline) and n
 The status never counts toward quorum, and never supersedes a comment without the marker, a review that names its head, or a formal review.
 
 - **Writer:** label each finding in a reply with a disposition shape (`- **Blocking, path:line** -- rebutted.`).
+  The bold holds only the label and one locator token, with the separator outside it.
+  The word is one of rebutted, deferred, declined, addressed, fixed, done or resolved.
+  Only rebutted, deferred and declined may carry an explanation, and only one from a short closed list.
+  Keep every disposition line bare apart from an optional commit sha, and put the explanation in a paragraph of its own below the list.
   After a reply that may read as not-clean, post such a status instead of editing the reply.
+- **Don't:** write `- **Blocking, encoding:** accepted.` with the colon inside the bold and a word off the list.
+  The checker read that reply on [#5944](https://github.com/Morrison-Lab/ai-config/pull/5944) as the maintainer's standing not-clean (2026-11-19).
+  A later status could not supersede it either, because it carried no disposition word, so the reply was edited into the shape above with an edit note.
 - **Reviewer:** flag a reply that labels a finding with a rejection word outside a disposition shape and has no later status of that shape.
 
 **A comment posted under a genuine BOT identity needs no marker.**

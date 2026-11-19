@@ -117,7 +117,7 @@ committed pass.
      item below for where. This changes step 4's target, not just the
      content.)
    - **What general principle is it a case of?**
-     Write the principle as one sentence beside the learning,
+     Write the principle as one sentence in your working list for this pass, not yet in any file,
      at the scope [`read-instructions-fully`](../../shared/workflow/read-instructions-fully.md)'s
      "Record a rule at the scope of the user's words" sets,
      and carry the sentence into step 3's search and step 5's report.
@@ -166,9 +166,10 @@ committed pass.
      When the catalog has no heading for it, the grep is the whole search.
      When an existing rule states the principle,
      add the new case to that rule rather than writing a new one.
-     When no rule states it, write the principle into the rule this pass adds for the learning.
+     When no rule states it, write the principle into the entry this pass writes for the learning,
+     whether a new rule or an addition to an existing file.
      When the principle needs more than that rule (for example, a new hook, a sweep or a new fragment),
-     still write it into that rule,
+     still write it into that entry,
      and file the rest with [`defer-issue`](../defer-issue/SKILL.md) in the same pass.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the
      append, and read its warning band, not only its pass/fail line.**

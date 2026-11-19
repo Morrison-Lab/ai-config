@@ -166,8 +166,8 @@ committed pass.
      When the catalog has no heading for it, the grep is the whole search.
      When an existing rule states the principle,
      add the new case to that rule rather than writing a new one.
-     When no rule states it, implement the principle in this pass.
-     When that is not trivial (for example, it needs a new hook, a sweep or a new fragment),
+     When no rule states it, write the principle into the rule this pass adds for the learning.
+     When the principle needs more than that rule (for example, a new hook, a sweep or a new fragment),
      file it with [`defer-issue`](../defer-issue/SKILL.md) in the same pass instead.
    - **Run `python3 scripts/check-memory-file-size.py` before writing the
      append, and read its warning band, not only its pass/fail line.**

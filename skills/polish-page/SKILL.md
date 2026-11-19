@@ -117,7 +117,7 @@ Do not sweep other pages (AGENTS.md, "No sweeps for new rules by default").
 
 ### 6. Ship
 
-- Small PRs: at most 10 files and 300 lines.
+- Small PRs: at most 20 files and 600 lines.
   Content and infrastructure never share one.
   Split a large page into stacked PRs (`stack-prs`).
 - Then `ardi` to clean.

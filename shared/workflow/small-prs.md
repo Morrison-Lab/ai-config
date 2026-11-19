@@ -6,7 +6,9 @@ do them in minimal batches", and "every PR should be as small and focused as it 
 ## The rule
 
 - A PR solves its stated task completely and nothing else.
-- A PR changes at most 10 files and 300 lines (added plus deleted).
+- A PR changes at most 20 files and 600 lines (added plus deleted).
+  Ezra raised it from 10 and 300 on 2026-11-19 ("we need to raise the pr size limit so you stop bothering me").
+  A line moved unchanged between files is not counted, nor is a file whose every changed line moved.
   Generated, lock, `_freeze/`, image and data paths are not counted.
   A committed generator output counts until the repo's `.gitattributes` marks it `linguist-generated`;
   then neither the push hook nor gha's `check-pr-size` counts it, and GitHub folds it in review
@@ -26,6 +28,7 @@ do them in minimal batches", and "every PR should be as small and focused as it 
   Each batch is one concern, with its own issue and its own PR.
   Open the first batch, then the next, rather than one PR for all of them.
 - Stacked PRs are fine: each layer is small, and each names the layer it needs.
+  A layer is measured against the layer it is stacked on, not against `main`.
 - Content and infrastructure stay in separate PRs, as before.
 
 ## Measure early, and split by patch
@@ -58,11 +61,12 @@ that issue tracks both.
 ## The mechanisms
 
 - `hooks/no-oversized-pr-push.py` denies a `git push` of a branch over the cap, before CI is spent.
-  A pure rename (no line changed) does not count toward the file cap.
-  Clear it with an `ALLOW_LARGE_PR=1` prefix for a stacked branch whose base is not the default branch, or for a mechanical, content-identical move or split, and state why in the reply.
+  A pure rename (no line changed) does not count toward the file cap, and lines moved between files do not count at all.
+  A stacked branch is measured against its open PR's base, or on a first push against the nearest remote branch in its history that `main` lacks, read from the server when the clone has no tracking ref for it.
+  Clear it with an `ALLOW_LARGE_PR=1` prefix only for a stacked branch whose parent is not on the server or not in its history, or for a mechanical, content-identical PR the move detection misses, and state why in the reply.
 - gha's `check-pr-size` ([gha#1188](https://github.com/Morrison-Lab/gha/issues/1188)) fails the same PR in CI.
   The `size-exempt` label lifts it; put it on a mechanical, content-identical PR.
-- The caps are a decision, recorded here: 10 files and 300 lines, tight on purpose after Ezra changed "waves" to "minimal batches".
-  The 300 was a starting value with no data behind it ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928)).
-  Before keeping it, measure it against the PRs that hit it.
+- The caps are a decision, recorded here: 20 files and 600 lines since 2026-11-19, doubled from the 10 and 300 set after Ezra changed "waves" to "minimal batches".
+  The 300 was a starting value with no data behind it ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928)), and the doubling is a judgment call Ezra can adjust.
+  gha's moved-line rule is not mirrored yet, so a split pushed under the hook still needs "mechanical, content-identical" in its PR body for CI.
   Change the caps and the `_fig-*` exemption in the hook, in the gha defaults and here together.

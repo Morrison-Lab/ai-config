@@ -261,6 +261,7 @@ See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-read
 
 On a transcript, script, skill or rule that runs `git stash pop` or `git stash apply`, check that it names the entry by a SHA found through its own unique push message, not by a position such as `stash@{0}` read after the push, and that it checked the push saved something.
 Flag a bare pop or apply, and a stash-then-pop pair that assumes the top entry is its own: the stack is shared by every worktree.
+Read the command yourself; do not report `hooks/no-bare-stash-pop.py`'s refusal or silence as your finding.
 See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
 
 ## Announcements need approval

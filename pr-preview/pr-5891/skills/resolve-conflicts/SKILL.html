@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Resolve merge conflicts.">
+<meta name="description" content="Resolve merge conflicts. Aliases: rc, rmc.">
 
 <title>skill – ai-config</title>
 <style>
@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -486,7 +486,13 @@ cookieconsent.run({
 </tbody>
 </table>
 <p>A row with something in “Dropped” and no reason is the defect this table exists to expose: content that either side added may be dropped only by a decision you can state (Ezra, 2026-10-23, ai-config#4716).</p>
-<p><strong>Also check whether the merged result duplicates content that already exists elsewhere in the file — a separate problem from the textual conflict itself.</strong> This can arise two ways: a single incoming PR may internally copy a sentence into a new section (the merge is clean, but the result now says the same thing twice), or both branches may independently add equivalent sentences in different sections (a cross-branch variant with the same symptom). In both cases <code>git merge</code>/<code>merge-tree</code> reports zero conflicts even though the result contains duplication — sometimes with a pronoun or reference that only made sense in its original location. Grep the merged file for the distinctive phrase from each side’s addition before finishing; if it already appears elsewhere, keep one copy (usually the version with the clearer standalone referent) and drop the redundant one. (ai-config#446: the merge itself was clean, but the incoming PR’s own diff had separately duplicated a CLAUDE.md sentence verbatim into a different section, where “this policy” lost its antecedent — the intra-PR variant, caught by the <code>@claude</code> review bot as a distinct finding from the conflict resolution.)</p></li>
+<p><strong>Also check whether the merged result duplicates content that already exists elsewhere in the file — a separate problem from the textual conflict itself.</strong> This can arise two ways: a single incoming PR may internally copy a sentence into a new section (the merge is clean, but the result now says the same thing twice), or both branches may independently add equivalent sentences in different sections (a cross-branch variant with the same symptom). In both cases <code>git merge</code>/<code>merge-tree</code> reports zero conflicts even though the result contains duplication — sometimes with a pronoun or reference that only made sense in its original location. Grep the merged file for the distinctive phrase from each side’s addition before finishing; if it already appears elsewhere, keep one copy (usually the version with the clearer standalone referent) and drop the redundant one. (ai-config#446: the merge itself was clean, but the incoming PR’s own diff had separately duplicated a CLAUDE.md sentence verbatim into a different section, where “this policy” lost its antecedent — the intra-PR variant, caught by the <code>@claude</code> review bot as a distinct finding from the conflict resolution.)</p>
+<p><strong>Then read each resolved file whole, as one document.</strong> Choosing the better side hunk by hunk can splice two self-consistent halves into an incoherent whole: each side is consistent with itself, so no per-hunk judgment sees that the combination is worse than either. On d-morrison/rme#1138, one side’s opening and the other side’s closing used one name for three different objects. The repair has its own trap: unifying the notation made one symbol stand for both sides of the inequality the sentence compared, a circular definition found two review rounds later.</p>
+<ul>
+<li><strong>Do:</strong> read the resolved file top to bottom, and check that every term and symbol means one thing throughout.</li>
+<li><strong>Do:</strong> after unifying notation, check that each comparison still has distinct symbols on its two sides.</li>
+<li><strong>Don’t:</strong> treat a resolution as done because each hunk, judged alone, took the better side.</li>
+</ul></li>
 <li><p><strong>Prove no markers (or whitespace damage) slipped through:</strong></p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> diff <span class="at">--check</span>                      <span class="co"># flags leftover markers + whitespace errors</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnE</span> <span class="st">'^(&lt;&lt;&lt;&lt;&lt;&lt;&lt; |======= *$|&gt;&gt;&gt;&gt;&gt;&gt;&gt; )'</span> . <span class="at">--exclude-dir</span><span class="op">=</span>.git   <span class="co"># precise markers, portable -E</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>

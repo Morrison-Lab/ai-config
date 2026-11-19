@@ -25,6 +25,7 @@ A worktree-isolated agent's checkout under `.claude/worktrees/` holds its own `.
 The message file of `git add -A && git commit -F msg.txt` is staged before the commit reads it, so the commit ships its own message ([ai-config#3558](https://github.com/Morrison-Lab/ai-config/issues/3558)).
 
 - **Do:** write a commit message file outside the work tree, in the session scratchpad or `/tmp`, and pass that path to `-F`.
+  A file under `.git/` also stays out of the commit, since git never stages its own directory.
 - **Do:** ignore `.claude/worktrees/` in every repository where agents run with worktree isolation, and name the paths you mean to add.
 - **Don't:** run `git add -A` in a tree you have not just read with `git status --short`.
 

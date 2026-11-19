@@ -9,8 +9,9 @@ Also a `git commit -F <file>` (`--file`, `-aF`) whose message file is staged
 now or by an earlier add-everything (`-A`, `--all`, `.`) on the same line
 (ai-config#3558), decided from the index and `check-ignore`; a commit limited
 to pathspecs without `-i`, a message path the shell still expands (`$`, a
-backtick), one under `.git/`, an add in another repository and a sweep a
-later whole-index `git reset` undid all pass. `ALLOW_SCRATCH_ADD=1`
+backtick), one under `.git/`, a `--dry-run`, an add in another repository
+and a sweep a later whole-index `git reset` (no paths, at most one commit)
+undid all pass; unstaging by path is not tracked. `ALLOW_SCRATCH_ADD=1`
 clears one command. Fails open when a helper cannot load, the line does not
 parse, `--git-dir`, `--work-tree`, `GIT_DIR` or `GIT_WORK_TREE` redirect the
 repository, or git fails.
@@ -141,6 +142,16 @@ def toplevel(cwd):
     return os.path.realpath(top[0]) if top else None
 
 
+def whole_index_reset(cwd, rest):
+    """True when `git reset <rest>` resets the whole index: not `--soft`,
+    no `--`, and at most one non-option argument, which names a commit."""
+    if "--soft" in rest or "--" in rest:
+        return False
+    revs = [a for a in rest if not a.startswith("-")]
+    return not revs or (len(revs) == 1 and git(
+        cwd, "rev-parse", "--verify", "-q", revs[0] + "^{commit}") is not None)
+
+
 def swept_message(cwd, path, sweeps):
     """Why the message file `path` lands in the commit, or None. A path the
     shell would still expand (`$VAR`, a backtick) is not resolved."""
@@ -196,11 +207,11 @@ def evaluate(command, cwd, environ=None):
             everything = _ADD._add_everything(rest)
             if everything:
                 sweeps.append((cur, toplevel(cur), *everything))
-        elif sub == "reset" and "--soft" not in rest and all(
-                a.startswith("-") or a == "HEAD" for a in rest):
+        elif sub == "reset" and whole_index_reset(cur, rest):
             # A whole-index reset unstages what an earlier sweep staged.
             sweeps = [s for s in sweeps if s[1] != toplevel(cur)]
-        elif sub == "commit" and not limited_commit(rest):
+        elif (sub == "commit" and "--dry-run" not in rest
+              and not limited_commit(rest)):
             msg = message_file(rest)
             how = msg and swept_message(cur, msg, sweeps)
             if how:

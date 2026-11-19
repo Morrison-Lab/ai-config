@@ -536,9 +536,9 @@ RX_WAIVE_LABEL = re.compile(
     r"\A\W*waive\s+the\s+check(?:\s*,\s*merge\s+(?:it|both|them|all))?\W*\Z",
     re.IGNORECASE)
 # Another option must decline. Its label is one of a fixed few and nothing
-# else ("Hold it", "No", "Not now"), and its consequence names no way of going
-# ahead, so "Skip the checker, land it now" and a "Hold it" whose consequence
-# merges are both refused.
+# else ("Hold it", "Hold", "Hold both", "No", "Not now"), and its consequence
+# names no way of going ahead, so "Skip the checker, land it now" and a
+# "Hold it" whose consequence merges are both refused.
 RX_DECLINE_LABEL = re.compile(
     r"\A\W*(?:hold(?:\s+(?:it|both))?|no|not\s+now)\W*\Z",
     re.IGNORECASE)

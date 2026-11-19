@@ -522,6 +522,9 @@ def main():
                  "and https://github.com/Morrison-Lab/psw/pull/9"):
         check(f"allows the tapped consequence {cons!r}",
               not mcp(card_steps(options=((WAIVE, cons), HOLD)))[0])
+    check("allows a pull URL written with no scheme",
+          not mcp(card_steps(options=(
+              (WAIVE, "I merge github.com/Morrison-Lab/psw/pull/354."), HOLD)))[0])
     check("allows a pull URL written with a capitalised host",
           not mcp(card_steps(options=(
               (WAIVE, "I merge GitHub.com/Morrison-Lab/psw/pull/354."), HOLD)))[0])

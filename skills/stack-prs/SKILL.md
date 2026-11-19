@@ -226,6 +226,12 @@ The order is forced: `gh pr reopen` fails while the base is missing, and
 closed pull request`).
 Expect `reviewDecision: REVIEW_REQUIRED` afterward --- retargeting resets the
 review state even though the head commit never moved.
+Retargeting also starts no new `pull_request` CI run.
+A run that began before the retarget still diffs against the old base,
+and fails outright once that base branch is deleted
+(ai-config#5900: `couldn't find remote ref` for the merged base).
+So merge `main` into the dependent after retargeting, even when nothing
+conflicts, to get CI that runs against `main`.
 (UCD-SERG/serocalculator #633/#635, 2026-08-07.
 PR #635 closed two seconds after #633 merged, and that timing is what
 establishes the cause.)

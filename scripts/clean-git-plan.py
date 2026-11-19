@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 """Read-only dry-run classifier for `clean-git` (ai-config#4170).
 
-Prints a JSON plan of one repository's worktrees, local branches and remote
-branches, each with a `status` and an `action`, using the rules in
-`skills/clean-worktrees/SKILL.md` and `skills/clean-branches/SKILL.md`.
-When `--repo` is not a git repository, it classifies each child directory
-that is one.
-
-It changes nothing: no fetch, no prune, no deletion.
-Run `git fetch --prune` yourself first, after saving a ref snapshot.
-Actions: `skip` (leave it), `flag` (a person decides), `prune` (stale
-worktree record), `remove` (worktree), `delete-d` / `delete-D` (local
-branch) and `delete` (remote branch).
-A branch that an open PR comes from or targets is always `skip`
-(ai-config#3515).
+Prints a JSON plan of a repository's (or each child repository's) worktrees,
+local and remote branches, with a `status` and an `action` per row, by the
+rules of `skills/clean-worktrees` and `skills/clean-branches`. It changes
+nothing; run `git fetch --prune` first, after saving a ref snapshot.
+Actions: `skip`, `flag` (a person decides), `prune` (stale worktree record),
+`remove` (worktree), `delete-d`/`delete-D` (local) and `delete` (remote).
+A branch an open PR comes from or targets is always `skip` (#3515).
 Claim comments are not checked; `notes` says so.
 """
 import argparse

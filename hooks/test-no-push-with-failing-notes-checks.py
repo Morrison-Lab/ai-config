@@ -373,20 +373,13 @@ REFUSED = [
     ("T80 a GITHUB_ key", FAIL, FAIL + " GITHUB_BASE_REF=x GITHUB_STEP_SUMMARY=/tmp/x",
      "GITHUB_BASE_REF does not name"),
     ("T79 two *_BASE_REF keys", FAIL, FAIL + " OI_BASE_REF=x", "not exactly one"),
-    ("T81 a commit-pinned gha ref", "ref: v3", "ref: " + "a" * 40, "is a commit, not a named tag"),
+    ("T81 a commit-pinned gha ref", "ref: v3", "ref: " + "a" * 40, "not a named tag"),
+    ("T83 a .. gha ref", "ref: v3", "ref: ..", "not a named tag"),
+    ("T82 a check's key that picks code to run", FAIL, FAIL + " CAW_BIN_DIR=tools", "CAW_BIN_DIR is not"),
 ]
 for case, before, after, reason in REFUSED:
     refused = hook.parse_run_check_lines(BUNDLED.replace(before, after))
     expect(f"{case} is not run", any(reason in u for u in refused[0]["unhandled"]), True)
-gha_src = tempfile.mkdtemp(prefix="npc-gha-src-")
-os.makedirs(os.path.join(gha_src, "check-x"))
-with open(os.path.join(gha_src, "check-x", "check-x.py"), "w", encoding="utf-8") as fh:
-    fh.write('PREFIX = "CAW_"\n')
-foreign_call = {"name": "check-x", "unhandled": [], "assigns": {"ZZZ_BASE_REF": "main"},
-                "command": "python3 .gha/check-x/check-x.py".split()}
-expect("T76 a prefix the gha script never names is not run",
-       hook.run_bundled(gha_src, gha_src, foreign_call, "origin/main")[1:],
-       ("error", "line not runnable locally: the gha script does not read ZZZ_* variables"))
 expect("T72 interpreter flags before the .gha/ script are allowed",
        hook.gha_script_command("python3 -I -u .gha/check-x/check-x.py --flag".split(), "check-x"), True)
 expect("T78 a check name not of the form check-<words> runs nothing",
@@ -414,6 +407,8 @@ expect("T41 a tag moved after a fresh stamp is refetched", git(hook.ensure_gha("
 expect("T42 an unchanged tag reports not moved", hook.remote_moved(first, "v3"), False)
 git(first, "remote", "set-url", "origin", "/nonexistent-origin")
 expect("T43 an unreadable remote falls back to the stamp", hook.remote_moved(first, "v3"), None)
+expect("T84 a .. ref is refused before any clone or cleanup",
+       (hook.ensure_gha(".."), hook.ensure_gha("."), os.path.isdir(first)), (None, None, True))
 
 real = os.environ.get("GHA_REAL_DIR")
 if real:

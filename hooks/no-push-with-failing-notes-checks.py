@@ -317,17 +317,17 @@ def parse_run_check_lines(text: str) -> list[dict]:
             continue
         command = argv[split + 1:]
         # The pushed repo writes this line: run only .gha/<name>/<name>.py from a named
-        # gha ref, with one unreserved prefix that the script names (run_bundled).
-        if re.fullmatch(r"[0-9a-f]{40}", ref or ""):
-            unhandled.append(f"gha ref {ref} is a commit, not a named tag or branch")
+        # gha ref, with one prefix and only the fixed VALUE_SAFE_KEYS under it (run_bundled).
+        if not SAFE_REF.fullmatch(ref or "") or re.fullmatch(r"[0-9a-f]{40}", ref or ""):
+            unhandled.append(f"gha ref {ref} is not a named tag or branch")
         prefixes = check_prefixes(assigns)
         if len(prefixes) != 1:
             unhandled.append(f"{len(prefixes)} *_BASE_REF keys, not exactly one")
         unhandled.extend(f"{p}BASE_REF does not name a check's variables" for p in prefixes
                          if not re.fullmatch(r"[A-Z][A-Z0-9]*_(?:[A-Z0-9]+_)*", p)
                          or p.startswith(RESERVED_PREFIXES))
-        unhandled.extend(f"{k} is not one of the check's own variables"
-                         for k in assigns if not k.startswith(prefixes))
+        unhandled.extend(f"{k} is not one of the check's own value-safe variables"
+                         for k in assigns if not any(k == p + s for p in prefixes for s in VALUE_SAFE_KEYS))
         # Only a pull-request base belongs in a *_BASE_REF; a pull_request test anywhere
         # else (a FAIL switch, an argument) has no local meaning, so it is not guessed.
         unhandled.extend(f"{k}={v}" for k, v in assigns.items()
@@ -343,6 +343,12 @@ def parse_run_check_lines(text: str) -> list[dict]:
 
 
 SAFE_PYTHON_FLAGS = ("-u", "-I", "-B")
+# The pushed line chooses the check, so a key such as TYPOS_BIN_DIR would choose code to run:
+# only these suffixes, which select files to read or how to report, may follow the prefix.
+VALUE_SAFE_KEYS = ("BASE_REF", "WHOLE_TREE", "GLOBS", "PATHS_IGNORE", "FAIL", "CLAUSE_BREAKS",
+                   "CLAUSE_MIN_LENGTH", "LIBRARY", "MACROS_FILE")
+# A ref that names a cache directory inside CACHE_ROOT/gha: no "." or "..", no leading "-".
+SAFE_REF = re.compile(r"(?!.*\.\.)[A-Za-z0-9][\w.\-/]*")
 # Prefixes whose variables change how a loader, interpreter or git behaves.
 # A check's own prefix is never one of these.
 RESERVED_PREFIXES = ("LD_", "DYLD_", "GIT_", "GITHUB_", "RUNNER_", "ACTIONS_", "PYTHON", "BASH",
@@ -393,6 +399,8 @@ def ensure_gha(ref: str) -> str | None:
     override = os.environ.get("GHA_CHECKS_DIR")
     if override:
         return override if os.path.isdir(override) else None
+    if not SAFE_REF.fullmatch(ref):
+        return None
     dest = os.path.join(CACHE_ROOT, "gha", re.sub(r"[^\w.\-]", "_", ref))
     stamp = os.path.join(dest, ".git", "refreshed")
     try:
@@ -548,9 +556,6 @@ def run_bundled(git_root: str, gha_dir: str, call: dict, base: str):
     script = os.path.join(gha_dir, name, name + ".py")
     if not os.path.isfile(script):
         return name, "error", f"{name}/{name}.py not found in gha checkout"
-    with open(script, encoding="utf-8", errors="replace") as fh:
-        if not re.search("[\"']" + re.escape(prefix), fh.read()):
-            return name, "error", f"line not runnable locally: the gha script does not read {prefix}* variables"
     # Inherited variables with the check's own prefix are dropped; nothing else is touched.
     env = {k: v for k, v in os.environ.items() if not k.startswith(prefix)}
     env.update(assigns)

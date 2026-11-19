@@ -132,6 +132,7 @@ Add a pointer to this skill only when the procedure changes.
 ## Relationship to other skills
 
 - [`send-notes`](../send-notes/SKILL.md): routes new content to a repo; this skill reworks an existing page.
+- [`dissolve-page`](../dissolve-page/SKILL.md): when the overlap survey says every piece of the page belongs elsewhere, dissolve it into its neighbors instead of polishing it.
 - [`find-overlap`](../find-overlap/SKILL.md): overlap between skills and memory, not notes pages.
 - [`use-preferred-style`](../use-preferred-style/SKILL.md), [`use-math-macros`](../use-math-macros/SKILL.md), [`fact-check-prose`](../fact-check-prose/SKILL.md): the rule skills this one calls.
 - `defer-issue`, `st`, `stack-prs`, `ardi`, `mwc`: the PR workflow around it.

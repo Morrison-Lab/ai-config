@@ -39,6 +39,22 @@ stopping-point declaration is emitted.
 - **Don't:** end at a non-clean stopping point with only a promise to return.
 - **Don't:** create a pointless timer after the work has reached a clean stop.
 
+**Check that the wake can fire.**
+A cloud session limited to the owner's trusted devices
+(after the owner approves reaching their other sessions or computers)
+could not deliver its own `send_later` reminder when this was observed on 2026-10-28:
+`get_trigger` showed `last_run.status` `ROUTINE_RUN_STATUS_FAILED`
+with `failure_reason` `ROUTINE_RUN_FAILURE_REASON_ACCESS_DENIED`,
+no turn arrived, and the session ran again only when the user typed
+([#4807](https://github.com/Morrison-Lab/ai-config/issues/4807)).
+In such a session, wait with a `run_in_background` command, which re-invokes the session itself,
+or say plainly that no wake is armed.
+In any session, read a reminder back with `get_trigger` after arming it,
+and on resume read its `last_run`, so a failed wake is reported rather than assumed.
+
+- **Do:** confirm the trigger exists after `send_later`, and report a failed `last_run` on resume.
+- **Don't:** report "I'll check back at 08:22 PT" from a trusted-device-limited cloud session whose reminders fail with `ACCESS_DENIED`.
+
 **The declaration is for a human reading a recap, so it does not apply where the last message is consumed by a machine instead.**
 The rigid interpretation of the rule says the last separate message MUST be the declaration.
 A CI harness that posts an agent's reply to a PR or issue thread typically takes the **last assistant message** and posts that.

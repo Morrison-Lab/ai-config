@@ -86,6 +86,7 @@ its description does not use (ai-config#949).
 | `skills/di/SKILL.md` | -> defer-issue. |  |
 | `skills/difm/SKILL.md` | -> do-it-for-me. |  |
 | `skills/discussions/SKILL.md` | Manage forge discussions. |  |
+| `skills/dissolve-page/SKILL.md` | Dissolve a notes page into its neighbors. |  |
 | `skills/dmmhyh/SKILL.md` | Stop over-asking. |  |
 | `skills/do-as-you-think-best/SKILL.md` | -> daytb. |  |
 | `skills/do-it-for-me/SKILL.md` | Do the step yourself; retry blocks, then lift auto mode. Aliases: difm. |  |
@@ -219,7 +220,8 @@ its description does not use (ai-config#949).
 | `skills/skill-builder/SKILL.md` | Create or update a skill. |  |
 | `skills/slide-tag/SKILL.md` | Move floating Git tag to main. Aliases: ts. |  |
 | `skills/spell/SKILL.md` | Spell-check changed files with the checker the repo's CI uses. |  |
-| `skills/split-concerns/SKILL.md` | Split multi-concern PRs. |  |
+| `skills/split-concerns/SKILL.md` | Split multi-concern PRs. Aliases: split-pr. |  |
+| `skills/split-pr/SKILL.md` | -> split-concerns. |  |
 | `skills/spot-skill-opportunities/SKILL.md` | Find opportunities for new skills. |  |
 | `skills/st/SKILL.md` | Start task issue-first. Aliases: start-task. |  |
 | `skills/stack-prs/SKILL.md` | Stack dependent PR on another. |  |

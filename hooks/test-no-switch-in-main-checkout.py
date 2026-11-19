@@ -47,6 +47,7 @@ with tempfile.TemporaryDirectory() as root:
     git("add", "a.txt", cwd=main)
     git("commit", "-q", "-m", "init", cwd=main)
     git("branch", "feature", cwd=main)
+    git("update-ref", "refs/remotes/origin/remote-only", "HEAD", cwd=main)
     sub = os.path.join(main, "sub")
     os.makedirs(sub)
 
@@ -80,6 +81,8 @@ with tempfile.TemporaryDirectory() as root:
             ("git checkout -B feature", main, "deny"),
             ("git checkout --detach", main, "deny"),
             ("git checkout -", main, "deny"),
+            ("git checkout remote-only", main, "deny"),
+            ("git checkout --no-guess remote-only", main, "allow"),
             ("git checkout feature", sub, "deny"),
             ("git -C .. checkout feature", sub, "deny"),
             ("cd ../main && git checkout feature", wt, "deny"),

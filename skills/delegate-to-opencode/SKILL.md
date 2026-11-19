@@ -215,6 +215,16 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   With 24000 tokens the model spent the whole budget on reasoning and stopped with `finish_reason: length`.
   Streaming did not fix it for `glm-5.3`, which streams its reasoning under `delta.reasoning`: on one 190-line review it was still reasoning when a 570 s `--max-time` ran out, so prefer `deepseek-v4.1-flash`.
 
+  On 2026-11-19 the Go plan hit its weekly `GoUsageLimitError` mid-afternoon, and `/models` listed the free ids `beam-free`, `iceman-contributor-free`, `longcat-2.5-free` and `hy4-flash-free`.
+  Reviewing a 20-line diff, `beam-free` returned a bare `Verdict: CLEAN` with no reasons.
+  `iceman-contributor-free` returned a reasoned verdict on each of four diffs of 20 to 180 lines ([#5877](https://github.com/Morrison-Lab/ai-config/pull/5877), [#5894](https://github.com/Morrison-Lab/ai-config/pull/5894), [#5898](https://github.com/Morrison-Lab/ai-config/pull/5898), [#5909](https://github.com/Morrison-Lab/ai-config/pull/5909)).
+  Those requests were streamed, with a system message saying the reviewer has no tools, `"reasoning_effort": "low"`, `"max_tokens": 60000`, and a brief asking for one line of reasoning per changed line before the verdict.
+
+  - **Do:** ask a free reviewer for a reason per changed line, so a verdict comes with the lines it checked.
+  - **Don't:** turn on the Go plan's "Extra Usage" when the weekly limit hits: it is pay-as-you-go.
+  - **Do:** post the model, the head sha and the verdict line as a PR comment when another session will merge the PR.
+    The merge gate credits only a read made in the merging session, and the merge runner on [#5898](https://github.com/Morrison-Lab/ai-config/pull/5898) found no read on the PR and ran its own.
+
   Check `/models` for the current free ids and try them before relying on this route.
 - **Make the request with `curl` itself if it is to satisfy the merge gate.**
   `hooks/warn-merge-without-cross-harness-review.py` counts a Bash command whose command word is `curl`, with a data flag (`-d`, `--data-binary`, `--json` and the like) and a literal `https://opencode.ai/zen/go/v1/chat/completions` URL, that exits without error after the last push.

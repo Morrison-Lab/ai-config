@@ -128,7 +128,9 @@ for _node in _ast.walk(_tree):
                       and k.value.id == "NO_WINDOW" for k in _node.keywords)
         if not _passes:
             _bare.append(_node.lineno)
-assert _seen >= 3, f"matched only {_seen} subprocess calls; expected the 3 in the file"
+# Two since ai-config#4733: `_run` (which every `gh pr view` read goes through,
+# via scripts/lib/pr_view.py) and the `--poll` Popen.
+assert _seen >= 2, f"matched only {_seen} subprocess calls; expected the 2 in the file"
 assert not _bare, f"subprocess calls without NO_WINDOW at lines {_bare}"
 
 print("PASS: detects an unmonitored PR, gives each PR a stable timer state file, and guards Windows process liveness and NO_WINDOW")

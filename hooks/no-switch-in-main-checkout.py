@@ -8,14 +8,14 @@ state. A `git checkout -B <b>` run from the wrong directory left the main
 checkout on a fixer's branch with a stale index (ai-config#4233), and a
 switch under a running subagent put a commit on the wrong branch
 (ai-config#3204). Denies `git switch` and a branch-changing `git checkout`
-(a commit, a remote-only branch name git would create, `-`, `-b`, `-B`,
-`-d`, `--orphan`, `--detach`, stuck or clustered as in `-qb`), run (after
-`cd`, `git -C` and inside `sh -c`) in the main worktree while more than one
-live worktree exists. Redirections such as `2>&1` are ignored. Path
-checkouts (paths after `--`, `-p`, two or more names, one name that is no
-commit) and a checkout of the current branch pass. Backtick substitution
-and `env -C` are not followed. `ALLOW_MAIN_CHECKOUT_SWITCH=1` clears one
-command. Fails open when a helper
+(a commit, a branch name only a remote has, `-`, `-b`, `-B`, `-d`,
+`--orphan`, `--detach`, stuck or clustered as in `-qb`), run (after `cd`,
+`git -C` and inside `sh -c`) in the main worktree while more than one live
+worktree exists. Redirections such as `2>&1` are ignored. Path checkouts
+(paths after `--`, `-p`, two or more names, one name that is no commit), a
+checkout of the current branch, and a remote-only name under `--no-guess`
+pass. Backtick substitution and `env -C` are not followed.
+`ALLOW_MAIN_CHECKOUT_SWITCH=1` clears one command. Fails open when a helper
 cannot load, the line does not parse, the repository is redirected, or git
 fails. Rule: [`shared-git-state`](../shared/workflow/shared-git-state.md).
 """
@@ -132,8 +132,10 @@ def changes_branch(sub, rest, cwd):
     # `checkout <tree-ish> <path>...` restores files and keeps the branch.
     if len(args) != 1 or is_current(cwd, args[0]):
         return False
-    return (git(cwd, "rev-parse", "--verify", "-q", args[0] + "^{commit}")
-            is not None or remote_only_branch(cwd, args[0]))
+    if git(cwd, "rev-parse", "--verify", "-q", args[0] + "^{commit}") is not None:
+        return True
+    # A name only a remote has makes git create and switch to a tracking branch.
+    return "--no-guess" not in rest[:cut] and remote_only_branch(cwd, args[0])
 
 
 def main_worktree(cwd):

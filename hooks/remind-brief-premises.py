@@ -179,6 +179,17 @@ import subprocess
 import sys
 import tempfile
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from tool_names import SUBAGENT_TOOLS as _SUBAGENT_TOOLS, subagent_brief
+except Exception:  # broken install: the launch tools named in ai-config#3740
+    _SUBAGENT_TOOLS = frozenset({
+        "agent", "task", "invoke_subagent", "dispatch_agent", "run_agent",
+        "spawn_agent", "collaboration.spawn_agent"})
+    subagent_brief = None
+
 # ---------------------------------------------------------------- clause A
 # A corpus path or a bare corpus filename. Bare `CLAUDE.md` and `MEMORY.md` are
 # included because they are the files briefs assert about most, and both
@@ -350,8 +361,9 @@ DERIVE_AGGREGATE = re.compile(r"FINDINGS_COUNT")
 # The values may only come back from a dispatched agent. Any other tool
 # result carrying the token is somebody else's review history -- see
 # `transcript_derivations`.
-AGENT_TOOLS = {"Agent", "Task", "agent", "task", "dispatch_agent",
-               "run_agent"}
+# Lowercase names, compared against `name.lower()`; the set itself is
+# scripts/lib/tool_names.py's (ai-config#3740).
+AGENT_TOOLS = _SUBAGENT_TOOLS
 
 # Clause C's own imperative list. The generic IMPERATIVE above is NOT
 # widened with these: `count`, `sum`, `tally` and `total` head a noun
@@ -468,6 +480,26 @@ BRANCH_ITEM = re.compile(r"\d{2,}")
 _OWN_ITEMS = None
 
 
+def _current_pr():
+    """The current branch's PR as `gh pr view --json number` reads it, or None.
+
+    Goes through scripts/lib/pr_view.py, which reads over REST where a cloud
+    session refuses GraphQL (ai-config#4733). A broken install reads nothing.
+    """
+    lib = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if lib not in sys.path:
+        sys.path.insert(0, lib)
+    try:
+        from pr_view import gh_pr_view
+    except Exception as exc:
+        print(f"remind-brief-premises: cannot load scripts/lib/pr_view.py ({exc}); "
+              "the current PR will not be read", file=sys.stderr)
+        return None
+    data, _error = gh_pr_view(["number"], timeout=5)
+    return data if isinstance(data, dict) else None
+
+
 def own_items():
     """The PR/issue numbers this session is demonstrably working, as strings.
 
@@ -501,13 +533,7 @@ def own_items():
         except (OSError, subprocess.SubprocessError):
             branch = ""
     items.update(BRANCH_ITEM.findall(branch))
-    try:
-        out = subprocess.run(
-            ["gh", "pr", "view", "--json", "number", "--jq", ".number"],
-            capture_output=True, text=True, timeout=5)
-        number = out.stdout.strip() if out.returncode == 0 else ""
-    except (OSError, subprocess.SubprocessError):
-        number = ""
+    number = str((_current_pr() or {}).get("number") or "")
     if number.isdigit():
         items.add(number)
     _OWN_ITEMS = frozenset(items)
@@ -1046,7 +1072,7 @@ def transcript_derivations(path):
                     if not isinstance(inp, dict):
                         continue
                     bname = b.get("name") or ""
-                    if bname in AGENT_TOOLS:
+                    if bname.lower() in AGENT_TOOLS:
                         agent_ids.add(b.get("id"))
                     elif bname in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
                         cmd_str = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
@@ -1263,7 +1289,9 @@ def main() -> int:
     if not payload or not isinstance(payload, dict):
         return 0
     tool_name = payload.get("tool_name")
-    if tool_name not in BRIEF_TOOLS:
+    other_launch = (tool_name not in BRIEF_TOOLS and subagent_brief is not None
+                    and str(tool_name or "").lower() in _SUBAGENT_TOOLS)
+    if tool_name not in BRIEF_TOOLS and not other_launch:
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
@@ -1273,7 +1301,11 @@ def main() -> int:
         return 0
 
     prompts = []
-    if tool_name == "invoke_subagent" and isinstance(tool_input.get("Subagents"), list):
+    if other_launch:
+        # A launch tool with no entry above, such as Codex's `spawn_agent`
+        # (ai-config#3740): read every brief field tool_names knows.
+        prompts.append(subagent_brief(tool_input))
+    elif tool_name == "invoke_subagent" and isinstance(tool_input.get("Subagents"), list):
         for sa in tool_input["Subagents"]:
             if isinstance(sa, dict) and isinstance(sa.get("Prompt"), str):
                 prompts.append(sa["Prompt"])

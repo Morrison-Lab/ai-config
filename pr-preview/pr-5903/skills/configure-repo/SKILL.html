@@ -51,9 +51,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -379,7 +379,7 @@ cookieconsent.run({
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
-<p>Run these from an ai-config checkout, against a branch of the target repository.</p>
+<p>Use two checkouts: an up-to-date ai-config checkout, which supplies the scripts, and a new branch of the target repository, which receives every change. Step 2 runs from the ai-config checkout and names the target’s directory as <code>&lt;repo-dir&gt;</code>. Every other step reads, edits and commits in the target’s checkout.</p>
 <ol type="1">
 <li><strong>Read the target’s own instructions first:</strong> its <code>AGENTS.md</code>, <code>CLAUDE.md</code>, <code>CONTRIBUTING.md</code> and <code>.github/</code> directory, so that nothing below overwrites a rule the repository already states (<a href="../../shared/workflow/read-canonical-doc-before-starting.md">read-canonical-doc-before-starting</a>).</li>
 <li><strong>Wire the agent instructions:</strong> <code>python3 scripts/wire-repo-config.py &lt;repo-dir&gt;</code>. It writes the marked ai-config block into <code>AGENTS.md</code> (and into a <code>CLAUDE.md</code> that does not import <code>AGENTS.md</code>), registers the marketplace in <code>.claude/settings.json</code>, and adds <code>.Rbuildignore</code> entries in an R package. Pass <code>--enable-plugin</code> only for a repository whose sessions get the plugin no other way, since a second copy fires every hook twice (the script’s docstring explains). Then run it again with <code>--check</code>, which must exit 0.</li>

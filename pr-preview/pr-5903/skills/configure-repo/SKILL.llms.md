@@ -12,7 +12,7 @@ It does not fire inside ai-config itself, which `wire-repo-config.py` refuses.
 
 ## Procedure
 
-Run these from an ai-config checkout, against a branch of the target repository.
+Use two checkouts: an up-to-date ai-config checkout, which supplies the scripts, and a new branch of the target repository, which receives every change. Step 2 runs from the ai-config checkout and names the target’s directory as `<repo-dir>`. Every other step reads, edits and commits in the target’s checkout.
 
 1.  **Read the target’s own instructions first:** its `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md` and `.github/` directory, so that nothing below overwrites a rule the repository already states ([read-canonical-doc-before-starting](../../shared/workflow/read-canonical-doc-before-starting.md)).
 2.  **Wire the agent instructions:** `python3 scripts/wire-repo-config.py <repo-dir>`. It writes the marked ai-config block into `AGENTS.md` (and into a `CLAUDE.md` that does not import `AGENTS.md`), registers the marketplace in `.claude/settings.json`, and adds `.Rbuildignore` entries in an R package. Pass `--enable-plugin` only for a repository whose sessions get the plugin no other way, since a second copy fires every hook twice (the script’s docstring explains). Then run it again with `--check`, which must exit 0.

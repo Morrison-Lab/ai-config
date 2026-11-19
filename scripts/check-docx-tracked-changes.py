@@ -65,8 +65,8 @@ that a content diff cannot see:
     `m:t` at all is a blank placeholder already present in the source,
     reported for information rather than as a finding.
   * a display equation (m:oMathPara) that shares its w:p with content on a
-    side it is not broken off from: no w:r ending in a break before it, or,
-    after it, neither an m:r ending in a break closing its m:oMath nor a w:r
+    side it is not broken off from: before it, neither a w:r ending in a
+    break nor an earlier m:oMathPara that closes with one, or, after it, neither an m:r ending in a break closing its m:oMath nor a w:r
     starting with one (ai-config#3438).  The
     equation then runs into the neighbouring prose.  This markup is legal
     and carries no text, so neither a structural validator nor a text diff

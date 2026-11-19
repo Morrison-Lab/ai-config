@@ -11,7 +11,7 @@ That second axis applies to any displayed equation, a standalone definition
 included, not only to a line inside a running derivation, and its remedy
 reaches document scope even though the defect shows up in one line.
 The third is **whether** a line is displayed at all: display versus inline, a decision that is usually never made on purpose rather than made wrongly.
-Two last sections cover how a derivation is laid out in teaching material, and prose that describes a formula: keeping a function apart from its value.
+The last sections cover parentheses that make operator precedence explicit, how a derivation is laid out in teaching material, and prose that describes a formula: keeping a function apart from its value.
 
 ## Writing: don't skip steps
 
@@ -572,6 +572,38 @@ A checker written afterward --- per file, counting display equations examined an
 On the supplement's working build it then found 7 missing-break findings across 5 defective equations, and 0 after repair, with the repair keeping all five equations display and adding the missing breaks.
 The finding count and the equation count differ because a single equation can be missing a break on either side or both: three of the five were missing only one side, two were missing both, which is 1 + 1 + 1 + 2 + 2 = 7.
 Two of the five defective equations sat in a different section from the three the author knew about, and neither the author nor the user had noticed those two: the defect carries no text of its own, so a build check that only compares accepted versus rejected text was blind to the defect by construction.)
+
+## Parenthesize to make operator precedence explicit
+
+Write the parentheses that settle operator precedence,
+rather than leaving the reader to apply a precedence convention
+(Ezra, 2026-11-19: "let's make a habit of using parentheses to clarify operator precedence").
+The style rule, with its examples, is psw's
+[Parenthesizing to show precedence](https://morrison-lab.github.io/psw/chapters/notation.html#parenthesizing-to-show-precedence);
+this section is the agent's writer and reviewer instruction for it.
+The two cases that come up most:
+
+- **A relation beside a logical connective:**
+  each comparison or membership that is an operand of
+  `\land`, `\lor`, `\Rightarrow`, or `\Leftrightarrow` gets its own parentheses.
+- **Two kinds of connective at one level, or a repeated implication:**
+  `P \land Q \lor R` and `P \Rightarrow Q \Rightarrow R` get parentheses;
+  a repeated `\land` or `\lor` does not need them.
+
+- **Do:** write `\set{x : (x \in A) \lor (x \in B)}` and `(x > 0) \Rightarrow (x^2 > 0)`.
+- **Don't:** write `\set{x : x \in A \lor x \in B}`,
+  even on a note sheet or in a solution where the meaning seems obvious.
+- **Reviewer:** flag each unparenthesized relation or mixed connective in a math diff,
+  quoting the expression and its parenthesized form.
+
+The deterministic half is gha's
+[`check-precedence-parens`](https://github.com/Morrison-Lab/gha/tree/main/check-precedence-parens),
+which fails a pull request adding either case.
+Its whole-tree count on 2026-11-19 was 24 lines in mcs, 52 in mcsg, and 7 in csci201;
+per the no-sweeps rule, existing lines change only when they are edited anyway or when Ezra says "sweep".
+A line that shows an ungrouped form on purpose,
+such as an exercise asking which grouping is meant,
+carries `<!-- check-precedence-parens: allow -->`.
 
 ## Teaching material: exercise, solution, theorem, proof
 

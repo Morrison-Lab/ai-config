@@ -1156,6 +1156,9 @@ A display equation running into its own introducing sentence is ambiguous betwee
 check the markup before changing anything.
 Format-general: applies to `$...$` versus `$$...$$`/an `equation` environment in Quarto/LaTeX,
 exactly as it applies to `<m:oMath>` versus `<m:oMathPara>` in Word/OOXML.
+Parenthesize to make operator precedence explicit:
+`\set{x : (x \in A) \lor (x \in B)}`, not `\set{x : x \in A \lor x \in B}` (Ezra, 2026-11-19);
+gha's `check-precedence-parens` enforces it on added lines.
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
 math, apply this in addition to the fact-check above.

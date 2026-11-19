@@ -50,7 +50,8 @@ The status never counts toward quorum, and never supersedes a comment without th
   After a reply that may read as not-clean, post such a status instead of editing the reply.
 - **Don't:** write `- **Blocking, encoding:** accepted.` with the colon inside the bold and a word off the list.
   The checker read that reply on [#5944](https://github.com/Morrison-Lab/ai-config/pull/5944) as the maintainer's standing not-clean (2026-11-19).
-  A later status could not supersede it either, because it carried no disposition word, so the reply was edited into the shape above with an edit note.
+  A later status cannot supersede a reply with no disposition word, so editing the reply, with an edit note, was the only way out there.
+  That is the one exception to posting a status instead of editing, and writing the shape the first time avoids it.
 - **Reviewer:** flag a reply that labels a finding with a rejection word outside a disposition shape and has no later status of that shape.
 
 **A comment posted under a genuine BOT identity needs no marker.**

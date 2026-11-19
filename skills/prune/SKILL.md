@@ -1,6 +1,7 @@
 ---
 name: prune
 description: "→ clean-branches."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

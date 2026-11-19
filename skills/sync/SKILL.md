@@ -1,6 +1,7 @@
 ---
 name: sync
 description: "→ sync-pr-branch."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

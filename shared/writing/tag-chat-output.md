@@ -14,8 +14,9 @@ Boxing everything defeats the purpose, so keep the box meaningful.
 Boxed (a `===` line above and below the labeled block):
 
 - ❓ **QUESTION** --- need the user's input.
-  For a real either/or, prefer the AskUserQuestion picker over a boxed question.
-  When a question is posed inline in chat prose rather than through a box, still set it apart --- its own paragraph (blank line before and after, since a bare newline collapses back into the surrounding paragraph), in bold.
+  Always pose it as an `AskUserQuestion` card (Ezra, 2026-11-19: "always ask me questions as a card"), with a recommendation as its first option.
+  Fall back to a boxed question, or inline prose, only where the tool is unavailable in the session, and say so.
+  When a question is posed inline in chat prose rather than through a card, still set it apart --- its own paragraph (blank line before and after, since a bare newline collapses back into the surrounding paragraph), in bold.
 - 💡 **OFFER** --- optional work I can do if they want it.
 - 🛑 **BLOCKER** --- stopped; need their call.
 - ✅ **ANSWER** --- the headline answer to a question they asked (put nuance below the box).

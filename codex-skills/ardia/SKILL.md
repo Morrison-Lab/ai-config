@@ -1,6 +1,6 @@
 ---
 name: "ardia"
-description: "Drive every in-scope open PR to clean."
+description: "Drive every in-scope open PR to clean. Aliases: adria, iterate-all."
 ---
 
 # ardia (Codex wrapper)

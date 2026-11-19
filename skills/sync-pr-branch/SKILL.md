@@ -1,6 +1,6 @@
 ---
 name: sync-pr-branch
-description: "Sync PR branch with main."
+description: "Sync PR branch with main. Aliases: merge-main, resync-branch, sync."
 user-invocable: true
 allowed-tools:
   - Bash

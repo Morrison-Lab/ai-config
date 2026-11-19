@@ -1,6 +1,7 @@
 ---
 name: recommend
 description: "→ rec."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools: []
 ---

@@ -1,6 +1,6 @@
 ---
 name: "memorize"
-description: "Persist memory across sessions."
+description: "Persist memory across sessions. Aliases: always, remember."
 ---
 
 # memorize (Codex wrapper)

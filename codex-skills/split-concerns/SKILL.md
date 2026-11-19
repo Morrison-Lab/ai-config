@@ -1,6 +1,6 @@
 ---
 name: "split-concerns"
-description: "Split multi-concern PRs."
+description: "Split multi-concern PRs. Aliases: split-pr."
 ---
 
 # split-concerns (Codex wrapper)

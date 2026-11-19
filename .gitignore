@@ -14,6 +14,14 @@ __pycache__/
 # Claude Code worktree-isolated background agents
 .claude/worktrees/
 
+# Mutated hook copies the mutation tests write beside the hook with
+# tempfile.mkstemp (default prefix `tmp`), so the copy resolves scripts/lib.
+# A killed test run leaves one behind, and `git add -A` committed it
+# (ai-config#5304). No tracked file matches these patterns, so never name
+# a real hook or script `tmp*`: it would be ignored too.
+hooks/tmp*.py
+scripts/tmp*.py
+
 # Local git worktrees checked out inside this clone (session-lock / gi).
 # Agent Glob/Grep walk these otherwise and can edit a stale copy.
 .worktrees/

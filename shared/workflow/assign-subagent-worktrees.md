@@ -24,6 +24,14 @@ Measured 2026-08-07.
 [`memories/git-worktrees.md`](../../memories/git-worktrees.md) carries the evidence.
 [`shared/workflow/challenge-the-assignment.md`](challenge-the-assignment.md) covers the general form --- a brief must not assert anything about the recipient's environment, which the author cannot query even in principle.
 
+**`isolation: "worktree"` needs the session's working directory to be a git repository.**
+Measured 2026-11-19, in a cloud session whose working directory (`/home/user`) was not a repository.
+The call failed with `Cannot create agent worktree: not in a git repository and no WorktreeCreate hooks are configured`.
+I had believed the option worked in any session.
+
+- **Do:** when the session root is not a repository, launch without `isolation`, say in the launch message that you did so deliberately, and brief the agent to run `git worktree add` from the checkout, stay inside that worktree, and push early.
+- **Don't:** retry the failing isolation call, or launch the agent unmarked.
+
 **The general rule is the more valuable half.** When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse --- never just change the behaviour.
 A repealed decision changes no artifact, so review, tests, and hooks are all blind to it by construction, and the only detector is someone who remembers.
 It is more dangerous than ordinary drift because the incident supplies an apparent reason, so from the inside it feels like having learned something rather than like lapsing.

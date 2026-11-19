@@ -186,6 +186,8 @@ def main():
         if os.path.isdir(os.path.join(root, d, ".git")))  # a worktree's .git is a file
     if not repos:
         sys.exit(f"clean-git-plan: no git repository at or under {root}")
+    if args.prs_json and len(repos) > 1:  # one PR list cannot describe two repositories
+        sys.exit(f"clean-git-plan: --prs-json names one repository's PRs; {root} holds {len(repos)}")
     now = time.time()
     plans = [Repo(r, load_prs(r, args.prs_json, args.limit), args.main, now).plan()
              for r in repos]

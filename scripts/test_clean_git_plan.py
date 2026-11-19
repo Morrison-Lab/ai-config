@@ -89,6 +89,10 @@ with tempfile.TemporaryDirectory() as root:
                           capture_output=True, check=False, text=True)
     check("non-repo parent classifies its child repositories, not their worktrees",
           [os.path.basename(p["repo"]) for p in json.loads(many.stdout or "[]")], ["repo"])
+    git(root, "init", "-q", os.path.join(root, "repo2"))
+    check("one --prs-json file refused for two repositories",
+          subprocess.run([sys.executable, SCRIPT, "--repo", root, "--prs-json", prs_file],
+                         capture_output=True, check=False, text=True).returncode != 0, True)
 
 if FAILS:
     print("\n".join(FAILS))

@@ -410,6 +410,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/search-library-before-saying-book-unavailable.md` | Before a reply says a reference book cannot be reached, is unavailable, or was not checked, search both places that hold the lab's books: |  |
 | `shared/workflow/self-review-fallback.md` | When a PR you're managing has its `@claude` review workflow fail to produce a usable verdict --- whether because it was **skipped for quota** or because it *... |  |
 | `shared/workflow/session-lab-notebook.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
+| `shared/workflow/shared-git-state.md` | Worktrees isolate a branch, its index and its working tree. They do not isolate everything git keeps per repository, and parallel sessions in one repository... |  |
 | `shared/workflow/skill-checklists.md` | Use checklists in skills deliberately, not by default. |  |
 | `shared/workflow/small-prs.md` | Ezra, 2026-10-23: "don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches", and "every PR should be as small and focused as it can be... |  |
 | `shared/workflow/stack-dont-pause.md` | The clear-all family --- `ardia`, `gia`, `gii`, `gip`, and the `clear-all` alias --- clears a whole queue of PRs and issues in one run. Merging stays human-g... |  |

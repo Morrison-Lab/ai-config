@@ -2163,6 +2163,41 @@ def external_reviewer_cases() -> tuple[int, int]:
     refuses("an unterminated quote fails closed",
             f"agy --print '{review}", "m1")
 
+    # `codex exec` (ai-config#3877), credited only where Codex is in scope
+    # (scripts/lib/codex_scope.py, ai-config#5084). The scope is pinned with
+    # the helper's own override so the cases do not depend on this checkout's
+    # remote; the default case below runs in this repository, which is not a
+    # UCDH project, and must refuse.
+    def codex_run(label, command, call_id, env, want_blocked):
+        rc, out = run_hook(PUSH, [
+            bash_call(command, call_id),
+            bash_result(call_id, body("Ready for merge", HEAD)),
+        ], extra_env=env)
+        decision = (out.get("hookSpecificOutput") or {}).get("permissionDecision")
+        check(label, rc == 0 and (decision == "deny") == want_blocked,
+              f"rc={rc} decision={decision}")
+
+    in_scope = {"AI_CONFIG_ALLOW_CODEX": "1"}
+    out_of_scope = {"AI_CONFIG_ALLOW_CODEX": "0"}
+    no_override = {"AI_CONFIG_ALLOW_CODEX": ""}
+    codex_run("codex exec with a clean verdict allows the push in a Codex project",
+              f"codex exec '{review}'", "x1", in_scope, False)
+    codex_run("codex exec is not credited where Codex is out of scope",
+              f"codex exec '{review}'", "x2", out_of_scope, True)
+    codex_run("codex exec is not credited in a non-UCDH repository by default",
+              f"codex exec '{review}'", "x3", no_override, True)
+    codex_run("codex exec with a prompt naming no review is refused",
+              "codex exec 'summarize the README'", "x4", in_scope, True)
+    # The subcommand belongs to codex alone: neither program borrows the
+    # other's spelling.
+    codex_run("codex --print is not an attested codex shape",
+              f"codex --print '{review}'", "x5", in_scope, True)
+    codex_run("agy exec is not an attested agy shape",
+              f"agy exec '{review}'", "x6", in_scope, True)
+    # The one-shape rule holds for codex too: an extra flag is refused.
+    codex_run("codex exec with an extra flag is refused",
+              f"codex exec -s read-only '{review}'", "x7", in_scope, True)
+
     return failures, ran
 
 

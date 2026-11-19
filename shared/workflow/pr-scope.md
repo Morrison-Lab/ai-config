@@ -39,7 +39,9 @@ An out-of-scope PR is reported to the user and left untouched.
 When no identity operation is available, fail closed the way `ardia` does:
 leave the author and assignee arms unevaluated, act only on PRs the user
 explicitly asked for or the Actions app authored, and say so in the report.
-See [`memories/reviewing-prs.md`](../../memories/reviewing-prs.md) for full provenance and `skills/ardia/SKILL.md` step 1 for reference implementation.
+See [`memories/reviewing-prs.md`](../../memories/reviewing-prs.md) for full provenance.
+The test, the field and login normalization, the veto and the fail-closed rule are implemented once in [`scripts/pr-scope.py`](../../scripts/pr-scope.py), with its table of cases in [`scripts/test_pr_scope.py`](../../scripts/test_pr_scope.py);
+every sweep pipes its PR listing through it, as `skills/ardia/SKILL.md` step 1 shows, and decides only which numbers the request names as `--requested` or `--excluded`.
 
 - **Do:** verify author, assignees, or explicit user requests before interacting with any PR.
 - **Do:** treat "do not touch" as an absolute exclusion veto overriding all other positive matches.

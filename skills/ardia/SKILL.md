@@ -35,17 +35,22 @@ mutates a PR stays serial.
      --- `gh api user --jq .login` locally, `mcp__github__get_me` in a remote session, `glab api user | jq -r .username` on GitLab, where the fields are `author.username` and `assignees[].username` ---
      and add any aliases `memories/reviewing-prs.md` lists for that person,
      so a lab member running this corpus from a vendored checkout filters on their own identity rather than the corpus owner's.
-     When no identity operation is available, fail closed: leave the author and assignee arms unevaluated, keep only explicitly requested and Actions-app-authored PRs, and say so in the report.
-     Normalise the fields first: the author is `author.login` in `gh --json`, `user.login` in REST and `mcp__github__list_pull_requests`, and `author.username` on GitLab;
-     assignees are `assignees[].login` in `gh --json` and REST, bare login strings in `assignees` from `mcp__github__list_pull_requests`, or `assignees[].username` on GitLab.
-     The MCP list tool omits the `assignees` key on an unassigned PR (measured 2026-09-01).
-     Keep a PR only when its author is one of those logins or the repository's own workflow bot (the app slug `github-actions`, in whichever form the source returns it;
-     `memories/reviewing-prs.md` lists the forms),
-     one of those logins is among its `assignees`,
-     or the user explicitly asked for work on that PR (or, via an explicit `chores` call, on the bot population) --- a mention such as "do not touch [#284](https://github.com/UCD-SERG/serodynamics/pull/284)" is not a request;
-     exclude every other PR from the action queue before doing anything else, and name the excluded ones in the report so the user can assign or name any they want driven.
-     An explicit exclusion in the request ("ardia, but do not touch" followed by a number) is a veto checked before every positive arm, the way `chores`'s `PR_SCOPE_EXCLUDED` works:
-     an excluded PR is dropped even when the user authored it, is assigned to it, or the Actions app opened it, and the exclusion list travels with the sweep into every recheck below and into any brief handed to a subagent.
+     Then classify the listing with [`scripts/pr-scope.py`](../../scripts/pr-scope.py) rather than applying the test by hand ([#2921](https://github.com/Morrison-Lab/ai-config/issues/2921)):
+     ```bash
+     gh pr list --state open --limit 200 --json number,author,assignees,headRefName,baseRefName \
+       | python3 scripts/pr-scope.py --user "$ME" --alias "$ALIASES" \
+           --requested "$REQUESTED" --excluded "$EXCLUDED" --text
+     ```
+     `$ME` is the resolved login, and `$ALIASES`, `$REQUESTED` and `$EXCLUDED` are comma-separated lists, empty when there are none.
+     In a remote session, save the `mcp__github__list_pull_requests` result to a file and pipe that in;
+     the script reads `gh --json`, REST, MCP and GitLab field shapes alike (author and assignee forms, the three `github-actions` login forms, and the MCP tool's missing `assignees` key on an unassigned PR).
+     Drop `--text` for JSON, whose `included` and `excluded` lists carry a reason per PR and whose `identity_resolved` says whether the author and assignee arms ran.
+     With no resolvable identity, omit `--user`: the script fails closed, keeping only explicitly requested and Actions-app-authored PRs, and the report says so.
+     What the script cannot decide is which numbers the request authorizes, so that judgment stays here:
+     pass a PR as `--requested` only when the user explicitly asked for work on it (or, via an explicit `chores` call, on the bot population) --- a mention such as "do not touch [#284](https://github.com/UCD-SERG/serodynamics/pull/284)" is not a request ---
+     and pass an explicit exclusion in the request ("ardia, but do not touch" followed by a number) as `--excluded`, a veto the script checks before every positive arm, the way `chores`'s `PR_SCOPE_EXCLUDED` works.
+     Exclude every PR in the script's `excluded` list from the action queue before doing anything else, and name them with their reasons in the report so the user can assign or name any they want driven.
+     The exclusion list travels with the sweep into every recheck below and into any brief handed to a subagent.
      Scope is a live precondition rather than a one-time classification: assignment can change while a sweep runs, so re-read the author and assignees and reapply the test immediately before each push, comment, review, or merge on a PR, and drop and report one that no longer passes.
      Keep the full listing for the stack detection in step 3, so an in-scope PR based on an out-of-scope PR's branch is still recognised as stacked.
      Such a child is driven only while its base is clean or merged.

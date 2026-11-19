@@ -53,7 +53,7 @@ queue to clear before surveying --- don't assume the first one found.
 
 **Confirm whose PRs are in scope, too.**
 Both phases act only on PRs opened by the invoking user, assigned to that user, explicitly requested by name, or authored by the GitHub Actions app (app slug `github-actions`);
-`ardia`'s step 1 resolves that user, applies the filter, and reports what it dropped.
+`ardia`'s step 1 resolves that user, applies the filter with `scripts/pr-scope.py`, and reports what it dropped.
 An out-of-scope PR (one that fails that filter: another lab member's or another bot's that is neither assigned to the user nor explicitly requested) stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.
 
 ### Phase 1 — ARDIA (existing open PRs/MRs)

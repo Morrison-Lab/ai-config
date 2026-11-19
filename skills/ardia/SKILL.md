@@ -45,7 +45,9 @@ mutates a PR stays serial.
      `scripts/` is the ai-config checkout's (`$CLAUDE_PLUGIN_ROOT/scripts/` in a plugin install), as for the corpus's other scripts.
      In a remote session, save the `mcp__github__list_pull_requests` result to a file and pipe that in;
      the script reads `gh --json`, REST, MCP and GitLab field shapes alike (author and assignee forms, the three `github-actions` login forms, and the MCP tool's missing `assignees` key on an unassigned PR).
-     Drop `--text` for JSON, whose `included` and `excluded` lists carry a reason per PR and whose `identity_resolved` says whether the author and assignee arms ran.
+     Drop `--text` for JSON: its `included` and `excluded` lists hold PR numbers,
+     each `prs[]` entry gives that PR's `reason`,
+     and `identity_resolved` says whether the author and assignee arms ran.
      With no resolvable identity, omit `--user`: the script fails closed, keeping only explicitly requested and Actions-app-authored PRs, and the report says so.
      What the script cannot decide is which numbers the request authorizes, so that judgment stays here:
      pass a PR as `--requested` only when the user explicitly asked for work on it (or, via an explicit `chores` call, on the bot population) --- a mention such as "do not touch [#284](https://github.com/UCD-SERG/serodynamics/pull/284)" is not a request ---

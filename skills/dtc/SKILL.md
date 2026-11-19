@@ -1,6 +1,7 @@
 ---
 name: dtc
 description: "→ delegate-to-codex."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

@@ -1,6 +1,6 @@
 ---
 name: "mwc"
-description: "Session merge grant with confidence gate."
+description: "Session merge grant with confidence gate. Aliases: maw, merge-at-will, merge-when-confident."
 ---
 
 # mwc (Codex wrapper)

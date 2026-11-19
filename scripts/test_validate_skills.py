@@ -132,7 +132,125 @@ def run_skills_check(tmpdir: Path):
     finally:
         vs.ROOT = original_root
 
+def write_skills(tmpdir: Path, skills: dict[str, str]) -> list[Path]:
+    """Write skills/<name>/SKILL.md for each name -> frontmatter body."""
+    paths = []
+    for name, frontmatter in skills.items():
+        skill_dir = tmpdir / "skills" / name
+        skill_dir.mkdir(parents=True)
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            f"---\nname: {name}\n{frontmatter}---\n\nbody\n", encoding="utf-8"
+        )
+        paths.append(skill_md)
+    return paths
+
+
+def run_aliases(tmpdir: Path, skills: dict[str, str]) -> list[str]:
+    """Run check_aliases on a synthetic skills/ tree; return its errors."""
+    paths = write_skills(tmpdir, skills)
+    original_root = vs.ROOT
+    vs.ROOT = tmpdir
+    vs.errors.clear()
+    try:
+        vs.check_aliases(paths)
+        return list(vs.errors)
+    finally:
+        vs.ROOT = original_root
+        vs.errors.clear()
+
+
+ARROW = "→"
+HIDDEN = "disable-model-invocation: true\n"
+
+
+def alias_cases(tmp: Path) -> None:
+    """Pin check_aliases and the listing's exclusion of hidden skills."""
+    canonical = 'description: "Drive one PR. Aliases: drive."\n'
+    alias = f'description: "{ARROW} ardi."\n'
+
+    # Negative controls first: each defect the check exists to catch.
+    errs = run_aliases(tmp / "a1", {"ardi": canonical, "drive": alias})
+    check("alias without disable-model-invocation errors", len(errs) == 1
+          and "disable-model-invocation" in errs[0])
+    errs = run_aliases(tmp / "a2", {
+        "ardi": 'description: "Drive one PR."\n', "drive": alias + HIDDEN,
+    })
+    check("canonical missing its alias errors", len(errs) == 1
+          and "does not name its alias 'drive'" in errs[0])
+    errs = run_aliases(tmp / "a3", {
+        "ardi": 'description: "Drive one PR. Aliases: drive, gone."\n',
+        "drive": alias + HIDDEN,
+    })
+    check("canonical naming a non-alias errors", len(errs) == 1
+          and "'gone'" in errs[0])
+    errs = run_aliases(tmp / "a4", {"drive": alias + HIDDEN})
+    check("alias of a missing skill errors", len(errs) == 1
+          and "missing skill 'ardi'" in errs[0])
+
+    errs = run_aliases(tmp / "a7", {"ardi": canonical + HIDDEN, "drive": alias + HIDDEN})
+    check("a hidden canonical errors", len(errs) == 1
+          and "routes nowhere" in errs[0])
+    errs = run_aliases(tmp / "a8", {
+        "ardi": canonical, "drive": 'description: "-> ardi."\n',
+    })
+    check("an ASCII-arrow alias is still held to the flag", len(errs) == 1
+          and "disable-model-invocation" in errs[0])
+    errs = run_aliases(tmp / "a9", {
+        "ardi": 'description: "Drive one PR. Aliases: drive more."\n',
+        "drive": alias + HIDDEN,
+    })
+    check("a malformed Aliases clause does not count", len(errs) == 1
+          and "does not name its alias 'drive'" in errs[0])
+    errs = run_aliases(tmp / "a10", {
+        "ardi": 'description: "Aliases: drive. Drive one PR."\n',
+        "drive": alias + HIDDEN,
+    })
+    check("an Aliases clause must end the description", len(errs) == 1
+          and "does not name its alias 'drive'" in errs[0])
+
+    errs = run_aliases(tmp / "a11", {
+        "ardi": canonical, "drive": 'description: "Alias for `ardi`."\n',
+    })
+    check("an old-template alias is reported, not skipped", len(errs) == 2
+          and "reads as an alias redirect" in errs[0])
+    errs = run_aliases(tmp / "a12", {
+        "ardi": canonical,
+        "drive": alias + HIDDEN + "user-invocable: false\n",
+    })
+    check("a hidden alias that is not user-invocable errors", len(errs) == 1
+          and "user-invocable" in errs[0])
+
+    errs = run_aliases(tmp / "a5", {"ardi": canonical, "drive": alias + HIDDEN})
+    check("consistent alias and canonical are clean", errs == [])
+    errs = run_aliases(tmp / "a13", {
+        "ardi": canonical, "drive": 'description: "-> ardi."\n' + HIDDEN,
+    })
+    check("an ASCII-arrow alias with the flag is clean", errs == [])
+    errs = run_aliases(tmp / "a14", {
+        "ardi": canonical,
+        "drive": f'description: >\n  {ARROW} ardi.\n' + HIDDEN,
+    })
+    check("a block-scalar alias with a trailing newline still parses", errs == [])
+
+    paths = write_skills(tmp / "a6", {
+        "ardi": canonical,
+        "drive": alias + HIDDEN,
+        "secret": 'description: "Not an alias."\n' + HIDDEN,
+    })
+    original_root = vs.ROOT
+    vs.ROOT = tmp / "a6"
+    try:
+        names = [name for name, _ in vs.listing_entries(paths)]
+    finally:
+        vs.ROOT = original_root
+    check("hidden alias and hidden non-alias are left out of the listing",
+          names == ["ardi"])
+
+
 def main() -> int:
+    with tempfile.TemporaryDirectory() as raw:
+        alias_cases(Path(raw))
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
 

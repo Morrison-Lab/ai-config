@@ -1,6 +1,7 @@
 ---
 name: fa
 description: "→ fetch-all."
+disable-model-invocation: true
 user-invocable: true
 allowed-tools:
   - Bash

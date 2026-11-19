@@ -1,6 +1,6 @@
 ---
 name: "find-ai-tells"
-description: "Spot AI prose tells."
+description: "Spot AI prose tells. Aliases: ai-tells."
 ---
 
 # find-ai-tells (Codex wrapper)

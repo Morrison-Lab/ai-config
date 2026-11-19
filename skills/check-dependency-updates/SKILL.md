@@ -1,6 +1,6 @@
 ---
 name: check-dependency-updates
-description: "Audit dependency updates."
+description: "Audit dependency updates. Aliases: cdu."
 user-invocable: true
 allowed-tools:
   - Bash

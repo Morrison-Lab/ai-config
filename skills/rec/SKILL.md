@@ -1,6 +1,6 @@
 ---
 name: rec
-description: "Provide recommendations for choices."
+description: "Provide recommendations for choices. Aliases: recommend."
 user-invocable: true
 allowed-tools: []
 ---

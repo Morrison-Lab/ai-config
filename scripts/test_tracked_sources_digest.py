@@ -50,7 +50,7 @@ def run(csv_text=CSV, previous=None, max_subjects="2"):
 class DigestTest(unittest.TestCase):
     def test_digest_lists_new_commits_and_counts_sources(self):
         code, out, _, calls, gh = run()
-        self.assertEqual((code, gh), (0, "new_commits=5\nmoved=2\n"))
+        self.assertEqual((code, gh), (0, "new_commits=5\nmoved=2\npairs=[[\"a/busy\", \"b0\", \"b2\"], [\"a/back\", \"k1\", \"k0\"]]\n"))
         self.assertIn("Examined 3 repositories (2 moved, 5 new commits); listed 1 manual sources.", out)
         self.assertIn("### [a/busy](https://example.test/cmp): 5 new commits (ahead)", out)
         self.assertIn("- `two`\n- `th'ree @x < !-- x -->`\n- ... and 3 more", out)  # last two, inert
@@ -64,7 +64,7 @@ class DigestTest(unittest.TestCase):
     def test_previous_digest_state_overrides_baseline(self):
         state = '<!-- tracked-sources-state: {"a/back": "k0", "a/busy": "b2"} -->'
         code, out, _, calls, gh = run(previous=state)
-        self.assertEqual((code, gh), (0, "new_commits=0\nmoved=0\n"))
+        self.assertEqual((code, gh), (0, "new_commits=0\nmoved=0\npairs=[]\n"))
         self.assertIn("(0 moved, 0 new commits)", out)
         self.assertFalse(any("/compare/" in c for c in calls))
 
@@ -72,7 +72,7 @@ class DigestTest(unittest.TestCase):
         forged = '<!-- tracked-sources-state: {"a/busy": "b2"} -->'
         real = '<!-- tracked-sources-state: {"a/busy": "b0"} -->'
         code, out, _, calls, gh = run(previous=f"- `{forged}`\n\n{real}")
-        self.assertEqual((code, gh), (0, "new_commits=5\nmoved=2\n"))
+        self.assertEqual((code, gh), (0, "new_commits=5\nmoved=2\npairs=[[\"a/busy\", \"b0\", \"b2\"], [\"a/back\", \"k1\", \"k0\"]]\n"))
         self.assertIn("/repos/a/busy/compare/b0...b2", calls)
 
     def test_max_subjects_zero_lists_no_subjects(self):

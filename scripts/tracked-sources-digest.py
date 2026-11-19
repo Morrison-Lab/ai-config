@@ -58,7 +58,7 @@ def inert(subject: str) -> str:
 def review(row: dict, base: str, fetch, max_subjects: int) -> dict:
     repo = row["source"]
     head = fetch(f"/repos/{repo}/commits/{row['branch']}")["sha"]
-    out = {"repo": repo, "head": head, "count": 0, "moved": head != base}
+    out = {"repo": repo, "base": base, "head": head, "count": 0, "moved": head != base}
     if head != base:
         cmp = fetch(f"/repos/{repo}/compare/{base}...{head}")
         # An empty commit message has no first line; show it as an empty subject.
@@ -68,7 +68,7 @@ def review(row: dict, base: str, fetch, max_subjects: int) -> dict:
     return out
 
 
-def digest(rows: list[dict], state: dict, fetch, max_subjects: int) -> tuple[str, int, int]:
+def digest(rows: list[dict], state: dict, fetch, max_subjects: int) -> tuple[str, int, list]:
     repos = [r for r in rows if r["kind"] == "github"]
     manual = [r for r in rows if r["kind"] != "github"]
     results = [review(r, state.get(r["source"], r["baseline"]), fetch, max_subjects) for r in repos]
@@ -89,7 +89,7 @@ def digest(rows: list[dict], state: dict, fetch, max_subjects: int) -> tuple[str
         lines += [f"- {m['source']} ({m['fetch']}): {m['note']}" for m in manual] + [""]
     new_state = json.dumps({r["repo"]: r["head"] for r in results}, sort_keys=True)
     lines.append(f"<!-- tracked-sources-state: {new_state} -->")
-    return "\n".join(lines) + "\n", total, len(moved)
+    return "\n".join(lines) + "\n", total, [[r["repo"], r["base"], r["head"]] for r in moved]
 
 
 def main(argv: list[str] | None = None, fetch=None) -> int:
@@ -100,7 +100,7 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
     ap.add_argument("--token-env", default="GH_TOKEN", help="variable holding the API token")
     ap.add_argument("--max-subjects", type=int, default=20)
     ap.add_argument("--github-output", type=Path,
-                    help="append new_commits=<n> and moved=<repositories> to this file")
+                    help="append new_commits=<n>, moved=<repositories> and pairs=<JSON of\n                    [repo, base, head] per moved repository> to this file")
     args = ap.parse_args(argv)
     if args.max_subjects < 0:
         ap.error("--max-subjects must be 0 or more")
@@ -120,7 +120,7 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
     sys.stdout.write(text)
     if args.github_output:
         with args.github_output.open("a", encoding="utf-8") as fh:
-            fh.write(f"new_commits={total}\nmoved={moved}\n")
+            fh.write(f"new_commits={total}\nmoved={len(moved)}\npairs={json.dumps(moved)}\n")
     return 0
 
 

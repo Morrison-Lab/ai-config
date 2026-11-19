@@ -32,7 +32,10 @@ It does not fire inside ai-config itself, which `wire-repo-config.py` refuses.
 
 ## Procedure
 
-Run these from an ai-config checkout, against a branch of the target repository.
+Use two checkouts: an up-to-date ai-config checkout, which supplies the scripts,
+and a new branch of the target repository, which receives every change.
+Step 2 runs from the ai-config checkout and names the target's directory as `<repo-dir>`.
+Every other step reads, edits and commits in the target's checkout.
 
 1. **Read the target's own instructions first:**
    its `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md` and `.github/` directory,

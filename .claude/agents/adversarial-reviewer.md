@@ -402,3 +402,11 @@ The agent removes what it created and reports the removal in the past tense.
 A file it did not create, or one holding a secret, is the exception.
 Read the transcript yourself; do not report the output of `hooks/no-leftover-cleanup-ask.py` as your finding.
 See [`standing-habits-from-ezra`](../../shared/workflow/standing-habits-from-ezra.md) ("Clean up after yourself after installs").
+
+## Relayed reviews passed on a no-action label
+
+On a transcript or PR that treats a relayed cross-model CLEAN as clearing the gate while the quoted review lists observations, check that the reviewer's own heading for those observations says "no action needed" (or "requested" or "required"), that no item under it is called blocking, and that the relay dispositions each one.
+Flag a pass that rests on a label the relaying agent added, or on a heading that says only "Non-blocking" or "(not bugs)": those still need the same model's re-review (Ezra, 2026-11-19, [ai-config#5858](https://github.com/Morrison-Lab/ai-config/issues/5858)).
+Read the quoted review yourself.
+Do not report the checker's verdict as your finding.
+See [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).

@@ -619,6 +619,44 @@ def _is_relay_identity(identity: str) -> bool:
     return identity.startswith(RELAY_IDENTITY_PREFIX)
 
 
+# The reviewer's own "no action" label on a non-blocking heading line:
+# "## Non-blocking observations (no action needed)". Ezra, 2026-11-19, on
+# ai-config#5858's decision card: "Pass only reviewer-labelled no-action".
+_NO_ACTION_LABEL_RE = re.compile(
+    r"\bno[ \t]+(?:further[ \t]+)?action[ \t]+(?:is[ \t]+)?"
+    r"(?:needed|requested|required)\b",
+    re.IGNORECASE,
+)
+# "blocking" that is not "non-blocking": a section that marks any item
+# blocking keeps failing, whatever its heading says.
+_BLOCKING_WORD_RE = re.compile(r"(?<![-\w])blocking\b", re.IGNORECASE)
+_SECTION_HEADING_RE = re.compile(r"^[> \t]*#{1,6}[ \t]", re.MULTILINE)
+
+
+def _is_relay_no_action_section(body: str, scan_body: str,
+                                match: "re.Match") -> bool:
+    """True for a relayed reviewer's non-blocking section it marks no-action.
+
+    Scoped to a cross-model relay (``_relayed_reviewer_identity``), whose
+    verdict is classified separately: a NOT CLEAN verdict still fails there.
+    The heading line itself must carry the reviewer's own label ("no action
+    needed", "no action requested", "no action required"); a section headed
+    only "Non-blocking" or "(not bugs)" stays a finding, per fully-clean.md.
+    The section, up to the next heading, must not call any item blocking.
+    """
+    if not _relayed_reviewer_identity(body):
+        return False
+    line_start = scan_body.rfind("\n", 0, match_content_start(match)) + 1
+    line_end = scan_body.find("\n", match.end())
+    if line_end == -1:
+        line_end = len(scan_body)
+    if not _NO_ACTION_LABEL_RE.search(scan_body[line_start:line_end]):
+        return False
+    next_heading = _SECTION_HEADING_RE.search(scan_body, line_end)
+    section_end = next_heading.start() if next_heading else len(scan_body)
+    return not _BLOCKING_WORD_RE.search(scan_body[line_end:section_end])
+
+
 def _approval_clears(
     identity: str, author: str, approved_authors: set
 ) -> bool:
@@ -3914,6 +3952,8 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                     continue
             elif pat in FINDING_HEADING_PATTERNS:
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
+                if _is_relay_no_action_section(body, scan_body, match):
                     continue
                 suffix = _negation_suffix(scan_body, match.end())
                 if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":

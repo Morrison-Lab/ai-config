@@ -187,11 +187,15 @@ def main():
     # lds#2885 shape: one 700-line page split into 35 subfiles, no wording change.
     def split_repo(edit=0):
         d = make_repo({"page.qmd": 700})
+        text = [f"Sentence {j} of the page.\n" for j in range(700)]
+        with open(os.path.join(d, "page.qmd"), "w", encoding="utf-8") as f:
+            f.write("".join(text))
+        git(d, "commit", "-q", "-a", "--amend", "-m", "page")
         git(d, "update-ref", "refs/remotes/origin/main", "HEAD")
         os.remove(os.path.join(d, "page.qmd"))
         for i in range(35):
             with open(os.path.join(d, f"_s{i}.qmd"), "w", encoding="utf-8") as f:
-                f.write("".join(f"l{j}\n" for j in range(i * 20, i * 20 + 20)))
+                f.write("".join(text[i * 20:i * 20 + 20]))
         for i in range(edit):
             with open(os.path.join(d, f"new{i}.qmd"), "w", encoding="utf-8") as f:
                 f.write("".join(f"new{i}-{j}\n" for j in range(40)))
@@ -314,7 +318,11 @@ def main():
     got = mod.stacked_parents(stacked_pr, "upper", "origin/main", None)
     fails += check("with no PR the nearest remote branch is the parent",
                    got == ["origin/nearer"])
-    total = len(cases) + 3 + len(new_path_cases())
+    budget = mod.move_budget({"a": (["}", ":::", "x = compute(y)"], []),
+                              "b": ([], ["}", ":::", "x = compute(y)"])})
+    fails += check("braces and fences never count as moved",
+                   dict(budget) == {"x = compute(y)": 1})
+    total = len(cases) + 4 + len(new_path_cases())
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

@@ -57,9 +57,9 @@ disabled.
 import json
 import os
 import re
-from collections import Counter
 import subprocess
 import sys
+from collections import Counter
 
 MAX_FILES = 20
 MAX_LINES = 600
@@ -167,10 +167,11 @@ def changed_lines(cwd, mb, tip):
 
 def move_budget(files):
     """How often each line text is both deleted and added: moved, as in a split
-    (lds#2885, 38 files, needed an override)."""
+    (lds#2885, 38 files, needed an override).  Short or punctuation-only lines
+    (braces, fences, blanks) recur in any big edit, so they never count as moved."""
     added, deleted = Counter(), Counter()
     for a, d in files.values():
-        added.update(a)
+        added.update(t for t in a if len(t) >= 8 and re.search(r"\w", t))
         deleted.update(d)
     return added & deleted
 
@@ -193,6 +194,7 @@ def measure(cwd, base, tip="HEAD"):
     out = git(cwd, "diff", "--numstat", "-M", mb, tip)
     if out is None:
         return None
+    # A failed text diff only turns off move detection: numstat still counts.
     texts = changed_lines(cwd, mb, tip) or {}
     plus, minus = move_budget(texts), move_budget(texts)
     added = git(cwd, "diff", "--name-only", "--diff-filter=A", "-M", mb, tip)

@@ -40,7 +40,7 @@ def check(name, got, want):
 with tempfile.TemporaryDirectory() as root:
     origin, repo = os.path.join(root, "origin.git"), os.path.join(root, "repo")
     git(root, "init", "-q", "--bare", "-b", "main", origin)
-    git(root, "clone", "-q", origin, repo)
+    git(root, "clone", "-q", "-c", "init.defaultBranch=main", origin, repo)
     commit(repo, "a")
     git(repo, "push", "-q", "origin", "main")
     for name in ("open-head", "stack-base", "zero-ahead", "landed", "unmerged", "closed"):
@@ -89,7 +89,7 @@ with tempfile.TemporaryDirectory() as root:
                           capture_output=True, check=False, text=True)
     check("non-repo parent classifies its child repositories, not their worktrees",
           [os.path.basename(p["repo"]) for p in json.loads(many.stdout or "[]")], ["repo"])
-    git(root, "init", "-q", os.path.join(root, "repo2"))
+    git(root, "init", "-q", "-b", "main", os.path.join(root, "repo2"))
     check("one --prs-json file refused for two repositories",
           subprocess.run([sys.executable, SCRIPT, "--repo", root, "--prs-json", prs_file],
                          capture_output=True, check=False, text=True).returncode != 0, True)

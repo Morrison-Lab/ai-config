@@ -896,6 +896,15 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
     )
 
     rc, out = breaks_run(
+        "eq-inserted-broken.docx",
+        PROSE_BEFORE + BR_RUN + INS.format(omp()) + PROSE_AFTER,
+    )
+    check(
+        "an inserted equation with both breaks passes",
+        rc == 0 and "1 display equation(s) (0 missing a line break)" in out,
+    )
+
+    rc, out = breaks_run(
         "eq-deleted.docx", PROSE_BEFORE + DEL.format(omp(close_break=False)) + PROSE_AFTER
     )
     check(
@@ -988,9 +997,15 @@ with __import__("tempfile").TemporaryDirectory() as tmp:
         + '<w:customXmlInsRangeEnd w:id="7"/>'
         + omp(),
     )
+    # The run still fails, on duplicate-id alone: that check wrongly flags a
+    # range End sharing its Start's w:id (ai-config#5918). When #5918 is
+    # fixed, this becomes rc == 0 and the duplicate-id count becomes 0.
     check(
         "custom-XML change-tracking range markers are transparent",
-        "1 display equation(s) (0 missing a line break)" in out
+        rc == 1
+        and out.count("[duplicate-id]") == 1
+        and out.count("] ") == 1
+        and "1 display equation(s) (0 missing a line break)" in out
         and "display-equation-break" not in out,
     )
 

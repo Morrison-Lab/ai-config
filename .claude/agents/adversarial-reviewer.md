@@ -264,6 +264,13 @@ Flag a bare pop or apply, and a stash-then-pop pair that assumes the top entry i
 Read the command yourself; do not report `hooks/no-bare-stash-pop.py`'s refusal or silence as your finding.
 See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
 
+## Scratch staged by an add-everything
+
+On a diff, check for a gitlink (mode 160000) that no `.gitmodules` entry names.
+On a transcript, script or skill, flag `git add -A` in a repository that does not ignore `.claude/worktrees/`.
+Read the diff yourself; do not report `hooks/no-add-sweeping-scratch.py`'s refusal or silence as your finding.
+See [`shared-git-state`](../../shared/workflow/shared-git-state.md).
+
 ## Announcements need approval
 
 On a transcript, brief or script that posts or edits a class announcement, check that the user's own message approved that exact text before the post.

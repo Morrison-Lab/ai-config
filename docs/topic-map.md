@@ -60,6 +60,7 @@ its description does not use (ai-config#949).
 | `skills/compress-session/SKILL.md` | Distill context before compacting. |  |
 | `skills/config-ai/SKILL.md` | Route AI capability requests. Aliases: ca, cai. |  |
 | `skills/configure-gitattributes/SKILL.md` | Configure file merge/diff attributes. |  |
+| `skills/configure-repo/SKILL.md` | Set up a repo for agent work with ai-config. |  |
 | `skills/consolidate-memory/SKILL.md` | Merge redundant memories. |  |
 | `skills/consolidate-skills/SKILL.md` | Merge overlapping skills. |  |
 | `skills/convert-repo-format/SKILL.md` | Convert repo format. Aliases: crf. |  |
@@ -129,6 +130,7 @@ its description does not use (ai-config#949).
 | `skills/learn/SKILL.md` | Persist new pattern to memory. |  |
 | `skills/lifecycle/SKILL.md` | Manage R package lifecycle using tidyverse principles. |  |
 | `skills/link-skills/SKILL.md` | Find cross-ref gaps across skills. |  |
+| `skills/lint/SKILL.md` | Lint changed R code with the linters the repo's CI uses. |  |
 | `skills/macroize/SKILL.md` | -> use-math-macros. |  |
 | `skills/manuscript/SKILL.md` | Prepare a paper for a journal. |  |
 | `skills/maw/SKILL.md` | -> mwc. |  |
@@ -147,6 +149,7 @@ its description does not use (ai-config#949).
 | `skills/next/SKILL.md` | Insert after in-flight task. |  |
 | `skills/oppo/SKILL.md` | -> opposition-research. |  |
 | `skills/opposition-research/SKILL.md` | Mine competitor community demand. Aliases: oppo. |  |
+| `skills/pause/SKILL.md` | Pause the session; hooks stop demanding work. |  |
 | `skills/pd/SKILL.md` | -> pending-decisions. |  |
 | `skills/pdc/SKILL.md` | -> prune-dead-code. |  |
 | `skills/pds/SKILL.md` | -> send-notes. |  |
@@ -215,6 +218,7 @@ its description does not use (ai-config#949).
 | `skills/skill-audit/SKILL.md` | Audit skill usage and prune. |  |
 | `skills/skill-builder/SKILL.md` | Create or update a skill. |  |
 | `skills/slide-tag/SKILL.md` | Move floating Git tag to main. Aliases: ts. |  |
+| `skills/spell/SKILL.md` | Spell-check changed files with the checker the repo's CI uses. |  |
 | `skills/split-concerns/SKILL.md` | Split multi-concern PRs. |  |
 | `skills/spot-skill-opportunities/SKILL.md` | Find opportunities for new skills. |  |
 | `skills/st/SKILL.md` | Start task issue-first. Aliases: start-task. |  |

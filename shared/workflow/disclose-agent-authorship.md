@@ -46,7 +46,6 @@ The status never counts toward quorum, and never supersedes a comment without th
 - **Writer:** label each finding in a reply with a disposition shape (`- **Blocking, path:line** -- rebutted.`).
   The bold holds only the label and one locator token, with the separator outside it.
   The word is one of rebutted, deferred, declined, addressed, fixed, done or resolved.
-  Only rebutted, deferred and declined may carry an explanation, and only one from a short closed list.
   Keep every disposition line bare apart from an optional commit sha, and put the explanation in a paragraph of its own below the list.
   After a reply that may read as not-clean, post such a status instead of editing the reply.
 - **Don't:** write `- **Blocking, encoding:** accepted.` with the colon inside the bold and a word off the list.

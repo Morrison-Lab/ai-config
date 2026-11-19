@@ -15,10 +15,9 @@ allowed-tools:
 
 A notes page can outlive its job.
 After earlier splits it may hold only a hub's leftovers: a recap exercise, a list of the pages it was split into, a reading list.
-Dissolving it moves each remaining piece to the page where it belongs,
-leaves a hidden stub that forwards old links,
-and then rewrites the inbound links to point at the new homes.
-This skill is the procedure; the rules it applies live in their own files and are linked, not restated.
+Dissolving it moves each remaining piece to the page where it belongs, leaves a hidden stub that forwards old links, and then rewrites the inbound links to point at the new homes.
+This skill is the procedure;
+the rules it applies live in their own files and are linked, not restated.
 
 Grounded in the dissolve of lds's Big Ideas page (2026-11-19, Morrison-Lab/lds#2935, with the follow-ups Morrison-Lab/lds#2694 and Morrison-Lab/lds#2695).
 
@@ -33,8 +32,7 @@ Grounded in the dissolve of lds's Big Ideas page (2026-11-19, Morrison-Lab/lds#2
 
 ### 1. Inventory the page, piece by piece
 
-Read the page's source and every subfile it includes, and list each unit:
-definitions, results, examples, exercise and solution pairs, remarks, figures, data divs, reading and video lists, the source or credits callout, any redirect script, and the dependency-graph or reference blocks.
+Read the page's source and every subfile it includes, and list each unit: definitions, results, examples, exercise and solution pairs, remarks, figures, data divs, reading and video lists, the source or credits callout, any redirect script, and the dependency-graph or reference blocks.
 For each, note its `#id` and which other pages already include the same subfile.
 
 Count the inbound links too, because they decide the order of the later steps:
@@ -49,10 +47,8 @@ Read any existing moved-anchors script on the page: its map already says where e
 
 ### 2. Check what else is in flight
 
-List the open PRs that touch the page, its subfile folder, or the destination pages,
-and read the restructure plan or issue that covers the module, if there is one.
-A move that edits a file an open PR edits will conflict with that PR,
-so the plan must route around them (step 5).
+List the open PRs that touch the page, its subfile folder, or the destination pages, and read the restructure plan or issue that covers the module, if there is one.
+A move that edits a file an open PR edits will conflict with that PR, so the plan must route around them (step 5).
 Search the tracker (`--state all`) for an existing issue on the subfile folder or the link rewrite before filing one.
 
 ### 3. Write the destination map and ask
@@ -75,11 +71,7 @@ Do not edit before the answer.
   Renaming the subfile folder is a later, separate PR.
 - Keep a heading's explicit id when its section moves (`# The anatomy of a learning system {#sec-anatomy}`).
 - Retarget every link that named a moved id on its old page (`<page>.qmd#fig-x` to `<new-page>.qmd#fig-x`), and add the moved ids to the redirect script's map and its hidden `<span id>` list.
-- Turn the page into a stub:
-  `format: html: default` only (a deck with one slide fails the site check, and the handout has no content),
-  `search: false`,
-  the redirect include,
-  and a short list of the pages that now hold the content.
+- Turn the page into a stub: `format: html: default` only (a deck with one slide fails the site check, and the handout has no content), `search: false`, the redirect include, and a short list of the pages that now hold the content.
   Keep it in the render list, because old links from other repositories and course sites still reach it.
   Remove it from the navbar and the sidebar.
 - Retarget the links to the page itself (no anchor) in this PR: the index, syllabus, calendar and study guide are few, and a reader should not land on the stub from inside the site.
@@ -91,9 +83,7 @@ Do not edit before the answer.
 ### 5. Rewrite the inbound links later, in batches
 
 Links to `<page>.qmd#id` keep working through the redirect script, one hop each.
-Rewrite them to their new homes with a mechanical replace driven by the redirect map,
-but only after the open PRs that edit the same files have merged:
-the rewrite touches hundreds of subfiles and would conflict with all of them.
+Rewrite them to their new homes with a mechanical replace driven by the redirect map, but only after the open PRs that edit the same files have merged: the rewrite touches hundreds of subfiles and would conflict with all of them.
 Split it into small PRs by directory, each marked "mechanical, content-identical".
 Keep the stub and its redirect script afterwards, for links from outside the repository.
 
@@ -110,7 +100,8 @@ File it as an issue in step 2 and do it after the link rewrite, one PR per desti
 
 ## Relationship to other skills
 
-- [`polish-page`](../polish-page/SKILL.md): reworks one page and decides overlap; it hands off here when the answer is "move everything".
+- [`polish-page`](../polish-page/SKILL.md): reworks one page and decides overlap;
+  it hands off here when the answer is "move everything".
 - [`send-notes`](../send-notes/SKILL.md): brings content in from outside; this skill moves content within a site.
 - [`split-concerns`](../split-concerns/SKILL.md): splits a PR, not a page.
 

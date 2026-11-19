@@ -6,6 +6,9 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"))
+from card_answer_fixtures import card, relayed_tap, tap  # noqa: E402
+
 HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "no-unnamed-repo-pr.py")
 MCP, TMP, CASE_ENV, failures = "mcp__github__create_pull_request", tempfile.mkdtemp(prefix="nurp-"), {}, 0
 
@@ -222,6 +225,34 @@ CASES = [
     ("an html-escaped project list counts", MCP, "mlg", transcript(PROJECT_BRIEF.replace("<", "&lt;"), "go"), "pass"),
     ("a missing transcript gives a note", MCP, "mlg", os.path.join(TMP, "none.jsonl"), "note"),
     ("no user message gives a note", MCP, "mlg", transcript({"type": "assistant", "message": {}}), "note"),
+    # ai-config#5839: a verified card tap is the user's word for the act the card named.
+    ("a tap whose consequence names the repo passes", MCP, "epi204", transcript(
+        "go", *card("Open the grading PR?", [("Open it", "Opens a PR in Morrison-Lab/epi204."), ("Skip", "x")]),
+        tap("Open it", "Open the grading PR?")), "pass"),
+    ("a tap whose question names the repo passes", MCP, "epi204", transcript(
+        "go", tap("Open it", "Open the PR in Morrison-Lab/epi204?")), "pass"),
+    ("a declining tap does not name the repo", MCP, "epi204", transcript(
+        "go", *card("Open the PR in epi204?", [("Open it", "x"), ("Not now", "Files an issue.")]),
+        tap("Not now", "Open the PR in epi204?", index=1)), "deny"),
+    ("an unverified tap does not name the repo", MCP, "epi204", transcript(
+        "go", tap("Open it", "Open the PR in epi204?", verified=False)), "deny"),
+    ("another card's consequence does not leak", MCP, "epi204", transcript(
+        "go", *card("Open it?", [("Yes", "Opens a PR in epi204.")], message_id="cmsg_other"),
+        tap("Yes", "Open it?")), "deny"),
+    ("a cloud spawn brief recorded as isMeta counts", MCP, "epi204", transcript(
+        {"type": "user", "isMeta": True, "message": {"content": PROJECT_BRIEF + RELAY_BRIEF}}, "go"), "pass"),
+    ("an isMeta project list counts when first", MCP, "mlg", transcript(
+        {"type": "user", "isMeta": True, "message": {"content": PROJECT_BRIEF}}, "go"), "pass"),
+    ("an isMeta brief after the first prompt does not", MCP, "epi204", transcript(
+        "go", {"type": "user", "isMeta": True, "message": {"content": RELAY_BRIEF}}), "deny"),
+    ("a tap echoed in a tool result does not name the repo", MCP, "epi204", transcript(  # glm-5.3 review
+        "go", {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "x", "content": [
+            {"type": "text", "text": tap("Open it", "Open the PR in epi204?")["message"]["content"]}]}]}}), "deny"),
+    ("a relay echoed in a tool result does not name the repo", MCP, "epi204", transcript(
+        "go", {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "x", "content": [
+            {"type": "text", "text": relayed_tap("Open it", "Open the PR in epi204?")["message"]["content"]}]}]}}), "deny"),
+    ("a relay citing a tap names the repo", MCP, "epi204", transcript(
+        "go", relayed_tap("Open it", "Open the PR in Morrison-Lab/epi204?")), "pass"),
 ]
 for name, tool, inp, tpath, want, *cwd in CASES + [("the hook-environment grant", MCP, "mlg", GO, "pass")]:
     CASE_ENV = {"ALLOW_UNNAMED_REPO_PR": "1"} if name == "the hook-environment grant" else (
@@ -277,7 +308,7 @@ MUTATIONS = [  # each must fail this suite; skipped inside a mutant run
     ("glab graphql mutation name", 'else "mergeRequestCreate"', 'else "createPullRequest"'),
     ("project keys ignored", "k != home and k not in project and", "k != home and"),
     ("relay notes ignored", "texts = texts + brief", "texts = texts"),
-    ("any prompt counts as the first", '(prompts[:1] or [""])[0]', '" ".join(prompts)'),
+    ("any prompt counts as the first", 'if first is None and rec.get("type") == "user"', 'if rec.get("type") == "user"'),
     ("any relay author counts", r'\bfrom=\"coordinator\"', r'\bfrom=\"[a-z]+\"'),
     ("payload cwd is home", "gh_target(first_cwd or payload.get(\"cwd\"))", "gh_target(payload.get(\"cwd\"))"),
 ]

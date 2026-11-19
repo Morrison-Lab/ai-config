@@ -47,3 +47,10 @@ the Claude-in-Chrome route is retired): [`reddit-access.md`](reddit-access.md).
   and record the new pass's yields back into this table with their date.
 - **Don't:** scope a pass by subscriber counts,
   or treat the 2026-08 yield column as current without re-measuring.
+
+## Scheduled review of tracked sources
+
+The high-yield subreddits above and the outside repositories in [`CREDITS.md`](../CREDITS.md) are listed in [`tracked-sources.csv`](tracked-sources.csv) ([#2231](https://github.com/Morrison-Lab/ai-config/issues/2231), [#2067](https://github.com/Morrison-Lab/ai-config/issues/2067)).
+The daily [`tracked-sources.yml`](../.github/workflows/tracked-sources.yml) workflow runs [`tracked-sources-digest.py`](../scripts/tracked-sources-digest.py) over it, opens a `tracked-sources-digest` issue when a tracked repository has new commits, and has an agent sift that issue into issues for ideas worth adopting.
+To add a repository, add a `github` row with its default branch and the head sha you last reviewed as `baseline` (`git ls-remote <url> HEAD`).
+A subreddit row is `manual`: Reddit refused this cloud container's proxy on 2026-11-19 and has not been tried from a GitHub runner, so the digest lists it without fetching it.

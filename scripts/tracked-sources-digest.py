@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""Print a Markdown digest of new commits in tracked outside repositories.
+
+ai-config#2231, #2067.  Lists the commits since each `github` row's `baseline`
+(or the state marker of the `--previous` digest) and the manual rows.  Any API or
+input error exits 2, so no source is reported quiet because it was unreadable.
+"""
+
+import argparse
+import csv
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+STATE = re.compile(r"<!-- tracked-sources-state: (\{.*?\}) -->")
+
+
+class DigestError(Exception):
+    """An input or API error that must stop the run."""
+
+
+def http_fetch(api: str, token: str):
+    def fetch(path: str) -> dict:
+        req = urllib.request.Request(api.rstrip("/") + path)
+        req.add_header("Accept", "application/vnd.github+json")
+        if token:
+            req.add_header("Authorization", f"Bearer {token}")
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.load(resp)
+        except (urllib.error.URLError, ValueError) as exc:
+            raise DigestError(f"GET {path} failed: {exc}") from exc
+    return fetch
+
+
+def read_sources(path: Path) -> list[dict]:
+    with path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    for n, row in enumerate(rows, start=2):
+        if row["kind"] == "github" and not (row["branch"] and row["baseline"]):
+            raise DigestError(f"{path}:{n}: a github row needs a branch and a baseline")
+        if row["kind"] != "github" and row["fetch"] != "manual":
+            raise DigestError(f"{path}:{n}: only a github row can be fetched; mark others manual")
+    return rows
+
+
+def review(row: dict, base: str, fetch, max_subjects: int) -> dict:
+    repo = row["source"]
+    head = fetch(f"/repos/{repo}/commits/{row['branch']}")["sha"]
+    out = {"repo": repo, "head": head, "count": 0}
+    if head != base:
+        cmp = fetch(f"/repos/{repo}/compare/{base}...{head}")
+        subjects = [c["commit"]["message"].splitlines()[0] for c in cmp["commits"]]
+        out.update(count=cmp["ahead_by"], status=cmp["status"], url=cmp["html_url"],
+                   subjects=subjects[-max_subjects:])
+    return out
+
+
+def digest(rows: list[dict], state: dict, fetch, max_subjects: int) -> tuple[str, int]:
+    repos = [r for r in rows if r["kind"] == "github"]
+    manual = [r for r in rows if r["kind"] != "github"]
+    results = [review(r, state.get(r["source"], r["baseline"]), fetch, max_subjects) for r in repos]
+    total = sum(r["count"] for r in results)
+    lines = ["New commits in `memories/tracked-sources.csv`; the scheduled agent sifts them.", "",
+             f"Examined {len(results)} repositories ({total} new commits); "
+             f"listed {len(manual)} manual sources.", ""]
+    for r in (r for r in results if r["count"]):
+        lines.append(f"### [{r['repo']}]({r['url']}): {r['count']} new commits ({r['status']})")
+        lines += [f"- `{s.replace('`', chr(39))}`" for s in r["subjects"]]  # inert: no mentions
+        if r["count"] > len(r["subjects"]):
+            lines.append(f"- ... and {r['count'] - len(r['subjects'])} more; see the compare link.")
+        lines.append("")
+    if manual:
+        lines.append("### Manual sources (not fetched)")
+        lines += [f"- {m['source']} ({m['fetch']}): {m['note']}" for m in manual] + [""]
+    new_state = json.dumps({r["repo"]: r["head"] for r in results}, sort_keys=True)
+    lines.append(f"<!-- tracked-sources-state: {new_state} -->")
+    return "\n".join(lines) + "\n", total
+
+
+def main(argv: list[str] | None = None, fetch=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--sources", type=Path, default=ROOT / "memories" / "tracked-sources.csv")
+    ap.add_argument("--previous", type=Path, help="body of the previous digest issue")
+    ap.add_argument("--api", default="https://api.github.com")
+    ap.add_argument("--token-env", default="GH_TOKEN", help="variable holding the API token")
+    ap.add_argument("--max-subjects", type=int, default=20)
+    ap.add_argument("--github-output", type=Path, help="append new_commits=<n> to this file")
+    args = ap.parse_args(argv)
+    try:
+        rows = read_sources(args.sources)
+        match = STATE.search(args.previous.read_text(encoding="utf-8")) if args.previous else None
+        if args.previous and not match:
+            raise DigestError("the previous digest has no tracked-sources-state marker")
+        state = json.loads(match.group(1)) if match else {}
+        fetch = fetch or http_fetch(args.api, os.environ.get(args.token_env, ""))
+        text, total = digest(rows, state, fetch, args.max_subjects)
+    except (DigestError, OSError, KeyError, json.JSONDecodeError) as exc:
+        print(f"tracked-sources-digest: {exc!r}", file=sys.stderr)
+        return 2
+    sys.stdout.write(text)
+    if args.github_output:
+        with args.github_output.open("a", encoding="utf-8") as fh:
+            fh.write(f"new_commits={total}\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

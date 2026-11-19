@@ -18,7 +18,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-STATE = re.compile(r"<!-- tracked-sources-state: (\{.*?\}) -->")
+STATE = re.compile(r"<!-- tracked-sources-state: (\{.*\}) -->")
 SHA = re.compile(r"[0-9a-f]{40}")
 
 
@@ -41,16 +41,20 @@ def http_fetch(api: str, token: str):
 
 
 def footer_state(text: str) -> dict | None:
-    """The state in a digest body's footer: its last marker, since an earlier one could only
-    come from outside text.  None when the body has no marker."""
-    markers = STATE.findall(text)
-    return json.loads(markers[-1]) if markers else None
+    """The state in a digest body's footer, its last non-blank line; a marker anywhere else
+    could only come from outside text.  None when that line is not a marker."""
+    lines = text.rstrip().splitlines()
+    match = STATE.fullmatch(lines[-1].strip()) if lines else None
+    # The pattern's braces make any valid JSON here an object.
+    return json.loads(match[1]) if match else None
 
 
 def read_sources(path: Path) -> list[dict]:
     with path.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
     for n, row in enumerate(rows, start=2):
+        if None in row or None in row.values():
+            raise DigestError(f"{path}:{n}: a row needs exactly the header's fields")
         if row["kind"] == "github" and not (row["branch"] and SHA.fullmatch(row["baseline"])):
             raise DigestError(f"{path}:{n}: a github row needs a branch and a full-sha baseline")
         if row["fetch"] != ("api" if row["kind"] == "github" else "manual"):
@@ -59,12 +63,11 @@ def read_sources(path: Path) -> list[dict]:
 
 
 MAX_SUBJECT = 200
-MAX_BODY = 60000  # GitHub refuses an issue body over 65536 characters.
 
 
 def inert(subject: str) -> str:
-    """Render an outside commit subject so it can neither mention anyone, forge the state marker,
-    nor grow past MAX_SUBJECT characters (the whole body is checked against MAX_BODY in main)."""
+    """Render an outside commit subject so it can neither mention anyone nor forge the state
+    marker, cut to MAX_SUBJECT characters plus "..."."""
     if len(subject) > MAX_SUBJECT:
         subject = subject[:MAX_SUBJECT] + "..."
     return subject.replace("`", "'").replace("<!--", "< !--")
@@ -73,6 +76,8 @@ def inert(subject: str) -> str:
 def review(row: dict, base: str, fetch, max_subjects: int) -> dict:
     repo = row["source"]
     head = fetch(f"/repos/{repo}/commits/{row['branch']}")["sha"]
+    if not (isinstance(head, str) and SHA.fullmatch(head)):
+        raise DigestError(f"the API returned a non-sha head for {repo}")
     out = {"repo": repo, "head": head, "count": 0, "moved": head != base}
     if head != base:
         cmp = fetch(f"/repos/{repo}/compare/{base}...{head}")
@@ -130,16 +135,14 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
             raise DigestError(f"the previous digest's state has a non-sha head for {bad}")
         fetch = fetch or http_fetch(args.api, os.environ.get(args.token_env, ""))
         text, total, moved = digest(rows, state, fetch, args.max_subjects)
-        if len(text) > MAX_BODY:
-            raise DigestError(f"the digest is {len(text)} characters, over {MAX_BODY}; "
-                              "lower --max-subjects")
-    except (DigestError, OSError, KeyError, json.JSONDecodeError) as exc:
+        if args.github_output:
+            with args.github_output.open("a", encoding="utf-8") as fh:
+                fh.write(f"new_commits={total}\nmoved={moved}\n")
+    except (DigestError, OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        # TypeError: an API response or CSV row of the wrong shape.
         print(f"tracked-sources-digest: {exc!r}", file=sys.stderr)
         return 2
     sys.stdout.write(text)
-    if args.github_output:
-        with args.github_output.open("a", encoding="utf-8") as fh:
-            fh.write(f"new_commits={total}\nmoved={moved}\n")
     return 0
 
 

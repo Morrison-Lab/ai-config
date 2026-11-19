@@ -16,7 +16,7 @@ CSV = ("kind,source,branch,baseline,fetch,note\ngithub,a/busy,main,b0b0b0b0b0b0b
        "github,a/quiet,main,d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0,api,quiet repo\ngithub,a/back,main,c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1,api,force-pushed back\n"
        "subreddit,r/mcp,,,manual,high tier\n")
 API = {"/repos/a/busy/commits/main": {"sha": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2"}, "/repos/a/quiet/commits/main": {"sha": "d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0"},
-       "/repos/a/back/commits/main": {"sha": "c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0"},
+       "/repos/a/back/commits/main": {"sha": "c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0"}, "/repos/a/odd/commits/main": {"sha": "main"},
        "/repos/a/back/compare/c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1...c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0": {
            "ahead_by": 0, "status": "behind", "html_url": "https://example.test/back", "commits": []},
        "/repos/a/busy/compare/b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0...b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": {
@@ -29,9 +29,9 @@ def run(csv_text=CSV, previous=None, max_subjects="2"):
         return run_in(Path(name), csv_text, previous, max_subjects)
 
 
-def run_in(tmp, csv_text, previous, max_subjects):
+def run_in(tmp, csv_text, previous, max_subjects, output="o"):
     (tmp / "s.csv").write_text(csv_text, encoding="utf-8")
-    args = ["--sources", str(tmp / "s.csv"), "--max-subjects", max_subjects, "--github-output", str(tmp / "o")]
+    args = ["--sources", str(tmp / "s.csv"), "--max-subjects", max_subjects, "--github-output", str(tmp / output)]
     if previous is not None:
         (tmp / "p.md").write_text(previous, encoding="utf-8")
         args += ["--previous", str(tmp / "p.md")]
@@ -103,15 +103,16 @@ class DigestTest(unittest.TestCase):
         self.assertEqual(tsd.inert("x" * 500), "x" * 200 + "...")
         self.assertEqual(tsd.inert("x" * 200), "x" * 200)
 
-    def test_body_over_the_limit_is_refused(self):
-        limit = tsd.MAX_BODY
-        tsd.MAX_BODY = 100
-        try:
-            code, out, err, _, gh = run()
-        finally:
-            tsd.MAX_BODY = limit
-        self.assertEqual((code, out, gh), (2, "", ""))
-        self.assertIn("over 100; lower --max-subjects", err)
+    def test_unwritable_github_output_prints_no_digest(self):
+        with tempfile.TemporaryDirectory() as name:
+            code, out, err, _, _ = run_in(Path(name), CSV, None, "2", output=".")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("IsADirectoryError", err)
+
+    def test_non_sha_api_head_is_refused(self):
+        code, out, err, *_ = run(CSV + "github,a/odd,main," + "e0" * 20 + ",api,x\n")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("non-sha head for a/odd", err)
 
     def test_negative_max_subjects_is_refused(self):
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
@@ -125,6 +126,8 @@ class DigestTest(unittest.TestCase):
             (CSV.replace(",api,busy repo", ",manual,busy repo"), None),  # github row marked manual
             (CSV, "no marker"),
             (CSV, "<!-- tracked-sources-state: {oops} -->"),
+            (CSV, '<!-- tracked-sources-state: {"a/busy": "' + "b2" * 20 + '"} -->\ntrailing'),  # not the last line
+            (CSV + "subreddit,r/x,,,manual,note,extra\n", None),  # a row with an extra field
         ):
             with self.subTest(csv=csv_text, previous=previous):
                 code, out, err, _, gh = run(csv_text, previous)

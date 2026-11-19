@@ -472,6 +472,30 @@ committed pass.
    If upstream is not accessible in-session, push and explicitly hand off that
    upstream PR creation is still required.
 
+   **When no PR can be opened, file the learnings as issues instead of dropping the pass**
+   ([ai-config#2335](https://github.com/Morrison-Lab/ai-config/issues/2335)).
+   The branch-and-PR path can be blocked:
+   no checkout and no worktree is reachable, a cloud agent's quota is spent,
+   the session has no write access, or the forge connector is down.
+   A blocked path does not cancel the pass; it changes where the pass lands.
+   For each distinct learning that is not already recorded:
+   - Search open and closed issues first
+     ([`issue-first`](../../shared/workflow/issue-first.md)'s all-state search),
+     and comment on a matching issue rather than filing a duplicate.
+   - Skip a learning the step 3 grep already found in `memories/`, `shared/`, `skills/` or `hooks/`.
+   - File one issue per learning with the [`defer-issue`](../defer-issue/SKILL.md) body
+     (Context, What to do, Why not now),
+     naming the file to edit and the Do/Don't pair to add,
+     with the `ai-authored`, `model:<model-id>` and priority labels
+     [`issue-first`](../../shared/workflow/issue-first.md) requires.
+   - Report each issue's link in step 5's table in place of a file path,
+     and say that the pass landed as issues because the PR path was blocked, naming the block.
+   If issue filing is blocked too, write the learnings to the session's local staging file
+   ([`learn`](../learn/SKILL.md)'s `learn-staging.md`)
+   and hand off that they still need filing; that file is not a durable home.
+   - **Do:** file each unrecorded learning as an issue when no PR can be opened, and link the issues in the report.
+   - **Don't:** end the pass with "UMS owed" or "no PR possible" and nothing filed.
+
    **Project-specific items** (a convention or gotcha tied to one repo we
    own): commit to *that* repo's own agent docs (`CLAUDE.md`,
    `.github/agents/*.md`, `.github/instructions/*.md`,

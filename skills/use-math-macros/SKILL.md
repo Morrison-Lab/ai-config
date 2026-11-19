@@ -307,7 +307,13 @@ fixed by changing to `\exp{-\frac{x^2}{2}}` and `\exp{x^8}`.
 
 - **Undefined matrix and vector shorthands (`\mA`, `\vw`)**: while `macros.qmd` defines `\mX` (`\matr{X}`), `\mx`, `\vx` (`\vecf{x}`), `\va`, etc., it does **not** define arbitrary shorthands like `\mA` or `\vw`.
   Bare `\mA` or `\vw` are undefined and break LuaLaTeX during PDF compilation.
-  Use `\matr{A}` for matrices and `\vec{w}` or `\vecf{w}` for vectors.
+  Use the semantic macro that names the quantity, such as `\vdesign` for a design vector or `\aug{\vx}` for an input with a leading 1.
+  If none exists, add one to `Morrison-Lab/macros` (step 6) before using it.
+  Never write the generic wrapper `\vecf{...}`, `\vec{...}` or `\matr{...}` directly in content:
+  it only marks a type, so it hides that the quantity has no name
+  ([`Morrison-Lab/lds#2881`](https://github.com/Morrison-Lab/lds/pull/2881) wrote `\vecf{z}` where `\aug{\vx}` existed).
+  `check-literal-math-letters`, called with its `wrappers` input, flags a direct use
+  ([`Morrison-Lab/gha#2131`](https://github.com/Morrison-Lab/gha/pull/2131)).
 - **Undefined square bracket macro (`\bracket`)**: `macros.qmd` does **not** define `\bracket{...}`.
   Using `\bracket{...}` (such as for definite integral evaluation limits)
   fails in LaTeX as an undefined control sequence.
@@ -316,7 +322,8 @@ fixed by changing to `\exp{-\frac{x^2}{2}}` and `\exp{x^8}`.
   ([`Morrison-Lab/mds#175`](https://github.com/Morrison-Lab/mds/pull/175), 2026-10-06.)
 - **Latin vector collision with `\vb`**: `macros.qmd` defines `\def\b{\beta}` and `\def\vb{\vec \b}`, which expands to Greek `\vec{\beta}` rather than Latin vector $b$.
   When denoting a Latin vector (such as an intercept or bias vector $b$), do not use `\vb`;
-  use `\vec{b}` or `\vecf{b}`.
+  use the semantic macro for that vector, such as a bias vector's, and add one to `Morrison-Lab/macros` if none exists,
+  rather than the generic `\vecf{b}`.
   ([`Morrison-Lab/mds#48`](https://github.com/Morrison-Lab/mds/pull/48), 2026-09-29.)
 
 ## No Greek letters in math source: name macros for meaning

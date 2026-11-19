@@ -102,7 +102,8 @@ Do-Confirm, at the moment the step 4 sweep plan is reported:
 
 1. Each planned repository's pre-prune snapshot was taken before its prune
    steps ran, and its path is in the report.
-2. Nothing was removed without the user's confirmation.
+2. Before the user confirmed, nothing ran but `clean-git`'s own pre-gate
+   prunes: no worktree was removed and no branch was deleted.
 
 ## New asks
 

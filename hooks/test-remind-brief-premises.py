@@ -694,6 +694,18 @@ for prompt, desc in SM_SILENT:
     wrong += v != "silent"
     print(f"  {v:<7} {desc}")
 
+# Codex's `spawn_agent` (ai-config#3740): no BRIEF_TOOLS entry, so the brief
+# comes from tool_names.subagent_brief. Before the fix the hook ignored it.
+print("\nspawn_agent (Codex launch tool):")
+for prompt, desc in SM_REMIND[:2]:
+    v = run(prompt, None, tool_name="spawn_agent")
+    wrong += v != "REMIND"
+    print(f"  {v:<7} {desc}")
+for prompt, desc in SM_SILENT[:2]:
+    v = run(prompt, None, tool_name="spawn_agent")
+    wrong += v != "silent"
+    print(f"  {v:<7} {desc}")
+
 # A protocol message is a dict, not prose, and must fail open and silent rather
 # than reach `evaluate` as a stringified dict.
 #
@@ -967,7 +979,7 @@ MUTANTS = [
      False, True),
 
     ("clause C: only this session's own agent results arm it",
-     "AGENT_TOOLS", {"Agent", "Task", "Bash"},
+     "AGENT_TOOLS", frozenset({"agent", "task", "bash"}),
      lambda: fires("Address the eleven findings on that other PR.", FOREIGN_PR),
      False, True),
 
@@ -1018,7 +1030,8 @@ print(f"  {'ok   ' if ok else 'WRONG'}  the two windows differ by exactly ',' (g
 
 total = (1 + len(REMIND) + len(SILENT) + len(CONTRACT) + 1 + CONTRACT_EXTRA
          + len(OWN_REPO) + len(seq)
-         + len(SM_REMIND) + len(SM_SILENT) + SM_EXTRA + len(MUTANTS))
+         + len(SM_REMIND) + len(SM_SILENT) + SM_EXTRA + len(MUTANTS)
+         + len(SM_REMIND[:2]) + len(SM_SILENT[:2]))
 print(f"\n{total - wrong}/{total} correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)")
       + ("" if skipped == 0 else f"  ({skipped} SKIPPED)"))

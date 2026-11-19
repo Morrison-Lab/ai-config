@@ -8,6 +8,7 @@ input error exits 2, so no source is reported quiet because it was unreadable.
 
 import argparse
 import csv
+import http.client
 import json
 import os
 import re
@@ -33,7 +34,7 @@ def http_fetch(api: str, token: str):
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 return json.load(resp)
-        except (urllib.error.URLError, ValueError) as exc:
+        except (urllib.error.URLError, http.client.HTTPException, ValueError) as exc:
             raise DigestError(f"GET {path} failed: {exc}") from exc
     return fetch
 
@@ -57,25 +58,27 @@ def inert(subject: str) -> str:
 def review(row: dict, base: str, fetch, max_subjects: int) -> dict:
     repo = row["source"]
     head = fetch(f"/repos/{repo}/commits/{row['branch']}")["sha"]
-    out = {"repo": repo, "head": head, "count": 0}
+    out = {"repo": repo, "head": head, "count": 0, "moved": head != base}
     if head != base:
         cmp = fetch(f"/repos/{repo}/compare/{base}...{head}")
         # An empty commit message has no first line; show it as an empty subject.
         subjects = [(c["commit"]["message"].splitlines() or [""])[0] for c in cmp["commits"]]
         out.update(count=cmp["ahead_by"], status=cmp["status"], url=cmp["html_url"],
-                   subjects=subjects[-max_subjects:])
+                   subjects=subjects[-max_subjects:] if max_subjects else [])
     return out
 
 
-def digest(rows: list[dict], state: dict, fetch, max_subjects: int) -> tuple[str, int]:
+def digest(rows: list[dict], state: dict, fetch, max_subjects: int) -> tuple[str, int, int]:
     repos = [r for r in rows if r["kind"] == "github"]
     manual = [r for r in rows if r["kind"] != "github"]
     results = [review(r, state.get(r["source"], r["baseline"]), fetch, max_subjects) for r in repos]
     total = sum(r["count"] for r in results)
+    moved = [r for r in results if r["moved"]]
     lines = ["New commits in `memories/tracked-sources.csv`; the scheduled agent sifts them.", "",
-             f"Examined {len(results)} repositories ({total} new commits); "
+             f"Examined {len(results)} repositories ({len(moved)} moved, {total} new commits); "
              f"listed {len(manual)} manual sources.", ""]
-    for r in (r for r in results if r["count"]):
+    # A head that moved back (status "behind") has no new commits but is still listed.
+    for r in moved:
         lines.append(f"### [{r['repo']}]({r['url']}): {r['count']} new commits ({r['status']})")
         lines += [f"- `{inert(s)}`" for s in r["subjects"]]
         if r["count"] > len(r["subjects"]):
@@ -86,7 +89,7 @@ def digest(rows: list[dict], state: dict, fetch, max_subjects: int) -> tuple[str
         lines += [f"- {m['source']} ({m['fetch']}): {m['note']}" for m in manual] + [""]
     new_state = json.dumps({r["repo"]: r["head"] for r in results}, sort_keys=True)
     lines.append(f"<!-- tracked-sources-state: {new_state} -->")
-    return "\n".join(lines) + "\n", total
+    return "\n".join(lines) + "\n", total, len(moved)
 
 
 def main(argv: list[str] | None = None, fetch=None) -> int:
@@ -96,8 +99,11 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
     ap.add_argument("--api", default="https://api.github.com")
     ap.add_argument("--token-env", default="GH_TOKEN", help="variable holding the API token")
     ap.add_argument("--max-subjects", type=int, default=20)
-    ap.add_argument("--github-output", type=Path, help="append new_commits=<n> to this file")
+    ap.add_argument("--github-output", type=Path,
+                    help="append new_commits=<n> and moved=<repositories> to this file")
     args = ap.parse_args(argv)
+    if args.max_subjects < 0:
+        ap.error("--max-subjects must be 0 or more")
     try:
         rows = read_sources(args.sources)
         # The footer is the last marker; an earlier one could only come from outside text.
@@ -107,14 +113,14 @@ def main(argv: list[str] | None = None, fetch=None) -> int:
             raise DigestError("the previous digest has no tracked-sources-state marker")
         state = json.loads(match) if match else {}
         fetch = fetch or http_fetch(args.api, os.environ.get(args.token_env, ""))
-        text, total = digest(rows, state, fetch, args.max_subjects)
+        text, total, moved = digest(rows, state, fetch, args.max_subjects)
     except (DigestError, OSError, KeyError, json.JSONDecodeError) as exc:
         print(f"tracked-sources-digest: {exc!r}", file=sys.stderr)
         return 2
     sys.stdout.write(text)
     if args.github_output:
         with args.github_output.open("a", encoding="utf-8") as fh:
-            fh.write(f"new_commits={total}\n")
+            fh.write(f"new_commits={total}\nmoved={moved}\n")
     return 0
 
 

@@ -5,7 +5,7 @@ github,daymade/claude-code-skills,main,2393e2e5a82e441c578928bfb10fd9b37b553d18,
 github,justcarlson/dotfiles-claude,master,781bd8bedffe9bb7aeb76f07f1cd2edc27649df5,api,"CREDITS.md: heal-skill idea (no license, ideas only)"
 github,rohitg00/awesome-claude-code-toolkit,main,ebdf1d596d2cde5c5cceb32177e8d1cf4829e7d9,api,"CREDITS.md: inventory and verify conventions (Apache-2.0)"
 github,posit-dev/skills,main,951959403f4ecc9d0274adf35538fc67153b6f31,api,"CREDITS.md: R and Quarto authoring skills (MIT, adapted copies under skills/)"
-github,sembr/skills,main,1b31998f0ec918399d9a5d4c8e4f011b1764bef7,api,"Submodule shared/sembr-skills: bump the submodule rather than copying"
+github,sembr/skills,main,5f973aaa75b1165b03dd45dca4cd1dc0437deba3,api,"Submodule shared/sembr-skills: bump the submodule rather than copying"
 subreddit,r/AI_Agents,,,manual,"community-watchlist.md high tier; Reddit route unmeasured from runners"
 subreddit,r/ClaudeAI,,,manual,"community-watchlist.md high tier"
 subreddit,r/ClaudeCode,,,manual,"community-watchlist.md high tier"

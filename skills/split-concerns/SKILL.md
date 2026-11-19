@@ -74,10 +74,12 @@ and earlier ones can merge while later ones are still in review.
    then tests or docs that cover it
    ([refactor-before-modifying-substance](../../shared/principles/refactor-before-modifying-substance.md)).
 2. **Build each layer from the original branch's diff.**
-   Start the first branch from `main`,
+   Start the first branch from the original PR's base branch (usually `main`),
    and each later branch from the tip of the one before it.
-   Bring that layer's files in with `git checkout <original-branch> -- <paths>`,
+   Bring in a layer's whole files with `git checkout <original-branch> -- <paths>`,
    or with `git cherry-pick` when the original commits already follow the split.
+   When two layers change the same file, take only this layer's hunks
+   with `git restore -p --source=<original-branch> -- <path>`.
 3. **Prove nothing was lost or added:**
    `git diff <original-branch> <top-of-stack>` must be empty.
 4. **Open each PR against the branch below it**, following

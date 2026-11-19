@@ -215,7 +215,8 @@ its description does not use (ai-config#949).
 | `skills/skill-audit/SKILL.md` | Audit skill usage and prune. |  |
 | `skills/skill-builder/SKILL.md` | Create or update a skill. |  |
 | `skills/slide-tag/SKILL.md` | Move floating Git tag to main. Aliases: ts. |  |
-| `skills/split-concerns/SKILL.md` | Split multi-concern PRs. |  |
+| `skills/split-concerns/SKILL.md` | Split multi-concern PRs. Aliases: split-pr. |  |
+| `skills/split-pr/SKILL.md` | -> split-concerns. |  |
 | `skills/spot-skill-opportunities/SKILL.md` | Find opportunities for new skills. |  |
 | `skills/st/SKILL.md` | Start task issue-first. Aliases: start-task. |  |
 | `skills/stack-prs/SKILL.md` | Stack dependent PR on another. |  |

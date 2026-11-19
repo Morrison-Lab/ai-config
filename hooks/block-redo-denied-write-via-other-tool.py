@@ -141,9 +141,16 @@ ACTION_VERBS = {
 }
 # What may precede that verb in its clause: nothing, or politeness and
 # sequencing words. Anything else ("did you", "why not") is not an order.
-RX_IMPERATIVE_LEAD = re.compile(
-    r"[\s,]*(?:(?:please|pls|ok(?:ay)?|now|then|and|so|just|go\s+ahead\s+and)"
-    r"[\s,]+)*", re.IGNORECASE)
+IMPERATIVE_LEAD_WORDS = frozenset(
+    {"please", "pls", "ok", "okay", "now", "then", "and", "so", "just",
+     "go", "ahead"})
+RX_LEAD_SPLIT = re.compile(r"[\s,]+")
+
+
+def _is_imperative_lead(lead):
+    """True when *lead* holds only politeness and sequencing words."""
+    words = [w for w in RX_LEAD_SPLIT.split(lead.lower()) if w]
+    return all(w in IMPERATIVE_LEAD_WORDS for w in words)
 RX_STRIP = re.compile(
     r"<system-reminder>.*?</system-reminder>"
     r"|<note>.*?</note>"
@@ -362,7 +369,7 @@ def _imperative(text, verb):
         return False
     for m in rx.finditer(text):
         lead = _clause_before(text, m.start())
-        if RX_IMPERATIVE_LEAD.fullmatch(lead):
+        if _is_imperative_lead(lead):
             return True
     return False
 

@@ -20,6 +20,17 @@ SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|
 POLL_SECONDS = 120
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
 
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from pr_view import gh_pr_view
+except Exception as _exc:  # broken install: no PR can be read
+    print(f"no-unmonitored-pr: cannot load scripts/lib/pr_view.py ({_exc}); "
+          "no PR state will be read", file=sys.stderr)
+    gh_pr_view = None
+
 
 
 def unwrap_command(cmd):
@@ -221,14 +232,21 @@ NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x0800000
              if sys.platform == "win32" else {})
 
 
+POLL_FIELDS = ["url", "state", "updatedAt", "reviewDecision", "statusCheckRollup", "reviews",
+               "mergeable", "mergeStateStatus"]
+
+
+def _run(*args, **kwargs):
+    return subprocess.run(*args, **kwargs, **NO_WINDOW)
+
+
 def pr_url(cwd):
-    try:
-        result = subprocess.run(["gh", "pr", "view", "--json", "url", "--jq", ".url"],
-                                cwd=cwd, capture_output=True, text=True,
-                                timeout=5, check=True, **NO_WINDOW)
-    except (OSError, subprocess.SubprocessError):
+    # `gh_pr_view` reads over REST where a cloud session refuses GraphQL
+    # (ai-config#4733).
+    if gh_pr_view is None:
         return ""
-    return result.stdout.strip()
+    data, _error = gh_pr_view(["url"], cwd=cwd, timeout=5, run=_run)
+    return str((data or {}).get("url") or "").strip()
 
 
 def start_monitor_for_url(url, cwd):
@@ -262,19 +280,17 @@ def poll(url, path):
     while True:
         state = read_json(path)
         state.update({"url": url, "pid": os.getpid(), "checked_at": time.time()})
-        try:
-            result = subprocess.run(["gh", "pr", "view", url, "--json",
-                                     "url,state,updatedAt,reviewDecision,statusCheckRollup,reviews,"
-                                     "mergeable,mergeStateStatus"],
-                                    capture_output=True, text=True, timeout=30, check=True,
-                                    **NO_WINDOW)
-            state["data"] = json.loads(result.stdout)
+        data, error = None, "scripts/lib/pr_view.py did not load"
+        if gh_pr_view is not None:
+            data, error = gh_pr_view(POLL_FIELDS, target=url, timeout=30, run=_run)
+        if isinstance(data, dict):
+            state["data"] = data
             state.pop("error", None)
             consecutive_errors = 0
-        except (OSError, ValueError, subprocess.SubprocessError) as error:
+        else:
             consecutive_errors += 1
             state.pop("data", None)
-            state["error"] = str(error)
+            state["error"] = str(error or "gh pr view answered something other than an object")
         write_json(path, state)
         if state.get("data", {}).get("state") in {"MERGED", "CLOSED"}:
             return

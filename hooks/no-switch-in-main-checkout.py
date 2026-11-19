@@ -63,8 +63,13 @@ def changes_branch(sub, rest, cwd):
         return True
     args = [a for a in rest if not a.startswith("-")]
     # `checkout <tree-ish> <path>...` restores files and keeps the branch.
-    return len(args) == 1 and git(cwd, "rev-parse", "--verify", "-q",
-                              args[0] + "^{commit}") is not None
+    if len(args) != 1:
+        return False
+    if git(cwd, "rev-parse", "--verify", "-q", args[0] + "^{commit}") is not None:
+        return True
+    # A name only a remote has makes git create and switch to a tracking branch.
+    return "--no-guess" not in rest and bool(git(
+        cwd, "for-each-ref", "--format=%(refname)", f"refs/remotes/*/{args[0]}"))
 
 
 def main_worktree(cwd):

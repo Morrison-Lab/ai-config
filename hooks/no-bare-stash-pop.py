@@ -25,7 +25,7 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import (simple_commands_with_scope, strip_env, walk_dirs,
-                          git_subcommand, env_value, shell_c_expansions,
+                          git_subcommand, env_value, nested_shell_commands,
                           GIT_VALUE_OPTS)
 except Exception as _exc:  # broken install: degrade, never block
     print(f"no-bare-stash-pop: shellcmd did not load ({_exc})", file=sys.stderr)
@@ -63,7 +63,8 @@ def _git_dir_opt(argv):
 
 def bare_take(argv):
     """True when `argv` is `git stash pop|apply` naming no entry. shlex leaves
-    redirections in argv (`2`, `>&`, `1`, or whole `2>/dev/null`): skip them."""
+    redirections in argv (`2`, `>&`, `1`, or whole `2>/dev/null`): skip them.
+    shlex drops spacing, so `pop 0 > f` reads `0` as an fd and is denied."""
     sub, rest, _env = git_subcommand(argv) or (None, [], None)
     if sub != "stash" or not rest or rest[0] not in TAKERS:
         return False
@@ -96,29 +97,18 @@ def worktree_count(directory):
         1 for b in blocks if b.startswith("worktree ") and "\nprunable" not in b)
 
 
-def _has_cd(cmds):
-    return any(strip_env(argv)[1][:1] in (["cd"], ["pushd"], ["popd"])
-               for _scope, argv in cmds)
-
-
-def evaluate(command, cwd, environ=None):
-    """The deny reason, or None. `sh -c` lines run from `cwd` when the outer
-    line has no `cd`; `eval`, `xargs` and `$VAR` git are not followed."""
+def evaluate(command, cwd, environ=None, depth=0):
+    """The deny reason, or None. A nested `sh -c` line is checked from the
+    directory its shell starts in; `eval`, `xargs`, `$VAR` git are not."""
     environ = os.environ if environ is None else environ
     if simple_commands_with_scope is None or environ.get(OVERRIDE) == "1":
         return None
-    outer = simple_commands_with_scope(command) or []
-    pieces = [command] if _has_cd(outer) else list(shell_c_expansions(command))
-    for piece in pieces:
-        reason = _evaluate_line(piece, cwd)
-        if reason:
-            return reason
-    return None
-
-
-def _evaluate_line(command, cwd):
     for argv, env, _rest, cur in walk_dirs(
             simple_commands_with_scope(command) or [], cwd):
+        for inner in nested_shell_commands(argv) if depth < 3 else []:
+            reason = cur and evaluate(inner, cur, environ, depth + 1)
+            if reason:
+                return reason
         redirected = any(env_value(env, v) is not None
                          for v in ("GIT_DIR", "GIT_WORK_TREE"))
         if (cur is None or redirected or env_value(env, OVERRIDE) == "1"

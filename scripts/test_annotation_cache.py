@@ -86,6 +86,19 @@ with tempfile.TemporaryDirectory() as cache:
         ac.gh_api = ac_gh
     check("a failed read exits 2 instead of printing a partial list",
           code == 2 and "incomplete read" in err.getvalue())
+    # Run 140 claims two annotations but the API returns one: a short read,
+    # on the second annotated run, after run 7 has read in full.
+    short_runs = list(RUNS)
+    short_runs[139] = run(140, 2)
+    out, err = io.StringIO(), io.StringIO()
+    ac.gh_api = fake_api(short_runs, ANNS, [])
+    try:
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = ac.main(["rows", "o/r", "c" * 40])
+    finally:
+        ac.gh_api = ac_gh
+    check("a short read exits 2 and prints no rows, not even the complete earlier run",
+          code == 2 and out.getvalue() == "" and "read 1 of 2" in err.getvalue())
     with contextlib.redirect_stderr(io.StringIO()):
         code = ac.main(["x"])
     check("a bad call prints usage and exits 2", code == 2)

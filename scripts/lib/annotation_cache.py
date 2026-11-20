@@ -95,11 +95,20 @@ def annotated_runs(api, repo, sha, per_page=PER_PAGE):
 
 
 def rows(api, repo, sha, cache_dir=None):
-    """One (run id, level, path, first 140 characters of the message's first line) per annotation."""
+    """One (run id, level, path, first 140 characters of the message's first line) per annotation.
+
+    Returns the whole list or raises, so a caller never prints part of it:
+    a run whose read count differs from its `annotations_count` raises RuntimeError.
+    """
+    out = []
     for run in annotated_runs(api, repo, sha):
-        for ann in read_annotations(api, repo, run, cache_dir):
+        anns = read_annotations(api, repo, run, cache_dir)
+        if len(anns) != expected_count(run):
+            raise RuntimeError(f"run {run['id']}: read {len(anns)} of {expected_count(run)} annotations")
+        for ann in anns:
             first = (ann.get("message") or "").split("\n")[0][:140]
-            yield (str(run["id"]), ann.get("annotation_level") or "", ann.get("path") or "", first)
+            out.append((str(run["id"]), ann.get("annotation_level") or "", ann.get("path") or "", first))
+    return out
 
 
 def main(argv=None):
@@ -109,11 +118,12 @@ def main(argv=None):
         print("usage: annotation_cache.py rows OWNER/REPO SHA", file=sys.stderr)
         return 2
     try:
-        for row in rows(gh_api, args[1], args[2], default_cache_dir()):
-            print("\t".join(field.replace("\t", " ") for field in row))
+        got = rows(gh_api, args[1], args[2], default_cache_dir())
     except (RuntimeError, KeyError, ValueError) as exc:
         print(f"ERROR: incomplete read: {exc}", file=sys.stderr)
         return 2
+    for row in got:
+        print("\t".join(field.replace("\t", " ") for field in row))
     return 0
 
 

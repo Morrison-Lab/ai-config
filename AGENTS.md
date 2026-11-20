@@ -46,7 +46,8 @@ It sets the plotting library, axis titles and ticks, where to add a visual, equa
 ## Define technical terms; never dodge them
 
 Never replace a technical term with a plain word to avoid defining it: use the term and define it, or link its definition ([`plain-prose`](shared/writing/plain-prose.md)).
-[`hooks/no-delete-flagged-term.py`](hooks/no-delete-flagged-term.py) blocks the case a check can see; a term no notes define yet is in no term list, so the rest rests on this rule.
+[`hooks/no-delete-flagged-term.py`](hooks/no-delete-flagged-term.py) blocks the case a check can see.
+A term no notes define yet is in no term list, so that case rests on this rule.
 
 ## Check external repository guidelines and PR template before filing
 

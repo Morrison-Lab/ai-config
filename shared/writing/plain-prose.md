@@ -20,12 +20,12 @@ When PSW and this guidance disagree, PSW wins.
   (Ezra, 2026-11-20: "never switch to a plain word to avoid needing to define a technical term").
   When the idea needs a technical term, use the term and define it,
   or link its definition; write the definition first when none exists yet.
-  The plain-word preference above is for words that carry no technical meaning,
-  such as "utilize" for "use", and the jargon to cut is filler, not a defined term.
+  The plain-word preference above is for words that carry no technical meaning, such as "utilize" for "use".
+  The jargon to cut is filler, not a defined term.
   A plain stand-in reads easier and says less:
   "a set" drops what "a finite set" required,
   and "a nice curve" says nothing that "a smooth function" does
-  ([Morrison-Lab/mds#868](https://github.com/Morrison-Lab/mds/pull/868) defined "smooth function" rather than avoid the word).
+  ([Morrison-Lab/mds#868](https://github.com/Morrison-Lab/mds/pull/868), open as of 2026-11-20, defines "smooth function" rather than avoid the word).
   A word used in its everyday sense, such as "weight" for heaviness, is not a technical term and needs no definition.
   - **Do:** keep "smooth function" and link it to its definition, writing one if the notes have none.
   - **Don't:** write "a nice curve" because "smooth" has no definition yet,

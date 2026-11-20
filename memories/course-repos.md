@@ -70,7 +70,8 @@ the fourth and later where a lab takes the third, and the third and later where 
 - A parallel pair that teaches two different things (LDA and QDA discriminant functions) is not redundant.
 - No exact detector exists, since a repeat need not share a slug, a source item or a heading.
   lds has `tools/check_redundant_examples.py`, a warn-only list that compares wording after masking numbers, math and code,
-  and marks `LAB` a lab exercise (`#exr-lab-`) that repeats a lecture item.
+  and marks `LAB` a lab exercise (`#exr-lab-`) that reuses a lecture item (same dataset, or word for word).
+  A lab on the same idea with other numbers or data is the allowed third version.
   The rule also covers ISL-lab ports, where one lab step repeats across data sets: `port-source-exercises` keeps one data set in the notes and banks the rest.
 
 (Ezra, 2026-11-19: "if we have redundant examples or exercises in notes with different example numbers or data, pick one version as an example, one version as an in-notes exercise, and put the rest into the exercise bank for homeworks and exams".

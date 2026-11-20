@@ -38,6 +38,15 @@ CASES = [  # (command, denied)
     ("while true; do gh pr checks 5; sleep \"$d\"; done", False),
     ('bash -c "while true; do gh pr checks 5; sleep 10; done"', True),
     ("ALLOW_GITHUB_POLL=1 gh pr checks 12 --watch", False),
+    # Each loop is judged on its own body (agy review of #5974).
+    ("while pgrep -x pytest; do sleep 5; done; gh pr checks 5", False),
+    ("for x in 1 2; do echo x; done; while true; do gh pr checks 5; sleep 5; done", True),
+    ("sleep 120; while true; do gh pr checks 5; sleep 5; done", True),
+    ("while true; do if a; then sleep 120; else sleep 1; fi; gh pr checks 5; done", True),
+    ("for i in {1..30}; do gh api repos/a/b/pulls/1; sleep 5; done", True),
+    ("watch -n 5 'gh pr checks 3'", True),
+    ('while true; do bash -c "gh pr checks 5"; sleep 5; done', True),
+    ("sudo -u me gh run watch 99", True),
     ("cat <<'EOF'\nwhile true; do gh pr checks 5; sleep 1; done\nEOF", False),
 ]
 

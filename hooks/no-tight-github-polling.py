@@ -45,6 +45,7 @@ KEYWORDS = {"!", "{", "}", "if", "then", "elif", "else", "fi", "do", "done", "ti
 WRAPPERS = {"env", "command", "nohup", "exec", "builtin", "sudo", "timeout", "nice", "doas"}
 ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 WRAPPER_ARG = re.compile(r"\A(?:-.*|[\d.]+[smhd]?)\Z")
+WRAPPER_VALUE_FLAGS = {"-u", "-g", "-n", "-s", "-k", "-C"}  # `sudo -u me`
 GH_VALUE_FLAGS = {"-R", "--repo", "--hostname"}
 # gh subcommands that call the API (not `auth`, `config`, `alias`, `extension`).
 GH_API_SUBS = {"api", "pr", "run", "issue", "workflow", "release", "repo", "search",
@@ -78,7 +79,7 @@ def _peel(argv):
         elif os.path.basename(tok) in WRAPPERS:
             rest = rest[1:]
             while rest and (WRAPPER_ARG.match(rest[0]) or ASSIGNMENT.match(rest[0])):
-                rest = rest[1:]  # `timeout 60`, `sudo -u me`
+                rest = rest[2:] if rest[0] in WRAPPER_VALUE_FLAGS else rest[1:]
             continue
         elif tok not in KEYWORDS:
             break
@@ -114,7 +115,8 @@ def _watch_target(rest):
     args, i = rest[1:], 0
     while i < len(args) and args[i].startswith("-"):
         i += 2 if args[i] in ("-n", "--interval") else 1
-    return _flag_value(args[:i], ["--interval", "-n"], 2.0), args[i:]
+    inner = (simple_commands(" ".join(args[i:])) or [[]])[0]  # `watch` runs `sh -c`
+    return _flag_value(args[:i], ["--interval", "-n"], 2.0), inner
 
 
 def is_github_call(rest):
@@ -153,44 +155,80 @@ def _watcher(rest, floor):
     return f"`{what}` polls GitHub every {iv:g} s" if iv < floor else None
 
 
+def _frame(argv):
+    """A loop frame for an argv starting `while`, `until` or `for`."""
+    words = argv[3:] if argv[0] == "for" and argv[2:3] == ["in"] else None
+    literal = words is not None and not any(c in w for w in words for c in "$`{*?")
+    return {"loop": argv[0], "words": len(words) if literal else None, "slept": 0.0,
+            "unknown": False, "calls": False, "cond": 0}
+
+
+def _judge(f, floor):
+    """A sentence for a closed loop frame that polls GitHub too fast, else None."""
+    if not f["calls"] or f["unknown"]:
+        return None
+    short = f["words"] is not None and f["words"] <= 5
+    if f["loop"] == "for" and (f["slept"] == 0 or short):
+        return None  # a batch over items, or a short retry
+    if f["slept"] < floor:
+        return f"a `{f['loop']}` loop calls GitHub with {f['slept']:g} s of sleep per pass"
+    return None
+
+
 def poll_violation(command, floor, depth=0):
-    """A sentence naming the too-fast GitHub poll in `command`, or None."""
-    loop, for_words, slept, unknown, calls = None, None, 0.0, False, False
+    """A sentence naming the too-fast GitHub poll in `command`, or None.
+
+    Each loop is judged on its own body, between its keyword and its `done`, and
+    a `sleep` inside an `if` counts for nothing, since it may not run every pass.
+    """
+    stack = []
     for argv in simple_commands(command) or []:
-        env, rest = _peel(argv)
+        i, skip = 0, False
+        while i < len(argv) and argv[i] in KEYWORDS | LOOPS:
+            tok = argv[i]
+            if tok in LOOPS:
+                stack.append(_frame(argv[i:]))
+                skip = tok == "for"  # the rest is its word list
+            elif tok == "done" and stack:
+                done = stack.pop()
+                why = _judge(done, floor)
+                if why:
+                    return why
+                if stack:
+                    stack[-1]["calls"] |= done["calls"]
+                    stack[-1]["slept"] += done["slept"]
+            elif tok in ("if", "fi") and stack:
+                stack[-1]["cond"] += 1 if tok == "if" else -1
+            i += 1
+        env, rest = _peel(argv[i:])
         if POLL_OVERRIDE in env:
             return None
-        if argv[0] in LOOPS:
-            if loop is None:
-                loop = argv[0]
-                words = argv[3:] if loop == "for" and argv[2:3] == ["in"] else None
-                if words is not None and not any("$" in w or "`" in w for w in words):
-                    for_words = len(words)
-            # The condition of `until gh run view ...` runs on every pass.
-            rest = [] if argv[0] == "for" else _peel(argv[1:])[1]
-        if not rest:
+        if skip or not rest:
             continue
+        top = stack[-1] if stack else None
         prog = os.path.basename(rest[0])
         if prog in SHELLS and "-c" in rest[1:-1] and depth < 3:
-            inner = poll_violation(rest[rest.index("-c", 1) + 1], floor, depth + 1)
+            body = rest[rest.index("-c", 1) + 1]
+            inner = poll_violation(body, floor, depth + 1)
             if inner:
                 return inner
+            if top:
+                top["calls"] |= any(is_github_call(_peel(a)[1])
+                                    for a in simple_commands(body) or [])
             continue
         why = _watcher(rest, floor)
         if why:
             return why
-        if prog == "sleep":
+        if top and prog == "sleep" and top["cond"] == 0:
             secs = _sleep_seconds(rest)
-            unknown = unknown or secs is None
-            slept += secs or 0.0
-        elif loop and is_github_call(rest):
-            calls = True
-    if not (loop and calls) or unknown:
-        return None
-    if loop == "for" and (slept == 0 or (for_words is not None and for_words <= 5)):
-        return None  # a batch over items, or a short retry
-    if slept < floor:
-        return f"a `{loop}` loop calls GitHub with {slept:g} s of sleep per pass"
+            top["unknown"] |= secs is None
+            top["slept"] += secs or 0.0
+        elif top and is_github_call(rest):
+            top["calls"] = True
+    for f in reversed(stack):  # a loop with no `done`
+        why = _judge(f, floor)
+        if why:
+            return why
     return None
 
 

@@ -1016,6 +1016,20 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                    "annotations_count": cr.annotations_count} for cr in pr.get_check_runs()]
 
     issues = []
+    # GitHub sometimes leaves a finished check run's `status` at `in_progress`
+    # for tens of minutes while `conclusion` and `completed_at` are set
+    # (ai-config#5637). Treat it as completed, once, here, so the supersede
+    # and annotation logic below sees the same view; a run missing either
+    # field stays in progress.
+    for cr in check_runs:
+        if (cr["status"] != "completed" and cr.get("conclusion")
+                and _completed_at(cr) is not None):
+            issues.append(
+                f"NOTE: check run '{cr['name']}' has status '{cr['status']}' "
+                f"but conclusion '{cr['conclusion']}' and completed_at "
+                f"{cr['completed_at']}; GitHub's status is stale, so it is "
+                "counted as completed (ai-config#5637)")
+            cr["status"] = "completed"
     if not check_runs:
         if _repo_has_no_ci(repo, sha):
             return True, [

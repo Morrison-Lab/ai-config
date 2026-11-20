@@ -415,6 +415,66 @@ def _test_own_actions_job():
               for p in checker.REVIEWER_REPLACEABLE_PREFIXES))
 
 
+def _test_stale_in_progress_check_run():
+    """A finished run whose `status` GitHub left at in_progress (ai-config#5637).
+
+    Outside Actions with no html_url, check_ci_runs needs no network.
+    """
+    stale_at = "2026-11-14T00:47:43Z"
+
+    def score(**fields):
+        run = {"id": 1, "name": "gather-context", "status": "in_progress",
+               "conclusion": None, "html_url": None, "completed_at": None,
+               "annotations_count": 0}
+        run.update(fields)
+        pr = types.SimpleNamespace(
+            head_sha="sha123", repo=TEST_REPO,
+            get_check_runs=lambda: [types.SimpleNamespace(**run)])
+        with patch.dict(os.environ, {}, clear=True):
+            return original_check_ci_runs(pr)
+
+    ok, issues = score(conclusion="success", completed_at=stale_at)
+    check("a stale in_progress run with a conclusion and completed_at passes (#5637)",
+          ok)
+    check("the stale run is named in a NOTE (#5637)",
+          any(i.startswith("NOTE: check run 'gather-context'")
+              and "in_progress" in i and "#5637" in i for i in issues))
+    ok, issues = score(conclusion="failure", completed_at=stale_at)
+    check("a stale in_progress run that concluded failure still blocks (#5637)",
+          not ok and any("conclusion 'failure'" in i for i in issues
+                         if not i.startswith("NOTE: ")))
+    ok, issues = score()
+    check("a genuinely in-progress run with no conclusion still blocks (#5637)",
+          not ok and "is still in status 'in_progress'" in " ".join(issues))
+    ok, issues = score(conclusion="success")
+    check("a conclusion without completed_at still blocks (#5637)", not ok)
+    ok, issues = score(completed_at=stale_at)
+    check("completed_at without a conclusion still blocks (#5637)", not ok)
+
+    # Mutation: with the condition removed the first case must flip to blocked.
+    source = (Path(__file__).parent / "check-pr-fully-clean.py").read_text(encoding="utf-8")
+    for old, new in (
+        ('cr["status"] != "completed" and cr.get("conclusion")',
+         'False and cr.get("conclusion")'),
+        ('and _completed_at(cr) is not None):\n            issues.append(\n                f"NOTE: check run',
+         'and False):\n            issues.append(\n                f"NOTE: check run'),
+    ):
+        mutant = types.ModuleType("mutant")
+        mutant.__file__ = str(Path(__file__).parent / "check-pr-fully-clean.py")
+        mutated = source.replace(old, new, 1)
+        check("mutation anchor is present: " + old[:40], old in source)
+        with patch.dict(os.environ, {}, clear=True):
+            exec(compile(mutated, mutant.__file__, "exec"), mutant.__dict__)
+            pr = types.SimpleNamespace(
+                head_sha="sha123", repo=TEST_REPO,
+                get_check_runs=lambda: [types.SimpleNamespace(
+                    id=1, name="gather-context", status="in_progress",
+                    conclusion="success", html_url=None, completed_at=stale_at,
+                    annotations_count=0)])
+            m_ok, _ = mutant.check_ci_runs(pr)
+        check("mutation flips the stale-run case to blocked: " + old[:40], not m_ok)
+
+
 def main() -> int:
     print("Testing check-pr-fully-clean.py...")
 
@@ -5292,6 +5352,7 @@ def main() -> int:
     )
 
     _test_own_actions_job()
+    _test_stale_in_progress_check_run()
 
     # Test 7: the repository is threaded, not hardcoded (#1243, #1338, #1346, #1391)
     #

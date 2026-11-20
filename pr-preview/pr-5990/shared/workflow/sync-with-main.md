@@ -13,6 +13,7 @@ The branch takes `main` in exactly three cases:
 It checks (a) with `git merge-tree`, (c) with a diff of `.github/workflows/`, and (b) by finding the named commit or PR on `main` and missing from the branch.
 There is no bare override, so `MERGE_MAIN_FOR` cannot be left on: it passes only when it names a real fix.
 Fetch `main` in its own command first, so the hook reads the current `main`.
+Reviewers flag a routine main merge the hook did not see, per the [adversarial reviewer's section](../../.claude/agents/adversarial-reviewer.md#routine-merges-of-main-into-a-pr-branch).
 When one of the three cases holds, the merge needs no asking (Ezra, 2026-10-22: "yes, always").
 Say so after.
 
@@ -21,10 +22,9 @@ Say so after.
 
 The rest of this page, which says to fetch and merge before every push, applies only when one of the three cases holds.
 
-The one exception is a PR that is already fully clean on its current head and waiting for a merge word.
-Merging `main` into it moves the head and voids the Clean review and the checker pass (ids#47 lost its Clean verdict this way, 2026-11-07, [ai-config#5093](https://github.com/Morrison-Lab/ai-config/issues/5093)).
-`hooks/no-update-branch-on-clean-pr.py` denies `update_pull_request_branch`, `gh api .../update-branch` and `gh pr update-branch` there,
-unless `check-pr-fully-clean.py` has reported that the branch needs the base (base drift adding a CI gate, a conflict, or a required up-to-date branch).
+A PR that is already fully clean on its current head and waiting for a merge word costs the most when `main` is merged in without need.
+The merge moves the head and voids the Clean review and the checker pass (ids#47 lost its Clean verdict this way, 2026-11-07, [ai-config#5093](https://github.com/Morrison-Lab/ai-config/issues/5093)).
+`hooks/no-update-branch-on-clean-pr.py` also denies `update_pull_request_branch`, `gh api .../update-branch` and `gh pr update-branch` there.
 At merge time the no-update rule covers every repository, not only lds (Ezra, 2026-11-14, [#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)): a PR behind only by other PRs' content merges on its current head, and the branch is updated only on a real conflict, a base-drift failure, or a base that requires an up-to-date branch, per the content-only rule in [`fully-clean`](fully-clean.md).
 
 **lds came first** (Ezra, 2026-11-09, [ai-config#5210](https://github.com/Morrison-Lab/ai-config/issues/5210)): lds stopped routine main merges for the same reason before the rule covered every repository.

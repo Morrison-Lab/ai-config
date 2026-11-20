@@ -65,6 +65,24 @@ def test_clean_main_merges_carry(repo):
     assert reasons[0].startswith("clean main merge")
 
 
+def test_main_edit_next_to_pr_hunk_still_carries(repo):
+    """A main edit beside a PR hunk changes context lines only (ai-config#6028)."""
+    path, approved = repo
+    approved = write(path, "a.txt", "a1\na2\na3 from pr\n", "pr edits a3")
+    main_gains(path, "a.txt", "a1 from main\na2\na3\n")
+    merge_main(path)
+    assert check(path, approved)[0]
+
+
+def test_changed_pr_diff_voids(repo):
+    """main already carries the PR's file, so the PR diff against main shrinks to nothing."""
+    path, approved = repo
+    main_gains(path, "c.txt", "pr content\n")
+    merge_main(path)
+    carries, reasons = check(path, approved)
+    assert not carries and "diff against the base changed" in reasons[0]
+
+
 def test_new_commit_voids(repo):
     path, approved = repo
     main_gains(path, "x.yml", "x\n")
@@ -148,3 +166,53 @@ def test_cli_exit_codes(repo, capsys):
                        "--no-fetch", "--head-ref", "pr"]) == 1
     assert carry.main(["--pr", "1", "--approved-sha", "not-a-sha", "--repo-dir", str(path),
                        "--no-fetch", "--head-ref", "pr"]) == 2
+
+
+def test_hunkless_pr_diff_change_voids(repo):
+    """main gains the PR's empty file, so the diff shrinks with no text hunk (agy, ai-config#6029)."""
+    path, _ = repo
+    approved = write(path, "empty.txt", "", "pr adds an empty file")
+    main_gains(path, "empty.txt", "")
+    merge_main(path)
+    carries, reasons = check(path, approved)
+    assert not carries and "diff against the base changed" in reasons[0]
+
+
+def test_mode_only_pr_diff_change_voids(repo):
+    """main makes the PR's mode change too, so the diff shrinks with no text hunk."""
+    path, _ = repo
+    (path / "b.txt").chmod(0o755)
+    g(path, "add", "b.txt")
+    g(path, "commit", "-q", "-m", "pr makes b executable")
+    approved = g(path, "rev-parse", "HEAD")
+    g(path, "checkout", "-q", "main")
+    (path / "b.txt").chmod(0o755)
+    g(path, "add", "b.txt")
+    g(path, "commit", "-q", "-m", "main makes b executable")
+    g(path, "checkout", "-q", "pr")
+    merge_main(path)
+    carries, reasons = check(path, approved)
+    assert not carries and "diff against the base changed" in reasons[0]
+
+
+def test_binary_content_is_in_the_id(repo):
+    """Two binary versions give two ids; git patch-id alone sees neither."""
+    path, _ = repo
+    base = g(path, "rev-parse", "main")
+    ids = set()
+    for content in (b"\x00\x01one", b"\x00\x01two"):
+        (path / "img.bin").write_bytes(content)
+        g(path, "add", "img.bin")
+        g(path, "commit", "-q", "-m", "pr binary")
+        ids.add(carry.pr_diff_id(str(path), "pr", base))
+    assert len(ids) == 2
+
+
+def test_rename_is_in_the_id(repo):
+    """A pure rename has no text hunk; the id still sees both paths."""
+    path, _ = repo
+    base = g(path, "rev-parse", "main")
+    before = carry.pr_diff_id(str(path), "pr", base)
+    g(path, "mv", "b.txt", "d.txt")
+    g(path, "commit", "-q", "-m", "pr renames b")
+    assert carry.pr_diff_id(str(path), "pr", base) != before

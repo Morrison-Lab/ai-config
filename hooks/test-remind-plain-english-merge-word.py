@@ -293,6 +293,21 @@ def mwr_checks():
               and "Treat it as a bare `mwc`" not in out and (want or not out.strip()))
         print(("  ok      " if ok else "  FAIL    ") + f"name-the-repo reminder for {prompt!r} is {want}")
         fails += 0 if ok else 1
+    # Round 16: a mixed grant still grants its repo-qualified PRs, so its
+    # reminder says so and never says the grant merges nothing; an all-bare
+    # grant keeps the merge-nothing reminder.
+    for prompt, mixed in (("mwr rme#5 #6", True), ("mwr #5 and #6", False)):
+        rc, out = run(prompt)
+        says_nothing = "grants no merge:" in out or "Merge nothing" in out
+        ok = (rc == 0 and ("Merge only the PRs named with a repository" in out) is mixed
+              and says_nothing is not mixed)
+        print(("  ok      " if ok else "  FAIL    ")
+              + f"{prompt!r} gets the {'mixed' if mixed else 'bare'} reminder")
+        fails += 0 if ok else 1
+    ok = module.mwr_grant("mwr rme#5 #6") == {("rme", 5), (None, 6)}
+    print(("  ok      " if ok else "  FAIL    ")
+          + "a mixed grant still grants its repo-qualified PR")
+    fails += 0 if ok else 1
     ok = module.merge_word("merge when ready", strict=True) == "merge when ready"
     print(("  ok      " if ok else "  FAIL    ") + "'merge when ready' is still an mwc word")
     fails += 0 if ok else 1

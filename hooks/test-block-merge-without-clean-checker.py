@@ -14,6 +14,10 @@ import time
 
 HOOKS_DIR = os.path.dirname(os.path.realpath(__file__))
 HOOK = os.path.join(HOOKS_DIR, "block-merge-without-clean-checker.py")
+
+# Stay offline: no amwr marker read (ai-config#3946, step 3). The off
+# switch only takes an amwr grant away; the amwr tests patch repo_amwr.
+os.environ["AI_CONFIG_AMWR_OFF"] = "1"
 sys.path.insert(0, os.path.join(os.path.dirname(HOOKS_DIR), "scripts", "lib"))
 import card_answer_fixtures as fx  # noqa: E402
 from mwr_checker_fixture import trusted_checker_root  # noqa: E402

@@ -5237,6 +5237,10 @@ MWR_KEPT_REVIEW_PREFIXES = (
 MWR_CI_DIR = ".github/"
 # GitHub's pull-request files endpoint lists at most this many files.
 PR_FILES_CAP = 3000
+# The root AGENTS.md carries the per-repository amwr marker, which grants mwr
+# for every PR in the repository. mwr never merges a change to it, so an mwr
+# merge cannot switch the marker on (ai-config#3946).
+MWR_AMWR_FILE = "agents.md"
 
 
 def check_mwr_ci_edits(pr) -> List[str]:
@@ -5270,12 +5274,20 @@ def check_mwr_ci_edits(pr) -> List[str]:
     # directory) changes the CI as surely as a path under it.
     edits = sorted({n for n in names
                     if n.lower() == MWR_CI_DIR.rstrip("/") or n.lower().startswith(MWR_CI_DIR)})
-    if not edits:
-        return []
-    shown = ", ".join(edits[:5]) + (" ..." if len(edits) > 5 else "")
-    return [f"mwr cannot merge a PR that edits CI: it changes {shown}, and the CI "
+    problems = []
+    if edits:
+        shown = ", ".join(edits[:5]) + (" ..." if len(edits) > 5 else "")
+        problems.append(
+            f"mwr cannot merge a PR that edits CI: it changes {shown}, and the CI "
             "it requires could be made green by the PR itself. Merge it under "
-            "mwc, with a clean review (ai-config#3946)"]
+            "mwc, with a clean review (ai-config#3946)")
+    marker_edits = sorted({n for n in names if n.lower() == MWR_AMWR_FILE})
+    if marker_edits:
+        problems.append(
+            f"mwr cannot merge a PR that changes the root {marker_edits[0]}, which "
+            "holds the repository's amwr marker. Merge it under mwc, with a "
+            "clean review (ai-config#3946)")
+    return problems
 
 
 def check_mwr_dismissed_reviews(pr) -> List[str]:

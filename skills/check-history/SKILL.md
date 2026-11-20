@@ -54,7 +54,10 @@ checks (skipping them wastes a whole issue-pick):
 
 If an open PR already covers it and passes `memories/reviewing-prs.md`'s
 scope test (opened by or assigned to the invoking user, explicitly requested,
-or authored by the GitHub Actions app), **drive that PR to clean** instead of
+or authored by the GitHub Actions app,
+as `python3 scripts/pr-scope.py --repo <owner>/<repo> --number <N> --user <login>`
+decides, with `--alias`, `--requested` and `--excluded` added as `ardia` step 1 defines them),
+**drive that PR to clean** instead of
 re-implementing.
 Scope establishes authorization, not that the branch is free: read the PR's
 claim state first per [`claim-pr`](../../shared/workflow/claim-pr.md), skip it

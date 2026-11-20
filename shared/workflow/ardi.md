@@ -431,6 +431,10 @@ The plain run (`--base origin/main`) took over 10 minutes (measured 2026-11-18 i
 
 - **Do:** launch the validation run as a background job and read its tail when it exits.
 - **Don't:** wrap it in a foreground `timeout 580`, which killed it.
+- **Do:** re-run it after every fix commit, including a one-line test addition.
+  On 2026-11-19 a new test expectation written as a list literal starting with `"python3"` passed its own suite and failed CI, because `scripts/test_test_hooks.py` reads it as a bare interpreter spawn.
+  A second such literal, added in a later fix round, was caught only because the validation run was repeated.
+- **Don't:** treat the hook's own suite passing as the validation run.
 
 - [ ] **A separate `adversarial-reviewer` subagent reviewed this diff and returned a clean verdict** --- dispatched in the foreground against `git diff origin/<default-branch>...HEAD`, briefed with the standards rather than with your rationale for the change, with every finding Addressed, Rebutted, or Deferred to a tracked issue, and re-dispatched after the last commit so its `Reviewed-Commit:` fingerprint names the commits the push would ship ([`adversarial-self-review`](adversarial-self-review.md)).
   An inline pass under a reviewer framing does not satisfy this, and reads identically in the output --- the test is whether an `Agent` call was made.

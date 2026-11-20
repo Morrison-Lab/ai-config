@@ -535,6 +535,7 @@ cookieconsent.run({
 <li>❌ Carrying the wording from one conflicting hunk into a string that several consumers share, without reading main’s version of each consumer.</li>
 <li>❌ Mixing up “ours”/“theirs” in a rebase (they’re reversed vs a merge).</li>
 <li>❌ Committing with conflict markers still in a file — always <code>git diff --check</code>.</li>
+<li>❌ Resolving with a regex that does not anchor the markers at line start. A file can quote the marker strings in its own text: <code>hooks/hooks.json</code> carries them in a hook’s <code>why</code> field, and on 2026-11-19 an unanchored <code>re.S</code> keep-both regex matched there and corrupted the JSON (<a href="https://github.com/Morrison-Lab/ai-config/issues/5884">ai-config#5884</a>). <code>no-commit-with-conflict-markers.py</code> caught nothing, because the markers it looks for were gone. Anchor with <code>re.M</code> and <code>^</code>, or rebuild the file from <code>git show :2:&lt;path&gt;</code> plus the other side’s hunk, and parse a JSON or YAML result before staging. To start over, <code>git show :2:&lt;path&gt;</code> and <code>:3:&lt;path&gt;</code> still hold both sides until <code>git add</code>; <code>git checkout -m</code> and <code>git restore --merge</code> are refused by the Safety Net hook.</li>
 <li>❌ Committing the resolution without running the repo’s build/lint/test checks.</li>
 <li>❌ <code>git rebase --skip</code> / <code>git merge --abort</code> to dodge a conflict you were asked to resolve.</li>
 <li>❌ Force-pushing a half-resolved merge/rebase.</li>

@@ -128,6 +128,7 @@ Confirm which physical branch is “ours” before you reach for `--ours` / `--t
 - ❌ Carrying the wording from one conflicting hunk into a string that several consumers share, without reading main’s version of each consumer.
 - ❌ Mixing up “ours”/“theirs” in a rebase (they’re reversed vs a merge).
 - ❌ Committing with conflict markers still in a file — always `git diff --check`.
+- ❌ Resolving with a regex that does not anchor the markers at line start. A file can quote the marker strings in its own text: `hooks/hooks.json` carries them in a hook’s `why` field, and on 2026-11-19 an unanchored `re.S` keep-both regex matched there and corrupted the JSON ([ai-config#5884](https://github.com/Morrison-Lab/ai-config/issues/5884)). `no-commit-with-conflict-markers.py` caught nothing, because the markers it looks for were gone. Anchor with `re.M` and `^`, or rebuild the file from `git show :2:<path>` plus the other side’s hunk, and parse a JSON or YAML result before staging. To start over, `git show :2:<path>` and `:3:<path>` still hold both sides until `git add`; `git checkout -m` and `git restore --merge` are refused by the Safety Net hook.
 - ❌ Committing the resolution without running the repo’s build/lint/test checks.
 - ❌ `git rebase --skip` / `git merge --abort` to dodge a conflict you were asked to resolve.
 - ❌ Force-pushing a half-resolved merge/rebase.

@@ -10914,6 +10914,21 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
           len(mwr_files_issues([{"filename": "ci", "previous_filename": ".github"}])) == 1)
     check("a sibling such as .githubx does not block",
           mwr_files_issues([".githubx/a.yml", ".github-notes"]) == [])
+    # Round 16: an empty path names no file, so it fails closed.
+    check("an entry with an empty filename fails closed",
+          len(mwr_files_issues([{"filename": ""}, {"filename": "README.md"}])) == 1)
+    check("an empty string entry fails closed",
+          len(mwr_files_issues(["", "README.md"])) == 1)
+    files_fetcher = checker.PayloadFetcher({"pr_files": ["README.md"]})
+    check("the payload answers the PR files route",
+          files_fetcher._api(f"repos/{TEST_REPO}/pulls/7/files") == "README.md")
+    try:
+        files_fetcher._api(f"repos/{TEST_REPO}/commits/abc/pulls/files")
+        loose = True
+    except checker.PayloadError:
+        loose = False
+    check("another path ending in /files is not answered with the PR's files",
+          not loose)
 
     def gh_files_issues(stdout=None, error=None):
         pr = PullRequest.__new__(PullRequest)

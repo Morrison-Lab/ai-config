@@ -5204,7 +5204,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--mwr", action="store_true",
         help="Skip the review-verdict axis and keep every other gate, for a "
-             "merge under an mwr or mwrs grant (ai-config#3946). Prints "
+             "merge under a typed mwr or mwrs grant (ai-config#3946; the "
+             "per-repository amwr marker is a later step of that issue, and "
+             "this checker does not read it). Prints "
              "a MERGE-READY line, never the FULLY CLEAN line an mwc merge needs.",
     )
     return parser.parse_args(argv)

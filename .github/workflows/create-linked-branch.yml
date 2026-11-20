@@ -1,0 +1,81 @@
+# Creates a branch for an issue already linked in the issue's Development
+# field, so a session that cannot call GraphQL (a cloud session gets HTTP 403)
+# can still follow shared/workflow/github-relationships.md: dispatch this
+# workflow over REST, wait for the run, fetch the branch, then push onto it
+# (ai-config#5303).
+#
+# GitHub links a branch only when it creates it, so this must run before the
+# first push. On a name that already exists, createLinkedBranch returns null
+# and this job fails rather than reporting a link it did not make.
+name: Create linked branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number in this repository.
+        required: true
+        type: string
+      branch:
+        description: Name of the new branch.
+        required: true
+        type: string
+      base:
+        description: Branch name or commit SHA the new branch starts at.
+        required: false
+        default: main
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: create-linked-branch-${{ inputs.branch }}
+  cancel-in-progress: false
+
+jobs:
+  create:
+    name: Create linked branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: Create the branch through createLinkedBranch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ inputs.issue }}
+          BRANCH: ${{ inputs.branch }}
+          BASE: ${{ inputs.base }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$ISSUE" =~ ^[0-9]+$ ]]; then
+            echo "::error::issue must be a number, got '$ISSUE'"
+            exit 1
+          fi
+          if ! git check-ref-format --branch "$BRANCH" >/dev/null; then
+            echo "::error::'$BRANCH' is not a valid branch name"
+            exit 1
+          fi
+          oid=$(gh api "repos/$REPO/commits/$BASE" --jq .sha)
+          issue_id=$(gh api "repos/$REPO/issues/$ISSUE" --jq .node_id)
+          query='mutation($issueId: ID!, $oid: GitObjectID!, $name: String!) {
+            createLinkedBranch(input: {issueId: $issueId, oid: $oid, name: $name}) {
+              linkedBranch { ref { name target { oid } } }
+            }
+          }'
+          made=$(gh api graphql -f query="$query" -f issueId="$issue_id" \
+            -f oid="$oid" -f name="$BRANCH" \
+            --jq '.data.createLinkedBranch.linkedBranch.ref.name // empty')
+          if [ -z "$made" ]; then
+            echo "::error::createLinkedBranch made no branch: '$BRANCH' may already exist, and GitHub cannot link an existing branch"
+            exit 1
+          fi
+          echo "Created $made at $oid, linked to #$ISSUE"
+          {
+            echo "### Linked branch created"
+            echo
+            echo "- Branch: \`$made\`"
+            echo "- Commit: \`$oid\`"
+            echo "- Issue: #$ISSUE"
+          } >> "$GITHUB_STEP_SUMMARY"

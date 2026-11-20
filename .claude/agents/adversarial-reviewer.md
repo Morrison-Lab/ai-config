@@ -447,3 +447,10 @@ On a diff that adds such a reference, read the cited step and check that the cit
 [`check-step-references.py`](../../scripts/check-step-references.py) reports a number with no step behind it, a range written backwards, and a citation whose skill or linked file no longer exists.
 It cannot tell that a number now names the wrong step, so read the cited steps yourself.
 See [`skill-builder`](../../skills/skill-builder/SKILL.md#conventions-match-the-existing-family) ([ai-config#1865](https://github.com/Morrison-Lab/ai-config/issues/1865)).
+
+## Merges under a moved mwc line
+
+On a report or transcript that merges a content PR under an mwc line whose approved head is not the merged head, find the `check-mwc-carry.py` output for that PR.
+Report the merge when there is no CARRIES line, when the merge pinned a head other than the full SHA that line names, or when the approved SHA passed to the script is not the one on the line or in the post the line answered.
+A CARRIES line covers only the head it names: a later push needs a new run.
+See [`mwc`](../../skills/mwc/SKILL.md#an-mwc-carries-to-a-new-head-only-for-a-named-pr) ([ai-config#5967](https://github.com/Morrison-Lab/ai-config/issues/5967)).

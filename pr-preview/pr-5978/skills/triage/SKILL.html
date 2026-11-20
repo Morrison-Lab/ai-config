@@ -392,7 +392,8 @@ cookieconsent.run({
   <li><a href="#build-the-plan" id="toc-build-the-plan" class="nav-link" data-scroll-target="#build-the-plan">1. Build the plan</a></li>
   <li><a href="#read-the-p1-and-close-lists-in-full" id="toc-read-the-p1-and-close-lists-in-full" class="nav-link" data-scroll-target="#read-the-p1-and-close-lists-in-full">2. Read the P1 and close lists in full</a></li>
   <li><a href="#apply" id="toc-apply" class="nav-link" data-scroll-target="#apply">3. Apply</a></li>
-  <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">4. Report</a></li>
+  <li><a href="#plan-the-worktree-and-branch-sweep" id="toc-plan-the-worktree-and-branch-sweep" class="nav-link" data-scroll-target="#plan-the-worktree-and-branch-sweep">4. Plan the worktree and branch sweep</a></li>
+  <li><a href="#report" id="toc-report" class="nav-link" data-scroll-target="#report">5. Report</a></li>
   </ul></li>
   <li><a href="#checklist" id="toc-checklist" class="nav-link" data-scroll-target="#checklist">Checklist</a></li>
   <li><a href="#new-asks" id="toc-new-asks" class="nav-link" data-scroll-target="#new-asks">New asks</a></li>
@@ -438,9 +439,13 @@ cookieconsent.run({
 <p>Adding a label the repo lacks creates it with GitHub’s default colour.</p>
 <p>A run that nobody reviews first, such as a scheduled one, adds <code>--labels-only</code>: it applies the priority labels and leaves every proposed close for this attended pass. Add <code>--ceiling N</code> to any run to print the open count against the backlog’s ceiling.</p>
 </section>
+<section id="plan-the-worktree-and-branch-sweep" class="level3">
+<h3 class="anchored" data-anchor-id="plan-the-worktree-and-branch-sweep">4. Plan the worktree and branch sweep</h3>
+<p>For each repository this pass triaged that has a local checkout, first take <a href="../../skills/clean-git/SKILL.html"><code>clean-git</code></a>’s pre-prune snapshot of the remote-tracking refs, as that skill requires. Then run <code>clean-git</code> up to its confirmation gate and stop there (ai-config#3517). The snapshot comes first because that run is not mutation-free: its classify steps run <code>git fetch --prune</code> and <code>git worktree prune</code>. Skip a repository with no local checkout, and every repository in a run that nobody reviews first, and say which were skipped. <a href="../../skills/post-merge/SKILL.html"><code>post-merge</code></a> removes a merged PR’s own worktree; this weekly plan catches the ones a session left behind, and the branches that went stale with them. Remove a worktree or branch only when the user confirms that plan, through <code>clean-git</code>’s own confirmation step.</p>
+</section>
 <section id="report" class="level3">
-<h3 class="anchored" data-anchor-id="report">4. Report</h3>
-<p>Post nothing to the tracker beyond the closes’ own comments. In chat, give the bucket counts, the examined count, every issue closed with its one-line reason, and the P1 list, each number linked.</p>
+<h3 class="anchored" data-anchor-id="report">5. Report</h3>
+<p>Post nothing to the tracker beyond the closes’ own comments. In chat, give the bucket counts, the examined count, every issue closed with its one-line reason, and the P1 list, each number linked. Add the sweep plan’s counts of dead worktrees and dead branches, the path of each pre-prune snapshot, and the repositories skipped.</p>
 </section>
 </section>
 <section id="checklist" class="level2">
@@ -452,6 +457,11 @@ cookieconsent.run({
 <li>Every close row was read, and each is a junk title, an aphorism, or a duplicate of an older open issue.</li>
 <li>Anything unlikely-but-actionable is P3, not closed.</li>
 <li>The dry run printed the command set, and its count matches expectations.</li>
+</ol>
+<p>Do-Confirm, at the moment the step 4 sweep plan is reported:</p>
+<ol type="1">
+<li>Each planned repository’s pre-prune snapshot was taken before its prune steps ran, and its path is in the report.</li>
+<li>Before the user confirmed, nothing ran but <code>clean-git</code>’s own pre-gate prunes: no worktree was removed and no branch was deleted.</li>
 </ol>
 </section>
 <section id="new-asks" class="level2">

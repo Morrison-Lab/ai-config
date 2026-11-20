@@ -277,14 +277,21 @@ def live_remote(cwd, branch):
     """`origin/<branch>` when the tracking ref matches the server's tip, else None.
 
     The tracking ref can be stale after a force push elsewhere, so the server's
-    tip must be the commit measured.
+    tip must be the commit measured. A clone that fetches only `main`, as a
+    cloud session's does, has no tracking ref at all, so a missing or stale
+    one is fetched from the server before it is compared (ai-config#5884).
     """
     remote = f"origin/{branch}"
-    local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
-    if not local:
-        return None
     live = git(cwd, "ls-remote", "--heads", "origin", branch)
-    if not live or live.split()[0] != local:
+    if not live:
+        return None
+    tip = live.split()[0]
+    local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
+    if local != tip:
+        git(cwd, "fetch", "-q", "--no-tags", "origin",
+            f"+refs/heads/{branch}:refs/remotes/{remote}")
+        local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
+    if local != tip:
         return None
     return remote
 

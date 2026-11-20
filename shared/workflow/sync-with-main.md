@@ -12,6 +12,10 @@ The branch takes `main` in exactly four cases:
   Merge `main` into such a PR only when it is next in the merge order, not into every open PR the moment the workflow lands:
   one new workflow on `main` would otherwise restart every open PR's CI at once (coordinator, 2026-11-20, [ai-config#6028](https://github.com/Morrison-Lab/ai-config/issues/6028)).
   Report such a PR as clean except drift, with its sha, so the merger knows it needs one main merge first.
+  One merge line covers that merge (Ezra, 2026-11-20, chose "One line covers it" on a decision card):
+  an mwc line on a clean-except-drift sha also covers the just-in-time main merge,
+  provided the full checker passes on the post-merge head and that head's diff against `main` matches the original PR diff.
+  `scripts/check-mwc-carry.py` prints CARRIES only when both hold for the merge it sees, and the checker decides the rest.
 - **(d) A deleted stacked base:** the PR was stacked, its base merged into `main` and was deleted, and the PR's latest `pull_request` runs still name that base.
   Re-running those runs replays the old base ref and fails at `git fetch` (lds#2913, lds#2922, [ai-config#6001](https://github.com/Morrison-Lab/ai-config/issues/6001)), so only a new push gives the PR a working run.
   Read the base from the runs' `pull_requests[].base.ref`, then name it on the merge command: `MERGE_MAIN_FOR=base:<branch> git merge origin/main`.

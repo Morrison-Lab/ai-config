@@ -65,6 +65,24 @@ def test_clean_main_merges_carry(repo):
     assert reasons[0].startswith("clean main merge")
 
 
+def test_main_edit_next_to_pr_hunk_still_carries(repo):
+    """A main edit beside a PR hunk changes context lines only (ai-config#6028)."""
+    path, approved = repo
+    approved = write(path, "a.txt", "a1\na2\na3 from pr\n", "pr edits a3")
+    main_gains(path, "a.txt", "a1 from main\na2\na3\n")
+    merge_main(path)
+    assert check(path, approved)[0]
+
+
+def test_changed_pr_diff_voids(repo):
+    """main already carries the PR's file, so the PR diff against main shrinks to nothing."""
+    path, approved = repo
+    main_gains(path, "c.txt", "pr content\n")
+    merge_main(path)
+    carries, reasons = check(path, approved)
+    assert not carries and "diff against the base changed" in reasons[0]
+
+
 def test_new_commit_voids(repo):
     path, approved = repo
     main_gains(path, "x.yml", "x\n")

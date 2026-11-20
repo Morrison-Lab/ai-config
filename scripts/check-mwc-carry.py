@@ -6,8 +6,11 @@
 Run it in a full clone of the PR's repository. The line CARRIES when the
 approved head is on the head's first-parent chain and each commit added on it
 is a two-parent merge whose second parent is on the base and whose tree is
-`git merge-tree --write-tree` of its parents. Anything else VOIDS it (fail
-closed). The new head must still be fully clean, and the merge pins the full
+`git merge-tree --write-tree` of its parents, and the PR's diff against the
+base (as a zero-context patch id) is the same at the head as at the approved
+head. Anything else VOIDS it (fail closed). That covers the just-in-time main
+merge of a PR the checker called CLEAN EXCEPT BASE DRIFT (Ezra, 2026-11-20,
+"One line covers it", ai-config#6028). The new head must still be fully clean, and the merge pins the full
 head SHA printed. Exit codes: 0 CARRIES, 1 VOID, 2 called wrong or git failed.
 """
 from __future__ import annotations
@@ -61,6 +64,22 @@ def auto_merge_tree(repo: str, ours: str, theirs: str) -> str | None:
     return proc.stdout.splitlines()[0].strip()
 
 
+def pr_diff_id(repo: str, tip: str, base: str) -> str:
+    """The patch id of `tip`'s diff from its merge base with `base`, with no context lines.
+
+    Zero context keeps a main edit next to a PR hunk from reading as a PR change.
+    """
+    mb = git(repo, "merge-base", tip, base).stdout.strip()
+    diff = git(repo, "diff", "-U0", "--no-color", "--no-ext-diff", mb, tip).stdout
+    if not diff:
+        return ""
+    proc = subprocess.run(["git", "-C", repo, "patch-id", "--stable"], input=diff,
+                          capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise GitError(f"git patch-id failed: {proc.stderr.strip()}")
+    return proc.stdout.split()[0] if proc.stdout.split() else ""
+
+
 def verdict(repo: str, approved: str, head: str, base: str) -> tuple[bool, list[str]]:
     """(carries, reasons). Reasons explain a VOID, or list the merges a carry crossed."""
     approved, head, base = commit_for_sha(repo, approved), rev(repo, head), rev(repo, base)
@@ -87,6 +106,9 @@ def verdict(repo: str, approved: str, head: str, base: str) -> tuple[bool, list[
                            "(an edit inside the merge)"]
         crossed.append(f"clean main merge {commit[:8]}")
         commit = ours
+    if pr_diff_id(repo, head, base) != pr_diff_id(repo, approved, base):
+        return False, [f"the PR's diff against the base changed between {approved[:8]} "
+                       f"and {head[:8]}, though every merge was clean"]
     return True, list(reversed(crossed))
 
 

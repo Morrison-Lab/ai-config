@@ -19,8 +19,18 @@ A card is open when a `request_decision` tool_use got a tool_result naming its
 `message_id` (`cmsg_...`), and nothing has closed it since: no
 `close_decision` tool_use with that `message_id`, and no record the assistant
 did not write saying `decision_id=<that id>` (the platform's decision-chosen
-wake). Only a request_decision tool_use and its own tool_result open a card,
-so text that merely quotes an id cannot.
+wake), and no message the person typed has arrived since (a wake whose
+`<message>` is `from="human" trust="principal"`): a typed answer, or a typed
+message that moves past the card, ends it as the live ask. Only a
+request_decision tool_use and its own tool_result open a card, so text that
+merely quotes an id cannot. A tool result that quotes `decision_id=<id>` (a
+thread read showing an old wake) also closes the card; that errs toward
+allowing the post, never toward a false block.
+
+Writer instruction: `shared/workflow/lab-operating-rules.md` ("Keep an
+unanswered decision card last"). Reviewer instruction:
+`.claude/agents/adversarial-reviewer.md` ("Posts under an unanswered decision
+card").
 
 A deny, not a reminder, because the failing shape is decidable from the
 transcript (ai-config#4741). `edit_message` is included because an edit can
@@ -40,6 +50,9 @@ REQUEST = re.compile(r"^mcp__hearthbot__request_decision$")
 CLOSE = re.compile(r"^mcp__hearthbot__close_decision$")
 MESSAGE_ID = re.compile(r'"message_id"\s*:\s*"(cmsg_[A-Za-z0-9]+)"')
 CHOSEN = re.compile(r"decision_id=(cmsg_[A-Za-z0-9]+)")
+# A wake carrying the person's own typed message: <message ... from="human" trust="principal">.
+# Raw transcript lines hold it JSON-escaped, so the quotes may carry a backslash.
+HUMAN = re.compile(r'from=\\?"human\\?"[^>]*trust=\\?"principal\\?"')
 
 REASON = (
     "[hook: no-post-under-open-card] A decision card ({card}) is still waiting for an answer, "
@@ -113,6 +126,11 @@ def open_cards(transcript: str):
         # toward allowing the post (fail open), never toward a false block.
         if not (isinstance(record, dict) and record.get("type") == "assistant"):
             closed.update(CHOSEN.findall(line))
+            # A message the person typed after the card answers it in words or
+            # moves past it; either way the card is no longer the live ask, so
+            # it stops pinning the thread (review of ai-config#5973).
+            if HUMAN.search(line):
+                closed.update(opened)
     return [c for c in opened if c not in closed]
 
 

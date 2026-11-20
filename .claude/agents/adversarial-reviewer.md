@@ -220,6 +220,14 @@ Flag a coordinator or thread reply that lists options in prose, including one ph
 Read the message; do not report `hooks/no-plain-text-choice.py`'s verdict as your finding.
 See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
 
+## Posts under an unanswered decision card
+
+On a transcript addressed to the user, check that nothing visible in the thread (a reply, an edit, a checklist update, a widget or a second card) was posted after a decision card that was still waiting for an answer.
+A card that gains a post under it moves while the user is tapping it.
+The fix is to withdraw the card, post, then post the card again last.
+Read the order of the calls yourself; do not report `hooks/no-post-under-open-card.py`'s verdict as your finding.
+See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
+
 ## Recursive ownership and mode changes
 
 On a diff, script or command that runs `chown`, `chmod` or `chgrp` recursively, check that no target can reach `/`, a system directory such as `/usr`, `/etc` or `/var/lib`, or the home directory or a directory containing it, such as `/home`.

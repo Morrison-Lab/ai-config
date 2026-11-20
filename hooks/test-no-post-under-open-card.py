@@ -68,6 +68,13 @@ QUOTED_ONLY = transcript(tool_use("mcp__hearthbot__post_message", {"text": f'"me
 TWO_ONE_OPEN = transcript(card_posted(CARD, "toolu_a"), wake(f"decision_id={CARD}"),
                           card_posted(OTHER_CARD, "toolu_b"))
 NONE = transcript(wake("hello"))
+TYPED = ('<wake reason="mention"><project><thread><message trigger="true" from="human" '
+         'trust="principal" author="Ezra" id="cmsg_x">the second one</message></thread></project></wake>')
+TYPED_ANSWER = transcript(card_posted(), wake(TYPED))
+TYPED_BEFORE = transcript(wake(TYPED), card_posted())
+RELAY_ONLY = transcript(card_posted(), wake('<relay from="coordinator"><note>update</note></relay>'))
+RESULT_QUOTE = transcript(card_posted(), tool_use("mcp__hearthbot__read_thread", {}, "toolu_r"),
+                          tool_result(f"old wake: decision_id={CARD}", "toolu_r"))
 
 
 def check(label, cond):
@@ -107,6 +114,11 @@ check("a quoted id in another tool's result opens nothing", hook.denial(payload(
 check("the later still-open card is named",
       OTHER_CARD in (hook.denial(payload(TWO_ONE_OPEN)) or ""))
 check("no card passes", hook.denial(payload(NONE)) is None)
+check("a typed message after the card closes it", hook.denial(payload(TYPED_ANSWER)) is None)
+check("a typed message before the card does not close it", hook.denial(payload(TYPED_BEFORE)) is not None)
+check("a coordinator relay does not close the card", hook.denial(payload(RELAY_ONLY)) is not None)
+check("a tool result quoting the decision id closes the card (fail open)",
+      hook.denial(payload(RESULT_QUOTE)) is None)
 check("missing transcript fails open", hook.denial(payload("/nonexistent/x.jsonl")) is None)
 check("non-dict payload fails open", hook.denial(["x"]) is None)
 

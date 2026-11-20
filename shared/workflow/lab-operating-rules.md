@@ -22,6 +22,16 @@ The rest are prose because no condition in the transcript can decide them.
 - Ask every multiple-choice question on a decision card (`request_decision`), never as a plain-text option list: "start now or file?", "which option?", lettered or numbered options (Ezra, 2026-11-18, ai-config#5826: "anytime you ask me a multiple choice question, can you use a multiple choice card?").
   This holds for every agent, coordinator and thread alike.
   Enforced by `hooks/no-plain-text-choice.py`; an open-ended question with no fixed answers stays plain text.
+- Keep an unanswered decision card last in its thread.
+  A card moves when anything is posted after it.
+  Ezra has tapped the wrong option because of that, and asked for this rule on 2026-11-19.
+  His words: "sometimes a card moves while I'm clicking and I click the wrong choice".
+  To post after a card, withdraw it with `close_decision`, make the post, then post the card again as the turn's last thread-visible call.
+  His words: "if you want to post something after a card, delete the card and repost it last".
+  **Do:** send the message and checklist update first, and post the card last.
+  **Don't:** update the checklist or reply under a card still waiting for an answer.
+  Enforced by `hooks/no-post-under-open-card.py` (ai-config#5969);
+  the reviewer layer is "Posts under an unanswered decision card" in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md).
 - An ask for a deliverable (for example "post the key") authorizes its whole follow-through, including re-uploads and replacements of the same item.
   Never ask again for each step.
   Enforced by `hooks/no-stepwise-approval-ask.py` (ai-config#4726).

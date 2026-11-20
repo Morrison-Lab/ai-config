@@ -51,7 +51,19 @@ MWR_CASES = [
     ("mwr #5940", {(None, 5940)}),
     ("mwr #5940.", {(None, 5940)}),
     ("/mwr #5940", {(None, 5940)}),
-    ("mwr 5940", {(None, 5940)}),
+    # Cross-harness review: a bare number is no PR reference, so the message
+    # is not only the grant, and grants nothing.
+    ("mwr 5940", None),
+    ("mwrs 2026", None),
+    ("mwr lds#5 2026", None),
+    ("mwr pull 12", {(None, 12)}),
+    ("mwr pull#12", {(None, 12)}),
+    # Cross-harness review: an Oxford-comma list grants every PR it names.
+    ("mwr lds#1, mds#2, and pds#3", {("lds", 1), ("mds", 2), ("pds", 3)}),
+    ("mwr lds#1, mds#2 and pds#3", {("lds", 1), ("mds", 2), ("pds", 3)}),
+    ("mwr lds#1, and mds#2", {("lds", 1), ("mds", 2)}),
+    # A repository name that holds a withdrawal word still grants.
+    ("mwr Morrison-Lab/not-a-bug#1", {("morrison-lab/not-a-bug", 1)}),
     ("mwr #5 and #6!", {(None, 5), (None, 6)}),
     ("mwr ai-config#5940", {("ai-config", 5940)}),
     ("mwr ai-config#5940 lds#12", {("ai-config", 5940), ("lds", 12)}),
@@ -176,6 +188,15 @@ MWR_REVOKE_CASES = [
     ("back to mwc only", False, True),
     ("please get it reviewed", False, True),
     ("thanks, carry on", False, False),
+    # Cross-harness review: a repository name holding a withdrawal word does
+    # not revoke its own grant; a real withdrawal beside a reference still does.
+    ("mwr Morrison-Lab/not-a-bug#1", False, False),
+    ("mwr not-a-bug#1", False, False),
+    ("mwr https://github.com/Morrison-Lab/stop-gap/pull/4", False, False),
+    ("mwr hold-queue#2, and wait-list#3", False, False),
+    ("mwr lds#5 not yet", True, True),
+    ("not lds#5", False, True),
+    ("stop", True, True),
     # A relay's cited user entry can revoke an mwr grant.
     ('<coordinator-relay><relay from="coordinator"><cited id="m2" author="user" name="E">'
      'never mind</cited><note>n</note></relay></coordinator-relay>', False, True),

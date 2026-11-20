@@ -116,13 +116,15 @@ one of:
   or add the `check-result-definition-links: allow: reason` comment when it has none.
 - **Partial link** --- `check-term-links` finds the link text covering only part
   of a defined term.
-  When finishing the link would mean pulling a function word into it, reword
-  the sentence so the linked phrase is a noun phrase naming the term, and never
-  widen the link over the function word.
+  The term is the word or phrase the definition bolds, which can be shorter
+  than the div's title.
+  When the check's suggested link would add a function word ("of", "a",
+  "the") after that term, reword the sentence so the word after the link is
+  not in the title, and never widen the link over the function word.
   In [mds#844](https://github.com/Morrison-Lab/mds/pull/844) and
   [mds#858](https://github.com/Morrison-Lab/mds/pull/858),
-  an agent linked "limit of", because the definition is titled
-  "Limit of a sequence".
+  the definition titled "Limit of a sequence" bolds **limit**, and the check
+  suggested linking "limit of", which an agent did.
   Rewording to "the sequence's limit", with only "limit" linked, fixes it.
   The check's own handling is tracked in
   [gha#2146](https://github.com/Morrison-Lab/gha/issues/2146).

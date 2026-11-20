@@ -163,6 +163,48 @@ with tempfile.TemporaryDirectory() as root:
     # Redirected repository: fail open.
     check("GIT_DIR", run("GIT_DIR=/nonexistent git merge origin/trunk", repo), "allow")
 
+# (d): a stacked PR whose base merged into main and was deleted (ai-config#6001).
+with tempfile.TemporaryDirectory() as root:
+    origin = os.path.join(root, "origin")
+    os.makedirs(origin)
+    git("init", "-q", "-b", "main", cwd=origin)
+    commit(origin, "a.txt", "a\n", "init")
+    git("switch", "-q", "-c", "stackbase", cwd=origin)
+    commit(origin, "s.txt", "s\n", "base work")
+    git("switch", "-q", "-c", "other", "main", cwd=origin)
+    commit(origin, "o.txt", "o\n", "other work")
+    git("switch", "-q", "main", cwd=origin)
+    repo = os.path.join(root, "repo")
+    git("clone", "-q", origin, repo, cwd=root)
+    git("switch", "-q", "-c", "child", "origin/stackbase", cwd=repo)
+    commit(repo, "c.txt", "c\n", "child work")
+    M = " git merge origin/main"
+    git("merge", "-q", "--no-ff", "-m", "Merge pull request #50 from Morrison-Lab/stackbase",
+        "stackbase", cwd=origin)
+    git("fetch", "-q", "origin", cwd=repo)
+    check("base still on remote", run("MERGE_MAIN_FOR=base:stackbase" + M, repo), "deny")
+    git("branch", "-q", "-D", "stackbase", cwd=origin)
+    git("update-ref", "-d", "refs/remotes/origin/stackbase", cwd=repo)
+    for command, want in [("MERGE_MAIN_FOR=base:stackbase" + M, "allow"),
+                          (M[1:], "deny"), ("MERGE_MAIN_FOR=base:" + M, "deny"),
+                          ("MERGE_MAIN_FOR=base:main" + M, "deny"),
+                          ("MERGE_MAIN_FOR=base:nosuch" + M, "deny"),
+                          ("MERGE_MAIN_FOR=base:other" + M, "deny")]:
+        check("deleted base: " + command, run(command, repo), want)
+    # A branch deleted without merging is not (d), even with a stale local ref.
+    git("branch", "-q", "-D", "other", cwd=origin)
+    check("deleted unmerged base", run("MERGE_MAIN_FOR=base:other" + M, repo), "deny")
+    # A squash-merged base leaves only a stale tracking ref; it counts when main has it.
+    git("switch", "-q", "-c", "sq", "main", cwd=origin)
+    sq = commit(origin, "q.txt", "q\n", "squash base")
+    git("switch", "-q", "main", cwd=origin)
+    git("merge", "-q", "--ff-only", "sq", cwd=origin)
+    git("fetch", "-q", "origin", cwd=repo)
+    git("branch", "-q", "-D", "sq", cwd=origin)
+    check("stale ref on main", run("MERGE_MAIN_FOR=base:sq" + M, repo), "allow")
+    git("update-ref", "-d", "refs/remotes/origin/sq", cwd=repo)
+    check("no trace of base", run("MERGE_MAIN_FOR=base:sq" + M, repo), "deny")
+
 if FAILS:
     print("\n".join(FAILS))
     sys.exit(1)

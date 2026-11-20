@@ -1,26 +1,30 @@
 **Merge `main` into a PR branch only when the branch needs it**, in every repository (Ezra, 2026-11-20, chose "Make it permanent" on "should we stop main merges permanently?", [ai-config#5988](https://github.com/Morrison-Lab/ai-config/issues/5988)).
 Every merge of `main` moves the head, which re-runs the PR's whole CI and voids its review, and routine merges across many open PRs helped queue 499 lds runs on 2026-11-19 ([Morrison-Lab/lds#2992](https://github.com/Morrison-Lab/lds/issues/2992)).
 A PR that is only behind `main` merges on its current head.
-The branch takes `main` in exactly three cases:
+The branch takes `main` in exactly four cases:
 
 - **(a) Conflict:** the branch conflicts with `main`.
 - **(b) A named fix:** the branch needs a specific commit or PR on `main`, such as the fix for a check it fails.
   Name it on the merge command: `MERGE_MAIN_FOR=<sha> git merge origin/main` or `MERGE_MAIN_FOR='#<PR>' git merge origin/main`.
 - **(c) Stale:** `main` changed `.github/workflows/` since the merge base, so a check may never have run on the head.
   This is `check-pr-fully-clean.py`'s base-drift refusal, and the runner's checker refuses such a head.
+- **(d) A deleted stacked base:** the PR was stacked, its base merged into `main` and was deleted, and the PR's latest `pull_request` runs still name that base.
+  Re-running those runs replays the old base ref and fails at `git fetch` (lds#2913, lds#2922, [ai-config#6001](https://github.com/Morrison-Lab/ai-config/issues/6001)), so only a new push gives the PR a working run.
+  Read the base from the runs' `pull_requests[].base.ref`, then name it on the merge command: `MERGE_MAIN_FOR=base:<branch> git merge origin/main`.
 
 `hooks/no-routine-main-merge.py` denies any other `git merge` or `git pull` of `main` into a PR branch, and every server-side update-branch call, since those cannot say why.
 It checks (a) with `git merge-tree`, (c) with a diff of `.github/workflows/`, and (b) by finding the named commit or PR on `main` and missing from the branch.
+It checks (d) with `git ls-remote`, which must find no such branch on the remote, and by finding a `Merge pull request #N from <owner>/<branch>` commit on `main` that the branch lacks, or a stale remote-tracking ref for the base whose tip is on `main` and not on the branch.
 There is no bare override, so `MERGE_MAIN_FOR` cannot be left on: it passes only when it names a real fix.
 Fetch `main` in its own command first: the hook denies a `git pull` of `main`, and a merge of `main` after a fetch in the same command, since it could judge those only on a stale or missing local ref.
 Reviewers flag a routine main merge the hook did not see, per the [adversarial reviewer's section](../../.claude/agents/adversarial-reviewer.md#routine-merges-of-main-into-a-pr-branch).
-When one of the three cases holds, the merge needs no asking (Ezra, 2026-10-22: "yes, always").
+When one of the four cases holds, the merge needs no asking (Ezra, 2026-10-22: "yes, always").
 Say so after.
 
-- **Do:** merge `main` when the PR conflicts, when it needs a named fix, or when the checker calls the head stale.
+- **Do:** merge `main` when the PR conflicts, when it needs a named fix, when the checker calls the head stale, or when its runs name a stacked base that merged and was deleted.
 - **Don't:** merge `main` because it moved, to freshen a PR before review, or once per sweep.
 
-The rest of this page, which says to fetch and merge before every push, applies only when one of the three cases holds.
+The rest of this page, which says to fetch and merge before every push, applies only when one of the four cases holds.
 
 A PR that is already fully clean on its current head and waiting for a merge word costs the most when `main` is merged in without need.
 The merge moves the head and voids the Clean review and the checker pass (ids#47 lost its Clean verdict this way, 2026-11-07, [ai-config#5093](https://github.com/Morrison-Lab/ai-config/issues/5093)).

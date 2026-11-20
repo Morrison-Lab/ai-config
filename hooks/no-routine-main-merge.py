@@ -6,8 +6,9 @@ Ezra, 2026-11-20, "Make it permanent" (lds#2992 queued 499 runs). Denies
 a configured remote, FETCH_HEAD, or a bare pull whose upstream is main) and
 every server-side update-branch call, unless (a) the branch conflicts with
 main, (b) `MERGE_MAIN_FOR=<sha|#PR>` on the command names a fix on main the
-branch lacks, or (c) main changed .github/workflows since the merge base.
-No bare override. Pull or fetch-then-merge of main: always denied. Else fails open.
+branch lacks, (c) main changed .github/workflows since the merge base, or
+(d) `MERGE_MAIN_FOR=base:<branch>` names the PR's old stacked base, which is
+gone from the remote and merged into main (ai-config#6001). No bare override. Pull or fetch-then-merge of main: always denied. Else fails open.
 Writer: shared/workflow/sync-with-main.md. Reviewer:
 .claude/agents/adversarial-reviewer.md (Routine merges of main...).
 """
@@ -43,8 +44,9 @@ PULL_VALUE_OPTS = {"-s", "--strategy", "-X", "--strategy-option", "--depth",
                    "--recurse-submodules-default", "-o", "--server-option"}
 RULE = ("A PR branch takes main only when (a) it conflicts with main, (b) it needs "
         "a fix on main, named by a MERGE_MAIN_FOR=<sha> or MERGE_MAIN_FOR='#<PR>' "
-        "prefix on this git command, or (c) main changed .github/workflows since "
-        "the merge base. Each main merge re-runs CI and voids review (Ezra, "
+        "prefix on this git command, (c) main changed .github/workflows since "
+        "the merge base, or (d) its runs still name a stacked base that merged "
+        "and was deleted, named by MERGE_MAIN_FOR=base:<branch>. Each main merge re-runs CI and voids review (Ezra, "
         "2026-11-20). Fetch main in its own command first. "
         "Rule: shared/workflow/sync-with-main.md.")
 DENY = "Refused: `{segment}` merges {target} into `{branch}`, and {why}. " + RULE
@@ -209,6 +211,11 @@ def named_fix_present(cwd, ref, value):
         return False, "the commits main has and the branch lacks could not be read"
     subjects = log.splitlines()
     for tok in tokens:
+        if tok.startswith("base:"):
+            ok, detail = deleted_base_merged(cwd, ref, tok[len("base:"):], subjects)
+            if not ok:
+                return False, detail
+            continue
         if "#" not in tok and SHA_TOKEN.fullmatch(tok) and git_out(
                 cwd, "rev-parse", "--verify", "-q", tok + "^{commit}"):
             on_main = git(cwd, "merge-base", "--is-ancestor", tok, ref)[0] == 0
@@ -224,6 +231,33 @@ def named_fix_present(cwd, ref, value):
         if not any(pat.search(s) for s in subjects):
             return False, f"no commit on main that the branch lacks names PR #{m.group(1)}"
     return True, ""
+
+
+def deleted_base_merged(cwd, ref, name, subjects):
+    """`(ok, detail)` for (d): `name` is a stacked base that is gone from the
+    remote and that main merged after the branch forked. The PR's old
+    pull_request runs still name it, so re-running them fails at `git fetch`
+    (ai-config#6001, lds#2913)."""
+    if not name or name in default_names(cwd) or not re.fullmatch(r"[\w./-]+", name):
+        return False, f"base:{name} names no stacked base"
+    remotes = remote_names(cwd)
+    remote = ref.removeprefix("refs/remotes/").split("/", 1)[0]
+    remote = remote if remote in remotes else ("origin" if "origin" in remotes else None)
+    if remote is None:
+        return False, "no remote to check the old base against"
+    code, _out = git(cwd, "ls-remote", "--exit-code", "--heads", remote, name)
+    if code != 2:
+        return False, (f"base {name} still exists on {remote}" if code == 0
+                       else f"could not check {remote} for base {name}")
+    merged = re.compile(rf"^Merge pull request #\d+ from [\w.-]+/{re.escape(name)}$")
+    if any(merged.match(s) for s in subjects):
+        return True, ""
+    stale = f"refs/remotes/{remote}/{name}"
+    if (git_out(cwd, "rev-parse", "--verify", "-q", stale + "^{commit}")
+            and git(cwd, "merge-base", "--is-ancestor", stale, ref)[0] == 0
+            and git(cwd, "merge-base", "--is-ancestor", stale, "HEAD")[0] != 0):
+        return True, ""
+    return False, f"main has no merge of base {name} that the branch lacks"
 
 
 def why_not_needed(cwd, ref, env):

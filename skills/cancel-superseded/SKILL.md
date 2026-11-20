@@ -173,4 +173,5 @@ per branch.
   A re-run replays the original event with its old base ref.
   It then fails at `git fetch origin <deleted base>` and leaves the review gates red, as on lds#2913 and lds#2922.
   Compare the run's `pull_requests[].base.ref` with the PR's current base, and skip the run when they differ or the run lists no PR.
-  Merge main into the PR instead, which starts a new `pull_request` event.
+  Merge main into the PR instead, which starts a new `pull_request` event:
+  `MERGE_MAIN_FOR=base:<old base> git merge origin/main`, the fourth case of [`sync-with-main`](../../shared/workflow/sync-with-main.md).

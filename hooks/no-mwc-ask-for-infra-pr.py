@@ -9,7 +9,8 @@ merge grant, yet agents kept reporting such PRs as waiting on a merge word,
 because nothing made them classify the diff first.
 
 Denies a user-visible reply tool call (post_message, reply, update_message,
-edit_message) whose text mentions `mwc` and names a PR that is provably
+edit_message) whose text mentions `mwc`, or asks for a typed merge line such as
+`merge gha 2152 d6004d3` (ai-config#6021), and names a PR that is provably
 infrastructure: every PR in gha, macros or ai-config, or any Morrison-Lab PR
 whose changed paths all match no-unauthorized-merge.py's INFRA_PATH_PATTERNS
 (the single source of truth for "infra path"). A message that says the PR merges
@@ -33,6 +34,12 @@ INFRA_REPOS = frozenset({"gha", "macros", "ai-config"})
 URL_REF = re.compile(r"github\.com/([\w.-]+)/([\w.-]+)/pull/(\d+)", re.I)
 FULL_REF = re.compile(r"(?<![\w/.-])([\w.-]+)/([\w.-]+)#(\d+)\b")
 SHORT_REF = re.compile(r"(?<![\w/.#-])([A-Za-z][\w.-]*)#(\d+)\b")
+# A typed merge line, "merge gha 2152 d6004d3, ai-config 6008", names PRs as
+# "<repo> <N>" and never says mwc, so it gets its own trigger (ai-config#6021).
+MERGE_ITEM = r"(?:[\w.-]+/)?[A-Za-z][\w.-]*\s+#?\d+(?:\s+[0-9a-f]{7,40})?"
+MERGE_LINE = re.compile(rf"\bmerge\s+({MERGE_ITEM}(?:\s*(?:,|\band\b)\s*{MERGE_ITEM})*)", re.I)
+MERGE_REF = re.compile(r"(?:([\w.-]+)/)?([A-Za-z][\w.-]*)\s+#?(\d+)")
+NOT_A_REPO = frozenset({"pr", "prs", "main", "master", "the", "it", "this", "that", "all", "and"})
 
 REASON = (
     "[hook: no-mwc-ask-for-infra-pr] This message mentions `mwc` and names {ref}, which is an "
@@ -86,6 +93,12 @@ def refs(sentence):
         found.setdefault(m.start(), (m.group(1).lower(), m.group(2).lower(), int(m.group(3))))
     for m in SHORT_REF.finditer(sentence):
         found.setdefault(m.start(), (OWNER, m.group(1).lower(), int(m.group(2))))
+    for line in MERGE_LINE.finditer(sentence):
+        for m in MERGE_REF.finditer(line.group(1)):
+            if m.group(2).lower() in NOT_A_REPO:
+                continue
+            found.setdefault(line.start(1) + m.start(), (
+                (m.group(1) or OWNER).lower(), m.group(2).lower(), int(m.group(3))))
     return sorted(found.items())
 
 
@@ -157,13 +170,18 @@ def main() -> int:
             return 0
         tool_input = payload.get("tool_input")
         text = tool_input.get("text") if isinstance(tool_input, dict) else None
-        if not isinstance(text, str) or not MWC.search(text):
+        if not isinstance(text, str) or not (MWC.search(text) or MERGE_LINE.search(text)):
             return 0
         deadline = time.monotonic() + TOTAL_BUDGET_S
         checked = 0
         # A grant statement exempts only the PR reference nearest to it.
+        said_mwc = bool(MWC.search(text))
         for sentence in SENTENCE_SPLIT.split(text):
             found = refs(sentence)
+            if not said_mwc:
+                # Only the PRs a merge line names are asked about.
+                spans = [line.span(1) for line in MERGE_LINE.finditer(sentence)]
+                found = [f for f in found if any(a <= f[0] < b for a, b in spans)]
             exempt = exempt_refs(sentence, found)
             for position, (owner, repo, number) in found:
                 if position in exempt:

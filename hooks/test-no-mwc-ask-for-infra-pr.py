@@ -26,6 +26,15 @@ CASES = [
     ("no PR ref", POST, "Type mwc when ready.", False),
     ("other owner", POST, "mwc for someone/gha#1.", False),
     ("unrelated tool", "Bash", "mwc gha#1628", False),
+    # Typed merge lines (ai-config#6021).
+    ("merge line for ai-config", POST, "Please type: merge ai-config 6002 e29c99a2", True),
+    ("merge line list, second infra", POST, "merge lds 2922 5416eb2b, gha 2152 d6004d32", True),
+    ("merge line with and", POST, "merge lds 2922 and macros #349", True),
+    ("merge line, content only", POST, "merge lds 2922 5416eb2b", False),
+    ("merge line, infra named elsewhere", POST, "merge lds 2922. gha#2152 is clean.", False),
+    ("merge line, grant stated", POST, "No need to merge gha 2152 yourself: it merges under the infra grant.", False),
+    ("merge PR word", POST, "I will merge PR 2152 later.", False),
+    ("merge line owner/repo", POST, "merge Morrison-Lab/gha 2152", True),
     ("no text", POST, None, False),
 ]
 

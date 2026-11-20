@@ -114,6 +114,15 @@ one of:
 - **Missing definition link** --- a `#thm-`, `#lem-`, `#cor-`, or `#prp-` div
   links no definition; link each defined term it uses to its definition,
   or add the `check-result-definition-links: allow: reason` comment when it has none.
+- **Partial link** --- `check-term-links` finds the link text covering only part
+  of a defined term.
+  When finishing the link would mean pulling a function word into it, reword
+  the sentence so the linked phrase is a noun phrase naming the term, and never
+  widen the link over the function word.
+  On mds#844 and mds#858 a definition titled "Limit of a sequence" led an agent
+  to write `[limit of](...)`; "the [limit](...) of the sequence" is the fix.
+  The check's own handling is tracked in
+  [gha#2146](https://github.com/Morrison-Lab/gha/issues/2146).
 - **Doubled type word** --- the mention writes the type name in front of a
   crossref that already supplies it; drop the hand-written word.
 

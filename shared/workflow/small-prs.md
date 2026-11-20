@@ -67,6 +67,11 @@ that issue tracks both.
 - `hooks/no-oversized-pr-push.py` denies a `git push` of a branch over the cap, before CI is spent.
   A pure rename (no line changed) does not count toward the file cap.
   Clear it with an `ALLOW_LARGE_PR=1` prefix for a stacked branch whose base is not the default branch, or for a mechanical, content-identical move or split, and state why in the reply.
+  On 2026-11-19 the hook measured a stacked layer, [#5926](https://github.com/Morrison-Lab/ai-config/pull/5926), against `origin/main`,
+  so the measured diff included the changes of its unmerged base, [#5947](https://github.com/Morrison-Lab/ai-config/pull/5947)
+  ([ai-config#5873](https://github.com/Morrison-Lab/ai-config/issues/5873)).
+  In that auto-mode session the classifier refused the prefix on the layer ("[Undermining Oversight]").
+  The layer's push succeeded only after #5947 merged: once `origin/main` was merged into the layer, the hook's measured diff held only the layer's changes, under the cap, and the push needed no prefix.
 - gha's `check-pr-size` ([gha#1188](https://github.com/Morrison-Lab/gha/issues/1188)) fails the same PR in CI.
   The `size-exempt` label lifts it; put it on a mechanical, content-identical PR.
 - The caps are a decision, recorded here: 10 files and 300 lines, tight on purpose after Ezra changed "waves" to "minimal batches".

@@ -187,9 +187,11 @@ and an `opencode run "<prompt>"` attempt exited 127.
 That hook reads the transcript for the probes and the attempt only.
 It does not check the PR waiver note, which this file still requires.
 After the probes, the attempt and the note, the merge call with `expectedHeadSha` succeeded.
+The same hook refused the next PR's merge ([ai-config#5997](https://github.com/Morrison-Lab/ai-config/pull/5997)) because that PR had been pushed to (a merge of `main`) after the probes were run:
+the probes count only when they come after the PR's last push, so a merge of `main` into the branch means running them again.
 
 - **Do:** run the checker alone with literal arguments (literal `--annotations-read` ids included) and a plain trailing `echo "exit=$?"`.
-  Run the five probes and the `opencode` attempt in the same stride, post the waiver note, and only then call the merge.
+  Run the five probes and the `opencode` attempt in the same stride, after the PR's last push, post the waiver note, and only then call the merge.
 - **Don't:** pipe the checker, or put an expansion other than `$?` in its echo.
   Don't call the merge before the probes and the attempt are in the transcript.
 

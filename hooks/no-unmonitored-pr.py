@@ -165,12 +165,28 @@ def extract_pr_urls(path):
     return urls
 
 
-def read_json(path):
-    try:
-        with open(path, encoding="utf-8") as stream:
-            return json.load(stream)
-    except Exception:
-        return {}
+READ_ATTEMPTS = 3
+
+
+def read_state(path):
+    """`(state, True)` for a readable or missing state file, `(None, False)`
+    when it exists but stays unreadable after READ_ATTEMPTS tries.
+
+    A live poller rewrites the file with `os.replace` every POLL_SECONDS, and
+    on Windows a read that overlaps the replace can fail. Reading that as
+    "no poller" spawned a duplicate each time, and the duplicates fed each
+    other (ai-config#4009), so an unreadable file means "unknown" here."""
+    for attempt in range(READ_ATTEMPTS):
+        try:
+            with open(path, encoding="utf-8") as stream:
+                state = json.load(stream)
+            return (state if isinstance(state, dict) else {}), True
+        except FileNotFoundError:
+            return {}, True
+        except (OSError, ValueError):
+            if attempt + 1 < READ_ATTEMPTS:
+                time.sleep(0.05)
+    return None, False
 
 
 def write_json(path, value):
@@ -253,8 +269,11 @@ def start_monitor_for_url(url, cwd):
     if not url:
         return None
     path = monitor_path(url)
-    if alive(read_json(path).get("pid")):
+    state, readable = read_state(path)
+    if readable and alive(state.get("pid")):
         return False
+    if not readable and recently_written(path):
+        return False  # a live poller may be mid-replace (ai-config#4009)
     try:
         process = subprocess.Popen([sys.executable, os.path.realpath(__file__), "--poll", url, path],
                                    cwd=cwd, stdin=subprocess.DEVNULL,
@@ -275,10 +294,38 @@ def start_monitor(cwd):
     return start_monitor_for_url(url, cwd)
 
 
+FRESH_SECONDS = 3 * POLL_SECONDS
+
+
+def recently_written(path):
+    """True when `path` was modified within FRESH_SECONDS. An unreadable
+    file that old has no poller behind it, so it no longer blocks a spawn."""
+    try:
+        return time.time() - os.path.getmtime(path) < FRESH_SECONDS
+    except OSError:
+        return False
+
+
+def other_poller(state):
+    """True when `state` names a different, live poller that has written
+    within FRESH_SECONDS, so this one should stand down."""
+    pid = state.get("pid")
+    if pid is None or str(pid) == str(os.getpid()) or not alive(pid):
+        return False
+    try:
+        seen = max(float(state.get("checked_at") or 0), float(state.get("started_at") or 0))
+    except (TypeError, ValueError):
+        return False
+    return time.time() - seen < FRESH_SECONDS
+
+
 def poll(url, path):
     consecutive_errors = 0
     while True:
-        state = read_json(path)
+        state, readable = read_state(path)
+        if readable and other_poller(state):
+            return  # converge to one poller per URL (ai-config#4009)
+        state = state if readable else {}
         state.update({"url": url, "pid": os.getpid(), "checked_at": time.time()})
         data, error = None, "scripts/lib/pr_view.py did not load"
         if gh_pr_view is not None:

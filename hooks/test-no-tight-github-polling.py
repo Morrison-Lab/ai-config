@@ -19,10 +19,13 @@ CASES = [  # (command, denied)
     ("gh pr checks 12 --watch -R a/b --interval=30", True),
     ("gh pr checks 12 --watch --interval 120", False),
     ("gh run watch 99 -i60", True),
+    ("gh run watch 99 --interval 300", False),
+    ('echo "gh pr checks 12 --watch"', False),
     ("timeout 600 gh run watch 99", True),
     ("watch -n 5 gh pr checks 3", True),
     ("watch gh api repos/a/b/pulls/3", True),
     ("watch -n 1 ls", False),
+    ("watch -n 300 gh pr checks 3", False),
     ("while true; do gh pr checks 5; sleep 1m; done", True),
     ("while true; do gh pr checks 5; sleep 3m; done", False),
     ("until gh run view 1 --json status | grep -q completed; do sleep 5; done", True),
@@ -58,8 +61,10 @@ def denied(tool, command, env_extra=None, session=None):
 checks = [(f"Bash {c!r}", denied("Bash", c), want) for c, want in CASES]
 checks += [
     ("Monitor is gated too", denied("Monitor", "gh run watch 7"), True),
+    ("other tools pass", call("Read", {"file_path": "x"}), False),
     ("floor is configurable",
-     denied("Bash", "gh run watch 1 -i 30", {"AI_CONFIG_GH_POLL_FLOOR": "20"}), False),
+     denied("Bash", "gh pr checks 1 --watch --interval 30", {"AI_CONFIG_GH_POLL_FLOOR": "20"}),
+     False),
     ("kill switch", denied("Bash", "gh run watch 7", {"AI_CONFIG_NO_GITHUB_POLL_GUARD": "1"}),
      False),
 ]

@@ -374,7 +374,8 @@ See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever
 
 Where a transcript, skill or script waits for CI, flag a GitHub poll faster than every two minutes (`gh pr checks --watch` at its default, `watch`, or a loop with a short `sleep`), which emptied the shared budget twice on 2026-11-19 ([ai-config#5970](https://github.com/Morrison-Lab/ai-config/issues/5970)).
 Also flag the same GitHub read repeated with nothing changed in between, above all a head's check-run annotations read more than once.
-Read the commands yourself rather than reporting the output of `hooks/no-tight-github-polling.py`, as [`monitor-pushed-heads`](../../shared/workflow/monitor-pushed-heads.md) says.
+Read the commands yourself rather than reporting the output of `hooks/no-tight-github-polling.py`.
+The writer rule is in [`monitor-pushed-heads`](../../shared/workflow/monitor-pushed-heads.md).
 
 ## Figures with a cut value axis
 

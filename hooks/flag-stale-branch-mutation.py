@@ -159,7 +159,9 @@ PUSH = re.compile(
 )
 # A `cd <path>` at a command position, and a `-C <path>` among git's own
 # flags. Both move where the git command after them runs (ai-config#3204).
-CD = re.compile(_CMD_START + r"cd\s+", re.MULTILINE)
+# A `(` starts a command too, so `(cd x && ...)` and `$(cd x; ...)` count;
+# `_closes_before` then drops a `cd` whose group closes before the match.
+CD = re.compile(r"(?:^|[;&|\n(])\s*cd\s+", re.MULTILINE)
 GIT_C = re.compile(r"(?:^|\s)-C\s*")
 SEPARATOR = re.compile(r"[;&|\n]")
 
@@ -265,6 +267,22 @@ def _resolve(base, path):
     return os.path.normpath(os.path.join(base, os.path.expanduser(path)))
 
 
+def _closes_before(masked, start, end):
+    """True when a `(` group open at `start` closes before `end`: the `)`
+    that does it takes the depth below where `start` stood. Quotes and
+    comments are already blanked in `masked`, so a quoted `)` is not
+    counted."""
+    depth = 0
+    for char in masked[start:end]:
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth < 0:
+                return True
+    return False
+
+
 def _command_dir(match, stripped, masked, cwd):
     """The directory a matched git command runs in.
 
@@ -274,11 +292,16 @@ def _command_dir(match, stripped, masked, cwd):
     on every commit made in another worktree (ai-config#3204). Each `cd`
     before the match, then each `-C` among its git flags, moves the
     directory in turn, as the shell and git apply them.
+
+    A `cd` inside a subshell or command substitution that closes before the
+    match, as in `(cd /tmp && true) && git commit`, does not move it.
     """
     directory = cwd
     for cd in CD.finditer(masked):
         if cd.end() > match.start():
             break
+        if _closes_before(masked, cd.end(), match.start()):
+            continue
         directory = _resolve(directory, _first_word(stripped, masked, cd.end()))
     flags_end = match.start("sub")
     for flag in GIT_C.finditer(masked, match.start(), flags_end):

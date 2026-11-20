@@ -488,6 +488,23 @@ def sc_git_dash_c_other_worktree(hook_path):
     return verdict_of(hso), hso.get("additionalContext", "")
 
 
+def sc_cd_in_closed_subshell(hook_path):
+    """A `cd` inside a subshell that closes before the commit does not move
+    it: the commit still runs in the drifted main checkout, so it warns
+    (OpenCode review of ai-config#6012)."""
+    repo, wt, sid = _drifted_main_checkout(hook_path)
+    hso = call_hook(hook_path, f"(cd {wt} && true) && git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
+def sc_cd_in_open_subshell(hook_path):
+    """The commit inside the same subshell as the `cd` runs in the other
+    worktree, where nothing drifted."""
+    repo, wt, sid = _drifted_main_checkout(hook_path)
+    hso = call_hook(hook_path, f"(cd {wt} && git commit -m 'wip')", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
 def sc_selection_is_per_worktree(hook_path):
     """A branch selected in the main checkout is not compared against a
     commit in another worktree: each worktree has its own checkout."""
@@ -547,6 +564,8 @@ SHOULD_WARN = [
      "a branch shadowing a filename is recorded, so later drift off it still warns"),
     ("W11", sc_drift_inside_other_worktree,
      "a selection made in a worktree via `cd` warns when that worktree drifts"),
+    ("W12", sc_cd_in_closed_subshell,
+     "a `cd` in a subshell that closed before the commit does not move it"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -575,6 +594,8 @@ SHOULD_STAY_SILENT = [
      "`git -C <worktree>` moves the commit out of the drifted main checkout"),
     ("S18", sc_selection_is_per_worktree,
      "a selection in one worktree is not compared with another worktree's branch"),
+    ("S19", sc_cd_in_open_subshell,
+     "a `cd` in a subshell moves a commit made inside that subshell"),
 ]
 
 if not os.path.isfile(HOOK):
@@ -674,7 +695,13 @@ MUTATIONS = {
         "a leading `cd <path>` moves where the git command after it runs",
         [("        directory = _resolve(directory, _first_word(stripped, masked, cd.end()))",
           "        pass")],
-        {"S16"},
+        {"S16", "S19"},
+    ),
+    "closed-subshell-cd-is-dropped": (
+        "a `cd` whose subshell closes before the match does not move it",
+        [("        if _closes_before(masked, cd.end(), match.start()):",
+          "        if False:")],
+        {"W12"},
     ),
     "dash-c-moves-the-command": (
         "a `git -C <path>` moves where that git command runs",

@@ -56,7 +56,8 @@ until someone makes that decision and retires the graded item.
 When a notes repo holds several examples or exercises that teach the same idea with different numbers or data, sort the versions in order.
 The first is a worked example (`#exm-`) and the second an in-notes exercise (`#exr-`).
 The third may be a lab exercise, and only as a different version: a lab never reuses a lecture example or exercise, because labs have their own set, parallel to the lecture's.
-Move the fourth and every later version to the evaluation repo's exercise bank (`exercises/` in `mlg`) for homeworks and exams.
+Move every version beyond those slots to the evaluation repo's exercise bank (`exercises/` in `mlg`) for homeworks and exams:
+the fourth and later where a lab takes the third, and the third and later where the course or topic has no lab exercise.
 
 - The move is intentional in the sense of the section above: the PR says so, the item and its solution leave the notes, and the item joins the question bank.
 - Never bank a version that stays in the notes (the example, the exercise or a lab exercise), and never leave a banked item's solution in the notes.
@@ -79,7 +80,8 @@ Move the fourth and every later version to the evaluation repo's exercise bank (
   Human-facing copy: [psw#682](https://github.com/Morrison-Lab/psw/pull/682), the section "Keep each question an exercise, and give examples to definitions and results" in psw's `chapters/teaching.qmd`.)
 - No exact detector exists, since a repeat need not share a slug, a source item or a heading.
   lds has `tools/check_redundant_examples.py`, a warn-only list that compares wording after masking numbers, math and code,
-  and marks `LAB` a lab exercise (`#exr-lab-`) that repeats a lecture item.
+  and marks `LAB` a lab exercise (`#exr-lab-`) that reuses a lecture item (same dataset, or word for word).
+  A lab on the same idea with other numbers or data is the allowed third version.
   The rule also covers ISL-lab ports, where one lab step repeats across data sets: `port-source-exercises` keeps one data set in the notes and banks the rest.
 
 (Ezra, 2026-11-19: "if we have redundant examples or exercises in notes with different example numbers or data, pick one version as an example, one version as an in-notes exercise, and put the rest into the exercise bank for homeworks and exams".

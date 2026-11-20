@@ -104,7 +104,8 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 - **Sort redundant versions: example, exercise, lab exercise, then the bank** (Ezra, 2026-11-19, amended 2026-11-20).
   When examples or exercises repeat one idea with different numbers or data, keep the first as a worked `#exm-` and the second as an in-notes `#exr-`.
   The third may be a lab exercise, where the course has labs.
-  Move the fourth and later to the exercise bank for homeworks and exams.
+  Move every version beyond those slots to the exercise bank for homeworks and exams:
+  the fourth and later where a lab takes the third, and the third and later where there is no lab exercise.
   A lab never reuses a lecture example or exercise: labs have their own set, parallel to the lecture's.
   See [`course-repos`](../../memories/course-repos.md) for where the bank lives and how to move an item.
   Apply it to a passage you are editing, not as a sweep.

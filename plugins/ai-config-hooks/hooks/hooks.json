@@ -1453,6 +1453,13 @@
             "timeout": 10,
             "script": "no-cross-repo-copy.py",
             "why": "Ezra, 2026-11-16: \"don't copy; decompose\" (ai-config#5709). A session proposed copying lds and mlg's cluster render setup into mcsg instead of factoring it into one reusable component. DENIES a Write of a new file whose content mostly repeats (15+ shared lines, 70%+ of its lines over 3 characters) a same-named file in a sibling repository, or a Bash cp, rsync or install that copies a file of 15+ lines from one repository to a new path in another, a repository being identified by its common git dir so a linked worktree is not another repository. Vendored paths, a thin caller of a gha reusable workflow, a remote or existing destination, and a '# decompose: allow <reason>' comment pass. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-delete-flagged-term.py\"'",
+            "timeout": 60,
+            "script": "no-delete-flagged-term.py",
+            "why": "Ezra, 2026-11-20: \"never remove technical terms that get flagged as unlinked; always link to them to a definition instead, writing one if necessary\" (ai-config#6009). A session dropped 'finite' from an lds exercise (lds#3017) to quiet check-term-links, which then passed. DENIES a Write/Edit/MultiEdit of a .qmd or .md file, in a repository whose workflows call gha's check-term-links, that rewords lines (difflib ratio 0.5 or more) where the check flags a term as unlinked or undefined and leaves the file with fewer uses of that term. Pure deletions, wholesale rewrites and a term moved within the file pass. ALLOW_DELETE_FLAGGED_TERM=1 clears it. Fails open when there is no caller, no gha checkout, or the check errors."
           }
         ]
       },

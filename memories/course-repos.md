@@ -67,6 +67,16 @@ Move the fourth and every later version to the evaluation repo's exercise bank (
 - Apply it to a passage you are editing anyway, not as a sweep ([`no-sweeps-by-default`](../shared/workflow/no-sweeps-by-default.md)).
   List other candidates in one issue for Ezra to release.
 - A parallel pair that teaches two different things (LDA and QDA discriminant functions) is not redundant.
+- Only definitions and results need worked examples, so the first version is an `#exm-` only when it illustrates a definition or result.
+  A hand-workable toy question stays an `#exr-` with its `#sol-`, never converted to an `#exm-`.
+  A real-data version of the same question follows the toy as a second exercise, in the notes:
+  the toy practices the method by hand and the real-data version practices applying it to data with code,
+  so the pair is not redundant and neither member goes to the bank or to a lab.
+  (Ezra, 2026-11-20:
+  "maybe we should keep the toy examples in https://github.com/Morrison-Lab/lds/pull/2913 as exercises?
+  only definitions and results really need examples?",
+  then "Both stay as exercises" on the follow-up card.
+  Human-facing copy: [psw#682](https://github.com/Morrison-Lab/psw/pull/682), the section "Keep each question an exercise, and give examples to definitions and results" in psw's `chapters/teaching.qmd`.)
 - No exact detector exists, since a repeat need not share a slug, a source item or a heading.
   lds has `tools/check_redundant_examples.py`, a warn-only list that compares wording after masking numbers, math and code,
   and marks `LAB` a lab exercise (`#exr-lab-`) that repeats a lecture item.

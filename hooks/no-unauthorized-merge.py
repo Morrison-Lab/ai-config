@@ -1728,6 +1728,12 @@ def granted_merge_target(masked_seg: str, inert_seg: str) -> str | None:
     The shared half of both standing grants: the merge-type and target
     ambiguity tests `standing_grant_target` documents. None means "not a
     determination", and every caller denies on it.
+
+    Known gap (ai-config#5959): this reads the command text, not gh's own
+    argument parsing, so a decoy `repos/O/R/pulls/N/merge` in a field or a
+    repeated `--repo` can name another target than gh merges. The mwr grant
+    no longer reads this route (round 12); the named, standing and infra
+    grants still do.
     """
     labels = matched_merge_labels(masked_seg, inert_seg)
     if not labels or not labels <= STANDING_GRANT_LABELS:
@@ -1864,6 +1870,8 @@ def merge_pr_number(inert_seg: str) -> int | None:
 
     Only a bare decimal number counts. A PR URL or branch name, or no
     argument at all (the current branch's PR), is not a number and denies.
+    A decoy `pulls/N/merge` placed in a field is a known gap of this parser
+    on the routes that still read it (ai-config#5959).
     """
     numbers = set(m.group(1) for m in _PULLS_MERGE_NUMBER.finditer(inert_seg))
     tail = pr_merge_tail(inert_seg)
@@ -2259,37 +2267,81 @@ def _load_merge_word_detector():
         return None
 
 
-def _user_prompts(transcript_path: str):
-    """Each prompt the user typed, oldest first; tool results, meta and sidechain records skipped."""
+def _prompt_text(rec) -> str | None:
+    """The text the user typed in transcript record `rec`, or None.
+
+    Tool results, meta, sidechain and compact-summary records are not typed
+    prompts and give None.
+    """
+    if not isinstance(rec, dict) or rec.get("type") != "user":
+        return None
+    if rec.get("isMeta") or rec.get("isSidechain") or rec.get("isCompactSummary"):
+        return None
+    if "toolUseResult" in rec:
+        return None
+    msg = rec.get("message")
+    content = msg.get("content") if isinstance(msg, dict) else None
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
+            return None
+        text = "\n".join(b.get("text", "") for b in content
+                         if isinstance(b, dict) and b.get("type") == "text")
+        return text or None
+    return None
+
+
+def _mwr_grant_source(rec) -> str | None:
+    """Which kind of record may START an mwr grant: "typed", "sdk", or None.
+
+    The strict allowlist (round 7). "typed" is a typed CLI prompt: no
+    `promptSource` key and no `origin` key (the merge-word hook then also
+    refuses text that opens with `<`). "sdk" is an SDK principal wake:
+    `promptSource == "sdk"` with an `origin` whose `kind` is "human" (the
+    hook then requires the text to open with `<wake` and a double-quoted
+    human-principal `<message>` tag). Every other record, `promptSource`
+    "system", any other origin, an SDK record with no origin, is None and
+    can only revoke. `type: user` and not-isMeta are `_prompt_text`'s.
+    """
+    has_source = "promptSource" in rec
+    has_origin = "origin" in rec
+    if not has_source and not has_origin:
+        return "typed"
+    if rec.get("promptSource") == "sdk" and has_origin:
+        origin = rec.get("origin")
+        if isinstance(origin, dict) and origin.get("kind") == "human":
+            return "sdk"
+    return None
+
+
+def _transcript_records(transcript_path: str):
+    """Each JSON record of the transcript, oldest first; unparsable lines skipped."""
     with open(transcript_path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
                 rec = json.loads(line)
             except ValueError:
                 continue
-            if not isinstance(rec, dict) or rec.get("type") != "user":
-                continue
-            if rec.get("isMeta") or rec.get("isSidechain") or rec.get("isCompactSummary"):
-                continue
-            if "toolUseResult" in rec:
-                continue
-            msg = rec.get("message")
-            content = msg.get("content") if isinstance(msg, dict) else None
-            if isinstance(content, str):
-                yield content
-            elif isinstance(content, list):
-                if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
-                    continue
-                text = "\n".join(b.get("text", "") for b in content
-                                 if isinstance(b, dict) and b.get("type") == "text")
-                if text:
-                    yield text
+            if isinstance(rec, dict):
+                yield rec
+
+
+def _user_prompts(transcript_path: str):
+    """Each prompt the user typed, oldest first; tool results, meta and sidechain records skipped."""
+    for rec in _transcript_records(transcript_path):
+        text = _prompt_text(rec)
+        if text is not None:
+            yield text
 
 
 def transcript_merge_grant(payload: dict | None = None) -> bool:
     """Whether this session's latest merge word or revocation is a grant (ai-config#5612).
 
     Needs no Bash call, so a cloud session can merge with the MCP tool.
+    Unlike the mwr grant, this reads every non-meta user record, whatever
+    its `promptSource` or `origin`; that exposure is pre-existing and
+    tracked in ai-config#5959.
     """
     path = (payload or {}).get("transcript_path") or (payload or {}).get("transcriptPath")
     if not isinstance(path, str) or not path.strip() or not os.path.isfile(path.strip()):
@@ -2342,6 +2394,131 @@ def transcript_named_grant(payload: dict | None, target: str | None, number: int
         return False
     repo = target.split("/")[-1].lower() if target else None
     return any(n == number and (r is None or r == repo) for r, n in granted)
+
+
+# The owner a bare "name#N" mwr reference means (round 4). A fixed constant,
+# never read from a checkout: the agent chooses the cwd and can repoint its
+# origin, and no scan of later tool calls can rule that out.
+MWR_DEFAULT_OWNER = "morrison-lab"
+
+
+def _mwr_spec(ref_repo) -> str | None:
+    """The "owner/name" an mwr reference names, lowercased, or None.
+
+    "owner/name#N" and a PR URL name their repository; a bare "name#N"
+    means Morrison-Lab/name. A repo-less "#N" or "PR N" names no
+    repository, so it is None and grants nothing.
+    """
+    if not isinstance(ref_repo, str) or not ref_repo.strip():
+        return None
+    ref_repo = ref_repo.strip().lower()
+    return ref_repo if "/" in ref_repo else f"{MWR_DEFAULT_OWNER}/{ref_repo}"
+
+
+def _queued_prompt(rec) -> str | None:
+    """The text of a message the user typed while the agent was working, or None.
+
+    Claude Code records it as an `attachment` of type `queued_command`.
+    Task notifications and peer messages are skipped, as
+    no-unapproved-announcement.py and no-unnamed-repo-pr.py skip them.
+    """
+    if not isinstance(rec, dict) or rec.get("isSidechain"):
+        return None
+    att = rec.get("attachment")
+    if not isinstance(att, dict) or att.get("type") != "queued_command":
+        return None
+    if att.get("commandMode") == "task-notification":
+        return None
+    origin = att.get("origin")
+    if isinstance(origin, dict) and origin.get("kind") == "peer":
+        return None
+    return str(att.get("prompt") or "")
+
+
+def transcript_mwr_grant(payload: dict | None = None, target: str | None = None,
+                         number: int | None = None) -> bool:
+    """Whether the user typed an `mwr`/`mwrs` grant that covers this merge (ai-config#3946).
+
+    Read from the transcript with the merge-word hook's `mwr_grant()`, as
+    transcript_merge_grant() reads `mwc`; no file marker. Only a whole
+    message that is the grant counts ("mwr #5940", "mwrs").
+
+    The grant covers a PR merge only: the caller must have determined the
+    one repository (`target`) and PR `number` of a `gh pr merge`, a
+    `gh api .../pulls/N/merge` or the MCP merge tool. Anything else, a
+    branch merge through `repos/O/R/merges` included, gets no mwr grant,
+    blanket or named, since no CI gate reads those routes.
+
+    A grant that names its PRs covers those PRs only; `mwrs` alone covers
+    every PR merge of the session. A bare `mwr` names no PR and grants
+    nothing, and neither does a repo-less "#N" or "PR N" (round 4): a
+    checkout's origin cannot stand in for the repository, since the agent
+    chooses the cwd. A bare "name#N" means Morrison-Lab/name (`_mwr_spec`).
+    A later revocation, the mwr-only kind included, clears every mwr grant
+    before it, and so does one the user typed while the agent was working
+    (a `queued_command` record), which can revoke but never grant.
+    Only an allowlisted record starts a grant (`_mwr_grant_source`, round
+    7): a typed CLI prompt (no `promptSource`, no `origin`, text not opening
+    with `<`), or an SDK principal wake (`promptSource == "sdk"`, an
+    `origin` of kind "human", text opening with `<wake`, and a `<message>`
+    tag with double-quoted from="human", trust="principal" and
+    trigger="true"). Every other record can only revoke, and
+    `<cited author="user">` never grants.
+
+    This is PERMISSION only. block-merge-without-clean-checker.py still
+    needs the checker's MERGE-READY line for the merge's own head, and only
+    under this grant does that line stand in for FULLY CLEAN. Fails closed:
+    any read error is no grant.
+    """
+    if not isinstance(target, str) or not target.strip() or number is None:
+        return False
+    path = (payload or {}).get("transcript_path") or (payload or {}).get("transcriptPath")
+    if not isinstance(path, str) or not path.strip() or not os.path.isfile(path.strip()):
+        return False
+    detector = _load_merge_word_detector()
+    if (detector is None or not hasattr(detector, "mwr_grant")
+            or not hasattr(detector, "revokes_mwr")):
+        return False
+    blanket = False
+    named = set()   # ("owner/name", number)
+    try:
+        for rec in _transcript_records(path.strip()):
+            queued = _queued_prompt(rec)
+            if queued is not None:
+                # Typed mid-turn: it can only revoke (round 4, finding 1).
+                if detector.revokes_mwr(queued):
+                    blanket, named = False, set()
+                continue
+            prompt = _prompt_text(rec)
+            if prompt is None:
+                continue
+            if detector.revokes_mwr(prompt):
+                blanket, named = False, set()
+                continue
+            # Only an allowlisted record can START a grant (round 7): a typed
+            # CLI prompt, or an SDK principal wake with a human origin. Any
+            # other record, promptSource "system" or an SDK record with no
+            # origin included, was read above for revocation only.
+            source = _mwr_grant_source(rec)
+            if source == "typed":
+                grant = detector.mwr_grant(prompt)
+            elif source == "sdk":
+                grant = detector.mwr_grant(prompt, sdk=True)
+            else:
+                continue
+            if grant == detector.MWR_ALL:
+                blanket = True
+                continue
+            for ref_repo, ref_num in grant or ():
+                spec = _mwr_spec(ref_repo)
+                if spec is not None:
+                    named.add((spec, ref_num))
+    except Exception as exc:
+        print(f"no-unauthorized-merge: mwr-grant read failed ({exc})", file=sys.stderr)
+        return False
+    if blanket:
+        return True
+    return (target.strip().lower(), number) in named
 
 
 def check_mwc_active(payload: dict | None = None) -> bool:
@@ -2484,6 +2661,12 @@ def offending(command: str, payload: dict | None = None):
                 payload, granted_merge_target(masked_command[start:end], inert_command[start:end]),
                 merge_pr_number(inert_command[start:end])):
             continue
+        # No mwr grant on this route (round 12): a typed `mwr`/`mwrs` grants
+        # the MCP merge tool only (check_mcp_merge), whose input is strict.
+        # A free-form gh or curl command is parsed here differently from
+        # how gh, curl or the server read it (a decoy path in a field, a
+        # repeated --repo, a sha pin the server ignores), so under mwr alone
+        # it is denied as if no grant existed.
         if standing_grant_target(masked_command[start:end], inert_command[start:end]):
             continue  # Allowed via the standing per-repository grant
         if standing_infra_grant(masked_command[start:end], inert_command[start:end]):
@@ -2495,7 +2678,12 @@ def offending(command: str, payload: dict | None = None):
         # "gh api PR merge", pointing whoever is debugging the refusal at
         # patterns that explain nothing.
         labels = matched_merge_labels(masked_command[start:end], inert_command[start:end])
-        return labels, orig_seg.strip()
+        note = ""
+        if payload is not None and transcript_mwr_grant(
+                payload, granted_merge_target(masked_command[start:end], inert_command[start:end]),
+                merge_pr_number(inert_command[start:end])):
+            note = MWR_MCP_ONLY_TEXT
+        return labels, orig_seg.strip(), note
     return None
 
 
@@ -2506,10 +2694,87 @@ def is_mcp_merge_tool(tool_name: str) -> bool:
     return bool(re.search(r"(?:^|__)(?:merge_pull_request|(?:enable|disable)_(?:pull_request_|pr_)?auto_merge)$", name))
 
 
-def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
+MCP_PULL_KEYS = ("pullNumber", "pull_number", "number")
+
+
+def mcp_pull_number(tool_input: dict) -> tuple[bool, object]:
+    """(ok, value) for the PR number of an MCP merge input.
+
+    The GitHub MCP server acts on `pullNumber` and ignores unknown keys, so a
+    call carrying `pull_number=5, pullNumber=6` merges PR 6, while a hook
+    that read `pull_number` first would check PR 5. When more than one of
+    MCP_PULL_KEYS is present and their values differ after `str().strip()`,
+    ok is False and the caller denies; otherwise the value is `pullNumber`'s,
+    or the one alternate key's. Every merge hook reads the repository from
+    `owner` and `repo` only, the server's own keys, so those need no such
+    check. The same logic is copied in block-merge-without-clean-checker.py
+    and enforce-mwc-review-gate.py, which cannot import this file.
+    """
+    present = [tool_input[k] for k in MCP_PULL_KEYS
+               if k in tool_input and tool_input[k] is not None]
+    if len({str(v).strip() for v in present}) > 1:
+        return False, None
+    return True, (present[0] if present else None)
+
+
+# The keys of the GitHub MCP merge tool's input schema (round 12). Under an
+# mwr grant with no other authority, the input may hold these keys only.
+MWR_MCP_KEYS = frozenset({"owner", "repo", "pullNumber", "expectedHeadSha",
+                          "merge_method", "commit_title", "commit_message"})
+MWR_SHA40 = re.compile(r"[0-9a-f]{40}")
+
+MWR_MCP_ONLY_TEXT = (
+    "Under an `mwr` or `mwrs` grant with no other authority, the only merge route "
+    "is the MCP merge tool `mcp__github__merge_pull_request`, with `owner`, `repo`, "
+    "`pullNumber`, and `expectedHeadSha` set to the full 40-character lowercase head "
+    "sha, and no key outside the tool's schema (`owner`, `repo`, `pullNumber`, "
+    "`expectedHeadSha`, `merge_method`, `commit_title`, `commit_message`). A `gh` or "
+    "`curl` merge is refused under `mwr`, since the hooks cannot read its target and "
+    "sha pin the way gh, curl and the server do."
+)
+
+
+def mwr_mcp_input_problem(tool_input) -> str:
+    """Return "" when an MCP merge input is strict enough for an mwr-only merge, else why not.
+
+    Round 12: an mwr-only merge goes through the MCP merge tool alone, with
+    every key in MWR_MCP_KEYS (so no `pull_number`, `number` or
+    `expected_head_sha` the server ignores), non-empty string `owner` and
+    `repo`, a `pullNumber` that is an int or a string of ASCII digits, and an
+    `expectedHeadSha` of exactly 40 lowercase hex characters, which GitHub
+    enforces at merge time. block-merge-without-clean-checker.py and
+    enforce-mwc-review-gate.py read this function as the one copy.
+    """
+    if not isinstance(tool_input, dict):
+        return "the tool input is not an object."
+    extra = sorted(str(k) for k in tool_input if k not in MWR_MCP_KEYS)
+    if extra:
+        return f"the input holds keys outside the tool schema: {extra!r}."
+    for key in ("owner", "repo"):
+        val = tool_input.get(key)
+        if not isinstance(val, str) or not val.strip():
+            return f"`{key}` is missing or not a non-empty string."
+    num = tool_input.get("pullNumber")
+    if isinstance(num, bool) or not (
+            (isinstance(num, int) and num > 0)
+            or (isinstance(num, str) and re.fullmatch(r"[0-9]+", num) and int(num) > 0)):
+        return f"`pullNumber` is not a positive int or digit string: {num!r}."
+    sha = tool_input.get("expectedHeadSha")
+    if not isinstance(sha, str) or not MWR_SHA40.fullmatch(sha):
+        return f"`expectedHeadSha` is not 40 lowercase hex characters: {sha!r}."
+    return ""
+
+
+def check_mcp_merge(payload: dict) -> tuple[str, str] | tuple[str, str, str] | None:
     tool_input = payload.get("tool_input")
     tool_input = tool_input if isinstance(tool_input, dict) else {}
     tool_name = payload.get("tool_name") or "mcp__github__merge_pull_request"
+
+    # Conflicting PR-number keys: the server merges `pullNumber` while a
+    # grant check could read another key, so no grant or override applies.
+    if not mcp_pull_number(tool_input)[0]:
+        keys = {k: tool_input[k] for k in MCP_PULL_KEYS if k in tool_input}
+        return tool_name, f"{tool_name}(conflicting PR number keys {keys!r})"
 
     if tool_input.get("allow_merge") in (1, "1", True) or tool_input.get("ALLOW_MERGE") in (1, "1", True):
         return None
@@ -2524,7 +2789,8 @@ def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
         if target in STANDING_MERGE_GRANT_REPOS:
             return None
 
-    pull_num = tool_input.get("pull_number") or tool_input.get("pullNumber") or tool_input.get("number") or ""
+    pull_num = mcp_pull_number(tool_input)[1]
+    pull_num = "" if pull_num is None else pull_num
     # A typed "merge PR N" grants that PR through the merge tool only, not
     # auto-merge (ai-config#5703).
     if (tool_name.lower().endswith("merge_pull_request")
@@ -2535,6 +2801,18 @@ def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
                 and owner.strip() and repo.strip() else None,
                 int(str(pull_num).strip()))):
         return None
+    # A typed `mwr`/`mwrs` grants the merge tool only, not auto-merge
+    # (ai-config#3946), and only on a strict input (round 12).
+    mwr_problem = ""
+    if (tool_name.lower().endswith("merge_pull_request")
+            and transcript_mwr_grant(
+                payload,
+                f"{owner.strip()}/{repo.strip()}" if isinstance(owner, str) and isinstance(repo, str)
+                and owner.strip() and repo.strip() else None,
+                int(str(pull_num).strip()) if str(pull_num).strip().isdigit() else None)):
+        mwr_problem = mwr_mcp_input_problem(tool_input)
+        if not mwr_problem:
+            return None
     mcp_sha = tool_input.get("expectedHeadSha") or tool_input.get("expected_head_sha") or ""
     # The infra-PR grant covers the merge tool only: enabling auto-merge
     # merges whatever the PR holds when checks pass, not what it holds now.
@@ -2545,6 +2823,8 @@ def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
             and infra_grant_applies(f"{owner.strip()}/{repo.strip()}", int(str(pull_num).strip()), mcp_sha.strip())):
         return None
     segment = f"{tool_name}(owner='{owner}', repo='{repo}', pull='{pull_num}')"
+    if mwr_problem:
+        return tool_name, segment, f"The mwr grant does not apply: {mwr_problem} {MWR_MCP_ONLY_TEXT}"
     return tool_name, segment
 
 
@@ -2609,7 +2889,8 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
         return 0
 
-    label_or_labels, segment = hit
+    label_or_labels, segment = hit[0], hit[1]
+    mwr_note = hit[2] if len(hit) > 2 else ""
     # check_mcp_merge (the MCP path) returns a single label string; offending
     # (the Bash path) returns the full set every interpretation matches, per
     # ai-config#1362. Normalize both to a set before rendering.
@@ -2620,14 +2901,24 @@ def main() -> int:
         f"MECHANISTIC PROHIBITION: {_join_labels(labels)} {verb} strictly "
         "blocked without explicit permission.\n\n"
         f"    Offending call/segment: {segment}\n\n"
+        + (f"{mwr_note}\n\n" if mwr_note else "")
+        +
         "AI agents are mechanistically forbidden from merging PRs/MRs unless explicitly instructed "
         "by the user, executing under an explicit override (e.g. ALLOW_MERGE=1 or active /mwc), or "
         "merging a PR whose target repo carries a standing grant (see STANDING_MERGE_GRANT_REPOS), "
         "or merging an infra-only PR under the standing infra-PR grant (see INFRA_PATH_PATTERNS).\n\n"
-        "A plain-English grant the user typed in this session (`mwc`, \"merge them all\", "
+        "A plain-English grant the user typed in this session (`mwc`, `mwr`, `mwrs`, \"merge them all\", "
         "\"merge when ready\") is read from the transcript and needs no command; if one was "
         "given and this still blocks, the words were not recognized, so say so rather than "
-        "retrying. Otherwise, only if the user gave a grant (possibly relayed with their "
+        "retrying. An `mwr` grant is read only from a message that is nothing but the grant "
+        "and names the PR with its repository (\"mwr owner/repo#N\", or \"mwr repo#N\" "
+        "for Morrison-Lab/repo); a bare `mwr`, or a repo-less \"mwr #N\", grants nothing, so "
+        "ask the user to name the repository and PR, or to type `mwrs` for the session. Under `mwr` only a PR merge "
+        "through `mcp__github__merge_pull_request` is granted, with `expectedHeadSha` set to "
+        "the full head sha; `gh` and `curl` merges are refused. An `mwr` or "
+        "`mwrs` grant is not an `mwc` grant: for a merge `mwr` does not cover, ask the user "
+        "to type `mwc`, and never run `ai-session.sh enable-mwc` on the strength of `mwr`. "
+        "Otherwise, only if the user gave an `mwc` grant (possibly relayed with their "
         "message id), run `ai-session.sh enable-mwc`, confirm with `check-mwc`, then retry. "
         "Without that grant, do not merge.\n\n"
         + mwc_diagnosis(payload)

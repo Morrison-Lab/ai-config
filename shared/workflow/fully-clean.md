@@ -2121,7 +2121,7 @@ The merge-state read is already owed by the conflict bullets earlier in this fil
 ai-config#5246 skipped it and was reported final at 6c456cc9 while it conflicted with `main` (coordinator, 2026-11-10).
 No hook requires that read yet: extending the hook above to do so is tracked in [ai-config#5252](https://github.com/Morrison-Lab/ai-config/issues/5252).
 
-(Measured 2026-11-19 in a cloud session on ai-config#5997.
+(Measured 2026-11-19 in a cloud session on [ai-config#5997](https://github.com/Morrison-Lab/ai-config/pull/5997).
 Every real run was green, yet `scripts/check-pr-fully-clean.py` still refused:
 the `lint-qmd / lint-qmd` check run (run 44699146232, job 136163026756) read status `in_progress` with conclusion `success` and a `completed_at`,
 while its owning `validate` run, a push-event run, was already `completed` and `success`.

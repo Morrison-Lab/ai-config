@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse: do not ask the user for hand work the agent can do itself.
+"""PreToolUse and Stop: do not ask the user for hand work the agent can do itself.
 
 ai-config#4698; shared/workflow/lab-operating-rules.md. Ezra, 2026-10-23:
 "don't make me intervene manually to prompt threads to \"go\" if there's any
@@ -28,10 +28,30 @@ once, for merges ask for the plain `mwc` word, and for a file edit write an
 idempotent script, test it, ask permission, and run it yourself (ai-config#4842
 replaced the earlier fallback of giving the user one command to run it).
 Fails open on parse trouble.
+
+Stop (ai-config#5797): a plain Claude Code final message is no tool call, so the
+PreToolUse matcher never saw it. On 2026-11-17 a lds session told Ezra "merge them
+in the GitHub UI" and "type `mwc all` in a local session". The Stop event scans
+the final assistant message (fenced code blocks removed) with the same asks and
+blocks the stop once per turn through `stop_notice`, so the agent reads the
+reason and rewrites the message.
 """
 import json
+import os
 import re
 import sys
+
+_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+
+try:
+    from fences import strip_fences
+except Exception:  # broken install: scan the message unstripped
+    strip_fences = None
 
 REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
 
@@ -99,7 +119,15 @@ ASKS = (
         re.I)),
     ("a merge button or manual merge", re.compile(
         r"\b(?:click|press|hit|tap)\b[^.\n]{0,30}\bmerge\b[^.\n]{0,20}\bbutton\b"
-        r"|\bmerge (?:it|them|the PRs?) (?:yourself|manually|by hand)\b",
+        r"|\bmerge (?:it|them|the PRs?) (?:yourself|manually|by hand)\b"
+        # A merge sent to the GitHub UI (ai-config#5797), as an imperative or a
+        # need-to ask. "I cannot merge ... in the UI" has no lead-in and passes.
+        r"|(?:" + LEAD + r"|\byou(?:'ll|\s+will)?\s+(?:need to|have to|must|should)\s+)merge\b[^.\n]{0,60}"
+        r"\b(?:in|via|through|from|on)\s+the\s+(?:GitHub\s+|GH\s+)?(?:web\s+)?(?:UI|interface|site|website|browser)\b"
+        # The typed `mwc` word sent to a local session (ai-config#5797). A plain
+        # "type `mwc`" ask is the substitute the rule asks for and passes.
+        r"|\b(?:type|say|send|enter|reply)\b[^.\n]{0,15}\bmwc\b[^.\n]{0,40}"
+        r"\b(?:locally|local\s+(?:session|terminal|Claude)|in\s+a\s+local)\b",
         re.I)),
     (COMMAND_ASK, re.compile(
         LEAD + r"(?:type|run|paste|enter|execute)\b[^.\n]{0,60}"
@@ -159,6 +187,54 @@ def scripted(text: str, match: re.Match) -> bool:
     return bool(SCRIPT_COMMAND.search(sentence_of(text, match)))
 
 
+def find_ask(text: str) -> str:
+    """The kind of hand work the text asks the user for, or "" when it asks for none."""
+    for what, pattern in ASKS:
+        for match in pattern.finditer(text):
+            if what == FILE_ASK and scripted(text, match):
+                continue
+            if what == COMMAND_ASK and SECRET.search(sentence_of(text, match)):
+                continue
+            return what
+    return ""
+
+
+# transcript-shapes-skip: antigravity -- an Antigravity session runs no Claude Code Stop hook, and the Stop payload's last_assistant_message is read first.
+def transcript_last_text(path: str) -> str:
+    """The text blocks of the last assistant message in a JSONL transcript, or ""."""
+    last = ""
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as handle:
+            for line in handle:
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(event, dict) or event.get("isSidechain"):
+                    continue
+                message = event.get("message")
+                blocks = message.get("content") if isinstance(message, dict) else None
+                if event.get("type") != "assistant" or not isinstance(blocks, list):
+                    continue
+                text = "".join(
+                    b.get("text", "") for b in blocks
+                    if isinstance(b, dict) and b.get("type") == "text")
+                if text.strip():
+                    last = text
+    except OSError:
+        return ""
+    return last
+
+
+def stop_text(payload: dict) -> str:
+    """The final assistant message of a Stop event, fenced code blocks removed."""
+    text = payload.get("last_assistant_message")
+    if not isinstance(text, str) or not text.strip():
+        path = payload.get("transcript_path") or payload.get("transcriptPath")
+        text = transcript_last_text(path) if isinstance(path, str) and path else ""
+    return strip_fences(text) if strip_fences else text
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -166,26 +242,26 @@ def main() -> int:
         return 0
     if not isinstance(payload, dict):
         return 0
+    if payload.get("hook_event_name") == "Stop":
+        what = find_ask(stop_text(payload))
+        if what:
+            print(stop_notice(payload, REASON.format(what=what), "no-manual-step-ask"))
+        return 0
     if not REPLY_TOOL.search(str(payload.get("tool_name") or "")):
         return 0
     tool_input = payload.get("tool_input")
     text = tool_input.get("text") if isinstance(tool_input, dict) else None
     if not isinstance(text, str):
         return 0
-    for what, pattern in ASKS:
-        for match in pattern.finditer(text):
-            if what == FILE_ASK and scripted(text, match):
-                continue
-            if what == COMMAND_ASK and SECRET.search(sentence_of(text, match)):
-                continue
-            print(json.dumps({
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": REASON.format(what=what),
-                }
-            }))
-            return 0
+    what = find_ask(text)
+    if what:
+        print(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": REASON.format(what=what),
+            }
+        }))
     return 0
 
 

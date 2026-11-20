@@ -41,7 +41,8 @@ ASK = re.compile(
 
 DONE = re.compile(r"\bwithout\s+(?:asking|waiting\s+for\s+(?:you|ezra)|your\s+word)\b|\bnever\s+ask", re.I)
 
-SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
+# Clauses, not only sentences: "The deck needs your approval; slide v3 done." is two.
+SPLIT = re.compile(r"(?<=[.!?;])\s+|\n+")
 
 REASON = (
     '[hook: no-ask-to-slide-tag] "{sentence}" asks leave to slide a floating tag, or hands '

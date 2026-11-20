@@ -41,7 +41,7 @@ class Repo:
     def __enter__(self):
         self.tmp = tempfile.TemporaryDirectory()
         root = self.tmp.name
-        subprocess.run(["git", "init", "-q", root], check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main", root], check=True)
         Path(root, "page.qmd").write_text(BEFORE, encoding="utf-8")
         return root
 

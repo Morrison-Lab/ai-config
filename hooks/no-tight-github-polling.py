@@ -196,8 +196,9 @@ def poll_violation(command, floor, depth=0):
                     return why
                 if stack:
                     stack[-1]["calls"] |= done["calls"]
-                    stack[-1]["slept"] += done["slept"]
-                    stack[-1]["unknown"] |= done["unknown"]
+                    if stack[-1]["cond"] == 0:  # an inner loop under an `if` may not run
+                        stack[-1]["slept"] += done["slept"]
+                        stack[-1]["unknown"] |= done["unknown"]
             elif tok in ("if", "fi") and stack:
                 stack[-1]["cond"] += 1 if tok == "if" else -1
             i += 1

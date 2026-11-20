@@ -51,6 +51,10 @@ CASES = [  # (command, denied)
     # agy review of #5976.
     ('while true; do for x in a b; do gh pr checks "$x"; sleep "$d"; done; done', False),
     ("watch -n 5 'date; gh pr checks 3'", True),
+    # agy review of 856027e1: an inner loop under an `if` may not run.
+    ("while true; do if false; then for x in 1; do sleep 120; done; fi; gh pr checks 5; done", True),
+    ('while true; do if false; then for x in 1; do sleep "$d"; done; fi; gh pr checks 5; done', True),
+    ("while true; do for x in 1; do sleep 120; done; gh pr checks 5; done", False),
 ]
 
 

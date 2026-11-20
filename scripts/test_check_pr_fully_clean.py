@@ -10904,6 +10904,16 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
           len(mwr_files_issues([])) == 1)
     check("a file list at the endpoint's cap fails closed",
           len(mwr_files_issues([f"f{i}" for i in range(checker.PR_FILES_CAP)])) == 1)
+    half = checker.PR_FILES_CAP // 2
+    check("renames count once each toward the cap, as the endpoint counts entries",
+          mwr_files_issues([{"filename": f"new{i}", "previous_filename": f"old{i}"}
+                            for i in range(half)]) == [])
+    check("a path that is .github itself blocks",
+          len(mwr_files_issues([".github"])) == 1)
+    check("a rename of .github itself blocks on its previous name",
+          len(mwr_files_issues([{"filename": "ci", "previous_filename": ".github"}])) == 1)
+    check("a sibling such as .githubx does not block",
+          mwr_files_issues([".githubx/a.yml", ".github-notes"]) == [])
 
     def gh_files_issues(stdout=None, error=None):
         pr = PullRequest.__new__(PullRequest)
@@ -10923,6 +10933,9 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("the gh path reads every page of the PR's files",
           len(issues) == 1 and seen and "--paginate" in seen[0]
           and seen[0][2] == f"repos/{TEST_REPO}/pulls/7/files")
+    issues, _ = gh_files_issues("src/x.py\t.github/workflows/a.yml\n")
+    check("the gh path reads a rename's old path after the tab",
+          len(issues) == 1 and ".github/workflows/a.yml" in issues[0])
     issues, _ = gh_files_issues(error="HTTP 502")
     check("a failed gh files read fails closed",
           len(issues) == 1 and "could not read the PR's changed files" in issues[0])

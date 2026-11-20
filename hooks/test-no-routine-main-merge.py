@@ -175,7 +175,7 @@ with tempfile.TemporaryDirectory() as root:
     commit(origin, "o.txt", "o\n", "other work")
     git("switch", "-q", "main", cwd=origin)
     repo = os.path.join(root, "repo")
-    git("clone", "-q", origin, repo, cwd=root)
+    git("clone", "-q", "-b", "main", origin, repo, cwd=root)
     git("switch", "-q", "-c", "child", "origin/stackbase", cwd=repo)
     commit(repo, "c.txt", "c\n", "child work")
     M = " git merge origin/main"

@@ -416,6 +416,9 @@ def main():
         else:
             all_monitored = False
 
+    # The loop above reads start_monitor_for_url's three results: True started a
+    # poller, False means the PR's recorded poller is already alive (it stays
+    # monitored), and None means none could start (all_monitored = False).
     # The poller is a record, not a wake: a reply that waits on PR state still
     # needs something that re-invokes the session. stop_hook_active means this
     # hook already blocked once this turn, so it does not block again.

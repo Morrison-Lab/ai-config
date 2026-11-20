@@ -37,6 +37,8 @@ A new check reads changed lines, so existing violations do not trip it, and a re
   Only the user's words count, never a coordinator's `<note>`, a question ("did I say to sweep?") or a negation ("don't sweep").
   A typed `gia`, `gii`, `gip` or `gmd` also allows more.
   There is no agent-side bypass; the user's next message resets the count.
+  The cap also stops a long infra thread's closing UMS PR (2026-11-20, the eleventh PR in a CI-logjam thread):
+  push the UMS branch and ask the coordinator to open it, rather than retrying.
   The reviewer layer is "Unrequested sweeps" in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md).
 - `hooks/no-unnamed-repo-pr.py` denies a PR in a repository the user never named this session, other than the session's own checkout, though a repository named only as precedent still passes ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).
 - `hooks/warn-sweep-pr-without-ask.py` warns when `gh pr create` or `mcp__github__create_pull_request` has "sweep" in the title (or, for `gh pr create` only, a `sweep` label) and no `Sweep authorized:` marker (followed by a message id or link).

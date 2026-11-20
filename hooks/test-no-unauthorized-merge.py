@@ -2135,7 +2135,8 @@ def _mwr_verdict(records, merge, remote="https://github.com/Morrison-Lab/mcsg.gi
             if url is None:
                 os.makedirs(where, exist_ok=True)
                 continue
-            subprocess.run(["git", "init", "-q", where], check=True, capture_output=True)
+            subprocess.run(["git", "init", "-q", "-b", "main", where], check=True,
+                           capture_output=True)
             subprocess.run(["git", "-C", where, "remote", "add", "origin", url],
                            check=True, capture_output=True)
         path = os.path.join(tmp, "transcript-mwr-test.jsonl")

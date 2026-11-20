@@ -47,6 +47,7 @@ ag_scheduled = antigravity_transcript([
     {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "schedule", "args": {"DurationSeconds": 120}}]}
 ])
 
+orig_state_dir = subject.STATE_DIR
 try:
     assert subject.pending(opened)
     assert not subject.pending(scheduled)
@@ -81,7 +82,6 @@ try:
         os.unlink(ag_multi_pr)
 
     # Verify start_monitor_for_url early return when already alive
-    orig_state_dir = subject.STATE_DIR
     with tempfile.TemporaryDirectory() as d:
         subject.STATE_DIR = d
         url1 = "https://github.com/o/r/pull/1"
@@ -128,12 +128,60 @@ try:
         finally:
             other.kill()
             other.wait()
-    subject.STATE_DIR = orig_state_dir
 finally:
+    # Restored here, not after the `with`, so a failed assertion cannot leave
+    # STATE_DIR pointing at the deleted temporary directory.
+    subject.STATE_DIR = orig_state_dir
     os.unlink(opened)
     os.unlink(scheduled)
     os.unlink(ag_opened)
     os.unlink(ag_scheduled)
+
+# ai-config#4790: a started poller is not a wake. A reply that waits on PR
+# state is blocked until a re-invoking mechanism is armed.
+import contextlib
+import io
+
+subscribed = transcript([
+    {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create"}},
+    {"type": "tool_use", "name": "mcp__claude-code-remote__subscribe_pr_activity", "input": {"pullNumber": 1}},
+])
+assert not subject.pending(subscribed)
+os.unlink(subscribed)
+
+
+def run_main(reply, stop_hook_active=False, started=True):
+    path = transcript([
+        {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create"}},
+        {"type": "tool_result", "content": "https://github.com/o/r/pull/7"},
+        {"type": "text", "text": reply},
+    ])
+    saved = (subject.shutil.which, subject.start_monitor_for_url, sys.stdin)
+    subject.shutil.which = lambda _name: "/usr/bin/gh"
+    subject.start_monitor_for_url = lambda _url, _cwd: started
+    sys.stdin = io.StringIO(json.dumps({"transcript_path": path, "cwd": _TMPDIR,
+                                        "stop_hook_active": stop_hook_active}))
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            subject.main()
+    finally:
+        subject.shutil.which, subject.start_monitor_for_url, sys.stdin = saved
+        os.unlink(path)
+    return json.loads(out.getvalue()) if out.getvalue().strip() else {}
+
+
+assert subject.last_reply(transcript([{"type": "text", "text": "a"}, {"type": "text", "text": "b"}])) == "b"
+waiting = "CI checks are still running; I'll merge once the review is clean."
+assert run_main(waiting).get("decision") == "block"
+assert "re-invoke" in run_main(waiting)["reason"]
+# An already-running poller (start returns False) is no wake either.
+assert run_main(waiting, started=False).get("decision") == "block"
+# A reply that waits on nothing passes with the poller's notice.
+done = run_main("Merged the PR and closed the issue.")
+assert "decision" not in done and "systemMessage" in done
+# Never block twice in one turn.
+assert "decision" not in run_main(waiting, stop_hook_active=True)
 
 # Verify alive() liveness checking across valid, dead, and invalid PIDs
 assert subject.alive(os.getpid()) is True

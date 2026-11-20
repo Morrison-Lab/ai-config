@@ -176,7 +176,7 @@ Limits: [`context-budget`](shared/workflow/context-budget.md).
 
 Isolate work in a dedicated `git worktree` so parallel sessions never clobber working directory or branch state.
 Never work in a primary branch checkout or share a dirty worktree across tasks.
-On Ezra's Mac, every agent puts each task's worktree in its own subdirectory of `~/Documents/GitHub/worktrees/<repo>/`, where `<repo>` names the repository (Ezra, 2026-11-20, [#3042](https://github.com/Morrison-Lab/ai-config/issues/3042)).
+On Ezra's Mac, create each task's worktree as its own directory `~/Documents/GitHub/worktrees/<repo>/<task>`, where `<repo>` names the repository and `<task>` is a name unique to that task, such as its branch (Ezra, 2026-11-20, [#3042](https://github.com/Morrison-Lab/ai-config/issues/3042)).
 Worktrees still share the stash stack and other repository state: see [`shared-git-state`](shared/workflow/shared-git-state.md).
 
 ## No sweeps for new rules by default

@@ -120,12 +120,12 @@ with tempfile.TemporaryDirectory() as cache:
           first[0] == 0 and second[1] == first[1]
           and not any("/annotations" in c or c == "rate_limit" for c in calls))
     path = Path(cache) / "o__r" / "14.json"
-    path.write_text(json.dumps([ann("x")] * 149))
+    path.write_text(json.dumps([ann("x")] * 149), encoding="utf-8")
     api, calls = fake_api(RUNS)
     code, out, err = run([], api, cache_dir=cache)
     check("a cached copy whose count disagrees is ignored and replaced by a live read",
           code == 0 and any("/check-runs/14/annotations" in c for c in calls)
-          and len(json.loads(path.read_text())) == 150)
+          and len(json.loads(path.read_text(encoding="utf-8"))) == 150)
     api, calls = fake_api({41: [ann("y")]}, status={41: "in_progress"})
     run([], api, cache_dir=cache)
     api, calls = fake_api({42: [ann("y"), ann("z")]}, report={42: 3})

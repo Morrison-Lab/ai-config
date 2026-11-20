@@ -91,7 +91,7 @@ with tempfile.TemporaryDirectory() as cache:
     check("a bad call prints usage and exits 2", code == 2)
 
     path = ac.cache_path(cache, "o/r", 7)
-    check("the cache file holds the full list", len(json.loads(path.read_text())) == 150)
+    check("the cache file holds the full list", len(json.loads(path.read_text(encoding="utf-8"))) == 150)
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

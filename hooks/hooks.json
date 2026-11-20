@@ -2418,7 +2418,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unmonitored-pr.py\"",
             "timeout": 10,
             "script": "no-unmonitored-pr.py",
-            "why": "After opening a PR, uses a recorded model scheduler when available; otherwise starts a detached two-minute gh poller and injects changed state on the next prompt. Blocks only if neither mechanism can be armed."
+            "why": "After opening a PR, uses a recorded model scheduler or PR subscription when available; otherwise starts a detached two-minute gh poller and injects changed state on the next prompt. Blocks if neither can be armed, or if the closing reply waits on PR state, since the poller cannot wake the session (ai-config#4790)."
           },
           {
             "type": "command",
@@ -2454,6 +2454,18 @@
             "timeout": 10,
             "script": "no-placeholder-reply.py",
             "why": "CLAUDE.md 'Always produce a reply --- never end a turn silently' -- blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement). The rule names the exact string in a Do/Don't pair and the lapse still recurred three times in one session (ai-config#1579), each time on resuming after a context-window summary, which reads like a report and so makes the work it describes feel already reported. Anchored on the WHOLE message rather than a substring, because this corpus quotes the banned string constantly; and a claim about the WORK (`Nothing to report.`, `No change.`) is deliberately not matched, since a no-change tick is behaviour the same section requires."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-manual-step-ask.py\"",
+            "timeout": 10,
+            "script": "no-manual-step-ask.py",
+            "why": "ai-config#5797. On 2026-11-17, in a Claude Code cloud session on Morrison-Lab/lds, the agent told Ezra twice to do a merge by hand (merge them in the GitHub UI; type mwc all in a local session) and Ezra answered \"I don't want to do things by hand\", then \"do not tell me to do this\". The PreToolUse registration of this script matches only mcp__hearthbot__ reply tools, and a plain final assistant message is no tool call, so nothing saw it. This Stop registration scans the final assistant message (fenced code blocks removed) with the same asks, and blocks the stop once per turn through stop_notice so the agent reads the reason and rewrites the message. A report that a merge was refused, naming no hand step, is left alone.",
+            "_note_activation": [
+              "Activation follows this file's uniform model (see the top-level",
+              "_comment and README): the plugin loads it on enable, and",
+              "install-hooks.py --fix registers it for a non-plugin install."
+            ]
           },
           {
             "type": "command",

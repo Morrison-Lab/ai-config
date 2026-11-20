@@ -169,3 +169,12 @@ per branch.
   since the re-run repeats finished work.
   Re-run a few PRs at a time, closest to final first,
   and only while the queue stays short, so it does not refill.
+  Never re-run a cancelled or queued run of a stacked PR whose base has since merged or been retargeted.
+  A re-run replays the original event with its old base ref.
+  It then fails at `git fetch origin <deleted base>` and leaves the review gates red, as on lds#2913 and lds#2922.
+  Compare the run's `pull_requests[].base.ref` with the PR's current base, and skip the run when they differ or the run lists no PR.
+  When the old base merged into main and was deleted, merge main into the PR instead, which starts a new `pull_request` event:
+  `MERGE_MAIN_FOR=base:<old base> git merge origin/main`, the fourth case of [`sync-with-main`](../../shared/workflow/sync-with-main.md).
+  The hook allows that case only for a base that main merged with a merge commit or a fast-forward.
+  When the run lists no PR, or the PR was retargeted while its old base still exists or never merged, skip the run and do not use `base:`, which the hook denies.
+  Push the PR's next real change, or ask the PR's owner, so a new event runs.

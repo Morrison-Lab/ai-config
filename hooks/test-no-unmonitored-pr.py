@@ -47,6 +47,7 @@ ag_scheduled = antigravity_transcript([
     {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "schedule", "args": {"DurationSeconds": 120}}]}
 ])
 
+orig_state_dir = subject.STATE_DIR
 try:
     assert subject.pending(opened)
     assert not subject.pending(scheduled)
@@ -76,12 +77,38 @@ try:
         assert urls == ["https://github.com/o/r/pull/10", "https://github.com/o/r/pull/20"], f"Got {urls}"
         ag_urls = subject.extract_pr_urls(ag_multi_pr)
         assert ag_urls == ["https://github.com/o/r/pull/30", "https://github.com/o/r/pull/40"], f"Got {ag_urls}"
+        # ai-config#5979: a tool's input is never a source. An Edit whose text
+        # names `gh pr create` and a PR URL opens nothing, and a PR body that
+        # cites another PR does not add that PR.
+        edited = transcript([
+            {"type": "tool_use", "id": "e1", "name": "Edit",
+             "input": {"new_string": "run gh pr create, then https://github.com/o/r/pull/77"}},
+            {"type": "tool_result", "tool_use_id": "e1", "content": "https://github.com/o/r/pull/78"},
+        ])
+        cited = transcript([
+            {"type": "tool_use", "id": "b1", "name": "Bash",
+             "input": {"command": "gh pr create --body 'Follows https://github.com/o/r/pull/5'"}},
+            {"type": "tool_result", "tool_use_id": "b1", "content": "https://github.com/o/r/pull/6"},
+        ])
+        mcp = transcript([
+            {"type": "tool_use", "id": "m1", "name": "mcp__github__create_pull_request",
+             "input": {"body": "Refs https://github.com/o/r/pull/8"}},
+            {"type": "tool_result", "tool_use_id": "m1", "content": "https://github.com/o/r/pull/9"},
+        ])
+        try:
+            assert subject.extract_pr_urls(edited) == [], subject.extract_pr_urls(edited)
+            assert not subject.pending(edited)
+            assert subject.extract_pr_urls(cited) == ["https://github.com/o/r/pull/6"]
+            assert subject.extract_pr_urls(mcp) == ["https://github.com/o/r/pull/9"]
+            assert subject.pending(mcp)
+        finally:
+            for p in (edited, cited, mcp):
+                os.unlink(p)
     finally:
         os.unlink(multi_pr)
         os.unlink(ag_multi_pr)
 
     # Verify start_monitor_for_url early return when already alive
-    orig_state_dir = subject.STATE_DIR
     with tempfile.TemporaryDirectory() as d:
         subject.STATE_DIR = d
         url1 = "https://github.com/o/r/pull/1"
@@ -128,12 +155,83 @@ try:
         finally:
             other.kill()
             other.wait()
-    subject.STATE_DIR = orig_state_dir
 finally:
+    # Restored here, not after the `with`, so a failed assertion cannot leave
+    # STATE_DIR pointing at the deleted temporary directory.
+    subject.STATE_DIR = orig_state_dir
     os.unlink(opened)
     os.unlink(scheduled)
     os.unlink(ag_opened)
     os.unlink(ag_scheduled)
+
+# ai-config#4790: a started poller is not a wake. A reply that waits on PR
+# state is blocked until a re-invoking mechanism is armed.
+import contextlib
+import io
+
+subscribed = transcript([
+    {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create"}},
+    {"type": "tool_use", "name": "mcp__claude-code-remote__subscribe_pr_activity", "input": {"pullNumber": 1}},
+])
+assert not subject.pending(subscribed)
+os.unlink(subscribed)
+
+
+def run_main(reply, stop_hook_active=False, started=True):
+    path = transcript([
+        {"type": "tool_use", "name": "Bash", "input": {"command": "gh pr create"}},
+        {"type": "tool_result", "content": "https://github.com/o/r/pull/7"},
+        {"type": "text", "text": reply},
+    ])
+    saved = (subject.shutil.which, subject.start_monitor_for_url, sys.stdin)
+    subject.shutil.which = lambda _name: "/usr/bin/gh"
+    subject.start_monitor_for_url = lambda _url, _cwd: started
+    sys.stdin = io.StringIO(json.dumps({"transcript_path": path, "cwd": _TMPDIR,
+                                        "stop_hook_active": stop_hook_active}))
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            subject.main()
+    finally:
+        subject.shutil.which, subject.start_monitor_for_url, sys.stdin = saved
+        os.unlink(path)
+    return json.loads(out.getvalue()) if out.getvalue().strip() else {}
+
+
+# transcript() wraps each block in an assistant record
+# ({"type": "assistant", "message": {"content": [block]}}), the shape last_reply reads.
+assert subject.last_reply(transcript([{"type": "text", "text": "a"}, {"type": "text", "text": "b"}])) == "b"
+waiting = "CI checks are still running; I'll merge once the review is clean."
+for phrase in ("Waiting on CI for the new head.",
+               "The checks are still running.",
+               "I'll merge once CI passes.",
+               "When the review comes back I'll address it."):
+    assert subject.WAITING.search(phrase), phrase
+# Replies that wait on nothing must not match (review of #5993).
+for phrase in ("Opened the PR. No pending items remain.",
+               "Done: all work in progress was merged.",
+               "The pending review was resolved and merged.",
+               "Merged after CI passed.",
+               "I am not waiting on CI any more.",
+               "No longer waiting for the review: it is clean.",
+               "Merged without waiting on CI, as the grant allows.",
+               "I fixed it now rather than waiting for the review."):
+    assert not subject.WAITING.search(phrase), phrase
+assert run_main(waiting).get("decision") == "block"
+assert "re-invoke" in run_main(waiting)["reason"]
+# An already-running poller is no wake either. start_monitor_for_url returns
+# False when the PR's recorded poller is alive (asserted above with a live pid)
+# and None when it cannot start one, so False is the already-running case.
+already = run_main(waiting, started=False)
+assert already.get("decision") == "block" and "re-invoke" in already["reason"]
+# A poller that cannot start blocks for that reason, not the waiting one.
+failed = run_main(waiting, started=None)
+assert failed.get("decision") == "block" and "No local timer" in failed["reason"]
+# A reply that waits on nothing passes with the poller's notice.
+done = run_main("Merged the PR and closed the issue.")
+assert "decision" not in done and "systemMessage" in done
+# Never block twice in one turn.
+assert "decision" not in run_main(waiting, stop_hook_active=True)
 
 # Verify alive() liveness checking across valid, dead, and invalid PIDs
 assert subject.alive(os.getpid()) is True

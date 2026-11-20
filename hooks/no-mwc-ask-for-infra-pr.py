@@ -36,13 +36,14 @@ FULL_REF = re.compile(r"(?<![\w/.-])([\w.-]+)/([\w.-]+)#(\d+)\b")
 SHORT_REF = re.compile(r"(?<![\w/.#-])([A-Za-z][\w.-]*)#(\d+)\b")
 # A typed merge line, "merge gha 2152 d6004d3, ai-config 6008", names PRs as
 # "<repo> <N>" and never says mwc, so it gets its own trigger (ai-config#6021).
-MERGE_ITEM = r"(?:[\w.-]+/)?[A-Za-z][\w.-]*\s+#?\d+(?:\s+[0-9a-f]{7,40})?"
-MERGE_LINE = re.compile(rf"\bmerge\s+({MERGE_ITEM}(?:\s*(?:,|\band\b)\s*{MERGE_ITEM})*)", re.I)
-MERGE_REF = re.compile(r"(?:([\w.-]+)/)?([A-Za-z][\w.-]*)\s+#?(\d+)")
+MERGE_ITEM = r"(?:[\w.-]+/)?[A-Za-z][\w.-]*(?:\s+#?|\s*#)\d+(?:\s+[0-9a-f]{7,40})?"
+MERGE_LINE = re.compile(rf"\bmerge\s+({MERGE_ITEM}(?:\s*(?:,\s*(?:and\b)?|\band\b)\s*{MERGE_ITEM})*)", re.I)
+MERGE_REF = re.compile(r"(?:([\w.-]+)/)?([A-Za-z][\w.-]*)(?:\s+#?|\s*#)(\d+)")
 NOT_A_REPO = frozenset({"pr", "prs", "main", "master", "the", "it", "this", "that", "all", "and"})
 
 REASON = (
-    "[hook: no-mwc-ask-for-infra-pr] This message mentions `mwc` and names {ref}, which is an "
+    "[hook: no-mwc-ask-for-infra-pr] This message asks for a merge word (an `mwc` grant or a "
+    "typed merge line) and names {ref}, which is an "
     "infrastructure PR ({why}). Infra PRs carry a standing merge grant once fully clean "
     "(strict-merge-policy.md; Ezra, 2026-11-07 about lds#2009: \"it's infra and shouldn't need "
     "my word\"). Do not ask for or wait on his word. In a project, an owner thread never merges: "

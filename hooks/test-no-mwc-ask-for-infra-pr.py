@@ -35,6 +35,9 @@ CASES = [
     ("merge line, grant stated", POST, "No need to merge gha 2152 yourself: it merges under the infra grant.", False),
     ("merge PR word", POST, "I will merge PR 2152 later.", False),
     ("merge line owner/repo", POST, "merge Morrison-Lab/gha 2152", True),
+    ("merge line, Oxford comma", POST, "merge lds 2922, rme 1450, and ai-config 6002", True),
+    ("merge line, unspaced #", POST, "merge ai-config#6002", True),
+    ("merge line list, unspaced #", POST, "merge lds 2922, Morrison-Lab/gha#2152", True),
     ("no text", POST, None, False),
 ]
 

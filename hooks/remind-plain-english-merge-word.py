@@ -396,22 +396,29 @@ def mwr_grant(prompt: str, sdk: bool = False):
     return None
 
 
-def mwr_bare(prompt: str) -> bool:
-    """Whether the user typed an mwr grant that names no repository for a PR.
+def mwr_bare(prompt: str) -> str:
+    """Which name-the-repository reminder an mwr grant the user typed needs:
+    "bare", "mixed" or "".
 
     A bare `mwr` names no PR, and a repo-less "#N" or "PR N" names no
     repository (round 4; Ezra, 2026-11-20: a bare mwr merges nothing and
-    asks which PR). The guard grants neither, so the reminder asks the user
-    to name the repository. This is a reminder, not a grant, so the
-    principal's message in a wake is read too.
+    asks which PR). The guard grants neither. "bare" is a grant whose every
+    reference lacks a repository, so it grants no merge at all. "mixed"
+    names some PRs with a repository, which the guard still grants
+    (`mwr_grant`), and some without, which it does not (round 16). This is
+    a reminder, not a grant, so the principal's message in a wake is read
+    too.
     """
     match = _mwr_match(prompt) or _mwr_match(prompt, sdk=True)
     if not match:
-        return False
+        return ""
     refs = _mwr_refs(match.group("refs") or "")
     if not refs:
-        return match.group("word").lower() == "mwr"
-    return any(repo is None for repo, _ in refs)
+        return "bare" if match.group("word").lower() == "mwr" else ""
+    bare = [number for repo, number in refs if repo is None]
+    if not bare:
+        return ""
+    return "bare" if len(bare) == len(refs) else "mixed"
 
 
 def revokes_mwr(prompt: str) -> bool:
@@ -440,6 +447,15 @@ MWR_BARE_REMINDER = (
     "ask the user to name the repository and PR they mean."
 )
 
+MWR_MIXED_REMINDER = (
+    "[hook: remind-plain-english-merge-word] The user's `mwr` names some PRs with a "
+    "repository and some with none (\"#N\"). The ones with a repository are granted; a "
+    "PR number with no repository grants no merge, and the merge guard denies it until "
+    "the user names its repository (\"mwr owner/repo#N\", or \"mwr repo#N\" for "
+    "Morrison-Lab/repo). Merge only the PRs named with a repository, and ask the user "
+    "to name the repository of each of the others."
+)
+
 
 def main() -> int:
     # Quoted prompt text can hold curly quotes, which a cp1252 console can
@@ -456,8 +472,9 @@ def main() -> int:
     prompt = payload.get("prompt") if isinstance(payload, dict) else None
     if not isinstance(prompt, str):
         return 0
-    if mwr_bare(prompt):
-        print(MWR_BARE_REMINDER)
+    bare = mwr_bare(prompt)
+    if bare:
+        print(MWR_MIXED_REMINDER if bare == "mixed" else MWR_BARE_REMINDER)
         return 0
     word = merge_word(prompt)
     if word is None:

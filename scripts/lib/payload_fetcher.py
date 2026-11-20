@@ -40,7 +40,12 @@ is exactly what this module accepts.
 """
 
 import json
+import re
 from typing import Any, Dict, List
+
+# The PR files route the checker reads under --mwr, matched whole so that no
+# other path ending in /files is answered with the PR's file list.
+PR_FILES_PATH = re.compile(r"^repos/[^/]+/[^/]+/pulls/\d+/files(?:\?.*)?$")
 
 
 class PayloadError(Exception):
@@ -310,7 +315,7 @@ class PayloadFetcher:
                 )
             return json.dumps(comments)
 
-        if "/pulls/" in path and path.endswith("/files"):
+        if PR_FILES_PATH.match(path):
             # Read only under --mwr (ai-config#3946). The gh call prints one
             # path per line (each filename, and a rename's previous name), so
             # this answers in the same shape. Absent or malformed raises, and
@@ -324,9 +329,12 @@ class PayloadFetcher:
                     f"payload 'pr_files' must be a list, got {type(files).__name__}.")
             names = []
             for i, item in enumerate(files):
-                if isinstance(item, str):
+                # An empty path names no file, so it cannot be ruled out of
+                # `.github/`; it fails closed like a malformed entry.
+                if isinstance(item, str) and item.strip():
                     names.append(item)
-                elif isinstance(item, dict) and isinstance(item.get("filename"), str):
+                elif (isinstance(item, dict) and isinstance(item.get("filename"), str)
+                      and item["filename"].strip()):
                     # One line per entry, a rename's old path after a tab,
                     # in the shape of the checker's --jq query.
                     entry = item["filename"]
@@ -335,8 +343,8 @@ class PayloadFetcher:
                     names.append(entry)
                 else:
                     raise PayloadError(
-                        f"payload 'pr_files[{i}]' must be a path or an object "
-                        f"with a 'filename', got {item!r}.")
+                        f"payload 'pr_files[{i}]' must be a non-empty path or an "
+                        f"object with a non-empty 'filename', got {item!r}.")
             return "\n".join(names)
 
         raise PayloadError(f"no payload mapping for gh api path: {path}")

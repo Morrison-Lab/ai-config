@@ -5371,8 +5371,8 @@ def main():
         # full CI cycle) long before its turn to merge (ai-config#6028).
         # Still exit 1: the head has not run the new gate.
         if all(i in drift_issues for i in blocking):
-            base = getattr(pr, "base_ref", "") or "the base branch"
-            print(f"\n⏸️ {repo}#{pr_num} is CLEAN EXCEPT BASE DRIFT on HEAD {sha[:8]}: "
+            base = pr.base_ref or "the base branch"
+            print(f"\n\u23f8\ufe0f {repo}#{pr_num} is CLEAN EXCEPT BASE DRIFT on HEAD {sha[:8]}: "
                   f"merge {base} into it only when it is next to merge (ai-config#6028)")
         sys.exit(1)
 

@@ -409,8 +409,8 @@ def _test_own_actions_job():
           code == 1 and note not in text)
 
     # Base drift as the only blocker prints a distinct line and still exits 1;
-    # Inside its own CI job, so the job's own in-progress run is not a blocker.
     # drift beside any other blocker does not (ai-config#6028).
+    # These run inside the PR's own CI job, so its in-progress run is not a blocker.
     drift_issue = ("Base 'main' gained 1 commit(s) since this head, including a "
                    "change under .github/workflows/")
     code, text = run_main(_actions_env(**in_actions), [], drift=[drift_issue])

@@ -1006,7 +1006,7 @@ def mwr_only_grant(payload, repo, num, sha=None):
 
 
 def mwr_route_problem(tool, tool_input):
-    """"" when an mwr-only merge uses the one route mwr allows, else why not
+    """Return "" when an mwr-only merge uses the one route mwr allows, else why not
     (round 12).
 
     The route is the MCP merge tool with a strict input, judged by
@@ -1168,7 +1168,7 @@ def fully_clean_on(found, repo, num, sha):
 
 
 def mwr_live_check(payload, repo, num, sha):
-    """"" when the merge-time mwr re-checks pass on live data, else the reason.
+    """Return "" when the merge-time mwr re-checks pass on live data, else the reason.
 
     Runs `fetch_mwr_live` and `mwr_live_problem` from the sibling
     `enforce-mwc-review-gate.py`, the one copy of both (round 8). Fails

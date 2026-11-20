@@ -1558,7 +1558,7 @@ def mwr_cleared(payload, pr_data):
 
 
 def mwr_route_denial(payload, repo, number, sha, mcp, tool_input):
-    """"" when this merge may proceed on its route, else the deny reason (round 12).
+    """Return "" when this merge may proceed on its route, else the deny reason (round 12).
 
     Under an mwr grant with no other authority (`mwr_only_grant` in the
     sibling `block-merge-without-clean-checker.py`), the only route is the
@@ -1592,7 +1592,7 @@ def mwr_route_denial(payload, repo, number, sha, mcp, tool_input):
 
 
 def mwr_credit_route_denial(pr_data, route):
-    """"" when a merge the MERGE-READY line credits uses the strict MCP
+    """Return "" when a merge the MERGE-READY line credits uses the strict MCP
     route, else the deny reason (round 13).
 
     `route` is `(mcp, tool_input)` from `main`; None is read as a shell
@@ -1749,6 +1749,12 @@ def fetch_mwr_live(pr_data, cwd):
         # it: GitHub merges into whatever base the PR has when the merge
         # lands. A timed background `gh pr edit --base` between this read and
         # the merge could race it (a base-retarget race, ai-config#5983).
+        # On the compare route `per_page` pages the commits, not the files:
+        # GitHub returns the whole file list on the first page, "up to 300
+        # changed files for the entire comparison" (REST docs, "Compare two
+        # commits", 2026-11-20). So one page is enough, and a list that
+        # reaches 300 may be cut short, which `mwr_live_problem` refuses
+        # (MWR_COMPARE_FILES_CAP).
         compare, error = _gh_rest_json(
             f"repos/{repo}/compare/{base}...{pinned}?per_page=1", cwd)
         if error:
@@ -2543,6 +2549,12 @@ def decide(cmd, pr_data, override, payload, cwd=".", route=None):
     # line, which does not count there (round 9); the FULLY CLEAN skip is
     # kept only when mwc covers the merge.
     only = mwr_only(payload, pr_data)
+    # No route check is needed on this allow path. An mwr-only merge was
+    # route-checked in `main` before `decide` ran (`mwr_route_denial`,
+    # round 12). A merge under another grant that the MERGE-READY line
+    # credits is route-checked by `block-merge-without-clean-checker.py`,
+    # which runs on every merge and alone reads the typed override and
+    # tapped waiver that exempt it.
     if only or (mwr_cleared(payload, pr_data)
                 and not fully_clean_in_transcript(payload, pr_data)):
         live_state = dict(pr_data)

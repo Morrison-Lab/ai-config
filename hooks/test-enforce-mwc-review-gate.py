@@ -511,8 +511,14 @@ def mwr_only_fully_clean_checks(grant, ready, clean_line):
               mwr_decision([grant, ready, clean_line], clean_pr_state(), bash=bash,
                            live=live_gh(reviews=[{"state": "DISMISSED",
                                                   "user": {"login": "maintainer"}}])) == "deny")
-        # Round 12: under mwr alone the gh route is refused outright.
+        # Round 15: an mwr-only merge of a PR that `evaluate` itself allows
+        # (a clean PR) still takes the strict MCP route; `main` route-checks
+        # it before `decide` runs, so the gh route denies in this hook too.
         want = "deny" if bash else "allow"
+        check(f"mwr only: evaluate allows a clean PR, {want}s on the {route} route",
+              mwr_decision([grant, ready, clean_line], clean_pr_state(),
+                           bash=bash) == want and (not bash or last_denied_for_route()))
+        # Round 12: under mwr alone the gh route is refused outright.
         check(f"mwr only: FULLY CLEAN and MERGE-READY, clean live data, "
               f"{want}s on the {route} route",
               mwr_decision([grant, ready, clean_line], stale_approved_state(),

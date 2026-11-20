@@ -297,6 +297,9 @@ Read a request for everything it plainly asks, do every safe step it covers, and
 - **Revert a premature or defective merge at once**, and reopen the issues it closed.
 - **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean.
   Handle it yourself through the merge, and never ask the user about it (Ezra, 2026-11-20).
+  Sliding a floating tag of an infrastructure repo to `main` (for example gha's `v3`) is infrastructure too, and needs no typed approval.
+  Ezra, 2026-11-20 8:31 AM PST: "sliding the gha tag shouldn't require my approval", "it's infra".
+  It still waits for every check on `main` to finish and for the permissions audit to pass ([`slide-tag`](skills/slide-tag/SKILL.md)).
 
 Detail, cases, cross-model waiver: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
 

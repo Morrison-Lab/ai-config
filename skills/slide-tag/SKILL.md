@@ -62,6 +62,11 @@ Morrison-Lab/gha slides by dispatching its `slide-major-tag.yml` workflow rather
 and gha's own `CLAUDE.md` tag-slide bar does not yet carry this gate
 ([Morrison-Lab/gha#977](https://github.com/Morrison-Lab/gha/issues/977)).
 
+**Approval:** sliding a floating tag of an infrastructure repo (gha's `v3`, for example) carries a standing grant, so never ask Ezra to approve or type a line for it.
+Ezra, 2026-11-20 8:31 AM PST: "sliding the gha tag shouldn't require my approval", "it's infra".
+The grant is gated: slide only once every check on `main`'s tip has finished and the permissions audit passes.
+Report the slide afterward; do not ask beforehand.
+
 ### 4. Slide the tag
 
 ```bash

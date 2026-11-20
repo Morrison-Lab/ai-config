@@ -51,9 +51,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -397,7 +397,7 @@ cookieconsent.run({
 <h3 class="anchored" data-anchor-id="establish-context">0. Establish context</h3>
 <p>Detect the forge (GitHub <code>gh</code> / GitLab <code>glab</code>) from <code>git remote get-url origin</code>. Note the default branch (<code>main</code> / <code>master</code>).</p>
 <p><strong>Confirm which repo first when several are in reach.</strong> GIA (like <code>ardia</code> and <code>gii</code>) clears <em>one</em> repo’s queue, but a session may start in a directory holding several repos (e.g.&nbsp;a web session scoped to multiple repos). If the working dir isn’t itself a single repo, or more than one repo is in scope, ask which repo’s queue to clear before surveying — don’t assume the first one found.</p>
-<p><strong>Confirm whose PRs are in scope, too.</strong> Both phases act only on PRs opened by the invoking user, assigned to that user, explicitly requested by name, or authored by the GitHub Actions app (app slug <code>github-actions</code>); <code>ardia</code>’s step 1 resolves that user, applies the filter, and reports what it dropped. An out-of-scope PR (one that fails that filter: another lab member’s or another bot’s that is neither assigned to the user nor explicitly requested) stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.</p>
+<p><strong>Confirm whose PRs are in scope, too.</strong> Both phases act only on PRs opened by the invoking user, assigned to that user, explicitly requested by name, or authored by the GitHub Actions app (app slug <code>github-actions</code>); <code>ardia</code>’s step 1 resolves that user, applies the filter with <code>scripts/pr-scope.py</code>, and reports what it dropped. An out-of-scope PR (one that fails that filter: another lab member’s or another bot’s that is neither assigned to the user nor explicitly requested) stays theirs, and an issue such a PR already fixes is left to it rather than grabbed.</p>
 </section>
 <section id="phase-1-ardia-existing-open-prsmrs" class="level3">
 <h3 class="anchored" data-anchor-id="phase-1-ardia-existing-open-prsmrs">Phase 1 — ARDIA (existing open PRs/MRs)</h3>

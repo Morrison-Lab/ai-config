@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -414,7 +414,7 @@ cookieconsent.run({
 <section id="the-procedure" class="level2">
 <h2 class="anchored" data-anchor-id="the-procedure">The procedure</h2>
 <ol type="1">
-<li><p><strong>List every open PR in the repo</strong> (<code>mcp__github__list_pull_requests</code> / <code>gh pr list --json number,headRefName,author,assignees</code>). Note each PR’s number, <code>headRefName</code>, <code>author</code>, and <code>assignees</code>. Filter the list by <code>memories/reviewing-prs.md</code>’s scope test first, as <code>ardia</code> step 1 does (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app (<code>github-actions</code>)), and report the PRs dropped: a resync pushes a merge commit, which that memory forbids on any other PR.</p></li>
+<li><p><strong>List every open PR in the repo</strong> (<code>mcp__github__list_pull_requests</code> / <code>gh pr list --limit 100 --json number,headRefName,author,assignees</code>). Note each PR’s number, <code>headRefName</code>, <code>author</code>, and <code>assignees</code>. Filter the list by <code>memories/reviewing-prs.md</code>’s scope test first (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app (<code>github-actions</code>)): save that list unfiltered to a file and pipe it into <code>python3 scripts/pr-scope.py</code> with the <code>--user</code>, <code>--alias</code>, <code>--requested</code> and <code>--excluded</code> flags <code>ardia</code> step 1 defines, and report the PRs dropped: a resync pushes a merge commit, which that memory forbids on any other PR.</p></li>
 <li><p><strong>Check whether main is actually ahead</strong> before touching anything:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> fetch origin main</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>For a PR whose <code>origin/main</code> is already an ancestor of the branch tip (<code>git merge-base --is-ancestor origin/main &lt;branch-tip&gt;</code> returns true), skip it — main is already incorporated; nothing to merge.</p></li>

@@ -589,6 +589,15 @@ Worked-example case records for the rules below live in
 
 2. **Every reviewer's latest verdict is totally clean:** no nits, and every item that wasn't directly **Addressed** is either **Deferred** to a tracked follow-up issue, or **Rebutted with a rebuttal that actually convinced the reviewer** --- i.e. the reviewer did *not* re-raise it on the next round.
    A later all-clear from a different reviewer does not clear another reviewer's standing not-clean, nits included.
+   One exception settles a free reviewer that keeps raising new minor items.
+   Ezra chose it on a decision card on 2026-11-20, "Second free model breaks ties" ([ai-config#6046](https://github.com/Morrison-Lab/ai-config/issues/6046)).
+   A relayed cross-model reviewer's not-clean stops vetoing once both of these are posted on the PR, in this order, after it:
+   - a rebuttal record for that model, whose first line is exactly ``Rebuttals for model `<model>` on head <sha>:``, naming the live head, ending with the disclosure footer, and posted from a member's account;
+   - a clean relay from a different model, naming the live head.
+
+   A model id that differs only by a `-free` or `:free` suffix is the same model.
+   `check-pr-fully-clean.py` reports the release as a NOTE.
+   Write a rebuttal for every open finding in the record, since the checker cannot tell whether one is missing.
 
 **In a local CLI session, "external reviewer" means the bot reviewers, not the human one.**
 `gh`/the MCP server authenticate as the same human account that owns the repo, so a formal review *request* against that human always 422s (`request-pr-review`'s own edge case) --- not occasionally, structurally, on every PR such a session opens.

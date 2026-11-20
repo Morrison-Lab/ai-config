@@ -16,7 +16,23 @@ import tempfile
 import time
 
 OPEN = re.compile(r"\bgh\s+pr\s+create\b|create_pull_request", re.I)
-SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|^schedule\b", re.I)
+SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|subscribe_pr_activity|^schedule\b", re.I)
+# A closing reply that says the session is waiting on PR state (ai-config#4790).
+# Each branch names the PR state and a future event, so a bare status word
+# ("no pending items", "after CI passed") does not match; "not", "no longer",
+# "without" and "than" right before "waiting" negate it.
+_PR_STATE = r"(?:CI|(?:the )?checks?|(?:the )?review|(?:the )?merge)"
+_FUTURE = (r"(?:passes|pass|finishes|finish|completes|complete|is clean|comes back"
+           r"|goes green|turns green|lands|is done|reports)")
+WAITING = re.compile(
+    r"(?<!not )(?<!no longer )(?<!without )(?<!than )\bwaiting (?:on|for) " + _PR_STATE
+    + r"|\b" + _PR_STATE + r" (?:is|are) still (?:running|pending|in progress)"
+    + r"|\b(?:once|when|after) " + _PR_STATE + r" " + _FUTURE + r"\b", re.I)
+WAKE_REASON = (
+    "This reply waits on PR state (CI, review or merge), but nothing recorded can "
+    "re-invoke this session: the detached poller only records state for the next "
+    "prompt (ai-config#4790). Arm a wake before ending the turn: send_later, "
+    "ScheduleWakeup, a trigger routine, or subscribe_pr_activity.")
 POLL_SECONDS = 120
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
 
@@ -88,6 +104,28 @@ def pending(path):
             if opened and SCHEDULE.search(blob):
                 armed = True
     return opened and not armed
+
+
+def last_reply(path):
+    """The text of the transcript's last assistant record that has text, or ''.
+
+    Claude Code writes each content block as its own record, so the closing
+    reply is often followed by a tool-only record (a final tool call). Those
+    records are skipped on purpose: the reply is the last text written.
+    """
+    text = ""
+    for record in records(path):
+        if record.get("type") != "assistant" and record.get("role") != "assistant":
+            continue
+        content = (record.get("message") or {}).get("content") or record.get("content") or []
+        if isinstance(content, str):
+            text = content
+            continue
+        parts = [block.get("text", "") for block in content
+                 if isinstance(block, dict) and block.get("type") == "text"]
+        if parts:
+            text = "\n".join(parts)
+    return text
 
 
 PR_URL = re.compile(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+")
@@ -383,6 +421,16 @@ def main():
         else:
             all_monitored = False
 
+    # The loop above reads start_monitor_for_url's three results: True started a
+    # poller, False means the PR's recorded poller is already alive (it stays
+    # monitored), and None means none could start (all_monitored = False).
+    # The poller is a record, not a wake: a reply that waits on PR state still
+    # needs something that re-invokes the session. stop_hook_active means this
+    # hook already blocked once this turn, so it does not block again.
+    if ((any_started or all_monitored) and not payload.get("stop_hook_active")
+            and WAITING.search(last_reply(transcript_path))):
+        print(json.dumps({"decision": "block", "reason": WAKE_REASON}))
+        return
     if any_started:
         print(json.dumps({"systemMessage": "No model scheduler was recorded, so a detached two-minute PR poller was started. It records GitHub state and injects changes on the next prompt; it cannot wake a terminated session."}))
         return

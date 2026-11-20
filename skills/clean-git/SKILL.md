@@ -294,7 +294,8 @@ python3 scripts/clean-git-execute.py --plan "$TMP/plan.json" --user "$(gh api us
 It classifies again before each pass and acts only on rows whose action is still the confirmed one.
 It keeps a branch with a claim comment from the last 24 hours on one of its PRs,
 and deletes a remote branch only when it is 0 commits ahead of main or every PR from it is in scope by [`scripts/pr-scope.py`](../../scripts/pr-scope.py) (pass `--alias` for the user's other logins).
-A failed worktree removal stops the branch pass, and no command uses `--force`.
+A failed worktree removal stops the branch pass, and no worktree removal uses `--force`.
+A local branch is force-deleted (`git branch -D`) only when its fresh row is `delete-D`: a PR from it merged and its tip predates the merge.
 Its `kept` list is the input to step 4's report, including the `Survived both passes --- needs a person` rows.
 
 Without the script, run `clean-worktrees` steps 5 and 6,

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -128,6 +129,10 @@ executor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(executor)
 check("a claim with no readable timestamp keeps the branch",
       executor.claimed([{"body": "hold off please", "createdAt": ""}], time.time()), True)
+bare = executor.Executor(".", [], types.SimpleNamespace(user="t", alias=[], main="origin/main"),
+                         lambda number: [], time.time())
+check("an ahead remote branch with no PR is kept",
+      bool(bare.blocked("orphan", remote=True)), True)
 check("an old claim does not", executor.claimed(
     [{"body": "hold off please", "createdAt": OLD}], time.time()), False)
 

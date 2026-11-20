@@ -120,7 +120,8 @@ one of:
   the sentence so the linked phrase is a noun phrase naming the term, and never
   widen the link over the function word.
   On mds#844 and mds#858 a definition titled "Limit of a sequence" led an agent
-  to write `[limit of](...)`; "the [limit](...) of the sequence" is the fix.
+  to put "limit of" in the link text;
+  linking only "limit" in "the limit of the sequence" is the fix.
   The check's own handling is tracked in
   [gha#2146](https://github.com/Morrison-Lab/gha/issues/2146).
 - **Doubled type word** --- the mention writes the type name in front of a

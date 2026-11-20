@@ -61,6 +61,11 @@ that issue tracks both.
   It worked for [#5814](https://github.com/Morrison-Lab/ai-config/pull/5814) (the tree matched [`59be24d`](https://github.com/Morrison-Lab/ai-config/commit/59be24d6a2163a412cc71c7c8e6a7dff2128ae01)) and [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) (2026-11-18).
 - **Don't:** reset or force-push the branch to drop the overflow commits, which erases the later heads' review record and breaks anyone tracking the branch.
 - **Don't:** leave the size check to the push.
+- **Do:** expect a merge of `main` into an over-cap branch to be refused when you resolve a conflict.
+  The hook lets a `main` merge through only when the branch's own diff text is unchanged, and a resolution changes it.
+  A PR that changes the cap is pushed under the installed hook's old cap until it merges, so ask Ezra on a card for an `ALLOW_LARGE_PR=1` push before the push, not after a second refusal
+  ([ai-config#5874](https://github.com/Morrison-Lab/ai-config/pull/5874) needed two such pushes, 2026-11-19).
+- **Don't:** reword a conflict's text to get under the hook: the rewording adds lines, and the refusal stays.
 - **Don't:** run `git checkout <commit> -- <file>` to carry a change onto a newer base.
   It carries the whole old file, so it silently reverts what `main` changed since the branch point
   (`hooks/hooks.json` lost 12 lines that way, and nothing failed).

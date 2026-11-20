@@ -48,6 +48,9 @@ CASES = [  # (command, denied)
     ('while true; do bash -c "gh pr checks 5"; sleep 5; done', True),
     ("sudo -u me gh run watch 99", True),
     ("cat <<'EOF'\nwhile true; do gh pr checks 5; sleep 1; done\nEOF", False),
+    # agy review of #5976.
+    ('while true; do for x in a b; do gh pr checks "$x"; sleep "$d"; done; done', False),
+    ("watch -n 5 'date; gh pr checks 3'", True),
 ]
 
 
@@ -112,6 +115,19 @@ checks += [
     ("GET search repeated",
      [denied("Bash", "gh api -X GET search/issues -f q=x", session=s4) for _ in "ab"][1], True),
     ("non-GitHub Bash passes", denied("Bash", "ls -la", session=s4), False),
+    ("rate_limit repeated",
+     [denied("Bash", "gh api rate_limit", session=s4) for _ in "ab"][1], False),
+    ("override reaches a bash -c body",
+     [denied("Bash", 'ALLOW_REPEAT_GITHUB_READ=1 bash -c "gh pr view 9 -R a/b"', session=s4)
+      for _ in "ab"][1], False),
+    ("gh pr view 8 first", denied("Bash", "gh pr view 8 -R a/b", session=s4), False),
+    ("-XDELETE is a write", denied("Bash", "gh api -XDELETE repos/a/b/x", session=s4), False),
+    ("read after -XDELETE passes", denied("Bash", "gh api rate_limit; gh pr view 8 -R a/b",
+                                          session=s4), False),
+    ("-fbody=x is a write",
+     [denied("Bash", "gh pr view 7 -R a/b", session=s4),
+      denied("Bash", "gh api -fbody=x repos/a/b/issues/3/comments", session=s4),
+      denied("Bash", "gh pr view 7 -R a/b", session=s4)][2], False),
 ]
 fails = [f"{label}: expected {'deny' if want else 'pass'}"
          for label, got, want in checks if got != want]

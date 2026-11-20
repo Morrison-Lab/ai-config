@@ -111,11 +111,11 @@ def _flag_value(args, names, default):
 
 
 def _watch_target(rest):
-    """For `watch [opts] cmd...`: `(interval, inner argv)`."""
+    """For `watch [opts] cmd...`: `(interval, inner argvs)`."""
     args, i = rest[1:], 0
     while i < len(args) and args[i].startswith("-"):
         i += 2 if args[i] in ("-n", "--interval") else 1
-    inner = (simple_commands(" ".join(args[i:])) or [[]])[0]  # `watch` runs `sh -c`
+    inner = simple_commands(" ".join(args[i:])) or []  # `watch` runs `sh -c`
     return _flag_value(args[:i], ["--interval", "-n"], 2.0), inner
 
 
@@ -129,7 +129,7 @@ def is_github_call(rest):
     if prog in ("curl", "wget"):
         return any(GH_API_HOST.match(a) for a in rest[1:])
     if prog == "watch":
-        return is_github_call(_peel(_watch_target(rest)[1])[1])
+        return any(is_github_call(_peel(a)[1]) for a in _watch_target(rest)[1])
     return any(GH_SCRIPTS.search(tok) for tok in rest[:2])
 
 
@@ -197,6 +197,7 @@ def poll_violation(command, floor, depth=0):
                 if stack:
                     stack[-1]["calls"] |= done["calls"]
                     stack[-1]["slept"] += done["slept"]
+                    stack[-1]["unknown"] |= done["unknown"]
             elif tok in ("if", "fi") and stack:
                 stack[-1]["cond"] += 1 if tok == "if" else -1
             i += 1
@@ -238,11 +239,15 @@ def _api_read_path(args):
     for arg in it:
         if arg in ("-X", "--method"):
             method = next(it, "").upper()
+        elif arg.startswith("-X"):
+            method = arg[2:].upper()  # `-XDELETE`
         elif arg.startswith("--method="):
             method = arg.split("=", 1)[1].upper()
         elif arg in ("-f", "--raw-field", "-F", "--field", "--input"):
             field = True  # gh sends a POST when fields are given with no method
             next(it, None)
+        elif arg[:2] in ("-f", "-F") or arg.startswith(("--raw-field=", "--field=", "--input=")):
+            field = True  # `-fbody=x`
         elif arg in ("-H", "--header", "-q", "--jq", "-t", "--template", "--hostname",
                      "--cache", "-p", "--preview"):
             next(it, None)
@@ -264,6 +269,8 @@ def classify(rest):
     sub, args = _gh_parts(rest)
     if sub == "api":
         path = _api_read_path(args)
+        if path is not None and path.strip("/") == "rate_limit":
+            return None  # free, and the advice for a denied read
         return ("write",) if path is None else ("read", key, bool(ANNOTATION_PATH.search(path)))
     if sub == "search" or (args[:1] and args[0] in GH_READ_VERBS.get(sub, ())):
         return ("read", key, False)
@@ -281,7 +288,8 @@ def bash_reads(command, depth=0):
             continue
         if os.path.basename(rest[0]) in SHELLS and "-c" in rest[1:-1] and depth < 3:
             inner, inner_wrote = bash_reads(rest[rest.index("-c", 1) + 1], depth + 1)
-            reads, wrote = reads + inner, wrote or inner_wrote
+            reads = reads + ([] if REPEAT_OVERRIDE in env else inner)
+            wrote = wrote or inner_wrote
             continue
         cls = classify(rest)
         if cls and cls[0] == "write":

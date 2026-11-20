@@ -44,6 +44,13 @@ that issue tracks both.
   Review fixes add tests, and tests alone carried a later branch from under the cap to 311 lines.
 - **Do:** carry a change onto a new base with `git diff <merge-base> <commit> -- <files> | git apply --index --3way`,
   then compare `git diff --cached --numstat` with the original branch's numstat for those files.
+  To move those files' changes off the original branch as well, save the same diff to a scratch file outside the worktree
+  and run `git apply -R --index --3way` with it on the original branch (2026-11-19).
+- **Don't:** use `git checkout <ref> -- <paths>` for it, since CC Safety Net blocks it.
+  In cc-safety-net 2.7.12 its message begins "git checkout <ref> -- <path> overwrites working tree with ref version".
+- **Do:** count `git diff --stat origin/main...HEAD` before the first push of a multi-skill edit, and plan the split then.
+  The pre-push hook caps a PR at 10 files and 300 lines (2026-11-19).
+- **Don't:** find the cap after a reviewed head is refused.
 - **Do:** after a split, open each file a part cites at `origin/main` and confirm the cited rule is there.
   A citation checked against the unsplit branch can point at text that only an unmerged sibling PR adds
   ([ai-config#5369](https://github.com/Morrison-Lab/ai-config/pull/5369)).
@@ -64,6 +71,11 @@ that issue tracks both.
   A pure rename (no line changed) does not count toward the file cap, and lines moved between files do not count at all.
   A stacked branch is measured against its open PR's base, or on a first push against the nearest remote branch in its history that `main` lacks, read from the server when the clone has no tracking ref for it.
   Clear it with an `ALLOW_LARGE_PR=1` prefix only for a stacked branch whose parent is not on the server or not in its history, or for a mechanical, content-identical PR the move detection misses, and state why in the reply.
+  On 2026-11-19 the hook measured a stacked layer, [#5926](https://github.com/Morrison-Lab/ai-config/pull/5926), against `origin/main`,
+  so the measured diff included the changes of its unmerged base, [#5947](https://github.com/Morrison-Lab/ai-config/pull/5947)
+  ([ai-config#5873](https://github.com/Morrison-Lab/ai-config/issues/5873)).
+  In that auto-mode session the classifier refused the prefix on the layer ("[Undermining Oversight]").
+  The layer's push succeeded only after #5947 merged: once `origin/main` was merged into the layer, the hook's measured diff held only the layer's changes, under the cap, and the push needed no prefix.
 - gha's `check-pr-size` ([gha#1188](https://github.com/Morrison-Lab/gha/issues/1188)) fails the same PR in CI.
   The `size-exempt` label lifts it; put it on a mechanical, content-identical PR.
 - The caps are a decision, recorded here: 20 files and 600 lines since 2026-11-19, doubled from the 10 and 300 set after Ezra changed "waves" to "minimal batches".

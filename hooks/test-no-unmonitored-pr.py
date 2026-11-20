@@ -171,8 +171,23 @@ def run_main(reply, stop_hook_active=False, started=True):
     return json.loads(out.getvalue()) if out.getvalue().strip() else {}
 
 
+# transcript() wraps each block in an assistant record
+# ({"type": "assistant", "message": {"content": [block]}}), the shape last_reply reads.
 assert subject.last_reply(transcript([{"type": "text", "text": "a"}, {"type": "text", "text": "b"}])) == "b"
 waiting = "CI checks are still running; I'll merge once the review is clean."
+for phrase in ("Waiting on CI for the new head.",
+               "The checks are still running.",
+               "I'll merge once CI passes.",
+               "When the review comes back I'll address it."):
+    assert subject.WAITING.search(phrase), phrase
+# Replies that wait on nothing must not match (review of #5993).
+for phrase in ("Opened the PR. No pending items remain.",
+               "Done: all work in progress was merged.",
+               "The pending review was resolved and merged.",
+               "Merged after CI passed.",
+               "I am not waiting on CI any more.",
+               "No longer waiting for the review: it is clean."):
+    assert not subject.WAITING.search(phrase), phrase
 assert run_main(waiting).get("decision") == "block"
 assert "re-invoke" in run_main(waiting)["reason"]
 # An already-running poller (start returns False) is no wake either.

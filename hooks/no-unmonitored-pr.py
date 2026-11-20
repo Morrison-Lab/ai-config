@@ -18,15 +18,21 @@ import time
 OPEN = re.compile(r"\bgh\s+pr\s+create\b|create_pull_request", re.I)
 SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|subscribe_pr_activity|^schedule\b", re.I)
 # A closing reply that says the session is waiting on PR state (ai-config#4790).
+# Each branch names the PR state and a future event, so a bare status word
+# ("no pending items", "after CI passed") does not match; "not" and "no longer"
+# before "waiting" negate it.
+_PR_STATE = r"(?:CI|(?:the )?checks?|(?:the )?review|(?:the )?merge)"
+_FUTURE = (r"(?:passes|pass|finishes|finish|completes|complete|is clean|comes back"
+           r"|goes green|turns green|lands|is done|reports)")
 WAITING = re.compile(
-    r"\b(?:waiting|still running|in progress|pending|once (?:CI|the checks?|the review)"
-    r"|when (?:CI|the checks?|the review)|after (?:CI|the checks?|the review))\b", re.I)
+    r"(?<!not )(?<!no longer )\bwaiting (?:on|for) " + _PR_STATE
+    + r"|\b" + _PR_STATE + r" (?:is|are) still (?:running|pending|in progress)"
+    + r"|\b(?:once|when|after) " + _PR_STATE + r" " + _FUTURE + r"\b", re.I)
 WAKE_REASON = (
     "This reply waits on PR state (CI, review or merge), but nothing recorded can "
     "re-invoke this session: the detached poller only records state for the next "
     "prompt (ai-config#4790). Arm a wake before ending the turn: send_later, "
-    "ScheduleWakeup, a trigger routine, subscribe_pr_activity, or a "
-    "run_in_background wait.")
+    "ScheduleWakeup, a trigger routine, or subscribe_pr_activity.")
 POLL_SECONDS = 120
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
 

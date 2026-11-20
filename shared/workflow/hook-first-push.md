@@ -20,7 +20,7 @@ Read the nearest sibling hook before writing the new one, since the reviewer wil
 
 Four more misses sent [#5615](https://github.com/Morrison-Lab/ai-config/pull/5615) through [#5618](https://github.com/Morrison-Lab/ai-config/pull/5618) to a second push (2026-11-13):
 
-- **Do:** count the diff before pushing (`git diff --shortstat origin/main`), and keep the hook, its test, its README row and its rule section within 10 files and 300 lines.
+- **Do:** count the diff before pushing (`git diff --shortstat origin/main`), and keep the hook, its test, its README row and its rule section within 20 files and 600 lines.
   Split first when over, since `hooks/no-oversized-pr-push.py` refuses the push.
 - **Don't:** push a new hook, test, README row and rule section together without counting them.
 - **Do:** add the `README.md` hook-catalog row in the same commit as the hook (`check-hook-catalog.py`).
@@ -43,6 +43,8 @@ Changing an existing hook's event or matcher in `hooks/hooks.json` needs the sam
 
 - **Do:** split a shell command into stages with `shlex` (`punctuation_chars=";&|\n"`), as [`least-flexible-tool`](../coding/least-flexible-tool.md) says, and test a quoted operator, a trailing operator and an unbalanced quote.
 - **Don't:** split on `&&`, `|` or `;` with a regex that cannot see quoting, as #5631 first did and broke on `rg "a|b" f` and `grep x f;`.
+- **Do:** when a hook judges a git command by reading local refs, test each command that fetches before it acts (`git pull`, `git fetch ... && git merge FETCH_HEAD`) on a repo that has not fetched the new commits, since there the local ref is stale.
+- **Don't:** fetch in every test before running the case, which hid exactly that gap in #5990 until agy's second round.
 
 A hook that parses a CLI's argv (`gh`, `glab`) needs the CLI's complete flag and placeholder table before its first commit.
 The hook for [#5784](https://github.com/Morrison-Lab/ai-config/issues/5784) (branch `claude/5784-unnamed-repo-api-paths`) took four adversarial review rounds with 17 findings before its PR opened (session record, 2026-11-18), largely undeclared flags (`glab` `--form`, `--output`, `--placeholder`), placeholder forms, and endpoint forms (query string, fragment, full URL, leading `//`).

@@ -220,6 +220,14 @@ Flag a coordinator or thread reply that lists options in prose, including one ph
 Read the message; do not report `hooks/no-plain-text-choice.py`'s verdict as your finding.
 See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
 
+## Posts under an unanswered decision card
+
+On a transcript addressed to the user, check that nothing visible in the thread (a reply, an edit, a checklist update, a widget or a second card) was posted after a decision card that was still waiting for an answer.
+A card that gains a post under it moves while the user is tapping it.
+The fix is to withdraw the card, post, then post the card again last.
+Read the order of the calls yourself; do not report `hooks/no-post-under-open-card.py`'s verdict as your finding.
+See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
+
 ## Recursive ownership and mode changes
 
 On a diff, script or command that runs `chown`, `chmod` or `chgrp` recursively, check that no target can reach `/`, a system directory such as `/usr`, `/etc` or `/var/lib`, or the home directory or a directory containing it, such as `/home`.
@@ -370,6 +378,13 @@ Also flag a cloud Bash command that chains an in-place edit (`sed -i`, `perl -i`
 Read the commands yourself; do not report the output of `hooks/prefer-mcp-over-bash-in-cloud.py` or `hooks/no-chained-edit-and-commit-in-cloud.py` as your finding.
 See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever-one-exists).
 
+## GitHub polling that drains the shared budget
+
+Where a transcript, skill or script waits for CI, flag a GitHub poll faster than every two minutes (`gh pr checks --watch` at its default, `watch`, or a loop with a short `sleep`), which emptied the shared budget twice on 2026-11-19 ([ai-config#5970](https://github.com/Morrison-Lab/ai-config/issues/5970)).
+Also flag the same GitHub read repeated with nothing changed in between, above all a head's check-run annotations read more than once.
+Read the commands yourself rather than reporting the output of `hooks/no-tight-github-polling.py`.
+The writer rule is in [`monitor-pushed-heads`](../../shared/workflow/monitor-pushed-heads.md).
+
 ## Figures with a cut value axis
 
 On a diff that draws a figure in any tool or format (a Quarto chunk, matplotlib or plotly for a slide or Word file, a native PowerPoint chart, a Shiny app), check that a bar chart's value axis starts at zero, and that a dot or line plot of a count, rate or proportion that readers compare also starts at zero unless the quantity has no meaningful zero.
@@ -447,3 +462,19 @@ On a diff that adds such a reference, read the cited step and check that the cit
 [`check-step-references.py`](../../scripts/check-step-references.py) reports a number with no step behind it, a range written backwards, and a citation whose skill or linked file no longer exists.
 It cannot tell that a number now names the wrong step, so read the cited steps yourself.
 See [`skill-builder`](../../skills/skill-builder/SKILL.md#conventions-match-the-existing-family) ([ai-config#1865](https://github.com/Morrison-Lab/ai-config/issues/1865)).
+
+## Merges under a moved mwc line
+
+On a report or transcript that merges a content PR under an mwc line whose approved head is not the merged head, find the `check-mwc-carry.py` output for that PR.
+Report the merge when there is no CARRIES line, when the merge pinned a head other than the full SHA that line names, or when the approved SHA passed to the script is not the one on the line or in the post the line answered.
+A CARRIES line covers only the head it names: a later push needs a new run.
+See [`mwc`](../../skills/mwc/SKILL.md#an-mwc-carries-to-a-new-head-only-for-a-named-pr) ([ai-config#5967](https://github.com/Morrison-Lab/ai-config/issues/5967)).
+
+## Routine merges of main into a PR branch
+
+On a PR, transcript or report, find each commit that merges `main` into the PR branch, including a server-side branch update.
+Report one where the branch did not conflict with `main`, needed no named fix on `main`, and was not missing a `.github/workflows/` change from `main`.
+Moving the head re-runs the PR's CI and voids its review, so "main moved" or "freshen before review" is not a reason.
+Read the merge's parents yourself (`git merge-tree --write-tree` for a conflict, `git diff --name-only <base> <main> -- .github/workflows` for staleness);
+do not report the output of `hooks/no-routine-main-merge.py` as your finding.
+See [`sync-with-main`](../../shared/workflow/sync-with-main.md) ([ai-config#5988](https://github.com/Morrison-Lab/ai-config/issues/5988)).

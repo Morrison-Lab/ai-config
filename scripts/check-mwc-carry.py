@@ -3,22 +3,12 @@
 
     python3 scripts/check-mwc-carry.py --pr N --approved-sha SHA [--base main]
 
-Run it from a full clone of the PR's repository; skills/mwc/SKILL.md says
-which head a line approved. The line CARRIES to the current head when every commit added on the PR's
-first-parent chain since the approved head is a clean merge of the base:
-
-  * the approved head is on that chain (no rebase or force-push);
-  * each added commit has two parents, the second on the base branch;
-  * each merge's tree is `git merge-tree --write-tree` of its parents
-    (no conflict resolution, no edit of its own).
-
-Anything else VOIDS the line: the PR's own diff may have changed. Carrying
-the line does not make the head mergeable; the new head must still be fully
-clean (`scripts/check-pr-fully-clean.py`). A merge git cannot make cleanly
-voids the line even when resolved correctly (fail closed; a new line fixes it).
-
-The output names the full head SHA it checked; the merge pins that SHA.
-Exit codes: 0 CARRIES, 1 VOID, 2 called wrong or git failed.
+Run it in a full clone of the PR's repository. The line CARRIES when the
+approved head is on the head's first-parent chain and each commit added on it
+is a two-parent merge whose second parent is on the base and whose tree is
+`git merge-tree --write-tree` of its parents. Anything else VOIDS it (fail
+closed). The new head must still be fully clean, and the merge pins the full
+head SHA printed. Exit codes: 0 CARRIES, 1 VOID, 2 called wrong or git failed.
 """
 from __future__ import annotations
 

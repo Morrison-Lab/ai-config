@@ -19,6 +19,22 @@ release.
 - User says "update the v2 tag", "bump the floating tag"
 - After merging work to main when the repo uses floating version tags
 
+## Never ask before sliding an infra tag
+
+Ezra, 2026-11-20: "never ask me before sliding an infra tag;
+always just do it" ([ai-config#6052](https://github.com/Morrison-Lab/ai-config/issues/6052)).
+A floating tag in an infrastructure repo (gha's `v3`, any lab repo whose consumers pin a major tag) moves forward without anyone's leave.
+Whichever agent finishes an infra PR, by merging it or by hearing that it merged, slides the tag once the gates in step 3 pass.
+That agent does not hand the slide to a runner thread, the coordinator or the user, and does not wait for a typed "slide v3".
+A gate that fails is a hold, not a question: say which gate failed, fix or wait on it, and slide when it clears.
+Two agents sliding at once are safe, because gha's `slide-major-tag.yml` takes `expected_sha` and refuses a commit nobody checked.
+`hooks/no-ask-to-slide-tag.py` denies a message that asks leave to slide a tag or hands the slide to someone else.
+
+- **Do:** dispatch the slide yourself after the gates pass, then report the old SHA, the new SHA and the PRs the tag now carries.
+- **Don't:** end a turn with "want me to slide v3?" or "the runner thread slides v3" after merging an infra PR.
+
+Moving a tag **backward** is not covered: it still needs explicit confirmation (see "Edge cases").
+
 ## Procedure
 
 ### 1. Determine tag and target
@@ -45,7 +61,7 @@ git push origin <tag>   # PUSH
 
 ### 3. Show what's moving
 
-Display the before/after so the user can sanity-check:
+Display the before/after, so the report can name what moved (this is a record, not a request for approval):
 ```bash
 echo "Current: $(git log --oneline -1 <tag>)"
 echo "Target:  $(git log --oneline -1 <target>)"
@@ -109,7 +125,8 @@ User: "slide v3 to the release branch"
 
 - ❌ Using `git push --force origin <tag>` without trying delete first
 - ❌ Sliding without fetching first (tag might already be at target)
-- ❌ Sliding without showing the user what commits are being added
+- ❌ Sliding without reporting what commits were added
+- ❌ Asking anyone's leave for a forward slide, or leaving it to a runner thread
 - ❌ Moving a tag backward without explicit confirmation
 
 ## Relationship to other skills

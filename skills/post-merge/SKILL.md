@@ -762,10 +762,10 @@ bump merged but unpublished, a submodule pin not yet bumped in its consumer.
 Two things make this the step that gets skipped rather than deferred.
 Nothing turns red --- CI passed, the PR is green and merged, and the failure
 lands on a consumer who is not in the room.
-And the slide is destructive (it force-moves a tag), so it needs explicit
-human authorization and cannot simply be folded into the tidy, which is
-exactly why it evaporates instead: a step you are not allowed to perform is
-easy to stop tracking.
+And the slide force-moves a tag, which once read as needing a human's word, so it was left out of the tidy and evaporated.
+It needs no word: for an infra repo's forward slide, Ezra's standing rule is "never ask me before sliding an infra tag;
+always just do it" (2026-11-20, [ai-config#6052](https://github.com/Morrison-Lab/ai-config/issues/6052)).
+So when a slide is owed, run [`slide-tag`](../slide-tag/SKILL.md) yourself once its gates pass, as part of this step.
 
 Decide it mechanically rather than from memory of what the PR touched --- two
 lookups settle it, so this is an
@@ -787,21 +787,17 @@ for both and there is no case where dropping it helps.
 (`slide-tag` reads a tag with `git log --oneline -1 <tag>`, which peels for
 the same reason.)
 
-Then raise it as a `⚠️ **FLAG** ---` in step 5's report,
-naming the tag and what is unreachable until it moves.
-An offer is not a flag: say plainly that the slide is owed and that it needs
-the human, the same way
-[`report-mistakes-proactively`](../../shared/workflow/report-mistakes-proactively.md)
-rules out offering to file an issue instead of filing it.
+Then slide it, and report the old and new SHAs in step 5.
+If a gate holds the slide, raise a `⚠️ **FLAG** ---` naming the tag, the gate, and what is unreachable until it moves.
+An offer is not a slide: never close with "want me to slide it?", the same way [`report-mistakes-proactively`](../../shared/workflow/report-mistakes-proactively.md) rules out offering to file an issue instead of filing it.
 
 - **Do:** compare the release ref against `main` after the merge, and flag the
   gap with the specific tag and the affected consumer-facing paths.
 - **Do:** run the comparison on every merge rather than first judging whether
   the repo looks release-gated --- it costs two commands and prints nothing to
   act on when the SHAs match, so the comparison *is* the classifier.
-- **Don't:** run the release step yourself when it force-moves a ref or
-  publishes --- that is the human-gated action `ardi` reserves for explicit
-  authorization.
+- **Do:** slide an infra repo's floating tag forward yourself once `slide-tag`'s gates pass, without asking.
+- **Don't:** run a release step that publishes a versioned release, or moves a tag backward, without explicit authorization.
 - **Don't:** report a merged PR wrapped up while the artifact it documents is
   still unreachable at the version its own docs name.
 
@@ -1026,8 +1022,8 @@ When this post-merge wrap-up completes the session's work **and no PR this sessi
 - **`ums`** — step 4 invokes it.
 - **`spot-skill-opportunities`** — step 4's "multi-step pattern that emerged"
   bullet routes here to judge recurrence before handing off to `skill-builder`.
-- **`slide-tag`** -- what step 3.5's flag asks the human to authorize; it does
-  the force-move, this skill only detects that one is owed.
+- **`slide-tag`** -- what step 3.5 runs when a slide is owed;
+  it does the force-move, and this skill decides when one is owed.
 - **`cb` / `clean-branches`** — for stacked or stale sibling branches.
 - **`clean-worktrees` / `cw`** — if the PR was built in a git worktree, remove
   it during the tidy (step 2); a leftover worktree pins its branch and blocks
@@ -1056,9 +1052,7 @@ When this post-merge wrap-up completes the session's work **and no PR this sessi
   -- whatever hooks are owed stay merged, documented, and inert, which is the
   deferred-step-with-no-owner shape this skill's own step 3.75 exists to close,
   arriving one level up in the checklist meant to catch it.
-- ❌ Calling a merge wrapped up in a release-gated repo without comparing the
-  release ref against `main` (step 3.5) -- the merged docs pin a version
-  consumers cannot resolve until a human slides the tag.
+- ❌ Calling a merge wrapped up in a release-gated repo without comparing the release ref against `main` (step 3.5) -- the merged docs pin a version consumers cannot resolve until the tag slides.
 - ❌ Reporting "all cleaned up" while a stacked sibling branch dangles unmentioned.
 - ❌ Treating the whole cascade-scan hit list as work caused by this merge, without
   intersecting it against the merge's own deleted and renamed paths (step 1.5's own step 2) --- on

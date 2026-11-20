@@ -2001,6 +2001,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-ask-to-slide-tag.py\"'",
+            "timeout": 10,
+            "script": "no-ask-to-slide-tag.py",
+            "why": "ai-config#6052. Ezra, 2026-11-20: \"never ask me before sliding an infra tag; always just do it\". Threads had held the gha v3 slide for a runner thread and the coordinator asked him. Denies a hearthbot message (post_message, reply, update_message, edit_message, request_decision, message_coordinator, message_thread) when one sentence names a tag slide and asks leave or hands the slide to someone else (the runner thread, the user), and any decision card that names a slide. A hold on a gate that names no person is allowed. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-stepwise-approval-ask.py\"'",
             "timeout": 10,
             "script": "no-stepwise-approval-ask.py",

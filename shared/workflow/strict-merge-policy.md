@@ -96,5 +96,10 @@ Do not enable session-wide `/mwc` for it.
   In a project with no runner thread, the thread that owns the infra PR merges it itself once it is fully clean, and never asks (Ezra, 2026-11-20: "always handle infra PRs yourself;
   never ask me").
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
+- **Do:** after an infra PR merges, slide the repo's floating tag (gha's `v3`) yourself once [`slide-tag`](../../skills/slide-tag/SKILL.md)'s gates pass, whichever thread you are.
+  Never ask the user first, and never leave the slide to a runner thread or the coordinator (Ezra, 2026-11-20: "never ask me before sliding an infra tag;
+  always just do it").
+  `hooks/no-ask-to-slide-tag.py` denies a message that asks or hands the slide off (ai-config#6052).
+- **Don't:** report an infra merge done while its tag slide is owed and no gate holds it.
 
 See [`AGENTS.cases.md`](../../AGENTS.cases.md), "Strict Merge Control Policy" for the authentic user directives.

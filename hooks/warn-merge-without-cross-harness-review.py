@@ -35,6 +35,11 @@ before the gap was noticed.
              `clis` attempted with any result, or shown absent by a lone,
              unredirected `command -v` / `which` that exited 1; `opencode` attempted.
 
+    AND NOT  the user typed an `mwr` or `mwrs` grant covering the PR, and
+             the transcript holds the checker's `--mwr` MERGE-READY line for
+             the merge's pinned head (`mwr_cleared`; ai-config#3946: Ezra,
+             2026-11-19, "Skip review, keep green CI").
+
 A skill (`dtc`, `dto`, `adv`) is not credited by being loaded: loading one
 runs nothing. Its reviewer CLI call, which is a Bash call, is what counts.
 On a cloud session where `opencode` CLI is unavailable, a `curl` invocation
@@ -614,6 +619,38 @@ def _targets(sib, tool, tool_input):
     return [hit for hit in map(sib._gh_merge, _argvs(sib, command)) if hit]
 
 
+def mwr_cleared(payload, tool, tool_input):
+    """True when every merge in this call is covered by the user's typed
+    `mwr`/`mwrs` grant AND has the checker's MERGE-READY line for its pinned
+    head (ai-config#3946: the grant skips the review, the non-Claude read
+    included).
+
+    Merge targets and the credit come from `block-merge-without-clean-checker.py`
+    (`merge_targets`, `mwr_clears`), so this gate and that one agree on what
+    an mwr merge is. A merge with no PR, repo or 40-character sha pin, and
+    auto-merge (which pins nothing), is never cleared. Fails closed: any error
+    is False, and the deny stands.
+    """
+    try:
+        if load_sibling is None:
+            return False
+        bmc = load_sibling(__file__, "block-merge-without-clean-checker.py",
+                           "_sib_bmwcc_mwr", required=True)
+        targets = bmc.merge_targets(tool, tool_input)
+        if not targets:
+            return False
+        for num, repo, sha in targets:
+            if num is None or not repo or not isinstance(sha, str) or not bmc.RX_SHA40.match(sha):
+                return False
+            if not bmc.mwr_clears(payload, repo, num, sha):
+                return False
+        return True
+    except Exception as exc:
+        print(f"{os.path.basename(__file__)}: cannot read the mwr grant ({exc}); "
+              "the cross-harness gate applies", file=sys.stderr)
+        return False
+
+
 def main() -> int:
     try:
         sib = _sibling()
@@ -648,6 +685,8 @@ def main() -> int:
     except Exception:
         return 0
     if probed or any(seq > last_push for seq in reviews):
+        return 0
+    if mwr_cleared(payload, tool, tool_input):
         return 0
 
     nums = list(dict.fromkeys(

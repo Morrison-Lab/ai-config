@@ -74,6 +74,53 @@ entry, system reminders, tool results and the assistant's prose never count,
 and a negated phrase does not. Condition 1 (PR, repo, 40-character sha pin)
 still holds, and the merge is logged on stderr.
 
+## The `mwr` grant (ai-config#3946)
+
+Under the user's own typed `mwr` or `mwrs` (read by
+`no-unauthorized-merge.py`'s `transcript_mwr_grant`, for this PR), the
+checker's `--mwr` pass line
+`<owner>/<repo>#<N> is MERGE-READY under mwr (review not evaluated) on HEAD <sha40>! [stale-base rule]`
+stands in for the FULLY CLEAN line in condition 2. Conditions 1, 3 and 4
+are unchanged: the same sha pin, repo, number, sources and veto. The line
+is narrower still (round 5): it counts only as the last non-empty line of
+a Bash run of `$CLAUDE_PLUGIN_ROOT/scripts/check-pr-fully-clean.py` alone,
+never a checkout's copy, and only when it names the `-R` repository and
+PR number of that same command. Without
+the grant a MERGE-READY line satisfies nothing, and any error reading the
+grant or the line counts as no grant (fails closed). An `echo` argument
+holding "ready" is a possible forgery, as one holding "clean" is, and so
+is any `echo` argument holding a backslash and any `echo -e`, on either
+line, since escapes can spell either word.
+
+A merge credited by the MERGE-READY line, not a FULLY CLEAN line, also
+passes the live re-checks of `enforce-mwc-review-gate.py`
+(`fetch_mwr_live`, `mwr_live_problem`; round 8), read in this hook call,
+whatever the review gate decided: no DISMISSED, CHANGES_REQUESTED or
+REJECTED review, nothing under `.github/` in the live base...head compare,
+and a live head equal to the pinned sha. A problem or a failed read denies.
+
+Under an mwr grant with no other user-given authority (`mwr_only_grant`,
+round 9), a FULLY CLEAN line does not count at all: the merge needs the
+MERGE-READY line and the live re-checks, whatever else the transcript holds.
+The other authority (`other_merge_authority`, round 10) is what
+`no-unauthorized-merge.py` reads: the user's typed `mwc`
+(`transcript_merge_grant`, never the `.mwc` marker the agent can write), a
+typed "merge ... PR N" naming the PR, the standing per-repository grant and
+the standing infra-PR grant. `ALLOW_MERGE=1` never counts. An unreadable
+grant counts as none, so the merge stays on the mwr path.
+
+An mwr-only merge has one route (`mwr_route_problem`, round 12): the MCP
+merge tool, with only the tool schema's keys, a digit `pullNumber` and an
+`expectedHeadSha` of 40 lowercase hex characters. A gh, gh api or curl
+merge is denied before any other check, since this hook reads such a
+command differently from gh, curl and the server (ai-config#5959).
+The same route is required of any merge the MERGE-READY line credits, under
+a typed `mwc`, a named grant or any other authority as well (round 13). A
+merge credited by a FULLY CLEAN line or the typed override keeps every
+route. This check fails closed, so it is the backstop when
+`no-unauthorized-merge.py` steps aside for `ALLOW_MERGE=1` or an
+`allow_merge` input key.
+
 ## Recognised merge routes
 
 `mcp__github__merge_pull_request`; `gh pr merge`; `gh api -X PUT
@@ -177,9 +224,35 @@ NOT_A_FILE = frozenset({"-c", "--command", "-m", "--module", "-h", "--help",
 PRINTERS = frozenset({"echo", "printf", "cat", "tee"})
 RX_DURATION = re.compile(r"^\d+(\.\d+)?[smhd]?$")
 WRAPPERS = frozenset({"timeout", "time", "nice", "nohup", "command", "stdbuf"})
-RX_FORGE = re.compile(r"clean|\$(?!\?)|`", re.IGNORECASE)
+RX_FORGE = re.compile(r"clean|ready|\$(?!\?)|`", re.IGNORECASE)
+# The only Bash command whose output can supply the `--mwr` MERGE-READY line
+# (ai-config#3946): the checker run alone, with plain arguments (no quotes,
+# braces, expansions, globs, pipes or redirects but `2>&1`). A printer
+# denylist cannot be completed (brace expansion, `python3 -c`, `awk`), so the
+# MERGE-READY line uses this allowlist instead. No trailing `echo` is
+# allowed, since only the run's last line is credited (round 5, finding 2).
+# The FULLY CLEAN line keeps `_runs_instrument`.
+RX_INSTRUMENT_ALONE = re.compile(
+    r"\A[ \t]*(?:(?:python3?|py)[ \t]+)?(?P<script>(?:[\w./-]*/)?check-pr-fully-clean\.py)"
+    r"(?P<args>(?:[ \t]+[\w./:=,@+-][\w./#:=,@+-]*)*)(?:[ \t]+2>&1)?[ \t]*\n?\Z")
+# An echo option cluster that turns on escape reading: `-e`, `-ne`, `-en`.
+RX_ECHO_E = re.compile(r"^-[a-zA-Z]*e[a-zA-Z]*$")
 RX_EVIDENCE = re.compile(
     r"([\w.-]+/[\w.-]+)#(\d+) is FULLY CLEAN on HEAD ([0-9a-f]{7,40})!? \[stale-base rule\]")
+# The checker's pass line under `--mwr` (ai-config#3946): review verdicts and
+# quorum were not evaluated, every other axis was. It stands in for the
+# FULLY CLEAN line only under the user's typed `mwr`/`mwrs` grant.
+# The sha is the full 40 hex characters (round 6), and `mwr_clears` requires
+# it to equal the merge's pinned sha. A checker older than round 6 printed an
+# 8-hex prefix there; that line no longer matches, so until the plugin root's
+# copy updates, an mwr merge is refused (fails closed).
+RX_MWR_EVIDENCE = re.compile(
+    r"([\w.-]+/[\w.-]+)#(\d+) is MERGE-READY under mwr \(review not evaluated\) "
+    r"on HEAD ([0-9a-f]{40})! \[stale-base rule\]")
+# The same line as the run's whole last line, opening with the checker's
+# success marker (U+2705), as `check-pr-fully-clean.py --mwr` prints it last
+# (round 5, finding 2).
+RX_MWR_LAST_LINE = re.compile(chr(0x2705) + " " + RX_MWR_EVIDENCE.pattern)
 RX_NOT_CLEAN = re.compile(r"NOT fully clean", re.IGNORECASE)
 RX_SHA40 = re.compile(r"^[0-9a-fA-F]{40}$")
 RX_API_MERGE = re.compile(
@@ -201,7 +274,8 @@ DENY_TEXT = (
     "must be relayed back into this session.\n"
     "   Pass arguments literally: a run whose command also holds `cat`, "
     "`printf`, `tee`, or an `echo` that could print the line (any argument "
-    "holding \"clean\" or an expansion other than `$?`), even inside `$(...)` "
+    "holding \"clean\", \"ready\", a backslash or an expansion other than `$?`, or an "
+    "`-e` flag), even inside `$(...)` "
     "such as `--annotations-read $(cat ids.txt)`, is not credited. A "
     "trailing `echo \"exit=$?\"` is fine.\n"
     "3. Retry the merge with the full head SHA pinned "
@@ -296,6 +370,13 @@ def _argv_merge(rest):
 
     num None means the merge cannot be tied to a PR; "graphql" in the third
     slot of the returned tuple's num marks a GraphQL merge.
+
+    Known gaps (ai-config#5959): this reads argv, not gh's own parsing, so a
+    decoy `repos/O/R/pulls/N/merge` in a `-f` field can be read in place of
+    the endpoint, a repeated `--repo` can name another repository than gh
+    merges in, and a sha in a field the server ignores is read as a pin. An
+    mwr-only merge no longer takes this route (round 12); ordinary and mwc
+    merges still do.
     """
     if not rest:
         return None
@@ -338,7 +419,15 @@ def _shell_command(tool_input):
 def merge_targets(tool, tool_input):
     """[(num|None, repo|None, sha|None)] for every merge this call performs."""
     if tool == MCP_MERGE_TOOL:
-        num = tool_input.get("pullNumber") or tool_input.get("pull_number")
+        # The server merges `pullNumber` and ignores unknown keys, so
+        # conflicting PR-number keys leave num None and the hook denies
+        # (no-unauthorized-merge.py's mcp_pull_number holds the same logic).
+        present = [tool_input[k] for k in ("pullNumber", "pull_number", "number")
+                   if k in tool_input and tool_input[k] is not None]
+        if len({str(v).strip() for v in present}) > 1:
+            num = None
+        else:
+            num = present[0] if present else None
         owner, name = tool_input.get("owner"), tool_input.get("repo")
         repo = f"{owner}/{name}" if owner and name else None
         sha = (tool_input.get("expectedHeadSha")
@@ -374,6 +463,16 @@ def _skip_wrapper_args(rest):
     return rest
 
 
+def _echo_could_forge(token):
+    """Whether one `echo` argument could print a checker line.
+
+    True for "clean", "ready", an expansion other than `$?` or a backtick
+    (RX_FORGE), for any backslash, which an escape-reading echo turns into
+    any character, and for an option cluster holding `e` (`-e`, `-ne`).
+    """
+    return bool(RX_FORGE.search(token) or "\\" in token or RX_ECHO_E.match(token))
+
+
 def _runs_instrument(command):
     """True when *command* runs the instrument and cannot print its own line."""
     ran = False
@@ -392,7 +491,10 @@ def _runs_instrument(command):
                 # `; echo "exit=$?"` is the usual way to read an exit status
                 # and cannot print the evidence line: allow an `echo` whose
                 # arguments hold no "clean" and no expansion but `$?`.
-                if head == "echo" and not any(RX_FORGE.search(t)
+                # A backslash or an `-e` flag can spell the line in escapes
+                # (`echo -e "MERGE-RE\x41DY"`, and dash's echo reads escapes
+                # with no flag at all), so either one counts as a forgery.
+                if head == "echo" and not any(_echo_could_forge(t)
                                               for t in rest[1:]):
                     continue
                 return False
@@ -419,6 +521,77 @@ def _blocks(rec):
     return [b for b in content if isinstance(b, dict)] if isinstance(content, list) else []
 
 
+# The checker's flags that make it score a payload instead of fetching live
+# state (scripts/check-pr-fully-clean.py, parse_args). argparse accepts any
+# unambiguous prefix ("--from", "--f") and "--flag=VALUE", so every option
+# token that is a prefix of one of these is refused (round 4, finding 2).
+MWR_PAYLOAD_FLAGS = ("--from-json",)
+
+
+def _plugin_root_checker():
+    """The real path of `$CLAUDE_PLUGIN_ROOT/scripts/<checker>`, or None when unset."""
+    root = os.environ.get("CLAUDE_PLUGIN_ROOT")
+    if not root:
+        return None
+    return os.path.realpath(os.path.join(root, "scripts", INSTRUMENT))
+
+
+def _payload_flag(cmd):
+    """Whether `cmd` passes the checker a flag that makes it score a payload."""
+    for token in cmd.split():
+        name = token.split("=", 1)[0]
+        if len(name) > 2 and name.startswith("--") and any(
+                flag.startswith(name) for flag in MWR_PAYLOAD_FLAGS):
+            return True
+    return False
+
+
+def _root_is_checkout(real):
+    """Whether the root above checker `real` (`<root>/scripts/<checker>`) is a git checkout.
+
+    Read from the file system (a `.git` entry at the root), so a git command
+    that fails cannot pass a checkout off as a plain copy. A plugin cache
+    nested in some other repository (a dotfiles home) is still a plain copy.
+    """
+    return os.path.lexists(os.path.join(os.path.dirname(os.path.dirname(real)), ".git"))
+
+
+def trusted_mwr_checker(cmd, cwd):
+    """Whether Bash command `cmd`, run in `cwd`, is the checker run alone from
+    the plugin root's own copy, on live state (round 5, finding 1).
+
+    The command must match RX_INSTRUMENT_ALONE and pass no payload flag
+    (MWR_PAYLOAD_FLAGS), and its script must resolve to
+    `$CLAUDE_PLUGIN_ROOT/scripts/check-pr-fully-clean.py`. The checker
+    imports `scripts/lib/*.py` and loads `scripts/build-pr-payload.py` from
+    its own directory, so hashing the checker file alone vouches for nothing
+    a checkout holds: no checkout's copy is ever trusted, and a plugin root
+    that is itself a git checkout is refused too. A relative script needs
+    the record's `cwd`. Anything else, an unset CLAUDE_PLUGIN_ROOT, or any
+    error is untrusted.
+
+    Residual: an agent with shell access can still edit the plugin cache, or
+    put a fake `gh` on PATH. That is tracked in ai-config#5959.
+    """
+    try:
+        match = RX_INSTRUMENT_ALONE.match(cmd or "")
+        if not match or _payload_flag(cmd):
+            return False
+        trusted = _plugin_root_checker()
+        if trusted is None or not os.path.isfile(trusted) or _root_is_checkout(trusted):
+            return False
+        script = match.group("script")
+        if not os.path.isabs(script):
+            if not isinstance(cwd, str) or not os.path.isdir(cwd):
+                return False
+            script = os.path.join(cwd, script)
+        return os.path.realpath(script) == trusted
+    except Exception as exc:
+        print(f"block-merge-without-clean-checker: checker trust check failed ({exc}); "
+              "not credited", file=sys.stderr)
+        return False
+
+
 def _result_text(block):
     content = block.get("content")
     if isinstance(content, str):
@@ -432,15 +605,83 @@ def _is_relay_tool(name):
     return name in RELAY_TOOLS or (name or "").startswith(RELAY_PREFIXES)
 
 
-def evidence(path):
-    """{(repo_lower, num, sha)} of FULLY CLEAN lines from accepted sources."""
+def mwr_command_target(cmd):
+    """(repo_lower, num) that checker command `cmd` names with `-R` and its PR number, or None.
+
+    Fails toward None: the repository must come from exactly one `-R OWNER/NAME`
+    pair, with no `--repo` spelling (argparse accepts `--r`, `--re`, `--rep`)
+    and no `-RVALUE` form beside it. Every option but `--mwr` is read as
+    taking a value, so a misread flag can only swallow the number, never
+    supply one. Exactly one positional, all digits, is the number.
+    """
+    match = RX_INSTRUMENT_ALONE.match(cmd or "")
+    if not match:
+        return None
+    tokens = match.group("args").split()
+    repo, positional = None, []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        name = tok.split("=", 1)[0]
+        if tok == "-R":
+            if repo is not None or i + 1 >= len(tokens):
+                return None
+            repo = tokens[i + 1]
+            i += 2
+            continue
+        if tok.startswith("-R") or (len(name) > 2 and "--repo".startswith(name)):
+            return None
+        if tok == "--mwr" or (tok.startswith("-") and "=" in tok):
+            i += 1
+            continue
+        if tok.startswith("-"):
+            i += 2
+            continue
+        positional.append(tok)
+        i += 1
+    if not repo or len(positional) != 1 or not positional[0].isdigit():
+        return None
+    return repo.lower(), int(positional[0])
+
+
+def _mwr_last_line(text, cmd):
+    """{(repo_lower, num, sha)} from the run's last non-empty line, or an empty set.
+
+    The line must be the checker's whole MERGE-READY line, success marker
+    first, and name the `-R` repository and PR number of `cmd` itself
+    (round 5, finding 2). Earlier lines are never read, so text the agent
+    controls that the checker echoes (a review thread's path in a NOTE)
+    cannot carry a line for another PR.
+    """
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    target = mwr_command_target(cmd)
+    if not lines or target is None:
+        return set()
+    m = RX_MWR_LAST_LINE.fullmatch(lines[-1])
+    if not m or (m.group(1).lower(), int(m.group(2))) != target:
+        return set()
+    return {(target[0], target[1], m.group(3).lower())}
+
+
+def evidence(path, pattern=RX_EVIDENCE, alone=False):
+    """{(repo_lower, num, sha)} of `pattern` lines (FULLY CLEAN by default) from accepted sources.
+
+    With `alone` (the MERGE-READY line), only a Bash result counts, and only
+    when its command is the checker run alone from the plugin root's copy
+    (`trusted_mwr_checker`, read with the record's own `cwd`); only its last
+    line is read (`_mwr_last_line`). A relay tool result and user-role text
+    never supply that line (round 3, finding 3).
+    """
     found = set()
-    bash_ids, relay_ids = set(), set()
+    bash_ids, relay_ids = {}, set()
 
     def take(text, veto):
         if veto and RX_NOT_CLEAN.search(text):
             return
-        for repo, num, sha in RX_EVIDENCE.findall(text):
+        # The FULLY CLEAN line is still read anywhere in the output, so a
+        # forged line in a NOTE (a review thread's path) can name another
+        # PR. That mwc-side gap is tracked in ai-config#5959.
+        for repo, num, sha in pattern.findall(text):
             found.add((repo.lower(), int(num), sha.lower()))
 
     for rec in _records(path):
@@ -454,11 +695,15 @@ def evidence(path):
                 if name in SHELL_TOOLS:
                     cmd = _shell_command(b.get("input") or {})
                     try:
-                        if cmd and _runs_instrument(cmd):
-                            bash_ids.add(b.get("id"))
+                        # The FULLY CLEAN line still trusts any script named
+                        # check-pr-fully-clean.py; that mwc-side gap is
+                        # ai-config#5959. The MERGE-READY line does not.
+                        if cmd and _runs_instrument(cmd) and (
+                                not alone or trusted_mwr_checker(cmd, rec.get("cwd"))):
+                            bash_ids[b.get("id")] = cmd
                     except Exception:
                         pass
-                elif _is_relay_tool(name):
+                elif _is_relay_tool(name) and not alone:
                     relay_ids.add(b.get("id"))
             elif kind == "tool_result":
                 tid = b.get("tool_use_id")
@@ -468,10 +713,14 @@ def evidence(path):
                 # header) is never credited even if its output quotes a clean
                 # line.
                 if tid in bash_ids and not b.get("is_error"):
-                    take(_result_text(b), veto=True)
+                    text = _result_text(b)
+                    if not alone:
+                        take(text, veto=True)
+                    elif not RX_NOT_CLEAN.search(text):
+                        found |= _mwr_last_line(text, bash_ids[tid])
                 elif tid in relay_ids:
                     take(_result_text(b), veto=False)
-            elif kind == "text" and role in ("user", "USER_INPUT"):
+            elif kind == "text" and role in ("user", "USER_INPUT") and not alone:
                 take(b.get("text") or "", veto=False)
     return found
 
@@ -659,6 +908,200 @@ def typed_override(path):
     return False
 
 
+def mwr_granted(payload, repo, num):
+    """Whether the user's typed `mwr`/`mwrs` covers `repo`#`num` (ai-config#3946).
+
+    Reads `transcript_mwr_grant` from no-unauthorized-merge.py, the one copy
+    of the rule. Fails closed: a sibling that cannot load, or any error, is
+    no grant, so a MERGE-READY line then satisfies nothing.
+    """
+    try:
+        if load_sibling is None:
+            return False
+        module = load_sibling(__file__, "no-unauthorized-merge.py", "_sib_nua_mwr")
+        if module is None or not hasattr(module, "transcript_mwr_grant"):
+            return False
+        return bool(module.transcript_mwr_grant(payload, repo, num))
+    except Exception as exc:
+        print(f"block-merge-without-clean-checker: mwr grant read failed ({exc}); "
+              "no mwr grant", file=sys.stderr)
+        return False
+
+
+def _nua_sibling():
+    """no-unauthorized-merge.py, the one copy of every merge-grant rule, or
+    None when it cannot load."""
+    if load_sibling is None:
+        return None
+    return load_sibling(__file__, "no-unauthorized-merge.py", "_sib_nua_mwr")
+
+
+def mwc_granted(payload):
+    """Whether the user TYPED an `mwc` grant this session, read by
+    `transcript_merge_grant` in no-unauthorized-merge.py (round 10).
+
+    Never the `.mwc` marker that `check_mwc_active` also accepts: the agent
+    can write that marker itself (`ai-session.sh enable-mwc`), so it must not
+    lift an mwr-only merge onto the FULLY CLEAN path (the marker itself is
+    ai-config#5959). Fails toward False: an unreadable grant leaves an
+    mwr-granted merge on the mwr path.
+    """
+    try:
+        module = _nua_sibling()
+        if module is None or not hasattr(module, "transcript_merge_grant"):
+            return False
+        return bool(module.transcript_merge_grant(payload))
+    except Exception as exc:
+        print(f"block-merge-without-clean-checker: mwc grant read failed ({exc}); "
+              "an mwr merge stays on the mwr path", file=sys.stderr)
+        return False
+
+
+def other_merge_authority(payload, repo, num, sha=None):
+    """Whether user-given authority other than `mwr` covers `repo`#`num`
+    (round 10), so the merge keeps the ordinary FULLY CLEAN path.
+
+    The rules no-unauthorized-merge.py allows a merge on, each read from
+    there: the typed `mwc` (`mwc_granted`), a typed "merge ... PR N" naming
+    this PR (`transcript_named_grant`), the standing per-repository grant
+    (`STANDING_MERGE_GRANT_REPOS`, the test `standing_grant_target` ends
+    with) and the standing infra-PR grant (`infra_grant_applies`, the core of
+    `standing_infra_grant`, which reads the PR's files from GitHub and needs
+    the pinned `sha`). As there, neither the named nor the infra grant covers
+    an auto-merge. `ALLOW_MERGE=1` never counts, since the agent can type it,
+    and neither does the `.mwc` marker. Fails toward False, so a failed read,
+    the infra grant's network read included, leaves the merge mwr-only.
+    """
+    try:
+        if mwc_granted(payload):
+            return True
+        module = _nua_sibling()
+        if module is None or not repo or num is None:
+            return False
+        target = repo.strip().lower()
+        if target in getattr(module, "STANDING_MERGE_GRANT_REPOS", ()):
+            return True
+        if mwr_auto_merge(payload):
+            return False
+        if (hasattr(module, "transcript_named_grant")
+                and module.transcript_named_grant(payload, target, num)):
+            return True
+        return bool(sha and hasattr(module, "infra_grant_applies")
+                    and module.infra_grant_applies(target, num, sha))
+    except Exception as exc:
+        print(f"block-merge-without-clean-checker: merge-grant read failed ({exc}); "
+              "an mwr merge stays on the mwr path", file=sys.stderr)
+        return False
+
+
+def mwr_only_grant(payload, repo, num, sha=None):
+    """Whether `repo`#`num` is merged under an `mwr` grant and no other
+    user-given authority (round 9; `other_merge_authority`, round 10). Then a
+    FULLY CLEAN line does not count: the merge rests on the MERGE-READY line
+    (`mwr_clears`) and the live re-checks (`mwr_live_check`). Without `sha`
+    the infra-PR grant cannot be read, so it does not count.
+    """
+    return (mwr_granted(payload, repo, num)
+            and not other_merge_authority(payload, repo, num, sha))
+
+
+def mwr_route_problem(tool, tool_input):
+    """"" when an mwr-only merge uses the one route mwr allows, else why not
+    (round 12).
+
+    The route is the MCP merge tool with a strict input, judged by
+    `mwr_mcp_input_problem` in no-unauthorized-merge.py, the one copy of the
+    rule; its text `MWR_MCP_ONLY_TEXT` says how to merge instead. Any shell
+    route (gh, gh api, curl) is refused. Fails closed: a sibling that cannot
+    load is a problem.
+    """
+    try:
+        module = _nua_sibling()
+        if module is None or not hasattr(module, "mwr_mcp_input_problem"):
+            return "the strict-input rule in no-unauthorized-merge.py could not load."
+        text = getattr(module, "MWR_MCP_ONLY_TEXT", "")
+        if tool != MCP_MERGE_TOOL:
+            return f"a shell merge is refused. {text}"
+        problem = module.mwr_mcp_input_problem(tool_input)
+        return f"{problem} {text}" if problem else ""
+    except Exception as exc:
+        return f"the strict-input rule could not run ({exc})."
+
+
+# An auto-merge: `gh pr merge --auto`, the MCP auto-merge tools, a GraphQL
+# `enablePullRequestAutoMerge`, or a REST `auto_merge` / `ccr/auto_merge`
+# route. It merges whatever the PR holds when checks pass, so the mwr grant
+# never skips review for it (round 3, finding 8).
+RX_AUTO_MERGE = re.compile(r"(?:^|[\s=])--auto\b|auto[_-]?merge", re.IGNORECASE)
+
+
+def mwr_auto_merge(payload):
+    """Whether this tool call is, or could be, an auto-merge. Fails toward True."""
+    try:
+        tool = str((payload or {}).get("tool_name") or "")
+        if RX_AUTO_MERGE.search(tool):
+            return True
+        tool_input = (payload or {}).get("tool_input")
+        if not isinstance(tool_input, dict):
+            return False
+        return bool(RX_AUTO_MERGE.search(json.dumps(tool_input)))
+    except Exception:
+        return True
+
+
+def mwr_clears(payload, repo, num, sha):
+    """True only when an `mwr` grant covers `repo`#`num` AND an accepted
+    MERGE-READY line names that repo, number and exactly `sha` (40 hex).
+
+    The line's sources, the NOT-fully-clean veto and the sha tie are the
+    FULLY CLEAN line's (`evidence`). Fails closed on any error.
+    """
+    try:
+        path = (payload or {}).get("transcript_path") or ""
+        if not repo or num is None or not sha or not path or not os.path.isfile(path):
+            return False
+        if mwr_auto_merge(payload):
+            return False
+        if not mwr_granted(payload, repo, num):
+            return False
+        sha = sha.lower()
+        # Equality with the pinned sha, never a prefix match (round 6).
+        return any(r == repo.lower() and n == num and sha == s
+                   for r, n, s in evidence(path, RX_MWR_EVIDENCE, alone=True))
+    except Exception as exc:
+        print(f"block-merge-without-clean-checker: MERGE-READY read failed ({exc}); "
+              "not credited", file=sys.stderr)
+        return False
+
+
+def fully_clean_on(found, repo, num, sha):
+    """Whether `found` (from `evidence`) holds a FULLY CLEAN line for
+    `repo`#`num` whose sha is a prefix of the pinned `sha`."""
+    sha = (sha or "").lower()
+    return bool(repo and sha) and any(
+        r == repo.lower() and n == num and sha.startswith(s) for r, n, s in found)
+
+
+def mwr_live_check(payload, repo, num, sha):
+    """"" when the merge-time mwr re-checks pass on live data, else the reason.
+
+    Runs `fetch_mwr_live` and `mwr_live_problem` from the sibling
+    `enforce-mwc-review-gate.py`, the one copy of both (round 8). Fails
+    closed: a sibling that cannot load or any error is a reason.
+    """
+    try:
+        if load_sibling is None:
+            return "scripts/lib/sibling.py could not be loaded."
+        gate = load_sibling(__file__, "enforce-mwc-review-gate.py",
+                            "_sib_enforce_mwr_live", required=True)
+        pr_data = {"url": f"https://github.com/{repo}/pull/{num}", "headRefOid": sha}
+        pr_data["mwrLive"] = gate.fetch_mwr_live(
+            pr_data, (payload or {}).get("cwd") or os.getcwd())
+        return gate.mwr_live_problem(pr_data)
+    except Exception as exc:
+        return f"the live re-checks could not run ({exc})."
+
+
 def deny(reason):
     return {
         "hookSpecificOutput": {
@@ -723,6 +1166,17 @@ def main() -> int:
                 "tied at all: use `gh pr merge N -R o/r --match-head-commit "
                 "<sha>` or the MCP merge tool.", num, repo)))
             return 0
+        # Under an mwr grant with no other authority, only the MCP merge
+        # tool with a strict input may merge (round 12), checked before
+        # anything else. A Bash route is read here differently from how gh,
+        # curl or the server read it, so it is refused outright.
+        pin = sha.lower() if isinstance(sha, str) and RX_SHA40.match(sha) else None
+        mwr_only = mwr_only_grant(payload, repo, num, pin)
+        if mwr_only:
+            route_problem = mwr_route_problem(tool, tool_input)
+            if route_problem:
+                print(json.dumps(deny(f"BLOCKED: merging {target} under `mwr`: {route_problem}")))
+                return 0
         if not sha or not RX_SHA40.match(sha):
             print(json.dumps(_refuse(
                 target, "the full 40-character head SHA pinned",
@@ -732,8 +1186,25 @@ def main() -> int:
                 "moved after the run.", num, repo)))
             return 0
         sha = sha.lower()
-        ok = any(r == repo.lower() and n == num and sha.startswith(s)
-                 for r, n, s in found)
+        # Under an mwr grant with no mwc grant, a FULLY CLEAN line does not
+        # count: only the MERGE-READY line and the live re-checks (round 9).
+        # `mwr_only` was read above, with this same sha.
+        ok = not mwr_only and fully_clean_on(found, repo, num, sha)
+        mwr_problem = ""
+        route_problem = ""
+        if not ok and mwr_clears(payload, repo, num, sha):
+            # Credited by the MERGE-READY line alone: the merge takes the
+            # strict MCP route whatever other grant covers it (round 13), and
+            # the live re-checks run here whatever the review gate decided
+            # (round 8). An mwr-only merge was route-checked above.
+            route_problem = "" if mwr_only else mwr_route_problem(tool, tool_input)
+            if not route_problem:
+                mwr_problem = mwr_live_check(payload, repo, num, sha)
+            if not route_problem and not mwr_problem:
+                print(f"block-merge-without-clean-checker: {target} merged under the "
+                      "user's typed mwr grant on a MERGE-READY line; review not "
+                      "evaluated", file=sys.stderr)
+                ok = True
         if not ok and overridden:
             print(f"block-merge-without-clean-checker: {target} merged on the "
                   "user's typed override; no checker pass was required",
@@ -744,11 +1215,44 @@ def main() -> int:
                   "user's tapped waiver; no checker pass was required",
                   file=sys.stderr)
             ok = True
+        if not ok and route_problem:
+            print(json.dumps(deny(
+                f"BLOCKED: merging {target} under `mwr`: {route_problem} "
+                "A merge credited by the MERGE-READY line takes this route "
+                "whatever other grant covers it; a merge credited by a FULLY "
+                "CLEAN line keeps every route.")))
+            return 0
+        if not ok and mwr_problem:
+            print(json.dumps(deny(
+                f"{target}: the mwr merge-time check failed: {mwr_problem} "
+                "Under mwr, the live PR state is read again at merge time.")))
+            return 0
+        if not ok and mwr_only:
+            print(json.dumps(_refuse(
+                target, f"a `{INSTRUMENT} --mwr` MERGE-READY line on head {sha}",
+                "This merge is granted by the user's typed `mwr` or `mwrs`, and by no "
+                "typed `mwc` and no named, standing or infra-PR grant, so a FULLY CLEAN "
+                "line does not count. The merge needs the "
+                f"`{repo}#{num} is MERGE-READY under mwr (review not evaluated) "
+                f"on HEAD {sha}! [stale-base rule]` line, as the last line of a run of "
+                f"`python3 {_plugin_root_checker() or '$CLAUDE_PLUGIN_ROOT/scripts/' + INSTRUMENT} "
+                f"{num} -R {repo} --mwr`, alone in its command, and the live re-checks. "
+                "If the PR needs the FULLY CLEAN path, ask the user to type `mwc`; "
+                "do not create an mwc grant yourself.",
+                num, repo)))
+            return 0
         if not ok:
             print(json.dumps(_refuse(
                 target, f"a `{INSTRUMENT}` pass on head {sha[:8]}",
                 f"No `{repo}#{num} is FULLY CLEAN on HEAD {sha[:8]}! [stale-base rule]` line is "
-                "in this session's checker results or relayed messages.",
+                "in this session's checker results or relayed messages. "
+                "Under the user's typed `mwr` or `mwrs` grant, a `--mwr` run's "
+                f"`{repo}#{num} is MERGE-READY under mwr (review not evaluated) "
+                f"on HEAD {sha}! [stale-base rule]` line (the full head sha) serves instead, "
+                "as the last line of a run of the plugin root's own copy, "
+                f"`python3 {_plugin_root_checker() or '$CLAUDE_PLUGIN_ROOT/scripts/' + INSTRUMENT} "
+                f"{num} -R {repo} --mwr`, alone in its command; a checkout's "
+                "copy is never credited.",
                 num, repo)))
             return 0
     return 0

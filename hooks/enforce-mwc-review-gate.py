@@ -52,6 +52,23 @@ merged over a "Needs more work" verdict (reverted in sparta#1429):
   verdict on a long thread is not lost to `gh pr view` truncation;
 - GitLab merges (`glab mr merge` / GitLab API merge) fail closed with a denial.
 
+Under the user's typed `mwr` or `mwrs` grant (ai-config#3946), a merge whose
+transcript holds the checker's `--mwr` MERGE-READY line for the live head is
+evaluated without the review verdict (`decide`, `mwr_cleared`); a formal
+CHANGES_REQUESTED or REJECTED review and every non-review gate still deny.
+Before such a merge is allowed, live data read in the same hook call is
+checked again (`fetch_mwr_live`, `mwr_live_problem`; round 7): no review in
+any state DISMISSED, CHANGES_REQUESTED or REJECTED, no change under
+`.github/` between the live base and the pinned head, and a live head equal
+to the pinned sha. Any unreadable field denies. These re-checks also run
+when the ordinary gate allows (a stale formal APPROVED, a trusted verdict)
+but the merge rests on the MERGE-READY line, not a FULLY CLEAN line (round
+8); `block-merge-without-clean-checker.py` runs the same functions. Under an
+mwr grant with no mwc grant, a FULLY CLEAN line never skips them (round 9).
+A merge the MERGE-READY line credits takes the strict MCP route
+(`mwr_credit_route_denial`, round 13) whatever other grant covers it, as an
+mwr-only merge does (`mwr_route_denial`, round 12).
+
 `git merge origin/main` is deliberately NOT gated: it merges main *into*
 the branch (the corpus-mandated sync direction) and cannot merge into main.
 """
@@ -1483,12 +1500,280 @@ def typed_override(transcript_path):
         return False
 
 
-def evaluate(cmd, pr_data, override=False):
+def _block_merge_sibling(key):
+    """Load the sibling hook `block-merge-without-clean-checker.py` by its
+    real path, so a staged symlink still finds it. Raises on failure."""
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                        "block-merge-without-clean-checker.py")
+    spec = importlib.util.spec_from_file_location(key, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def fully_clean_in_transcript(payload, pr_data):
+    """True when the transcript holds an accepted FULLY CLEAN line for this
+    PR's live head, read by the sibling hook's `evidence` (round 8).
+    Fails toward False, which makes an mwr merge run the live re-checks."""
+    try:
+        url_match = PR_URL_RE.search((pr_data or {}).get("url", "") or "")
+        head_oid = ((pr_data or {}).get("headRefOid") or "").strip()
+        path = (payload or {}).get("transcript_path") or ""
+        if not url_match or not head_oid or not path or not os.path.isfile(path):
+            return False
+        module = _block_merge_sibling("_sib_block_merge_clean")
+        return bool(module.fully_clean_on(module.evidence(path), url_match.group(1),
+                                          int(url_match.group(2)), head_oid))
+    except Exception as exc:
+        print(f"enforce-mwc-review-gate: cannot read the FULLY CLEAN line ({exc}); "
+              "an mwr merge runs the live re-checks", file=sys.stderr)
+        return False
+
+
+def mwr_cleared(payload, pr_data):
+    """True when the user's typed `mwr`/`mwrs` covers this PR and the
+    transcript holds the checker's MERGE-READY line for its live head
+    (ai-config#3946).
+
+    Delegates to `mwr_clears` in the sibling hook
+    `block-merge-without-clean-checker.py`, so both gates credit the same
+    line from the same sources under the same grant. The repository and
+    number come from the fetched PR's URL and the sha from its live
+    `headRefOid`, so a line for an older head does not match. Fails closed:
+    any error, a missing transcript or an unloadable sibling is False.
+    """
+    try:
+        url_match = PR_URL_RE.search((pr_data or {}).get("url", "") or "")
+        head_oid = ((pr_data or {}).get("headRefOid") or "").strip()
+        if not url_match or not head_oid or not isinstance(payload, dict):
+            return False
+        module = _block_merge_sibling("_sib_block_merge_mwr")
+        return bool(module.mwr_clears(payload, url_match.group(1),
+                                      int(url_match.group(2)), head_oid))
+    except Exception as exc:
+        print(f"enforce-mwc-review-gate: cannot read the mwr grant ({exc}); "
+              "the review gate applies", file=sys.stderr)
+        return False
+
+
+def mwr_route_denial(payload, repo, number, sha, mcp, tool_input):
+    """"" when this merge may proceed on its route, else the deny reason (round 12).
+
+    Under an mwr grant with no other authority (`mwr_only_grant` in the
+    sibling `block-merge-without-clean-checker.py`), the only route is the
+    MCP merge tool with a strict input (`mwr_route_problem` there, which
+    reads `mwr_mcp_input_problem` in no-unauthorized-merge.py). A shell
+    merge (gh, gh api, curl) is refused, since the free-form command is read
+    differently by these hooks than by gh, curl or the server. Ordinary and
+    mwc merges are unchanged here; a merge that the MERGE-READY line credits
+    under another grant is route-checked in `decide`
+    (`mwr_credit_route_denial`, round 13). An error reading the grant
+    writes one stderr line and returns "". The backstop is then
+    `block-merge-without-clean-checker.py`, whose own route check
+    (`mwr_route_problem`) fails closed. no-unauthorized-merge.py is not
+    one: it returns early when the agent sets `ALLOW_MERGE=1` or an
+    `allow_merge` input key, before its mwr route rule runs.
+    """
+    try:
+        module = _block_merge_sibling("_sib_block_merge_mwr_route")
+        pin = sha.lower() if isinstance(sha, str) and SHA40_RE.match(sha.lower()) else None
+        if not module.mwr_only_grant(payload, repo, number, pin):
+            return ""
+        problem = module.mwr_route_problem(
+            module.MCP_MERGE_TOOL if mcp else "Bash", tool_input)
+    except Exception as exc:
+        print(f"enforce-mwc-review-gate: cannot read the mwr route rule ({exc}); "
+              "no-unauthorized-merge.py still gates the route", file=sys.stderr)
+        return ""
+    if not problem:
+        return ""
+    return f"Strict Merge Control Policy: merging {repo}#{number} under `mwr`: {problem}"
+
+
+def mwr_credit_route_denial(pr_data, route):
+    """"" when a merge the MERGE-READY line credits uses the strict MCP
+    route, else the deny reason (round 13).
+
+    `route` is `(mcp, tool_input)` from `main`; None is read as a shell
+    route. Applies under any grant, since the line skips the review verdict
+    whoever granted the merge; `mwr_route_problem` in the sibling
+    `block-merge-without-clean-checker.py` judges the input. Fails closed:
+    any error is a denial.
+    """
+    url_match = PR_URL_RE.search((pr_data or {}).get("url", "") or "")
+    target = f"{url_match.group(1)}#{url_match.group(2)}" if url_match else "this PR"
+    mcp, tool_input = route if route else (False, None)
+    try:
+        module = _block_merge_sibling("_sib_block_merge_mwr_credit_route")
+        problem = module.mwr_route_problem(
+            module.MCP_MERGE_TOOL if mcp else "Bash", tool_input)
+    except Exception as exc:
+        problem = f"the strict-input rule could not run ({exc})."
+    if not problem:
+        return ""
+    return (f"Strict Merge Control Policy: merging {target} under `mwr`: {problem} "
+            "A merge credited by the MERGE-READY line takes this route whatever "
+            "other grant covers it; only a FULLY CLEAN line for the pinned head, or "
+            "the user's typed override, keeps every route.")
+
+
+def mwr_only(payload, pr_data):
+    """True when an `mwr` grant covers this PR and no other user-given
+    authority does (round 9): no typed `mwc`, never the `.mwc` marker, and no
+    named, standing or infra-PR grant (round 10). Read by `mwr_only_grant`
+    in the sibling hook `block-merge-without-clean-checker.py`, with the
+    live `headRefOid` for the infra-PR grant. Then a FULLY CLEAN line does
+    not skip the live re-checks. Fails closed: an error is True, so the
+    merge runs the live re-checks."""
+    try:
+        url_match = PR_URL_RE.search((pr_data or {}).get("url", "") or "")
+        if not url_match or not isinstance(payload, dict):
+            return False
+        head_oid = ((pr_data or {}).get("headRefOid") or "").strip() or None
+        module = _block_merge_sibling("_sib_block_merge_mwr_only")
+        return bool(module.mwr_only_grant(payload, url_match.group(1),
+                                          int(url_match.group(2)), head_oid))
+    except Exception as exc:
+        print(f"enforce-mwc-review-gate: cannot read the mwr or mwc grant ({exc}); "
+              "the live re-checks run", file=sys.stderr)
+        return True
+
+
+# Merge-time re-checks for an mwr merge (round 7). The checker's `--mwr` run
+# pins a head sha, but the merge happens later, against live state: a review
+# can be dismissed, or the base retargeted, after the MERGE-READY line was
+# printed. These read live data fetched by `fetch_mwr_live` in the same hook
+# call as the merge, and every missing or malformed field denies.
+MWR_BLOCKING_REVIEW_STATES = ("DISMISSED", "CHANGES_REQUESTED", "REJECTED")
+MWR_CI_DIR = ".github/"
+# GitHub's compare endpoint lists at most this many changed files.
+MWR_COMPARE_FILES_CAP = 300
+SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def mwr_live_problem(pr_data):
+    """The reason an mwr merge must not proceed on live data, or "" when it may.
+
+    Reads `pr_data["mwrLive"]`, which `decide` fills from `fetch_mwr_live`
+    just before evaluating under mwr. Fails closed: an absent, malformed or
+    errored live read is a problem, never a pass.
+    """
+    live = (pr_data or {}).get("mwrLive")
+    if not isinstance(live, dict):
+        return "the live PR state for the mwr re-checks was not read."
+    if live.get("error"):
+        return f"the live PR state could not be read ({live.get('error')})."
+    pinned = ((pr_data or {}).get("headRefOid") or "").strip().lower()
+    head = str(live.get("headSha") or "").strip().lower()
+    base = str(live.get("baseSha") or "").strip().lower()
+    if not SHA40_RE.match(pinned) or not SHA40_RE.match(head) or head != pinned:
+        return (f"the live head ({head or 'unknown'}) is not the pinned head "
+                f"({pinned or 'unknown'}) the MERGE-READY line names.")
+    if not SHA40_RE.match(base):
+        return "the live base sha could not be read."
+    reviews = live.get("reviews")
+    if not isinstance(reviews, list):
+        return "the PR's reviews could not be read."
+    for review in reviews:
+        if not isinstance(review, dict) or not isinstance(review.get("state"), str):
+            return "a review on the PR has no readable state."
+        state = review["state"].upper()
+        if state in MWR_BLOCKING_REVIEW_STATES:
+            who = review.get("login") or "an unknown author"
+            return (f"the PR has a {state} review from {who}; mwr never merges past "
+                    "a dismissed or objecting review. Ask the user to type `mwc` "
+                    "for it; do not create an mwc grant yourself.")
+    files = live.get("files")
+    if not isinstance(files, list) or not all(isinstance(f, str) and f for f in files):
+        return "the changed files between the live base and the pinned head could not be read."
+    if not files:
+        return "no changed files were read between the live base and the pinned head."
+    if len(files) >= MWR_COMPARE_FILES_CAP:
+        return (f"the compare file list reached the endpoint's cap ({MWR_COMPARE_FILES_CAP}), "
+                f"so a change under {MWR_CI_DIR} cannot be ruled out.")
+    edits = sorted({f for f in files if f.lower().startswith(MWR_CI_DIR)})
+    if edits:
+        shown = ", ".join(edits[:5]) + (" ..." if len(edits) > 5 else "")
+        return (f"against the live base, the PR changes {shown}; mwr never merges a PR "
+                "that edits CI. Ask the user to type `mwc` for it, which still needs "
+                "a clean review; do not create an mwc grant yourself.")
+    return ""
+
+
+def fetch_mwr_live(pr_data, cwd):
+    """Read, at merge time, the live data `mwr_live_problem` checks.
+
+    Returns a dict with `headSha` and `baseSha` (from `pulls/N`), `reviews`
+    (every review, not only each reviewer's latest, with its state) and
+    `files` (the changed paths, renames' previous names included, of
+    `compare/<live base>...<pinned head>`). Any failed or malformed read
+    gives {"error": reason}; never a partial dict read as clean.
+    """
+    try:
+        url_match = PR_URL_RE.search((pr_data or {}).get("url", "") or "")
+        pinned = ((pr_data or {}).get("headRefOid") or "").strip().lower()
+        if not url_match or not SHA40_RE.match(pinned):
+            return {"error": "the PR's repository, number or pinned head is unknown"}
+        repo, number = url_match.group(1), url_match.group(2)
+        pr, error = _gh_rest_json(f"repos/{repo}/pulls/{number}", cwd)
+        if error:
+            return {"error": error}
+        if not isinstance(pr, dict):
+            return {"error": "pulls/N answered something other than an object"}
+        head = str(((pr.get("head") or {}).get("sha")) or "")
+        base = str(((pr.get("base") or {}).get("sha")) or "")
+        reviews_raw, error = _gh_rest_json(
+            f"repos/{repo}/pulls/{number}/reviews?per_page=100", cwd, paginate=True)
+        if error:
+            return {"error": error}
+        if not isinstance(reviews_raw, list):
+            return {"error": "the reviews route answered something other than a list"}
+        reviews = []
+        for r in reviews_raw:
+            if not isinstance(r, dict):
+                return {"error": "a review is not an object"}
+            reviews.append({"state": r.get("state"),
+                            "login": ((r.get("user") or {}).get("login")) or ""})
+        if not SHA40_RE.match(base.lower()):
+            return {"error": "the live base sha is missing"}
+        # The base is read here, in the hook, and the merge call does not pin
+        # it: GitHub merges into whatever base the PR has when the merge
+        # lands. A timed background `gh pr edit --base` between this read and
+        # the merge could race it (a base-retarget race, ai-config#5983).
+        compare, error = _gh_rest_json(
+            f"repos/{repo}/compare/{base}...{pinned}?per_page=1", cwd)
+        if error:
+            return {"error": error}
+        raw_files = compare.get("files") if isinstance(compare, dict) else None
+        if not isinstance(raw_files, list):
+            return {"error": "the compare route returned no file list"}
+        files = []
+        for f in raw_files:
+            if not isinstance(f, dict) or not isinstance(f.get("filename"), str):
+                return {"error": "a compare file entry has no filename"}
+            files.append(f["filename"])
+            if f.get("previous_filename"):
+                files.append(str(f["previous_filename"]))
+        return {"headSha": head, "baseSha": base, "reviews": reviews, "files": files}
+    except Exception as exc:  # fail closed
+        return {"error": f"exception while reading live state: {exc}"}
+
+
+def evaluate(cmd, pr_data, override=False, mwr=False):
     """Pure decision function: merge command + PR state -> hook decision.
 
     `override` is True when the user typed the merge override phrase (see
     `typed_override`). It lets a merge through CI checks that are still
     pending, and nothing else: failing checks and every other gate still deny.
+
+    `mwr` is True under the user's typed `mwr`/`mwrs` grant with a matching
+    MERGE-READY line (see `mwr_cleared`; ai-config#3946, "Skip review, keep
+    green CI"). It skips what the checker's `--mwr` skips: review requests in
+    flight, review-body and verdict-comment states, and the clean-verdict
+    requirement. A formal CHANGES_REQUESTED or REJECTED review still denies,
+    and so do GraphQL and `--admin` merges, unanswered maintainer feedback,
+    unresolved threads and CI.
     """
     if GRAPHQL_MERGE_RE.search(cmd):
         return deny(
@@ -1592,7 +1877,7 @@ def evaluate(cmd, pr_data, override=False):
 
     # Reviews in flight check: never merge while reviews are still running/requested (ai-config#3570).
     review_requests = pr_data.get("reviewRequests") or []
-    if review_requests:
+    if review_requests and not mwr:
         req_names = extract_request_names(review_requests)
         if req_names:
             return deny(
@@ -1610,7 +1895,7 @@ def evaluate(cmd, pr_data, override=False):
             "explicit dismissal) can clear it -- a later bot verdict cannot."
         )
     not_clean_bodies = [k for k, v in human_states.items() if v == "NOT_CLEAN"]
-    if not_clean_bodies:
+    if not_clean_bodies and not mwr:
         return deny(
             "Strict Merge Control Policy: a human review body from "
             f"{', '.join(sorted(not_clean_bodies))} states this PR is not "
@@ -1620,7 +1905,10 @@ def evaluate(cmd, pr_data, override=False):
 
     review_comments = pr_data.get("reviewComments", []) or []
     bot_states = latest_bot_review_states(reviews, head_oid, review_comments, comments)
-    bot_blockers = [k for k, v in bot_states.items() if v in ("CHANGES_REQUESTED", "REJECTED", "NOT_CLEAN")]
+    # Under mwr only a formal objection blocks; a NOT_CLEAN verdict does not.
+    bot_block_states = (("CHANGES_REQUESTED", "REJECTED") if mwr
+                        else ("CHANGES_REQUESTED", "REJECTED", "NOT_CLEAN"))
+    bot_blockers = [k for k, v in bot_states.items() if v in bot_block_states]
     if bot_blockers:
         return deny(
             "Strict Merge Control Policy: automated review from "
@@ -1628,6 +1916,15 @@ def evaluate(cmd, pr_data, override=False):
             "Consensus clean verdicts across all reviewers are required to merge; address "
             "it and get an approving review on the current head."
         )
+
+    if mwr:
+        # The review verdict is what the mwr grant skips (ai-config#3946).
+        # The checker ran earlier, against state that may since have changed,
+        # so the mwr-only safety checks run again here on live data (round 7).
+        problem = mwr_live_problem(pr_data)
+        if problem:
+            return deny(f"Strict Merge Control Policy: mwr merge-time check failed: {problem}")
+        return ALLOW
 
     verdict = evaluate_verdict(comments, head_oid)
     if verdict in ("not-clean", "stale"):
@@ -2030,6 +2327,11 @@ def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
     present in the GraphQL rollup are deduplicated by detailsUrl, and timestamps are
     propagated so cancel-in-progress runs are properly superseded (ai-config#4112).
     """
+    # Known gaps (ai-config#5959): the shell branch below reads the command
+    # text, not gh's own parsing, so a decoy `repos/O/R/pulls/N/merge` in a
+    # `-f` field or a repeated `--repo` can resolve another PR than gh
+    # merges. An mwr-only merge no longer takes a shell route (round 12);
+    # ordinary and mwc merges still do.
     # The (repo, number) the REST fallback can read, when both are known.
     rest_target = None
     if target_repo and target_number:
@@ -2196,6 +2498,52 @@ def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
     return pr_data, None
 
 
+def decide(cmd, pr_data, override, payload, cwd=".", route=None):
+    """`evaluate` as before; when that denies, re-evaluate under an `mwr`
+    grant if `mwr_cleared` holds (ai-config#3946). Under mwr the live state
+    is read again first (`fetch_mwr_live`, round 7). When `evaluate` allows,
+    `mwr_cleared` holds and the transcript has no FULLY CLEAN line for the
+    head, the live re-checks still run and a problem denies (round 8). Under
+    an mwr grant with no mwc grant (`mwr_only`) they run when `evaluate`
+    allows, FULLY CLEAN line or not (round 9). With no mwr grant, or with an
+    mwc grant and a FULLY CLEAN line, the mwc path is unchanged.
+
+    When `evaluate` denies and the MERGE-READY line is what lifts the deny,
+    the merge must take the strict MCP route (`mwr_credit_route_denial`,
+    round 13), whatever other grant covers it. `route` is `(mcp,
+    tool_input)`; None is read as a shell route, so it fails closed."""
+    decision = evaluate(cmd, pr_data, override)
+    # An auto-merge never runs under mwr, mwc active or not (round 3,
+    # finding 8): it merges whatever the PR holds once checks pass.
+    if (re.search(r"(?:^|[\s=])--auto\b|auto[_-]?merge", cmd or "", re.IGNORECASE)
+            or is_mcp_auto_merge_tool(str((payload or {}).get("tool_name") or ""))):
+        return decision
+    if decision.get("decision") == "deny":
+        if mwr_cleared(payload, pr_data):
+            route_denial = mwr_credit_route_denial(pr_data, route)
+            if route_denial:
+                return deny(route_denial)
+            live_state = dict(pr_data)
+            live_state["mwrLive"] = fetch_mwr_live(pr_data, cwd)
+            return evaluate(cmd, live_state, override, mwr=True)
+        return decision
+    # An allow can rest on a stale formal APPROVED or a trusted verdict while
+    # the clean-checker hook credits the merge by the MERGE-READY line. Then
+    # the live re-checks run here too, whatever `evaluate` decided (round 8).
+    # Under an mwr grant with no mwc grant they run even beside a FULLY CLEAN
+    # line, which does not count there (round 9); the FULLY CLEAN skip is
+    # kept only when mwc covers the merge.
+    only = mwr_only(payload, pr_data)
+    if only or (mwr_cleared(payload, pr_data)
+                and not fully_clean_in_transcript(payload, pr_data)):
+        live_state = dict(pr_data)
+        live_state["mwrLive"] = fetch_mwr_live(pr_data, cwd)
+        problem = mwr_live_problem(live_state)
+        if problem:
+            return deny(f"Strict Merge Control Policy: mwr merge-time check failed: {problem}")
+    return decision
+
+
 def _read_payload():
     """Parse payload from sys.argv (--dry-run / --simulate) or sys.stdin."""
     args = sys.argv[1:]
@@ -2276,11 +2624,21 @@ def main():
             tool_input = {}
         owner = tool_input.get("owner")
         repo = tool_input.get("repo")
-        pull_num = (
-            tool_input.get("pull_number")
-            or tool_input.get("pullNumber")
-            or tool_input.get("number")
-        )
+        # The server merges `pullNumber` and ignores unknown keys, so a call
+        # with `pull_number=5, pullNumber=6` merges PR 6: deny any PR-number
+        # keys that disagree (no-unauthorized-merge.py's mcp_pull_number holds
+        # the same logic; this gate stays import-free).
+        present = [tool_input[k] for k in ("pullNumber", "pull_number", "number")
+                   if k in tool_input and tool_input[k] is not None]
+        if len({str(v).strip() for v in present}) > 1:
+            keys = {k: tool_input[k] for k in ("pullNumber", "pull_number", "number")
+                    if k in tool_input}
+            _emit(deny(
+                f"MCP merge_pull_request call names conflicting PR numbers {keys!r}: "
+                "the server merges `pullNumber`, so every PR-number key must agree."
+            ), is_antigravity)
+            return
+        pull_num = present[0] if present else None
         expected_sha = (
             tool_input.get("expectedHeadSha")
             or tool_input.get("expected_head_sha")
@@ -2295,6 +2653,12 @@ def main():
 
         repo_slug = f"{str(owner).strip()}/{str(repo).strip()}"
         number = int(str(pull_num).strip())
+        # An mwr-only merge needs a strict input, checked before any fetch (round 12).
+        route_denial = mwr_route_denial(payload, repo_slug, number, expected_sha, True,
+                                        tool_input)
+        if route_denial:
+            _emit(deny(route_denial), is_antigravity)
+            return
         try:
             pr_data, error = fetch_pr_data("", cwd, target_repo=repo_slug, target_number=number)
             if error:
@@ -2310,7 +2674,8 @@ def main():
                     return
             cmd_desc = f"mcp merge_pull_request {repo_slug}#{number}"
             override = typed_override(payload.get("transcript_path") or "")
-            _emit(evaluate(cmd_desc, pr_data, override), is_antigravity)
+            _emit(decide(cmd_desc, pr_data, override, payload, cwd,
+                         route=(True, tool_input)), is_antigravity)
         except Exception as e:
             _emit(deny(f"Hook exception during MCP PR review check: {e}"), is_antigravity)
         return
@@ -2372,8 +2737,21 @@ def main():
         if error:
             _emit(deny(error), is_antigravity)
             return
+        # Under an mwr grant with no other authority, a shell merge is
+        # refused for its route (round 12). The PR is the one fetch_pr_data
+        # resolved, whose parsing has the gaps named in ai-config#5959; under
+        # mwrs every PR is granted, so any PR it resolves is refused here.
+        url_match = PR_URL_RE.search(pr_data.get("url", "") or "")
+        if url_match:
+            route_denial = mwr_route_denial(
+                payload, url_match.group(1), int(url_match.group(2)),
+                pr_data.get("headRefOid"), False, None)
+            if route_denial:
+                _emit(deny(route_denial), is_antigravity)
+                return
         override = typed_override(payload.get("transcript_path") or "")
-        _emit(evaluate(cmd, pr_data, override), is_antigravity)
+        _emit(decide(cmd, pr_data, override, payload, cwd,
+                     route=(False, None)), is_antigravity)
     except Exception as e:  # fail closed: an undiagnosed state never merges
         _emit(deny(f"Hook exception during PR review check: {e}"), is_antigravity)
 

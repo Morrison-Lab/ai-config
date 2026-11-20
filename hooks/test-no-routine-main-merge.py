@@ -62,45 +62,31 @@ with tempfile.TemporaryDirectory() as root:
     other = commit(origin, "e.txt", "e\n", "Unrelated content (#43)")
     git("fetch", "-q", "origin", cwd=repo)
 
-    for command, want in [
-            ("git merge origin/main", "deny"),
-            ("git merge --no-edit origin/main", "deny"),
-            ("git merge -m 'sync' origin/main 2>&1 | tail -1", "deny"),
-            ("git merge refs/remotes/origin/main", "deny"),
-            ("git merge origin", "deny"),
-            ("git merge origin/HEAD", "deny"),
-            ("git pull origin main", "deny"),
-            ("git pull --no-rebase origin main", "deny"),
-            ("git -C . merge origin/main", "deny"),
-            ("bash -c 'git merge origin/main'", "deny"),
-            ("cd / && cd " + repo + " && git merge origin/main", "deny"),
-            # Not main: the PR branch's own remote, a feature branch, no-ops.
-            ("git pull", "allow"),
-            ("git pull origin pr", "allow"),
-            ("git merge --abort", "allow"),
-            ("git merge --continue", "allow"),
-            ("git log origin/main", "allow"),
-            ("echo git merge origin/main", "allow"),
-            ("git merge origin/nosuch", "allow"),
-            # (b): the named fix is on main and missing from the branch.
-            (f"MERGE_MAIN_FOR={fix[:10]} git merge origin/main", "allow"),
-            ("MERGE_MAIN_FOR='#42' git merge origin/main", "allow"),
-            ("MERGE_MAIN_FOR=42 git merge origin/main", "allow"),
-            ("MERGE_MAIN_FOR=Morrison-Lab/x#42 git merge origin/main", "allow"),
-            ("MERGE_MAIN_FOR='#42,#43' git merge origin/main", "allow"),
-            # (b) that does not hold is still denied.
-            ("MERGE_MAIN_FOR='#99' git merge origin/main", "deny"),
-            ("MERGE_MAIN_FOR= git merge origin/main", "deny"),
-            ("MERGE_MAIN_FOR=1 git merge origin/main", "deny"),
-            ("MERGE_MAIN_FOR=yes git merge origin/main", "deny"),
-            ("MERGE_MAIN_FOR=deadbeefdead git merge origin/main", "deny"),
-            # The value counts only on the merge command itself.
-            ("MERGE_MAIN_FOR='#42' true && git merge origin/main", "deny"),
-    ]:
+    M = " git merge origin/main"
+    deny = [
+        "git merge origin/main", "git merge --no-edit origin/main",
+        "git merge -m 'sync' origin/main 2>&1 | tail -1",
+        "git merge refs/remotes/origin/main", "git merge origin",
+        "git merge origin/HEAD", "git pull origin main",
+        "git pull --no-rebase origin main", "git -C . merge origin/main",
+        "bash -c 'git merge origin/main'", "cd / && cd " + repo + " &&" + M,
+        # (b) that does not hold; a value counts only on the merge itself.
+        "MERGE_MAIN_FOR='#99'" + M, "MERGE_MAIN_FOR=" + M, "MERGE_MAIN_FOR=1" + M,
+        "MERGE_MAIN_FOR=yes" + M, "MERGE_MAIN_FOR=deadbeefdead" + M,
+        "MERGE_MAIN_FOR='#42' true &&" + M]
+    allow = [
+        # Not main: the PR branch's own remote, a feature branch, no-ops.
+        "git pull", "git pull origin pr", "git merge --abort",
+        "git merge --continue", "git log origin/main", "echo" + M,
+        "git merge origin/nosuch",
+        # (b): the named fix is on main and missing from the branch.
+        f"MERGE_MAIN_FOR={fix[:10]}" + M, "MERGE_MAIN_FOR='#42'" + M,
+        "MERGE_MAIN_FOR=42" + M, "MERGE_MAIN_FOR=Morrison-Lab/x#42" + M,
+        "MERGE_MAIN_FOR='#42,#43'" + M]
+    for command, want in [(c, "deny") for c in deny] + [(c, "allow") for c in allow]:
         check(command, run(command, repo), want)
 
-    # A local branch whose name only ends in /main is not main.
-    # A bare pull on a branch that tracks origin/main pulls main.
+    # A branch named */main is not main; a bare pull of an origin/main upstream is.
     git("switch", "-q", "-c", "feat/main", "--track", "origin/main", cwd=repo)
     git("switch", "-q", "-c", "ci/master", "pr", cwd=repo)
     git("branch", "-q", "--set-upstream-to=origin/main", cwd=repo)
@@ -111,38 +97,31 @@ with tempfile.TemporaryDirectory() as root:
     git("branch", "-D", "-q", "feat/main", "ci/master", cwd=repo)
 
     # A session-wide value does not pass by default.
-    check("environment value ignored",
-          run("git merge origin/main", repo, env_extra={"MERGE_MAIN_FOR": "#42"}),
-          "deny")
+    check("env value", run(M[1:], repo, env_extra={"MERGE_MAIN_FOR": "#42"}), "deny")
 
     # A commit already on the branch is not a reason to merge.
     pr_sha = git("rev-parse", "HEAD", cwd=repo)
-    check("named commit already on branch",
-          run(f"MERGE_MAIN_FOR={pr_sha[:10]} git merge origin/main", repo), "deny")
+    check("commit on branch", run(f"MERGE_MAIN_FOR={pr_sha[:10]}" + M, repo), "deny")
 
     # FETCH_HEAD holding main is main; holding the PR branch is not.
     git("fetch", "-q", "origin", "main", cwd=repo)
     check("FETCH_HEAD main", run("git merge FETCH_HEAD", repo), "deny")
-    check("fetch then FETCH_HEAD on one line",
-          run("git fetch origin main && git merge --no-edit FETCH_HEAD", repo), "deny")
+    check("fetch then FETCH_HEAD", run("git fetch origin main && git merge FETCH_HEAD", repo), "deny")
     git("push", "-q", "origin", "pr", cwd=repo)
     git("fetch", "-q", "origin", "pr", cwd=repo)
-    check("FETCH_HEAD own branch", run("git merge --no-edit FETCH_HEAD", repo), "allow")
-    check("fetch own branch then merge",
-          run("git fetch origin pr && git merge --no-edit FETCH_HEAD", repo), "allow")
+    for command in ["git merge FETCH_HEAD", "git fetch origin pr && git merge FETCH_HEAD"]:
+        check("own branch: " + command, run(command, repo), "allow")
 
     # Server-side updates name no reason.
-    check("MCP update branch",
-          run("", repo, tool="mcp__github__update_pull_request_branch"), "deny")
-    check("gh pr update-branch", run("gh pr update-branch 12", repo), "deny")
-    check("gh api update-branch",
-          run("gh api -X PUT repos/o/r/pulls/12/update-branch", repo), "deny")
-    check("gh api other", run("gh api repos/o/r/pulls/12", repo), "allow")
+    check("MCP update", run("", repo, tool="mcp__github__update_pull_request_branch"), "deny")
+    for command, want in [("gh pr update-branch 12", "deny"), ("gh api repos/o/r/pulls/12", "allow"),
+                          ("gh api -X PUT repos/o/r/pulls/12/update-branch", "deny")]:
+        check(command, run(command, repo), want)
 
     # On main itself, pulling main is fine.
     git("switch", "-q", "main", cwd=repo)
-    check("on main", run("git pull origin main", repo), "allow")
-    check("on main merge", run("git merge origin/main", repo), "allow")
+    for command in ["git pull origin main", "git merge origin/main"]:
+        check("on main: " + command, run(command, repo), "allow")
     git("switch", "-q", "pr", cwd=repo)
 
     # Already up to date: nothing changes.
@@ -152,11 +131,8 @@ with tempfile.TemporaryDirectory() as root:
     # main moved on and nothing has fetched it yet: the local origin/main is an
     # ancestor of HEAD, but a command that fetches first still brings main in.
     commit(origin, "f.txt", "f\n", "Unfetched content (#44)")
-    for command, want in [
-            ("git pull origin main", "deny"),
-            ("git pull --no-rebase origin main", "deny"),
-            ("git fetch origin main && git merge --no-edit FETCH_HEAD", "deny"),
-            ("git merge origin/main", "allow")]:
+    for command, want in [("git pull origin main", "deny"), ("git merge origin/main", "allow"),
+                          ("git fetch origin main && git merge FETCH_HEAD", "deny")]:
         check("unfetched: " + command, run(command, repo), want)
     git("branch", "-q", "--set-upstream-to=origin/main", cwd=repo)
     check("unfetched: bare pull", run("git pull", repo), "deny")
@@ -185,8 +161,7 @@ with tempfile.TemporaryDirectory() as root:
     check("origin/HEAD default", run("git merge origin/trunk", repo), "deny")
 
     # Redirected repository: fail open.
-    check("GIT_DIR redirect", run("GIT_DIR=/nonexistent git merge origin/trunk", repo),
-          "allow")
+    check("GIT_DIR", run("GIT_DIR=/nonexistent git merge origin/trunk", repo), "allow")
 
 if FAILS:
     print("\n".join(FAILS))

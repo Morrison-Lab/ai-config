@@ -289,6 +289,7 @@ Read a request for everything it plainly asks, do every safe step it covers, and
 - **View every page of a document render before calling its PR ready** ([`review-rendered-documents`](shared/workflow/review-rendered-documents.md)).
 - **Revert a premature or defective merge at once**, and reopen the issues it closed.
 - **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean.
+  Handle it yourself through the merge, and never ask the user about it (Ezra, 2026-11-20).
 
 Detail, cases, cross-model waiver: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
 

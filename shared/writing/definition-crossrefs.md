@@ -119,12 +119,11 @@ one of:
   When finishing the link would mean pulling a function word into it, reword
   the sentence so the linked phrase is a noun phrase naming the term, and never
   widen the link over the function word.
-  On [mds#844](https://github.com/Morrison-Lab/mds/pull/844) and
+  In [mds#844](https://github.com/Morrison-Lab/mds/pull/844) and
   [mds#858](https://github.com/Morrison-Lab/mds/pull/858),
-  a definition titled "Limit of a sequence" led an agent to put "limit of" in
-  the link text.
-  Rewording to "the sequence's limit" or "the limit of the sequence",
-  with the whole term or just "limit" linked, fixes it.
+  an agent linked "limit of", because the definition is titled
+  "Limit of a sequence".
+  Rewording to "the sequence's limit", with only "limit" linked, fixes it.
   The check's own handling is tracked in
   [gha#2146](https://github.com/Morrison-Lab/gha/issues/2146).
 - **Doubled type word** --- the mention writes the type name in front of a

@@ -62,11 +62,30 @@ A run that nobody reviews first, such as a scheduled one, adds `--labels-only`:
 it applies the priority labels and leaves every proposed close for this attended pass.
 Add `--ceiling N` to any run to print the open count against the backlog's ceiling.
 
-### 4. Report
+### 4. Plan the worktree and branch sweep
+
+For each repository this pass triaged that has a local checkout,
+first take [`clean-git`](../clean-git/SKILL.md)'s pre-prune snapshot of the
+remote-tracking refs, as that skill requires.
+Then run `clean-git` up to its confirmation gate and stop there
+(ai-config#3517).
+The snapshot comes first because that run is not mutation-free: its classify
+steps run `git fetch --prune` and `git worktree prune`.
+Skip a repository with no local checkout, and every repository in a run that
+nobody reviews first, and say which were skipped.
+[`post-merge`](../post-merge/SKILL.md) removes a merged PR's own worktree;
+this weekly plan catches the ones a session left behind, and the branches
+that went stale with them.
+Remove a worktree or branch only when the user confirms that plan, through
+`clean-git`'s own confirmation step.
+
+### 5. Report
 
 Post nothing to the tracker beyond the closes' own comments.
 In chat, give the bucket counts, the examined count, every issue closed with
 its one-line reason, and the P1 list, each number linked.
+Add the sweep plan's counts of dead worktrees and dead branches, the path of
+each pre-prune snapshot, and the repositories skipped.
 
 ## Checklist
 
@@ -78,6 +97,13 @@ Do-Confirm, at the moment the `--apply` command is about to run:
    duplicate of an older open issue.
 4. Anything unlikely-but-actionable is P3, not closed.
 5. The dry run printed the command set, and its count matches expectations.
+
+Do-Confirm, at the moment the step 4 sweep plan is reported:
+
+1. Each planned repository's pre-prune snapshot was taken before its prune
+   steps ran, and its path is in the report.
+2. Before the user confirmed, nothing ran but `clean-git`'s own pre-gate
+   prunes: no worktree was removed and no branch was deleted.
 
 ## New asks
 

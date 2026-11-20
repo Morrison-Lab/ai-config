@@ -1033,10 +1033,86 @@ def mwr_route_problem(tool, tool_input):
 # route. It merges whatever the PR holds when checks pass, so the mwr grant
 # never skips review for it (round 3, finding 8).
 RX_AUTO_MERGE = re.compile(r"(?:^|[\s=])--auto\b|auto[_-]?merge", re.IGNORECASE)
+# Free text the merge tool takes, never a switch: a commit title such as
+# "fix auto-merge bug" must not read as an auto-merge.
+MCP_FREE_TEXT_KEYS = ("commit_title", "commit_message")
+# `gh pr merge` flags whose value is free text (title, body, body file).
+GH_MERGE_FREE_TEXT_FLAGS = ("-t", "--subject", "-b", "--body", "-F", "--body-file")
+# Shells whose quoting `shellcmd` models. PowerShell's differs, so its
+# command is read raw.
+POSIX_SHELL_TOOLS = frozenset({"Bash", "bash"})
+# Text the argv split cannot see into, so a command holding any of it is
+# read raw: a heredoc body (blanked by the split), command and process
+# substitution.
+RX_OPAQUE_SHELL = re.compile(r"<<|\$\(|`|<\(|>\(")
+# A free-text value is set aside only when it holds nothing the shell could
+# expand or re-split differently from the parse: no expansion, escape,
+# brace or glob character, no newline, and no leading dash (a value that
+# looks like a flag is ambiguous).
+RX_UNSAFE_VALUE = re.compile(r"[$`\\{}*?\[\]\n]|^-")
+
+
+def _gh_merge_kept_tokens(argv):
+    """The tokens of `argv` left once a `gh pr merge`'s free-text values go.
+
+    Any other command keeps every token. A value is dropped only when it is
+    safe (`RX_UNSAFE_VALUE`), so an ambiguous one stays and is tested.
+    """
+    rest = strip_env(argv)[1]
+    if not rest or _basename(rest[0]) != "gh":
+        return list(argv)
+    i = 1
+    while i < len(rest) and rest[i].startswith("-"):
+        i += 2 if rest[i] in ("-R", "--repo") else 1
+    if rest[i:i + 2] != ["pr", "merge"]:
+        return list(argv)
+    kept = list(argv[:len(argv) - len(rest)]) + rest[:i + 2]
+    args = rest[i + 2:]
+    j = 0
+    while j < len(args):
+        tok = args[j]
+        name, eq, value = tok.partition("=")
+        if eq and name in GH_MERGE_FREE_TEXT_FLAGS and name.startswith("--"):
+            if RX_UNSAFE_VALUE.search(value):
+                kept.append(tok)
+            j += 1
+            continue
+        if tok in GH_MERGE_FREE_TEXT_FLAGS and j + 1 < len(args):
+            kept.append(tok)
+            if RX_UNSAFE_VALUE.search(args[j + 1]):
+                kept.append(args[j + 1])
+            j += 2
+            continue
+        kept.append(tok)
+        j += 1
+    return kept
+
+
+def _shell_auto_merge(command):
+    """Whether a POSIX shell `command` could arm an auto-merge, judged from
+    its parsed argv with `gh pr merge` free-text values set aside. Anything
+    the split cannot see into, or cannot parse, is read raw."""
+    if not RX_AUTO_MERGE.search(command):
+        return False
+    if RX_OPAQUE_SHELL.search(command):
+        return True
+    argvs = simple_commands(command)
+    if not argvs:
+        return True
+    return any(RX_AUTO_MERGE.search(tok)
+               for argv in argvs for tok in _gh_merge_kept_tokens(argv))
 
 
 def mwr_auto_merge(payload):
-    """Whether this tool call is, or could be, an auto-merge. Fails toward True."""
+    """Whether this tool call is, or could be, an auto-merge. Fails toward True.
+
+    The tool name decides first (the MCP auto-merge tools). Then the input:
+    for the MCP route, every key but the free-text `commit_title` and
+    `commit_message`; for a POSIX shell, the command's parsed argv with the
+    free-text values of `gh pr merge` set aside (`_shell_auto_merge`), and
+    every other input key but the harness's `description`. Any other tool's
+    input is read whole.
+    """
     try:
         tool = str((payload or {}).get("tool_name") or "")
         if RX_AUTO_MERGE.search(tool):
@@ -1044,6 +1120,15 @@ def mwr_auto_merge(payload):
         tool_input = (payload or {}).get("tool_input")
         if not isinstance(tool_input, dict):
             return False
+        if tool.startswith("mcp__"):
+            rest = {k: v for k, v in tool_input.items() if k not in MCP_FREE_TEXT_KEYS}
+            return bool(RX_AUTO_MERGE.search(json.dumps(rest)))
+        if tool in POSIX_SHELL_TOOLS:
+            command = tool_input.get("command")
+            if not isinstance(command, str):
+                return bool(RX_AUTO_MERGE.search(json.dumps(tool_input)))
+            rest = {k: v for k, v in tool_input.items() if k not in ("command", "description")}
+            return bool(RX_AUTO_MERGE.search(json.dumps(rest)) or _shell_auto_merge(command))
         return bool(RX_AUTO_MERGE.search(json.dumps(tool_input)))
     except Exception:
         return True

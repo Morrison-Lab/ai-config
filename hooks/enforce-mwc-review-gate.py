@@ -1684,15 +1684,22 @@ def mwr_live_problem(pr_data):
             return (f"the PR has a {state} review from {who}; mwr never merges past "
                     "a dismissed or objecting review. Ask the user to type `mwc` "
                     "for it; do not create an mwc grant yourself.")
+    # One entry per compare file object: its path, then a rename's previous
+    # path. The cap counts entries, so a rename counts once, and both of its
+    # names are checked against .github/.
     files = live.get("files")
-    if not isinstance(files, list) or not all(isinstance(f, str) and f for f in files):
+    if not isinstance(files, list) or not all(
+            isinstance(f, list) and f and all(isinstance(n, str) and n for n in f)
+            for f in files):
         return "the changed files between the live base and the pinned head could not be read."
     if not files:
         return "no changed files were read between the live base and the pinned head."
     if len(files) >= MWR_COMPARE_FILES_CAP:
         return (f"the compare file list reached the endpoint's cap ({MWR_COMPARE_FILES_CAP}), "
                 f"so a change under {MWR_CI_DIR} cannot be ruled out.")
-    edits = sorted({f for f in files if f.lower().startswith(MWR_CI_DIR)})
+    ci_root = MWR_CI_DIR.rstrip("/")
+    edits = sorted({n for f in files for n in f
+                    if n.lower() == ci_root or n.lower().startswith(MWR_CI_DIR)})
     if edits:
         shown = ", ".join(edits[:5]) + (" ..." if len(edits) > 5 else "")
         return (f"against the live base, the PR changes {shown}; mwr never merges a PR "
@@ -1706,8 +1713,9 @@ def fetch_mwr_live(pr_data, cwd):
 
     Returns a dict with `headSha` and `baseSha` (from `pulls/N`), `reviews`
     (every review, not only each reviewer's latest, with its state) and
-    `files` (the changed paths, renames' previous names included, of
-    `compare/<live base>...<pinned head>`). Any failed or malformed read
+    `files` (one list per file object of
+    `compare/<live base>...<pinned head>`: its path, then a rename's
+    previous path). Any failed or malformed read
     gives {"error": reason}; never a partial dict read as clean.
     """
     try:
@@ -1752,9 +1760,10 @@ def fetch_mwr_live(pr_data, cwd):
         for f in raw_files:
             if not isinstance(f, dict) or not isinstance(f.get("filename"), str):
                 return {"error": "a compare file entry has no filename"}
-            files.append(f["filename"])
+            names = [f["filename"]]
             if f.get("previous_filename"):
-                files.append(str(f["previous_filename"]))
+                names.append(str(f["previous_filename"]))
+            files.append(names)
         return {"headSha": head, "baseSha": base, "reviews": reviews, "files": files}
     except Exception as exc:  # fail closed
         return {"error": f"exception while reading live state: {exc}"}

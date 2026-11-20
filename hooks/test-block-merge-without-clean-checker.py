@@ -321,7 +321,7 @@ def mwc_marker_session(tmp, sid):
     """A git repository at `tmp` holding a live `.mwc` marker for session
     `sid`, as `ai-session.sh enable-mwc` writes it; returns the run kwargs
     that make the hooks find it."""
-    subprocess.run(["git", "init", "-q", tmp], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", tmp], check=True)
     reg = os.path.join(tmp, ".git", "ai-sessions")
     os.makedirs(reg)
     with open(os.path.join(reg, f"{sid}.mwc"), "w") as fh:
@@ -993,7 +993,8 @@ def main():
         try:
             check("mwr: allows a MERGE-READY line from a plain plugin root",
                   not mcp([grant, bash(abs_mwr.format(other_root), ready_line(), cwd="/")])[0])
-            subprocess.run(["git", "init", "-q", other_root], check=True, capture_output=True)
+            subprocess.run(["git", "init", "-q", "-b", "main", other_root], check=True,
+                           capture_output=True)
             check("mwr: denies a MERGE-READY line from a plugin root that is a git checkout",
                   mcp([grant, bash(abs_mwr.format(other_root), ready_line(), cwd="/")])[0])
         finally:
@@ -1072,6 +1073,65 @@ def main():
             got = bmc.mwr_clears({"tool_name": tool, "tool_input": tool_input,
                                   "transcript_path": steps_path}, REPO, 354, SHA)
             check(f"mwr_clears is {want} for {desc}", got is want)
+        # Cross-harness review: free text that mentions auto-merge (a commit
+        # title, a `gh pr merge` subject or body) is not an auto-merge, while
+        # every real or ambiguous auto-merge still is.
+        mcp_in = {"owner": "Morrison-Lab", "repo": "psw", "pullNumber": 354,
+                  "expectedHeadSha": SHA}
+        merge = f"gh pr merge 354 -R {REPO} --squash --match-head-commit {SHA}"
+        for desc, tool, tool_input, want in [
+            ("an MCP merge titled 'fix auto-merge bug'", MCP,
+             dict(mcp_in, commit_title="fix auto-merge bug"), False),
+            ("an MCP merge whose message names --auto", MCP,
+             dict(mcp_in, commit_message="drop the --auto flag; auto_merge off"), False),
+            ("an MCP merge with auto-merge in a key other than the free text", MCP,
+             dict(mcp_in, merge_method="auto-merge"), True),
+            ("an MCP auto-merge tool with a plain title", "mcp__github__enable_pr_auto_merge",
+             dict(mcp_in, commit_title="t"), True),
+            ("`gh pr merge -t 'fix auto-merge bug'`", "Bash",
+             {"command": merge + " -t 'fix auto-merge bug'"}, False),
+            ("`gh pr merge --subject='fix auto-merge bug' --body 'no --auto'`", "Bash",
+             {"command": merge + " --subject='fix auto-merge bug' --body 'no --auto here'"}, False),
+            ("`gh pr merge -F auto-merge-notes.md`", "Bash",
+             {"command": merge + " -F auto-merge-notes.md"}, False),
+            ("a Bash description that names auto-merge", "Bash",
+             {"command": merge, "description": "Merge, not auto-merge"}, False),
+            ("`gh pr merge -t x --auto`", "Bash", {"command": merge + " -t x --auto"}, True),
+            ("`gh pr merge -t --auto` (a flag-like value)", "Bash",
+             {"command": merge + " -t --auto"}, True),
+            ("`gh pr merge --subject=--auto`", "Bash", {"command": merge + " --subject=--auto"},
+             True),
+            ("a subject holding a command substitution", "Bash",
+             {"command": merge + ' -t "$(echo auto-merge)"'}, True),
+            ("a quoted subject holding a backslash and auto-merge", "Bash",
+             {"command": merge + ' -t "auto-merge\\$x"'}, True),
+            ("a subject holding a brace", "Bash",
+             {"command": merge + " -t 'auto-merge {x}'"}, True),
+            ("a heredoc body", "Bash",
+             {"command": merge + " -F - <<'EOF'\nauto-merge\nEOF"}, True),
+            ("a second command with --auto", "Bash",
+             {"command": merge + " -t 'auto-merge'; " + merge + " --auto"}, True),
+            ("a subject value on a command other than gh pr merge", "Bash",
+             {"command": "gh issue create -t 'auto-merge'"}, True),
+            ("an env-prefixed gh pr merge's subject", "Bash",
+             {"command": "GH_PROMPT_DISABLED=1 " + merge + " -t 'auto-merge'"}, False),
+            # A wrapper with arguments (`timeout 60`) leaves `gh` unfound, so
+            # every token is tested: fail closed.
+            ("a timeout-wrapped gh pr merge's subject, read whole", "Bash",
+             {"command": "timeout 60 " + merge + " -t 'auto-merge'"}, True),
+            ("a wrapped gh pr merge --auto", "Bash",
+             {"command": "timeout 60 " + merge + " -t x --auto"}, True),
+            ("PowerShell, whose quoting is not parsed", "PowerShell",
+             {"command": merge + " -t 'fix auto-merge bug'"}, True),
+            ("a Bash input with no command key", "Bash", {"cmd": merge + " -t 'auto-merge'"},
+             True),
+        ]:
+            got = bmc.mwr_auto_merge({"tool_name": tool, "tool_input": tool_input})
+            check(f"mwr_auto_merge is {want} for {desc}", got is want)
+        check("mwr_clears is True for an MCP merge titled 'fix auto-merge bug'",
+              bmc.mwr_clears({"tool_name": MCP, "transcript_path": steps_path,
+                              "tool_input": dict(mcp_in, commit_title="fix auto-merge bug")},
+                             REPO, 354, SHA) is True)
     finally:
         os.unlink(steps_path)
     mwr_only_fully_clean_checks()

@@ -429,6 +429,30 @@ def mwr_live_checks(ready):
     renamed = live_gh(compare={MAIN_BASE: [("ci/build.yml", ".github/workflows/build.yml")]})
     check("mwr live: a rename out of .github/ denies (previous name counts)",
           mwr_decision([grant, ready], not_clean_pr_state(), live=renamed) == "deny")
+    # Cross-harness review: the compare cap counts file objects, so a rename
+    # counts once; both of its names are still checked.
+    cap = gate.MWR_COMPARE_FILES_CAP
+    renames = [(f"src/new{i}.py", f"src/old{i}.py") for i in range(cap // 2 + 1)]
+    check(f"mwr live: {len(renames)} renames ({2 * len(renames)} names) under the "
+          f"{cap}-entry cap allow",
+          mwr_decision([grant, ready], not_clean_pr_state(),
+                       live=live_gh(compare={MAIN_BASE: renames})) == "allow")
+    check(f"mwr live: {cap} compare entries reach the cap and deny",
+          mwr_decision([grant, ready], not_clean_pr_state(), live=live_gh(compare={
+              MAIN_BASE: [(f"src/f{i}.py", None) for i in range(cap)]})) == "deny")
+    check("mwr live: one of many renames, out of .github/, still denies",
+          mwr_decision([grant, ready], not_clean_pr_state(), live=live_gh(compare={
+              MAIN_BASE: renames + [("ci/x.yml", ".github/workflows/x.yml")]})) == "deny")
+    # A path that is exactly `.github` (a file, or a submodule) is a CI edit.
+    check("mwr live: a changed path that is exactly .github denies",
+          mwr_decision([grant, ready], not_clean_pr_state(), live=live_gh(compare={
+              MAIN_BASE: [("src/a.py", None), (".github", None)]})) == "deny")
+    check("mwr live: a rename from exactly .GitHub denies",
+          mwr_decision([grant, ready], not_clean_pr_state(), live=live_gh(compare={
+              MAIN_BASE: [("github-old", ".GitHub")]})) == "deny")
+    check("mwr live: a path that only starts with .github (.githubx) allows (control)",
+          mwr_decision([grant, ready], not_clean_pr_state(), live=live_gh(compare={
+              MAIN_BASE: [(".githubx/a.yml", None)]})) == "allow")
     dismissed = live_gh(reviews=[
         {"state": "DISMISSED", "user": {"login": "maintainer"}},
         {"state": "COMMENTED", "user": {"login": "maintainer"}}])

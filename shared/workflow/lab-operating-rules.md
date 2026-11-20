@@ -16,6 +16,19 @@ The rest are prose because no condition in the transcript can decide them.
   instead, ask me for permission to do it for me").
   This replaces the 2026-10-26 fallback of giving him one command that runs an idempotent script.
   Enforced by `hooks/no-manual-step-ask.py`, which denies a reply that tells him to type or run a shell command, unless the reply names a secret, token, password or credential.
+- An `mwc <repo> <pr>` line, with or without a SHA, carries to a later head that only merged main, and `scripts/check-mwc-carry.py` decides that (see [`mwc`](../../skills/mwc/SKILL.md#an-mwc-carries-to-a-new-head-only-for-a-named-pr)).
+  Never ask Ezra for a new line because a main merge moved the SHA.
+  In a copy block, give only `mwc <repo> <pr>`, never the head SHA or title that `scripts/mwc-batch.py` prints beside it.
+- CI-caller PRs land in batches (Ezra, 2026-11-19, a project decision card answered "Both", ai-config#5967).
+  A CI-caller PR is an infra PR that changes a file under `.github/workflows/`, such as a repo's new caller of a gha check.
+  Its merge can make every waiting PR in that repository merge main, because a new check never ran on their heads.
+  So the runner merges clean CI-caller PRs together, once per `scripts/mwc-batch.py` sweep, never one at a time as each turns clean.
+  In that sweep it first merges every content PR in that repository that already holds an mwc line and is fully clean;
+  it never holds the batch for a line not yet given.
+  After the batch, each waiting PR merges main once, in one pass ([`batch-merge-and-resolve`](batch-merge-and-resolve.md)).
+  `scripts/mwc-batch.py` lists CI-caller PRs as their own group, so the batch is visible in its report.
+  - **Do:** hold a clean CI-caller PR until the runner's next sweep, and merge the batch after the repository's mwc-approved content PRs.
+  - **Don't:** merge CI-caller PRs one by one, each forcing another main-merge round on every waiting PR.
 
 ## Deliverables and approvals
 
@@ -49,7 +62,7 @@ The rest are prose because no condition in the transcript can decide them.
 - One approval ask per message.
   A bare "yes" covers only the primary ask, and any use of a credential or key (ssh key, token, secret) is its own single-question ask (Ezra, 2026-11-02, ai-config#4875).
   Enforced by `hooks/no-bundled-approval-ask.py`.
-- Give every line Ezra must type or paste in a fenced code block of its own, never only in inline code, quotes or plain text, in every project and thread, the coordinator's project chat included: merge words (`mwc <repo> <pr> <sha>`, `merge 95 and 96`), classifier-clearing lines (`approve push of ...`, `approve editing ...`), `retry <repo>#<n>`, `merge anyway <pr>` and commands.
+- Give every line Ezra must type or paste in a fenced code block of its own, never only in inline code, quotes or plain text, in every project and thread, the coordinator's project chat included: merge words (`mwc <repo> <pr>` or `mwc <repo> <pr> <sha>`, `merge 95 and 96`), classifier-clearing lines (`approve push of ...`, `approve editing ...`), `retry <repo>#<n>`, `merge anyway <pr>` and commands.
   The Claude app shows a copy button only on a fenced block (Ezra, 2026-11-15: "always give me the line with a copy button", ai-config#5667;
   restated the same day as "always give me lines in copy blocks" after a coordinator post asked for "merge 95 and 96" inline, ai-config#5685).
   Enforced by `hooks/no-unfenced-typed-line-ask.py`, and checked by [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#typed-lines-without-a-copy-button).

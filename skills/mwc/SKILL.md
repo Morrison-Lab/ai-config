@@ -36,7 +36,8 @@ without asking confirmation before every merge.
   `mwr` never merges a PR that changes any file under `.github/`, since such a PR could edit the very CI that `mwr` relies on.
   Nor does it merge a PR that changes the root `AGENTS.md`, which holds the `amwr` marker.
   Merge that PR under `mwc`.
-  The `amwr` marker is the repository-wide form: a line that is exactly `<!-- amwr: on -->`, outside code blocks, in the root `AGENTS.md` of the repository's default branch, grants `mwr` for every PR of that repository (step 3; Ezra's card, 2026-11-20: "read from main only").
+  The `amwr` marker is the repository-wide form, step 3 of ai-config#3946.
+  A line that is exactly `<!-- amwr: on -->`, outside code blocks, in the root `AGENTS.md` of the repository's default branch, grants `mwr` for every PR of that repository (Ezra's card, 2026-11-20: "read from main only").
   It is read from the default branch only, so a PR cannot grant itself, and a read that fails grants nothing.
   A revocation in the session suspends it, after which only a later typed grant counts.
   The [`mwr`](../mwr/SKILL.md) skill is the short form.

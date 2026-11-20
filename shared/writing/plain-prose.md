@@ -16,6 +16,24 @@ When PSW and this guidance disagree, PSW wins.
 - **Prefer plain (Anglish) words over Latin-derived ones** (PSW, "Word choice").
   "before", not "prior to"; "needed", not "necessary"; "use", not "utilize". A
   heuristic, not a purity rule.
+- **Never swap a technical term for a plain word to avoid defining it**
+  (Ezra, 2026-11-20: "never switch to a plain word to avoid needing to define a technical term").
+  When the idea needs a technical term, use the term and define it,
+  or link its definition; write the definition first when none exists yet.
+  The plain-word preference above is for words that carry no technical meaning,
+  such as "utilize" for "use", and the jargon to cut is filler, not a defined term.
+  A plain stand-in reads easier and says less:
+  "a set" drops what "a finite set" required,
+  and "a nice curve" says nothing that "a smooth function" does
+  ([Morrison-Lab/mds#868](https://github.com/Morrison-Lab/mds/pull/868) defined "smooth function" rather than avoid the word).
+  A word used in its everyday sense, such as "weight" for heaviness, is not a technical term and needs no definition.
+  - **Do:** keep "smooth function" and link it to its definition, writing one if the notes have none.
+  - **Don't:** write "a nice curve" because "smooth" has no definition yet,
+    or caption a histogram "bars" because "histogram" would need a link.
+  [`hooks/no-delete-flagged-term.py`](../../hooks/no-delete-flagged-term.py) denies the case a tool can see:
+  an edit that rewords a line where gha's `check-term-links` flags a term and drops that term.
+  A term that no lab notes define yet is in no term list,
+  so no check can tell it from a plain word, and that case rests on this rule alone.
 - **Prefer simple declarative sentences and active voice.** Subject, verb,
   point. Name the actor, then the action.
 - **Join independent clauses with coordinating conjunctions** (and, but, so, or)

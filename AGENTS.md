@@ -43,6 +43,11 @@ Never send email for the user; draft it ([`never-send-email`](shared/workflow/ne
 Follow [`graph-and-equation-defaults`](shared/writing/graph-and-equation-defaults.md) for figures, visuals and display math.
 It sets the plotting library, axis titles and ticks, where to add a visual, equation layout and labels, and the macros all LaTeX math uses.
 
+## Define technical terms; never dodge them
+
+Never replace a technical term with a plain word to avoid defining it: use the term and define it, or link its definition ([`plain-prose`](shared/writing/plain-prose.md)).
+[`hooks/no-delete-flagged-term.py`](hooks/no-delete-flagged-term.py) blocks the case a check can see; a term no notes define yet is in no term list, so the rest rests on this rule.
+
 ## Check external repository guidelines and PR template before filing
 
 Before filing a PR in an external repository, read and follow its `CONTRIBUTING.md` and `.github/pull_request_template.md`, never an internal template or memory.

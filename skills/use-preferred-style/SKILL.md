@@ -51,6 +51,10 @@ cited individually below.
 
 2. **Cut low-content filler and jargon.** Delete words that add no information.
    Replace jargon with the plain word. See the swap table below.
+   Jargon here means filler dressed up, not a technical term:
+   never swap a technical term for a plain word to avoid defining it;
+   keep the term and define or link it
+   ([`plain-prose`](../../shared/writing/plain-prose.md)).
 
 3. **Prefer simple declarative sentences.** State the fact. Put the subject
    first, then the verb, then the rest. Short beats clever.

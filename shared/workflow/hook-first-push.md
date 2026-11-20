@@ -20,7 +20,7 @@ Read the nearest sibling hook before writing the new one, since the reviewer wil
 
 Four more misses sent [#5615](https://github.com/Morrison-Lab/ai-config/pull/5615) through [#5618](https://github.com/Morrison-Lab/ai-config/pull/5618) to a second push (2026-11-13):
 
-- **Do:** count the diff before pushing (`git diff --shortstat origin/main`), and keep the hook, its test, its README row and its rule section within 10 files and 300 lines.
+- **Do:** count the diff before pushing (`git diff --shortstat origin/main`), and keep the hook, its test, its README row and its rule section within 20 files and 600 lines.
   Split first when over, since `hooks/no-oversized-pr-push.py` refuses the push.
 - **Don't:** push a new hook, test, README row and rule section together without counting them.
 - **Do:** add the `README.md` hook-catalog row in the same commit as the hook (`check-hook-catalog.py`).

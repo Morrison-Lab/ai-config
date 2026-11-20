@@ -73,6 +73,12 @@
   refused every GraphQL call while `gh api user`/`gh api repos/<o>/<r>` both
   returned 200 --- a second, distinct root cause for the same
   `check-pr-fully-clean.py` failure symptom already tracked in that issue.)
+  `gh workflow run` fails the same way even with `--ref` given, because it
+  looks up the repository's default branch over GraphQL first
+  (`unable to determine default branch for <o>/<r>: HTTP 403`).
+  Dispatch over REST instead:
+  `gh api -X POST repos/<o>/<r>/actions/workflows/<file>.yml/dispatches -f ref=main -f 'inputs[<name>]=<value>'`
+  (2026-11-20, re-gating four caller PRs after Morrison-Lab/gha#2164).
 
   **A third root cause reaches that same first call, and it is the most
   common one: `gh` is not installed at all.**

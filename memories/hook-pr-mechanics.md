@@ -33,3 +33,20 @@ Other first-try refusals from that run: a Python heredoc with a backslash, and `
 
 - **Do:** link the session once per paragraph or rephrase ("this work", "the brief"), link every PR even in the Stopping Point line, edit scripts with Edit or Write instead of a heredoc, and assign (not request review from) a PR author.
 - **Don't:** retry the same wording or form after a refusal.
+
+## A stacked base whose findings are fixed only in its child cannot pass the gate
+
+The final-head gate judges each head on its own.
+When agy findings on a hook PR at the size cap went into its stacked child, the base's own head could never get a clean line:
+the runner could not send [ai-config#5974](https://github.com/Morrison-Lab/ai-config/pull/5974) for one (2026-11-19).
+The fix chosen was to retarget the child, [ai-config#5976](https://github.com/Morrison-Lab/ai-config/pull/5976), to `main` with the whole combined diff, to land alone (both still open when this was written).
+
+- **Do:** when the combined diff fits the cap (20 files, 600 lines), retarget the child to `main`, rewrite its body to cover the whole combined diff, and land only the child with a merge commit;
+  GitHub marks a PR merged once its head commit reaches its base branch.
+  Comment on the base that it must not merge alone.
+- **Don't:** plan "base first, then child" while the base still carries findings fixed only in the child.
+- **Do:** settle the structure before asking for agy, so agy reviews the head that will land.
+- **Don't:** write a lesson as a file in the project memory store;
+  `hooks/block-project-memory-write.py` denies it, and the lesson belongs in a tracked file such as this one.
+- **Don't:** chain a `>>` append with `git commit` in one cloud Bash call;
+  `hooks/no-chained-edit-and-commit-in-cloud.py` denies it, so edit with the Edit tool and commit separately.

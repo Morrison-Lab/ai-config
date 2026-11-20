@@ -2418,7 +2418,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unmonitored-pr.py\"",
             "timeout": 10,
             "script": "no-unmonitored-pr.py",
-            "why": "After opening a PR, uses a recorded model scheduler when available; otherwise starts a detached two-minute gh poller and injects changed state on the next prompt. Blocks only if neither mechanism can be armed."
+            "why": "After opening a PR, uses a recorded model scheduler or PR subscription when available; otherwise starts a detached two-minute gh poller and injects changed state on the next prompt. Blocks if neither can be armed, or if the closing reply waits on PR state, since the poller cannot wake the session (ai-config#4790)."
           },
           {
             "type": "command",

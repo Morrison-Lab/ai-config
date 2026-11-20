@@ -176,6 +176,25 @@ Tried afterward, it returned 401 "OpenCode Go requires an API key", so the waive
   Only then merge.
 - **Don't:** read "every CLI is absent" as "no reviewer can run" in a cloud session, where the reviewer route is an HTTP call rather than a CLI.
 
+Case (2026-11-19, a cloud session merging [ai-config#5935](https://github.com/Morrison-Lab/ai-config/pull/5935)):
+two merge hooks refused in turn.
+`hooks/block-merge-without-clean-checker.py` did not credit a `check-pr-fully-clean.py` run that was piped through `tail`
+and followed by an `echo` of `${PIPESTATUS[0]}`.
+The hook's own test is the echo, not the pipe: it refuses any `echo` argument holding `clean` or an expansion other than `$?`, since such an echo could print the evidence line.
+The `tail` pipe also hides the checker's exit status behind `tail`'s, so drop it as well.
+`hooks/warn-merge-without-cross-harness-review.py` then refused until five lone `command -v` probes (`agy`, `codex`, `cursor-agent`, `gemini`, `opencode`) each exited 1
+and an `opencode run "<prompt>"` attempt exited 127.
+That hook reads the transcript for the probes and the attempt only.
+It does not check the PR waiver note, which this file still requires.
+After the probes, the attempt and the note, the merge call with `expectedHeadSha` succeeded.
+The same hook refused the next PR's merge ([ai-config#5997](https://github.com/Morrison-Lab/ai-config/pull/5997)) because that PR had been pushed to (a merge of `main`) after the probes were run:
+the probes count only when they come after the PR's last push, so a merge of `main` into the branch means running them again.
+
+- **Do:** run the checker alone with literal arguments (literal `--annotations-read` ids included) and a plain trailing `echo "exit=$?"`.
+  Run the five probes and the `opencode` attempt in the same stride, after the PR's last push, post the waiver note, and only then call the merge.
+- **Don't:** pipe the checker, or put an expansion other than `$?` in its echo.
+  Don't call the merge before the probes and the attempt are in the transcript.
+
 
 The merge-side rules live with the gate they serve:
 

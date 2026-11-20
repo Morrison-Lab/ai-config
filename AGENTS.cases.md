@@ -85,3 +85,6 @@ This widened the grant from repositories the work needs to any repository that w
 "let's say that everything in gha is infra",
 "so is ai-config",
 "that's why we have a standing mwc for ai-config".)
+
+(User directive, 2026-11-20, in a project with no runner thread, after a thread waited on him for seven caller PRs and a hook fix: "always handle infra PRs yourself;
+never ask me".)

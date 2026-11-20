@@ -80,15 +80,18 @@ outs = run(work, resolve(), sd, times=2)
 check("second attempt is denied too (ai-config#6027)", '"deny"' in outs[0] and '"deny"' in outs[1])
 
 
-def read(thread, report, uid="r1", older=None, newer_status=False):
-    """A read_thread call and its result, in the shape the hearthbot tool returns."""
+def read(thread, report, uid="r1", older=None, newer_status=False, raw=None):
+    """A read_thread call and its result, in the shape the hearthbot tool returns.
+
+    `raw` replaces the whole result text, for malformed-result cases.
+    """
     msgs = [{"author": "agent", "created_at": "2026-11-20T09:55:43Z", "body": report}]
     if older:
         msgs.append({"author": "agent", "created_at": "2026-11-20T08:00:00Z", "body": older})
     if newer_status:
         msgs.insert(0, {"author": "agent", "created_at": "2026-11-20T09:59:00Z",
                         "body": '{"kind":"status","text":"checklist"}'})
-    text = "Untrusted content follows.\n<wrap>" + json.dumps(
+    text = raw if raw is not None else "Untrusted content follows.\n<wrap>" + json.dumps(
         {"thread_id": thread, "messages": msgs}) + "</wrap>"
     call = {"type": "assistant", "message": {"content": [
         {"type": "tool_use", "id": uid, "name": "mcp__hearthbot__read_thread",
@@ -116,8 +119,21 @@ check("a newer checklist card does not hide the report",
       run(work + read("cmsg_A", done, newer_status=True), resolve(thread="cmsg_A"), fresh()) == "")
 check("the caller's own UMS does not stand in for the thread's",
       '"deny"' in run(work + [tool("Skill", {"skill": "ums"})], resolve(thread="cmsg_A"), fresh()))
-check("an unparseable read result denies (fails closed)",
-      '"deny"' in run(work + [tool("x", {})], resolve(thread="cmsg_A"), fresh()))
+for desc, raw in [
+    ("not JSON", "UMS executed: but no JSON envelope"),
+    ("truncated JSON", '{"thread_id": "cmsg_A", "messages": [{"author": "agent", "body": "UMS executed: x"'),
+    ("a non-list messages value", '{"thread_id": "cmsg_A", "messages": 7}'),
+    ("a true messages value", '{"thread_id": "cmsg_A", "messages": true}'),
+]:
+    check(f"a read_thread result with {desc} denies (fails closed)",
+          '"deny"' in run(work + read("cmsg_A", "", raw=raw), resolve(thread="cmsg_A"), fresh()))
+for prose in ("No UMS executed yet.", "Wait until UMS completed before resolving.",
+              "UMS executed later, maybe"):
+    check(f"prose {prose!r} is not a report",
+          '"deny"' in run(work + read("cmsg_A", prose), resolve(thread="cmsg_A"), fresh()))
+check("a report after a sentence on the same line counts",
+      run(work + read("cmsg_A", "PR is up. UMS executed: nothing to record."),
+          resolve(thread="cmsg_A"), fresh()) == "")
 check("the by-id deny tells the coordinator to read the thread",
       "read_thread" in run(work, resolve(thread="cmsg_A"), fresh()))
 check("a thread's own resolve (no thread_id) gets the run-ums deny",

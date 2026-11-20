@@ -69,7 +69,9 @@ EVENT = re.compile(r"<event\b([^>]*\bsource=\"github\"[^>]*)>(.*?)</event>", re.
 MERGED = re.compile(r"\bkind=\"[^\"]*merged[^\"]*\"|\"merged\"\s*:\s*true|\"state\"\s*:\s*\"merged\"", re.I)
 
 # The report line a thread ends its final message with (skills/ums/SKILL.md).
-UMS_REPORT = re.compile(r"\bUMS(?: pass)?:?\s+(?:executed|done|completed?)\b", re.I)
+# Anchored: the literal "UMS executed:" at a line start or right after sentence punctuation
+# or markdown emphasis, so prose such as "No UMS executed yet" does not count.
+UMS_REPORT = re.compile(r"(?:^|[.;:!*_]\s*)UMS executed:", re.I | re.M)
 STATUS_BODY = re.compile(r'^\s*\{\s*"kind"\s*:\s*"status"')
 
 UMS_PATH = re.compile(r"(?:^|/)(?:memories|shared)/|(?:^|/)(?:AGENTS|CLAUDE)\.md$|ai-config")
@@ -181,7 +183,9 @@ def latest_report(text):
     except ValueError:
         return ""
     msgs = data.get("messages") if isinstance(data, dict) else None
-    replies = [m for m in msgs or [] if isinstance(m, dict) and m.get("author") == "agent"
+    if not isinstance(msgs, list):
+        return ""
+    replies = [m for m in msgs if isinstance(m, dict) and m.get("author") == "agent"
                and isinstance(m.get("body"), str) and not STATUS_BODY.match(m["body"])]
     if not replies:
         return ""

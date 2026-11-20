@@ -40,12 +40,12 @@ A later disclosed status from the same login supersedes such a reply (ai-config#
 - carries no rejection or open-work word ("blocking", "needs more work", "broken", "except") anywhere else, the rest of the verdict line included;
 - names no other reviewer.
 
-The superseded reply must carry a disposition word (rebut, defer, decline) and name no other reviewer, since a relayed verdict is cleared only by that reviewer's own later clean.
+The superseded reply must carry a disposition word and name no other reviewer, since a relayed verdict is cleared only by that reviewer's own later clean.
 The status never counts toward quorum, and never supersedes a comment without the marker, a review that names its head, or a formal review.
 
 - **Writer:** label each finding in a reply with a disposition shape (`- **Blocking, path:line** -- rebutted.`).
   The bold holds only the label and one locator token, with the separator outside it.
-  The word is one of rebutted, deferred, declined, addressed, fixed, done or resolved.
+  The disposition word is one of rebutted, deferred, declined, addressed, fixed, done or resolved (the checker's `_REPLY_DISPOSITION_WORD`, which also accepts other forms of rebut, defer and address).
   Keep every disposition line bare apart from an optional commit sha, and put the explanation in a paragraph of its own below the list.
   After a reply that may read as not-clean, post such a status instead of editing the reply.
 - **Don't:** write `- **Blocking, encoding:** accepted.` with the colon inside the bold and a word off the list.

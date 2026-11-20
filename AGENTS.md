@@ -321,7 +321,7 @@ Verify every push first, and carry work worth keeping through to a PR ([#2889](h
 
 - **Commit, push, and PR any potentially-reusable work you produce:** commit work produced incidentally in any medium to an owning repository when reproducing it costs more than a moment **and** something durable cites it, or will ([`commit-reusable-work`](shared/workflow/commit-reusable-work.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
   [Port content by script](shared/workflow/port-by-script.md): when adapting any content, copy it first with a script and modify after;
-  when porting a source, also inventory it item by item, port every item, and report the source-to-target map.
+  when porting a source, also inventory it item by item, port every item, and report a coverage map plus a review of whether the source suggests a better structure for the destination.
 - **Deliver completed implementation work:** when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
   This grants no merge authority: the Strict Merge Control Policy still applies.
 - **Verify changes before pushing:** always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.

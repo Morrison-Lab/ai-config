@@ -595,6 +595,14 @@ On [ai-config#5974](https://github.com/Morrison-Lab/ai-config/pull/5974) a foreg
 - **Do:** start it with the Bash tool's `run_in_background`, wait for its exit notice, and read the table.
 - **Don't:** wrap it in a foreground `timeout` and then report "no failure before the timeout" as a local pass.
 
+## A hook that judges shell loops keeps state per loop, not per command
+
+`simple_commands` returns a flat list, with `do`, `done` and `if` as leading tokens.
+The first version of `hooks/no-tight-github-polling.py` kept one loop, sleep and call state for the whole list, and the agy review of [ai-config#5974](https://github.com/Morrison-Lab/ai-config/pull/5974) found five false positives and false negatives from it (2026-11-19), fixed in [ai-config#5976](https://github.com/Morrison-Lab/ai-config/pull/5976).
+
+- **Do:** open a frame at each `while`, `until` or `for` (also after `do`), judge it at its own `done`, and treat a value under `if` as conditional.
+- **Don't:** sum `sleep` or GitHub calls across the whole command, or record only the first loop keyword.
+
 ## A hook that parses Bash commands reuses `scripts/lib/shellcmd.py`
 
 [ai-config#5678](https://github.com/Morrison-Lab/ai-config/pull/5678) first matched `gh api .../update-branch` with a hand-written command-position regex and quote scanner.

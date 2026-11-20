@@ -23,7 +23,10 @@ be deleted:
   Actions app"). An unresolved identity fails closed.
 
 A failed worktree removal stops that repository's branch pass, since the
-branch plan assumed the worktree pass succeeded. No command uses `--force`.
+branch plan assumed the worktree pass succeeded. No worktree removal uses
+`--force`. A local branch is force-deleted (`git branch -D`) only when its
+fresh row is `delete-D`: a PR from it merged and its tip predates the merge,
+so a squash or rebase merge left its commits unreachable from main.
 
 Usage:
     python3 scripts/clean-git-plan.py --repo . > plan.json   # then confirm it
@@ -125,7 +128,11 @@ class Executor:
         for p in prs:
             if claimed(self.comments_for(p["number"]), self.now):
                 return f"claim comment on PR #{p['number']} in the last 24 hours"
-        if remote and prs:
+        if remote and not prs:
+            # The plan deletes an ahead remote branch only when a PR from it
+            # merged, so this does not happen; if it does, nothing scopes it.
+            return "ahead of main, or ahead unknown, with no PR to scope it"
+        if remote:
             for p in prs:
                 pr = scope_mod.normalize_pr(p)
                 ok, reason = scope_mod.classify(pr, self.ids, set(), set(), bool(self.ids))

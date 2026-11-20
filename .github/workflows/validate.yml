@@ -368,6 +368,9 @@ jobs:
       - name: Run clean-git-plan tests
         # ai-config#4170: the read-only worktree and branch sweep classifier.
         run: python3 scripts/test_clean_git_plan.py
+      - name: Run clean-git-execute tests
+        # ai-config#4170: the executor that carries out a confirmed plan.
+        run: python3 scripts/test_clean_git_execute.py
       - name: Check that all scripts/test_*.py test suites are gated
         # ai-config#2540: verify every test suite in scripts/ is gated in CI.
         run: python3 scripts/check-test-suites-covered.py

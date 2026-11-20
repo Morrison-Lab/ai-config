@@ -469,3 +469,12 @@ On a report or transcript that merges a content PR under an mwc line whose appro
 Report the merge when there is no CARRIES line, when the merge pinned a head other than the full SHA that line names, or when the approved SHA passed to the script is not the one on the line or in the post the line answered.
 A CARRIES line covers only the head it names: a later push needs a new run.
 See [`mwc`](../../skills/mwc/SKILL.md#an-mwc-carries-to-a-new-head-only-for-a-named-pr) ([ai-config#5967](https://github.com/Morrison-Lab/ai-config/issues/5967)).
+
+## Routine merges of main into a PR branch
+
+On a PR, transcript or report, find each commit that merges `main` into the PR branch, including a server-side branch update.
+Report one where the branch did not conflict with `main`, needed no named fix on `main`, and was not missing a `.github/workflows/` change from `main`.
+Moving the head re-runs the PR's CI and voids its review, so "main moved" or "freshen before review" is not a reason.
+Read the merge's parents yourself (`git merge-tree --write-tree` for a conflict, `git diff --name-only <base> <main> -- .github/workflows` for staleness);
+do not report the output of `hooks/no-routine-main-merge.py` as your finding.
+See [`sync-with-main`](../../shared/workflow/sync-with-main.md) ([ai-config#5988](https://github.com/Morrison-Lab/ai-config/issues/5988)).

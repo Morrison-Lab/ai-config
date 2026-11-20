@@ -5,7 +5,9 @@ Ezra, 2026-11-20, chose "Make it permanent" on stopping main merges: each one
 re-runs a PR's whole CI and voids its review, and routine merges helped queue
 499 lds runs on 2026-11-19 (Morrison-Lab/lds#2992). Denies, on Bash,
 `git merge` and `git pull` of main, master or origin/HEAD's branch (any ref
-form, or a `FETCH_HEAD` holding one), through `cd`, `git -C` and `bash -c`,
+form under a configured remote, a `FETCH_HEAD` holding one, or a bare
+`git pull` / `git pull <remote>` whose upstream is one; `feat/main` is a
+branch, not main), through `cd`, `git -C` and `bash -c`,
 unless the current branch is that branch, the merge changes nothing, or:
 (a) the branch conflicts with main (`git merge-tree --write-tree`);
 (b) a `MERGE_MAIN_FOR=<sha>` or `MERGE_MAIN_FOR='#<N>'` prefix on the git
@@ -20,6 +22,8 @@ a session-wide value is ignored. A `FETCH_HEAD` fetched on the same line is
 read as the remote-tracking ref, so fetch main in its own command first.
 Fails open on helper, parse or git trouble (git before 2.38 lacks
 `merge-tree --write-tree`). Rule: shared/workflow/sync-with-main.md.
+Reviewer layer: .claude/agents/adversarial-reviewer.md ("Routine merges of
+main into a PR branch").
 """
 
 import json
@@ -91,11 +95,40 @@ def default_names(cwd):
     return names
 
 
-def is_main_name(name, names):
-    """True for `main`, `origin/main`, `refs/remotes/<r>/main`,
-    `refs/heads/main`, and the same forms of the origin/HEAD branch."""
-    tail = re.sub(r"^(?:refs/heads/|refs/remotes/[^/]+/|[^/]+/)", "", name)
-    return tail in names
+def remote_names(cwd):
+    """The repository's configured remotes."""
+    out = git_out(cwd, "remote")
+    return set(out.split()) if out else set()
+
+
+def is_main_name(name, names, remotes):
+    """True for `main`, `<remote>/main`, `refs/remotes/<remote>/main`,
+    `refs/heads/main`, and the same forms of the origin/HEAD branch.
+    A prefix that is not a configured remote (`feat/main`) is a branch."""
+    for prefix in ("refs/heads/", "refs/remotes/"):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            if prefix == "refs/heads/":
+                return name in names
+            break
+    if name in names:
+        return True
+    head, sep, tail = name.partition("/")
+    return bool(sep) and head in remotes and tail in names
+
+
+def upstream_target(cwd, remote=None):
+    """`(label, ref)` for the current branch's upstream when it is main-like
+    (a bare `git pull`, or `git pull <remote>` naming the upstream's remote)."""
+    up = git_out(cwd, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    if not up or "/" not in up:
+        return []
+    up_remote, _sep, branch = up.partition("/")
+    if remote is not None and remote != up_remote:
+        return []
+    if branch not in default_names(cwd):
+        return []
+    return [(f"upstream {up}", f"refs/remotes/{up}")]
 
 
 def fetch_head_branches(cwd):
@@ -159,6 +192,7 @@ def main_targets(sub, rest, cwd, fetched):
     """`(label, ref)` pairs: each main-like thing the command merges in, with
     the local ref that stands for it."""
     names = default_names(cwd)
+    remotes = remote_names(cwd)
     if sub == "merge":
         args = positionals(rest, MERGE_VALUE_OPTS)
         if not args:
@@ -173,13 +207,15 @@ def main_targets(sub, rest, cwd, fetched):
                 else:
                     out += [(f"FETCH_HEAD ({b})", "FETCH_HEAD")
                             for b in fetch_head_branches(cwd) if b in names][:1]
-            elif is_main_name(a, names):
+            elif is_main_name(a, names, remotes):
                 out.append((a, a))
         return out
     if sub == "pull":
         args = positionals(rest, PULL_VALUE_OPTS)
-        if not args or len(args) < 2:
+        if args is None:
             return []
+        if len(args) < 2:
+            return upstream_target(cwd, args[0] if args else None)
         remote = args[0]
         out = []
         for spec in args[1:]:

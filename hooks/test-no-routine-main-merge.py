@@ -97,6 +97,22 @@ with tempfile.TemporaryDirectory() as root:
     ]:
         check(command, run(command, repo), want)
 
+    # A local branch whose name only ends in /main is not main.
+    git("branch", "feat/main", "origin/main", cwd=repo)
+    git("branch", "ci/master", "origin/main", cwd=repo)
+    check("feat/main is a branch", run("git merge feat/main", repo), "allow")
+    check("ci/master is a branch", run("git merge ci/master", repo), "allow")
+    git("branch", "-D", "-q", "feat/main", "ci/master", cwd=repo)
+
+    # A bare pull on a branch that tracks origin/main pulls main.
+    git("switch", "-q", "-c", "tracks-main", "pr", cwd=repo)
+    git("branch", "-q", "--set-upstream-to=origin/main", cwd=repo)
+    check("bare pull tracking main", run("git pull", repo), "deny")
+    check("pull remote tracking main", run("git pull origin", repo), "deny")
+    check("pull other remote", run("git pull upstream", repo), "allow")
+    git("switch", "-q", "pr", cwd=repo)
+    git("branch", "-D", "-q", "tracks-main", cwd=repo)
+
     # A session-wide value does not pass by default.
     check("environment value ignored",
           run("git merge origin/main", repo, env_extra={"MERGE_MAIN_FOR": "#42"}),

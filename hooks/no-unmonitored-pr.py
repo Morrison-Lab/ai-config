@@ -107,7 +107,12 @@ def pending(path):
 
 
 def last_reply(path):
-    """The text of the transcript's last assistant message, or ''."""
+    """The text of the transcript's last assistant record that has text, or ''.
+
+    Claude Code writes each content block as its own record, so the closing
+    reply is often followed by a tool-only record (a final tool call). Those
+    records are skipped on purpose: the reply is the last text written.
+    """
     text = ""
     for record in records(path):
         if record.get("type") != "assistant" and record.get("role") != "assistant":

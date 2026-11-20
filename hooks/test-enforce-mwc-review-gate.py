@@ -550,7 +550,7 @@ def round10_checks(clean_line):
     # `ai-session.sh enable-mwc` writes it, found through CLAUDE_PROJECT_DIR.
     import subprocess
     with tempfile.TemporaryDirectory() as repo:
-        subprocess.run(["git", "init", "-q", repo], check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main", repo], check=True)
         reg = os.path.join(repo, ".git", "ai-sessions")
         os.makedirs(reg)
         Path(reg, "transcript-mwr.mwc").write_text("")

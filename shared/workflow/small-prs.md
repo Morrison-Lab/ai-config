@@ -66,6 +66,16 @@ that issue tracks both.
   A PR that changes the cap is pushed under the installed hook's old cap until it merges, so ask Ezra on a card for an `ALLOW_LARGE_PR=1` push before the push, not after a second refusal
   ([ai-config#5874](https://github.com/Morrison-Lab/ai-config/pull/5874) needed two such pushes, 2026-11-19).
 - **Don't:** reword a conflict's text to get under the hook: the rewording adds lines, and the refusal stays.
+- **Measured case (2026-11-19):** a merge of `main` into a 7-file, 543-line branch was denied under the installed cap of 10 files and 300 lines.
+  The merge needed a conflict resolution in `.claude/agents/adversarial-reviewer.md`, keeping two sections, so the PR diff changed.
+  The hook's own wording is "A push that leaves the PR diff (merge base to tip) the same as on the server's tip passes, as after a merge from the base or a rebase", compared by `git patch-id --stable` in `hooks/no-oversized-pr-push.py`.
+  A clean merge keeps the patch id and passes.
+  A conflict-resolving merge does not.
+- **Do:** split an over-cap PR at the start into batches of one concern each: hook plus tests, registration files, rule text.
+  Then a later conflict-resolving merge stays under the cap.
+- **Do:** when a push is denied, report it and split.
+  `ALLOW_LARGE_PR=1` is for mechanical or stacked PRs.
+- **Don't:** build a 500-line single-concern PR and rely on the merge-from-base exemption to keep it pushable.
 - **Don't:** run `git checkout <commit> -- <file>` to carry a change onto a newer base.
   It carries the whole old file, so it silently reverts what `main` changed since the branch point
   (`hooks/hooks.json` lost 12 lines that way, and nothing failed).

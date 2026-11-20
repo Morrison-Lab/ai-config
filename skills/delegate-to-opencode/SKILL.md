@@ -185,6 +185,7 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
 - `/messages` (`claude-haiku-5-5`, `minimax-m3`) returned 401 `Missing API key` through the proxy on 2026-10-09, so it is not usable there.
 - `/responses` and `/models` also exist; `/models` lists every id.
 - Send a stable `x-opencode-session` UUID header for each conversation, or the request fails with 400 `MissingSessionID`.
+  Make the UUID with `python3 -c 'import uuid; print(uuid.uuid4())'`, as the examples below do: a cloud container has no `uuidgen` (2026-11-19, [ai-config#5979](https://github.com/Morrison-Lab/ai-config/issues/5979)).
 - Models seen on `/models` on 2026-10-15 include `deepseek-v4.1-flash` (the vendor estimates about 87,000 requests per week on Go at 410 input, 71,300 cached and 310 output tokens per request, with input at $0.15 per million tokens off-peak;
   a review that returns a longer answer gets fewer requests, and several smaller models list lower prices) and `gemini-4-argon-contributor` (the Argon model, 2x usage for a limited time).
   Treat `/models` as the authority, since the vendor says the list changes as models are added.

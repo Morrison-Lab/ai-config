@@ -484,3 +484,10 @@ Moving the head re-runs the PR's CI and voids its review, so "main moved" or "fr
 Read the merge's parents yourself (`git merge-tree --write-tree` for a conflict, `git diff --name-only <base> <main> -- .github/workflows` for staleness);
 do not report the output of `hooks/no-routine-main-merge.py` as your finding.
 See [`sync-with-main`](../../shared/workflow/sync-with-main.md) ([ai-config#5988](https://github.com/Morrison-Lab/ai-config/issues/5988)).
+
+## Tag slides asked about or handed off
+
+On a transcript or report where an infra PR merged in a repo with a floating tag (gha's `v3`), check that the agent slid the tag once the gates passed, or named the gate holding it.
+Report a message that asked the user's leave to slide, or left the slide to a runner thread or the coordinator.
+`hooks/no-ask-to-slide-tag.py` catches the common wordings; report the ones it missed.
+See [`slide-tag`](../../skills/slide-tag/SKILL.md#never-ask-before-sliding-an-infra-tag) ([ai-config#6052](https://github.com/Morrison-Lab/ai-config/issues/6052)).

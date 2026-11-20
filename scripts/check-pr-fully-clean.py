@@ -5218,7 +5218,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--mwr", action="store_true",
         help="Skip the review-verdict axis and keep every other gate, for a "
-             "merge under an mwr, mwrs or amwr grant (ai-config#3946). Prints "
+             "merge under a typed mwr or mwrs grant (ai-config#3946; the "
+             "per-repository amwr marker is a later step of that issue, and "
+             "this checker does not read it). Prints "
              "a MERGE-READY line, never the FULLY CLEAN line an mwc merge needs.",
     )
     return parser.parse_args(argv)
@@ -5229,6 +5231,66 @@ MWR_KEPT_REVIEW_PREFIXES = (
     "PR formal review decision is ",
     "PR has active formal review state ",
 )
+
+# The CI an mwr merge still requires is defined under `.github/`, so a PR that
+# edits it could make its own checks trivially green. mwr never merges one.
+MWR_CI_DIR = ".github/"
+# GitHub's pull-request files endpoint lists at most this many files.
+PR_FILES_CAP = 3000
+
+
+def check_mwr_ci_edits(pr) -> List[str]:
+    """Under --mwr, block a PR that changes any file under `.github/`.
+
+    Fails closed: a file list that cannot be read, or that reaches the
+    endpoint's cap, blocks too. A rename counts on both its old and new path.
+    Each line is one file entry, with a rename's old path after a tab, so the
+    cap is counted in entries, as the endpoint counts it.
+    """
+    cmd = ["gh", "api", f"repos/{pr.repo}/pulls/{pr.pr_num}/files",
+           "--paginate", "--jq",
+           '.[] | [.filename, (.previous_filename // empty)] | join("\\t")']
+    try:
+        raw = fetch(cmd)
+    except (RuntimeError, PayloadError) as exc:
+        return [f"mwr could not read the PR's changed files ({exc}), so it cannot "
+                f"rule out a change to the CI under {MWR_CI_DIR}; merge it under "
+                "mwc instead (ai-config#3946)"]
+    entries = [line for line in str(raw or "").splitlines() if line.strip()]
+    names = [n.strip() for line in entries for n in line.split("\t") if n.strip()]
+    if not names:
+        return [f"mwr read no changed files for this PR, so it cannot rule out a "
+                f"change to the CI under {MWR_CI_DIR}; merge it under mwc instead "
+                "(ai-config#3946)"]
+    if len(entries) >= PR_FILES_CAP:
+        return [f"the PR's file list reached the endpoint's cap ({PR_FILES_CAP}), "
+                f"so mwr cannot rule out a change under {MWR_CI_DIR}; merge it "
+                "under mwc instead (ai-config#3946)"]
+    # A path that is `.github` itself (a submodule, or a file replacing the
+    # directory) changes the CI as surely as a path under it.
+    edits = sorted({n for n in names
+                    if n.lower() == MWR_CI_DIR.rstrip("/") or n.lower().startswith(MWR_CI_DIR)})
+    if not edits:
+        return []
+    shown = ", ".join(edits[:5]) + (" ..." if len(edits) > 5 else "")
+    return [f"mwr cannot merge a PR that edits CI: it changes {shown}, and the CI "
+            "it requires could be made green by the PR itself. Merge it under "
+            "mwc, with a clean review (ai-config#3946)"]
+
+
+def check_mwr_dismissed_reviews(pr) -> List[str]:
+    """Under --mwr, block on any dismissed review.
+
+    Dismissing a CHANGES_REQUESTED review removes it from the formal review
+    decision, so without this an objection would vanish from an mwr run.
+    """
+    issues = []
+    for review in pr.get_reviews():
+        if review.state == "DISMISSED":
+            who = review.author_login or "an unknown author"
+            issues.append(f"PR has a dismissed review from {who}; mwr does not merge "
+                          "past a dismissed review. Merge it under mwc (ai-config#3946)")
+    return issues
 
 
 def _auto_build_payload(repo: str, pr_number: str) -> str:
@@ -5319,15 +5381,18 @@ def main():
     # from the boolean check_review_comments returns, so filtering the issue
     # list is the whole of the --mwr change.
     _, review_issues = check_review_comments(pr, args.quorum)
+    mwr_issues: List[str] = []
     if mwr:
+        mwr_issues = check_mwr_ci_edits(pr) + check_mwr_dismissed_reviews(pr)
         review_issues = [i for i in review_issues if i.startswith(MWR_KEPT_REVIEW_PREFIXES)]
         review_issues.append(
             "NOTE: --mwr: review verdicts and quorum were not evaluated (ai-config#3946); "
-            "a pass under --mwr authorizes a merge only under an mwr, mwrs or amwr grant")
+            "a pass under --mwr authorizes a merge only under an mwr or mwrs grant")
     drift_ok, drift_issues = check_base_drift(pr)
     required_ok, required_issues = check_required_checks(pr)
 
-    all_issues = ci_issues + thread_issues + feedback_issues + review_issues + drift_issues + required_issues
+    all_issues = (ci_issues + thread_issues + feedback_issues + review_issues
+                  + mwr_issues + drift_issues + required_issues)
 
     # Inside a CI job whose own check run is on this head, some review items
     # describe the PR BEFORE that job posts anything: no review on this head
@@ -5368,8 +5433,10 @@ def main():
         sys.exit(1)
 
     if mwr:
+        # The full 40-character sha, so the merge hook can require equality
+        # with the sha it pins rather than an 8-hex prefix (ai-config#3946).
         print(f"\n\u2705 {repo}#{pr_num} is MERGE-READY under mwr (review not evaluated) "
-              f"on HEAD {sha[:8]}! [stale-base rule]")
+              f"on HEAD {sha}! [stale-base rule]")
         sys.exit(0)
     print(f"\n\u2705 {repo}#{pr_num} is FULLY CLEAN on HEAD {sha[:8]}! [stale-base rule]")
     sys.exit(0)

@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for hooks/no-post-under-open-card.py.
-
-Run: python3 hooks/test-no-post-under-open-card.py
-"""
+"""Tests for hooks/no-post-under-open-card.py. Run: python3 hooks/test-no-post-under-open-card.py"""
 import importlib.util
 import json
 import os
@@ -90,35 +87,34 @@ def payload(path, tool=POST, tool_input=None):
     return {"tool_name": tool, "tool_input": tool_input or {"text": "update"}, "transcript_path": path}
 
 
-check("open card denies a post", hook.denial(payload(OPEN)) is not None)
+H = "mcp__hearthbot__"
+DENY, PASS = True, False
+CASES = [  # (label, transcript, tool, expect a deny)
+    ("open card denies a post", OPEN, POST, DENY),
+    ("open card denies a checklist update", OPEN, H + "update_progress_checklist", DENY),
+    ("open card denies a second card", OPEN, H + "request_decision", DENY),
+    ("open card denies an edit", OPEN, H + "edit_message", DENY),
+    ("close_decision is never blocked", OPEN, H + "close_decision", PASS),
+    ("no_reply_needed is never blocked", OPEN, H + "no_reply_needed", PASS),
+    ("a react is never blocked", OPEN, H + "react", PASS),
+    ("non-hearthbot tools pass", OPEN, "Bash", PASS),
+    ("answered card (text block wake) passes", ANSWERED, POST, PASS),
+    ("answered card (string wake) passes", ANSWERED_STR, POST, PASS),
+    ("answered card (queue-operation wake) passes", ANSWERED_QUEUE, POST, PASS),
+    ("the assistant quoting a decision id does not close the card", ASSISTANT_QUOTE, POST, DENY),
+    ("withdrawn card passes", WITHDRAWN, POST, PASS),
+    ("failed request_decision opens nothing", FAILED, POST, PASS),
+    ("a quoted id in another tool's result opens nothing", QUOTED_ONLY, POST, PASS),
+    ("no card passes", NONE, POST, PASS),
+    ("a typed message after the card closes it", TYPED_ANSWER, POST, PASS),
+    ("a typed message before the card does not close it", TYPED_BEFORE, POST, DENY),
+    ("a coordinator relay does not close the card", RELAY_ONLY, POST, DENY),
+    ("a tool result quoting the decision id closes the card (fail open)", RESULT_QUOTE, POST, PASS),
+]
+for label, path, tool, deny in CASES:
+    check(label, (hook.denial(payload(path, tool)) is not None) == deny)
 check("denial names the card", CARD in (hook.denial(payload(OPEN)) or ""))
-check("open card denies a checklist update",
-      hook.denial(payload(OPEN, "mcp__hearthbot__update_progress_checklist")) is not None)
-check("open card denies a second card",
-      hook.denial(payload(OPEN, "mcp__hearthbot__request_decision")) is not None)
-check("open card denies an edit", hook.denial(payload(OPEN, "mcp__hearthbot__edit_message")) is not None)
-check("close_decision is never blocked",
-      hook.denial(payload(OPEN, "mcp__hearthbot__close_decision")) is None)
-check("no_reply_needed is never blocked",
-      hook.denial(payload(OPEN, "mcp__hearthbot__no_reply_needed")) is None)
-check("a react is never blocked", hook.denial(payload(OPEN, "mcp__hearthbot__react")) is None)
-check("non-hearthbot tools pass", hook.denial(payload(OPEN, "Bash")) is None)
-check("answered card (text block wake) passes", hook.denial(payload(ANSWERED)) is None)
-check("answered card (string wake) passes", hook.denial(payload(ANSWERED_STR)) is None)
-check("answered card (queue-operation wake) passes", hook.denial(payload(ANSWERED_QUEUE)) is None)
-check("the assistant quoting a decision id does not close the card",
-      hook.denial(payload(ASSISTANT_QUOTE)) is not None)
-check("withdrawn card passes", hook.denial(payload(WITHDRAWN)) is None)
-check("failed request_decision opens nothing", hook.denial(payload(FAILED)) is None)
-check("a quoted id in another tool's result opens nothing", hook.denial(payload(QUOTED_ONLY)) is None)
-check("the later still-open card is named",
-      OTHER_CARD in (hook.denial(payload(TWO_ONE_OPEN)) or ""))
-check("no card passes", hook.denial(payload(NONE)) is None)
-check("a typed message after the card closes it", hook.denial(payload(TYPED_ANSWER)) is None)
-check("a typed message before the card does not close it", hook.denial(payload(TYPED_BEFORE)) is not None)
-check("a coordinator relay does not close the card", hook.denial(payload(RELAY_ONLY)) is not None)
-check("a tool result quoting the decision id closes the card (fail open)",
-      hook.denial(payload(RESULT_QUOTE)) is None)
+check("the later still-open card is named", OTHER_CARD in (hook.denial(payload(TWO_ONE_OPEN)) or ""))
 check("missing transcript fails open", hook.denial(payload("/nonexistent/x.jsonl")) is None)
 check("non-dict payload fails open", hook.denial(["x"]) is None)
 
@@ -132,10 +128,8 @@ def run(stdin):
 
 
 out = run(json.dumps(payload(OPEN)))
-check("cli exits 0", out.returncode == 0)
-check("cli emits deny", '"permissionDecision": "deny"' in out.stdout)
-out = run(json.dumps(payload(ANSWERED)))
-check("cli silent when clean", out.stdout.strip() == "")
+check("cli exits 0 and emits deny", out.returncode == 0 and '"permissionDecision": "deny"' in out.stdout)
+check("cli silent when clean", run(json.dumps(payload(ANSWERED))).stdout.strip() == "")
 out = run("not json")
 check("cli fails open on bad stdin", out.returncode == 0 and out.stdout.strip() == "")
 

@@ -24,8 +24,7 @@ The rest are prose because no condition in the transcript can decide them.
   Enforced by `hooks/no-plain-text-choice.py`; an open-ended question with no fixed answers stays plain text.
 - Keep an unanswered decision card last in its thread.
   A card moves when anything is posted after it.
-  Ezra has tapped the wrong option because of that, and asked for this rule on 2026-11-19.
-  His words: "sometimes a card moves while I'm clicking and I click the wrong choice".
+  Ezra has tapped the wrong option because of that (2026-11-19): "sometimes a card moves while I'm clicking and I click the wrong choice".
   To post after a card, withdraw it with `close_decision`, make the post, then post the card again as the turn's last thread-visible call.
   His words: "if you want to post something after a card, delete the card and repost it last".
   **Do:** send the message and checklist update first, and post the card last.

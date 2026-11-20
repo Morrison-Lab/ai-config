@@ -1,41 +1,20 @@
 #!/usr/bin/env python3
-"""PreToolUse: nothing may be posted under a decision card that is still waiting for an answer.
+"""PreToolUse: deny a thread-visible post while a decision card waits for an answer.
 
 Ezra, 2026-11-19: "sometimes a card moves while I'm clicking and I click the
-wrong choice; can we avoid that?" and "or maybe if you want to post something
-after a card, delete the card and repost it last?" A thread had posted an
-annotation-gate card and then a message under it; the card shifted as he
-tapped, and he picked the option he did not mean.
+wrong choice" and "if you want to post something after a card, delete the card
+and repost it last". Denies post_message, reply, update_message, edit_message
+(an edit changes height too), update_progress_checklist, post_widget and
+request_decision while the transcript holds an open card, and names Ezra's
+fix: close_decision, post, then request_decision last.
 
-The app's layout is not ours to change, so the fix is on the posting side:
-while a card is open, it must stay the last thing in the thread. This hook
-denies a thread-visible post (`mcp__hearthbot__post_message`, `reply`,
-`update_message`, `edit_message`, `update_progress_checklist`, `post_widget`,
-`request_decision`) when the session's transcript holds an open card. The fix
-it names is Ezra's: withdraw the card with `close_decision` (no `chose`), make
-the post, then post the card again with `request_decision` as the last call.
-
-A card is open when a `request_decision` tool_use got a tool_result naming its
-`message_id` (`cmsg_...`), and nothing has closed it since: no
-`close_decision` tool_use with that `message_id`, and no record the assistant
-did not write saying `decision_id=<that id>` (the platform's decision-chosen
-wake), and no message the person typed has arrived since (a wake whose
-`<message>` is `from="human" trust="principal"`): a typed answer, or a typed
-message that moves past the card, ends it as the live ask. Only a
-request_decision tool_use and its own tool_result open a card, so text that
-merely quotes an id cannot. A tool result that quotes `decision_id=<id>` (a
-thread read showing an old wake) also closes the card; that errs toward
-allowing the post, never toward a false block.
-
-Writer instruction: `shared/workflow/lab-operating-rules.md` ("Keep an
-unanswered decision card last"). Reviewer instruction:
-`.claude/agents/adversarial-reviewer.md` ("Posts under an unanswered decision
-card").
-
-A deny, not a reminder, because the failing shape is decidable from the
-transcript (ai-config#4741). `edit_message` is included because an edit can
-change a message's height above the card too. `ALLOW_POST_UNDER_CARD=1`
-overrides. Fails open on any parse trouble.
+Open: a request_decision tool_use whose own tool_result names its message_id.
+Closed: a close_decision with that id; a `decision_id=<id>` in any record the
+assistant did not write (the tap wake, or a tool result quoting one, which errs
+toward allowing); or a later wake with a typed message from the person.
+A deny because the state is decidable (ai-config#4741). Writer layer:
+shared/workflow/lab-operating-rules.md; reviewer layer: adversarial-reviewer.md.
+ALLOW_POST_UNDER_CARD=1 overrides. Fails open on parse trouble.
 """
 import json
 import os
@@ -55,12 +34,10 @@ CHOSEN = re.compile(r"decision_id=(cmsg_[A-Za-z0-9]+)")
 HUMAN = re.compile(r'from=\\?"human\\?"[^>]*trust=\\?"principal\\?"')
 
 REASON = (
-    "[hook: no-post-under-open-card] A decision card ({card}) is still waiting for an answer, "
-    "and this call would put something under it. Cards move when anything is posted after "
-    "them, and Ezra has tapped the wrong option because of it (2026-11-19).\n"
-    "Keep the card last: withdraw it with mcp__hearthbot__close_decision (message_id "
-    "{card}, no `chose`), make this post, then post the card again with "
-    "mcp__hearthbot__request_decision as the turn's last thread-visible call. "
+    "[hook: no-post-under-open-card] Decision card {card} is still waiting for an answer, and this "
+    "call would put something under it, so the card moves under Ezra's tap (2026-11-19).\n"
+    "Keep the card last: mcp__hearthbot__close_decision (message_id {card}, no `chose`), make this post, "
+    "then mcp__hearthbot__request_decision again as the turn's last thread-visible call. "
     "ALLOW_POST_UNDER_CARD=1 overrides."
 )
 
@@ -87,11 +64,9 @@ def blocks(node):
 
 def result_text(block) -> str:
     content = block.get("content")
-    if isinstance(content, str):
-        return content
     if isinstance(content, list):
         return "\n".join(str(c.get("text") or "") for c in content if isinstance(c, dict))
-    return ""
+    return content if isinstance(content, str) else ""
 
 
 def open_cards(transcript: str):
@@ -119,30 +94,20 @@ def open_cards(transcript: str):
                     m = MESSAGE_ID.search(result_text(block))
                     if m:
                         opened.append(m.group(1))
-        # The decision-chosen wake reaches the transcript as a queue-operation
-        # or attachment record, or as a user message (measured 2026-11-19 on a
-        # real thread transcript). Any record not written by the assistant may
-        # close a card; a tool result that quotes the id can too, which errs
-        # toward allowing the post (fail open), never toward a false block.
+        # The tap wake can be any non-assistant record type (measured 2026-11-19).
         if not (isinstance(record, dict) and record.get("type") == "assistant"):
             closed.update(CHOSEN.findall(line))
-            # A message the person typed after the card answers it in words or
-            # moves past it; either way the card is no longer the live ask, so
-            # it stops pinning the thread (review of ai-config#5973).
-            if HUMAN.search(line):
+            if HUMAN.search(line):  # a typed answer, or a message past the card
                 closed.update(opened)
     return [c for c in opened if c not in closed]
 
 
 def denial(payload: dict):
-    if os.environ.get(OVERRIDE) or not isinstance(payload, dict):
-        return None
-    if not TOOL.search(str(payload.get("tool_name") or "")):
+    if os.environ.get(OVERRIDE) or not isinstance(payload, dict) \
+            or not TOOL.search(str(payload.get("tool_name") or "")):
         return None
     still_open = open_cards(read_text(payload.get("transcript_path")))
-    if not still_open:
-        return None
-    return REASON.format(card=still_open[-1])
+    return REASON.format(card=still_open[-1]) if still_open else None
 
 
 def main() -> int:
@@ -155,13 +120,8 @@ def main() -> int:
     except Exception:  # fail open: a hook bug must never block a reply
         return 0
     if reason:
-        print(json.dumps({
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": reason,
-            }
-        }))
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason}}))
     return 0
 
 

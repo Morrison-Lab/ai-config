@@ -9,7 +9,10 @@ uses `request_decision`.
 Scope: the user-visible text tools (post_message, reply, update_message,
 edit_message), in every session. `request_decision` itself and agent-to-agent
 messages are not matched. Denies a text that holds a question and either two or
-more option lines / "Option N" labels, or a "now or file/later" choice. A deny is
+more option lines / "Option N" labels, or a "now or file/later" choice, and any
+text that asks for a go-ahead in prose ("Reply 'push it' and I'll push", "I need
+your OK", "say the word"), which is a yes-or-no choice too (Ezra, 2026-11-20, lds
+thread: "why didn't you post a card?"). A deny is
 possible because the failing shape is lexical (ai-config#4741). An open-ended
 question with no fixed answers is left alone. Fenced code is ignored.
 `ALLOW_PLAIN_CHOICE=1` overrides. Fails open on any parse trouble.
@@ -30,6 +33,13 @@ OPTION_LABEL = re.compile(r"\boption\s+([A-D1-4])\b", re.I)
 START_OR_FILE = re.compile(
     r"\b(?:now|immediately)\s+or\s+(?:file|defer|later|tonight|queue)\w*"
     r"|\bstart\b[^.?\n]{0,40}\bor\s+file\b", re.I)
+QUOTE_OPEN = "\"'\u201c\u2018`*"
+QUOTE_CLOSE = "\"'\u201d\u2019`*"
+APPROVAL_ASK = re.compile(
+    rf"\breply\s+[{QUOTE_OPEN}]+[^{QUOTE_CLOSE}\n]{{1,30}}[{QUOTE_CLOSE}]+\s+and\s+I(?:'|\u2019)?ll\b"
+    r"|\bsay\s+the\s+word\b"
+    r"|\bI\s+need\s+your\s+(?:OK|okay|go-?ahead|approval|sign-?off)\b"
+    r"|\b(?:give|send)\s+me\s+(?:the|a)\s+go-?ahead\b", re.I)
 CHOICE_CUE = re.compile(
     r"\b(?:which|choose|pick|prefer|select)\b|\bor\b", re.I)
 
@@ -50,6 +60,8 @@ def user_text(tool_input: dict) -> str:
 
 def choice_shape(text: str):
     """Describe the plain-text multiple-choice shape found in the text, or None."""
+    if APPROVAL_ASK.search(text):
+        return "a request for a go-ahead"
     questions = [s for s in re.split(r"(?<=[?])\s+|\n+", text) if s.strip().endswith("?")]
     if not questions:
         return None

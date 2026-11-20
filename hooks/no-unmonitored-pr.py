@@ -15,8 +15,25 @@ import sys
 import tempfile
 import time
 
-OPEN = re.compile(r"\bgh\s+pr\s+create\b|create_pull_request", re.I)
-SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|^schedule\b", re.I)
+GH_PR_CREATE = re.compile(r"\bgh\s+pr\s+create\b", re.I)
+CREATE_TOOL = re.compile(r"create_pull_request", re.I)
+SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|subscribe_pr_activity|^schedule\b", re.I)
+# A closing reply that says the session is waiting on PR state (ai-config#4790).
+# Each branch names the PR state and a future event, so a bare status word
+# ("no pending items", "after CI passed") does not match; "not", "no longer",
+# "without" and "than" right before "waiting" negate it.
+_PR_STATE = r"(?:CI|(?:the )?checks?|(?:the )?review|(?:the )?merge)"
+_FUTURE = (r"(?:passes|pass|finishes|finish|completes|complete|is clean|comes back"
+           r"|goes green|turns green|lands|is done|reports)")
+WAITING = re.compile(
+    r"(?<!not )(?<!no longer )(?<!without )(?<!than )\bwaiting (?:on|for) " + _PR_STATE
+    + r"|\b" + _PR_STATE + r" (?:is|are) still (?:running|pending|in progress)"
+    + r"|\b(?:once|when|after) " + _PR_STATE + r" " + _FUTURE + r"\b", re.I)
+WAKE_REASON = (
+    "This reply waits on PR state (CI, review or merge), but nothing recorded can "
+    "re-invoke this session: the detached poller only records state for the next "
+    "prompt (ai-config#4790). Arm a wake before ending the turn: send_later, "
+    "ScheduleWakeup, a trigger routine, or subscribe_pr_activity.")
 POLL_SECONDS = 120
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
 
@@ -47,6 +64,21 @@ def unwrap_command(cmd):
             return cmd.replace('\\n', '\n').replace('\\"', '"')
     return cmd
 
+def opens_pr(name, args):
+    """True when a tool call opens a PR: a `create_pull_request` tool, or a
+    shell command running `gh pr create`.
+
+    Only the tool name and its command field are read. An Edit or Write whose
+    text mentions `gh pr create` opens nothing (ai-config#5979).
+    """
+    if CREATE_TOOL.search(name or ""):
+        return True
+    if not isinstance(args, dict):
+        return False
+    cmd = unwrap_command(args.get("command") or args.get("CommandLine") or args.get("cmd") or "")
+    return bool(GH_PR_CREATE.search(cmd))
+
+
 def records(path):
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
@@ -62,11 +94,11 @@ def records(path):
 def pending(path):
     opened = armed = False
     for record in records(path):
-        blobs = []
+        calls = []
         if record.get("type") == "assistant" or record.get("role") == "assistant":
             for block in (record.get("message") or {}).get("content") or record.get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
-                    blobs.append(block.get("name", "") + " " + json.dumps(block.get("input") or {}))
+                    calls.append((block.get("name", ""), block.get("input") or {}))
         if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
             for block in (record.get("tool_calls") or []):
                 if isinstance(block, dict):
@@ -81,13 +113,35 @@ def pending(path):
                         args = {}
                     cmd = args.get("CommandLine") or args.get("command") or args.get("cmd") or ""
                     cmd = unwrap_command(cmd)
-                    blobs.append(name + " " + json.dumps({**args, "command": cmd}))
-        for blob in blobs:
-            if OPEN.search(blob):
+                    calls.append((name, {**args, "command": cmd}))
+        for name, args in calls:
+            if opens_pr(name, args):
                 opened, armed = True, False
-            if opened and SCHEDULE.search(blob):
+            if opened and SCHEDULE.search(name + " " + json.dumps(args)):
                 armed = True
     return opened and not armed
+
+
+def last_reply(path):
+    """The text of the transcript's last assistant record that has text, or ''.
+
+    Claude Code writes each content block as its own record, so the closing
+    reply is often followed by a tool-only record (a final tool call). Those
+    records are skipped on purpose: the reply is the last text written.
+    """
+    text = ""
+    for record in records(path):
+        if record.get("type") != "assistant" and record.get("role") != "assistant":
+            continue
+        content = (record.get("message") or {}).get("content") or record.get("content") or []
+        if isinstance(content, str):
+            text = content
+            continue
+        parts = [block.get("text", "") for block in content
+                 if isinstance(block, dict) and block.get("type") == "text"]
+        if parts:
+            text = "\n".join(parts)
+    return text
 
 
 PR_URL = re.compile(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+")
@@ -98,7 +152,12 @@ def monitor_path(url):
 
 
 def extract_pr_urls(path):
-    """Extract PR URLs strictly produced by gh pr create / create_pull_request tool calls."""
+    """PR URLs from the results of PR-opening tool calls (see `opens_pr`).
+
+    A URL is read only from such a call's result, never from a tool's input,
+    so an Edit or a `gh pr view` that names a PR URL adds nothing
+    (ai-config#5979).
+    """
     urls = []
     pending_tool_ids = set()
     pending_open = False
@@ -117,13 +176,11 @@ def extract_pr_urls(path):
         if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
             for tc in record.get("tool_calls") or []:
                 if isinstance(tc, dict):
-                    blob = (tc.get("name") or "") + " " + json.dumps(tc.get("args") or tc.get("input") or {})
-                    if OPEN.search(blob):
+                    args = tc.get("args") or tc.get("input") or {}
+                    if isinstance(args, str):
+                        args = {"command": args}
+                    if opens_pr(tc.get("name") or "", args):
                         pending_open = True
-                        for match in PR_URL.finditer(blob):
-                            u = match.group(0)
-                            if u not in urls:
-                                urls.append(u)
 
         # Antigravity tool result or generic output text
         if pending_open and (record.get("source") in {"MODEL", "SYSTEM"} or record.get("type") in {"GENERIC", "USER_INPUT"}):
@@ -141,17 +198,12 @@ def extract_pr_urls(path):
                 continue
             btype = block.get("type")
             if btype == "tool_use":
-                blob = block.get("name", "") + " " + json.dumps(block.get("input") or {})
-                if OPEN.search(blob):
+                if opens_pr(block.get("name", ""), block.get("input") or {}):
                     tool_id = block.get("id")
                     if tool_id:
                         pending_tool_ids.add(tool_id)
                     else:
                         pending_open = True
-                    for match in PR_URL.finditer(blob):
-                        u = match.group(0)
-                        if u not in urls:
-                            urls.append(u)
             elif btype == "tool_result":
                 tool_id = block.get("tool_use_id")
                 if (tool_id and tool_id in pending_tool_ids) or pending_open:
@@ -383,6 +435,16 @@ def main():
         else:
             all_monitored = False
 
+    # The loop above reads start_monitor_for_url's three results: True started a
+    # poller, False means the PR's recorded poller is already alive (it stays
+    # monitored), and None means none could start (all_monitored = False).
+    # The poller is a record, not a wake: a reply that waits on PR state still
+    # needs something that re-invokes the session. stop_hook_active means this
+    # hook already blocked once this turn, so it does not block again.
+    if ((any_started or all_monitored) and not payload.get("stop_hook_active")
+            and WAITING.search(last_reply(transcript_path))):
+        print(json.dumps({"decision": "block", "reason": WAKE_REASON}))
+        return
     if any_started:
         print(json.dumps({"systemMessage": "No model scheduler was recorded, so a detached two-minute PR poller was started. It records GitHub state and injects changes on the next prompt; it cannot wake a terminated session."}))
         return

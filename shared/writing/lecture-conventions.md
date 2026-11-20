@@ -101,8 +101,12 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   See [`media-links-beside-content`](media-links-beside-content.md).
 - **Place each topic in the earliest course site whose readers need it.**
   See [`course-sequence`](course-sequence.md).
-- **Keep one example, one exercise, and bank the rest** (Ezra, 2026-11-19).
-  When examples or exercises repeat one idea with different numbers or data, keep one as a worked `#exm-` and one as an in-notes `#exr-`, and move the rest to the exercise bank for homeworks and exams.
+- **Sort redundant versions: example, exercise, lab exercise, then the bank** (Ezra, 2026-11-19, amended 2026-11-20).
+  When examples or exercises repeat one idea with different numbers or data, keep the first as a worked `#exm-` and the second as an in-notes `#exr-`.
+  The third may be a lab exercise, where the course has labs.
+  Move every version beyond those slots to the exercise bank for homeworks and exams:
+  the fourth and later where a lab takes the third, and the third and later where there is no lab exercise.
+  A lab never reuses a lecture example or exercise: labs have their own set, parallel to the lecture's.
   See [`course-repos`](../../memories/course-repos.md) for where the bank lives and how to move an item.
   Apply it to a passage you are editing, not as a sweep.
 - **Do not answer graded work in student-facing notes.**

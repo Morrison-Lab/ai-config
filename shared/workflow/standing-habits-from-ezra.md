@@ -55,9 +55,8 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   the agent twice recommended "merge them in the GitHub UI" and "type `mwc all` in a local session".
   Ezra: "I don't want to do things by hand", then "do not tell me to do this" and "nor this".
   Report the refusal as a measured fact, then fix or coordinate on the blocker, as the [ai-config#4304](https://github.com/Morrison-Lab/ai-config/issues/4304) work does.
-  `hooks/no-manual-step-ask.py` is wired to the `mcp__hearthbot__` reply tools only,
-  and its merge pattern has no UI or typed-word phrasing,
-  so this prose carries the rule until that gap is closed ([ai-config#5797](https://github.com/Morrison-Lab/ai-config/issues/5797)).
+  `hooks/no-manual-step-ask.py` denies those phrasings in a `mcp__hearthbot__` reply,
+  and its Stop registration blocks a plain final message that holds one, once per turn ([ai-config#5797](https://github.com/Morrison-Lab/ai-config/issues/5797)).
 - **Don't:** list the steps for him to perform, or ask him to hand-edit a file.
   Ezra, 2026-10-26, after a reply asked him to paste an `autoMode.allow` entry into `~/.claude/settings.json`: "never ask me to paste anything into a file;
   always give me a script-based command to run that does it for me".

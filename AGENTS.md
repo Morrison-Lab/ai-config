@@ -57,6 +57,10 @@ What you say about the state you stop in must be true, and any work that remains
 - **Say whether the session is done when reporting stopping point status**, confirming UMS ran (or no new learnings accumulated) and noticed follow-ups are filed;
   never say done with uncommitted, unpushed, or un-PRed changes, or open PRs the session authored ([`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md)).
 - **Run UMS before every pause**, first, before ending a turn to wait on anything (CI, a review round, a subagent, or an answer from the user), if learnings have accumulated ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
+  Every thread runs UMS before it is resolved, whoever resolves it,
+  and ends its last report with a `UMS executed:` line (Ezra, 2026-11-20).
+  `hooks/require-ums-before-resolve.py` denies a thread's own resolve without a UMS run,
+  and a resolve by thread id without that line in the thread's newest reply (ai-config#6027).
 - **Run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn;
   answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
 - **Terminate superseded and abandoned background tasks** (diagnostic commands, monitors, subagents) once their purpose is met, their findings are superseded, or the session moves on,

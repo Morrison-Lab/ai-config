@@ -77,6 +77,33 @@ try:
         assert urls == ["https://github.com/o/r/pull/10", "https://github.com/o/r/pull/20"], f"Got {urls}"
         ag_urls = subject.extract_pr_urls(ag_multi_pr)
         assert ag_urls == ["https://github.com/o/r/pull/30", "https://github.com/o/r/pull/40"], f"Got {ag_urls}"
+        # ai-config#5979: a tool's input is never a source. An Edit whose text
+        # names `gh pr create` and a PR URL opens nothing, and a PR body that
+        # cites another PR does not add that PR.
+        edited = transcript([
+            {"type": "tool_use", "id": "e1", "name": "Edit",
+             "input": {"new_string": "run gh pr create, then https://github.com/o/r/pull/77"}},
+            {"type": "tool_result", "tool_use_id": "e1", "content": "https://github.com/o/r/pull/78"},
+        ])
+        cited = transcript([
+            {"type": "tool_use", "id": "b1", "name": "Bash",
+             "input": {"command": "gh pr create --body 'Follows https://github.com/o/r/pull/5'"}},
+            {"type": "tool_result", "tool_use_id": "b1", "content": "https://github.com/o/r/pull/6"},
+        ])
+        mcp = transcript([
+            {"type": "tool_use", "id": "m1", "name": "mcp__github__create_pull_request",
+             "input": {"body": "Refs https://github.com/o/r/pull/8"}},
+            {"type": "tool_result", "tool_use_id": "m1", "content": "https://github.com/o/r/pull/9"},
+        ])
+        try:
+            assert subject.extract_pr_urls(edited) == [], subject.extract_pr_urls(edited)
+            assert not subject.pending(edited)
+            assert subject.extract_pr_urls(cited) == ["https://github.com/o/r/pull/6"]
+            assert subject.extract_pr_urls(mcp) == ["https://github.com/o/r/pull/9"]
+            assert subject.pending(mcp)
+        finally:
+            for p in (edited, cited, mcp):
+                os.unlink(p)
     finally:
         os.unlink(multi_pr)
         os.unlink(ag_multi_pr)

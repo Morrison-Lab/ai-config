@@ -2735,7 +2735,7 @@ MWR_MCP_ONLY_TEXT = (
 
 
 def mwr_mcp_input_problem(tool_input) -> str:
-    """"" when an MCP merge input is strict enough for an mwr-only merge, else why not.
+    """Return "" when an MCP merge input is strict enough for an mwr-only merge, else why not.
 
     Round 12: an mwr-only merge goes through the MCP merge tool alone, with
     every key in MWR_MCP_KEYS (so no `pull_number`, `number` or

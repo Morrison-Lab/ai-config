@@ -310,10 +310,8 @@ def sc_stale_state_ttl(hook_path):
     call_hook(hook_path, "git checkout -b feat/j", repo, sid)
     _run(repo, "checkout", "-q", "-b", "feat/j")
     _run(repo, "checkout", "-q", "-b", "feat/other7")
-    common_dir = _run(repo, "rev-parse", "--git-common-dir").stdout.strip()
-    if not os.path.isabs(common_dir):
-        common_dir = os.path.normpath(os.path.join(repo, common_dir))
-    key = hashlib.sha256(f"{sid}\n{common_dir}".encode()).hexdigest()[:16]
+    toplevel = _run(repo, "rev-parse", "--show-toplevel").stdout.strip()
+    key = hashlib.sha256(f"{sid}\n{toplevel}".encode()).hexdigest()[:16]
     state_path = os.path.join(tempfile.gettempdir(),
                               f".claude-branch-select-{key}.json")
     with open(state_path, "w", encoding="utf-8") as fh:
@@ -451,6 +449,74 @@ def sc_branch_shadowing_a_file_still_detects_drift(hook_path):
     return verdict_of(hso), hso.get("additionalContext", "")
 
 
+def _new_worktree(repo, branch):
+    """A worktree of `repo` on a new branch, in its own temp directory."""
+    parent = tempfile.mkdtemp()
+    _TMPDIRS.append(parent)
+    path = os.path.join(parent, "wt")
+    _run(repo, "worktree", "add", "-q", "-b", branch, path)
+    return path
+
+
+def _drifted_main_checkout(hook_path):
+    """A repo whose main checkout drifted off the branch this session
+    selected there, plus a second worktree on `feat/wt`."""
+    repo = _new_repo()
+    sid = _new_session()
+    call_hook(hook_path, "git checkout -b feat/sel", repo, sid)
+    _run(repo, "checkout", "-q", "-b", "feat/sel")
+    _run(repo, "checkout", "-q", "-b", "feat/moved")
+    wt = _new_worktree(repo, "feat/wt")
+    _write(wt, "base.txt", "changed\n")
+    _run(wt, "add", "base.txt")
+    return repo, wt, sid
+
+
+def sc_cd_into_other_worktree(hook_path):
+    """ai-config#3204: the main checkout drifted, but this commit runs in
+    another worktree after `cd`, where nothing drifted. Before the fix the
+    hook read the main checkout's branch and warned."""
+    repo, wt, sid = _drifted_main_checkout(hook_path)
+    hso = call_hook(hook_path, f"cd {wt} && git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
+def sc_git_dash_c_other_worktree(hook_path):
+    """The same, with `git -C <worktree>` in place of `cd`."""
+    repo, wt, sid = _drifted_main_checkout(hook_path)
+    hso = call_hook(hook_path, f"git -C {wt} commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
+def sc_selection_is_per_worktree(hook_path):
+    """A branch selected in the main checkout is not compared against a
+    commit in another worktree: each worktree has its own checkout."""
+    repo = _new_repo()
+    sid = _new_session()
+    call_hook(hook_path, "git checkout -b feat/here", repo, sid)
+    _run(repo, "checkout", "-q", "-b", "feat/here")
+    wt = _new_worktree(repo, "feat/there")
+    _write(wt, "base.txt", "changed\n")
+    _run(wt, "add", "base.txt")
+    hso = call_hook(hook_path, f"cd {wt} && git commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
+def sc_drift_inside_other_worktree(hook_path):
+    """The positive half: a branch selected in a worktree through `cd`, then
+    that worktree drifting, warns on a later `git -C` commit there."""
+    repo = _new_repo()
+    sid = _new_session()
+    wt = _new_worktree(repo, "feat/start")
+    call_hook(hook_path, f"cd {wt} && git checkout -b feat/k", repo, sid)
+    _run(wt, "checkout", "-q", "-b", "feat/k")
+    _run(wt, "checkout", "-q", "-b", "feat/k-moved")
+    _write(wt, "base.txt", "changed\n")
+    _run(wt, "add", "base.txt")
+    hso = call_hook(hook_path, f"git -C {wt} commit -m 'wip'", repo, sid)
+    return verdict_of(hso), hso.get("additionalContext", "")
+
+
 SHOULD_WARN = [
     ("W1", sc_incident, "TEST CASE: the incident, commit step"),
     ("W2", sc_incident_push, "TEST CASE: the incident, push step (sharper message)"),
@@ -479,6 +545,8 @@ SHOULD_WARN = [
      "`git switch` takes no pathspec, so a file-shaped operand is still a branch"),
     ("W10", sc_branch_shadowing_a_file_still_detects_drift,
      "a branch shadowing a filename is recorded, so later drift off it still warns"),
+    ("W11", sc_drift_inside_other_worktree,
+     "a selection made in a worktree via `cd` warns when that worktree drifts"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -501,6 +569,12 @@ SHOULD_STAY_SILENT = [
      "`git checkout .` is a pathspec restore, not a branch called `.`"),
     ("S15", sc_branch_shadowing_a_file_is_still_a_branch,
      "a name that is BOTH a branch and a file is a branch -- git prefers the branch"),
+    ("S16", sc_cd_into_other_worktree,
+     "`cd <worktree> &&` moves the commit out of the drifted main checkout"),
+    ("S17", sc_git_dash_c_other_worktree,
+     "`git -C <worktree>` moves the commit out of the drifted main checkout"),
+    ("S18", sc_selection_is_per_worktree,
+     "a selection in one worktree is not compared with another worktree's branch"),
 ]
 
 if not os.path.isfile(HOOK):
@@ -595,6 +669,25 @@ MUTATIONS = {
         [('        if branch and branch == selected:',
           "        if branch:")],
         {"S8"},
+    ),
+    "cd-moves-the-command": (
+        "a leading `cd <path>` moves where the git command after it runs",
+        [("        directory = _resolve(directory, _first_word(stripped, masked, cd.end()))",
+          "        pass")],
+        {"S16"},
+    ),
+    "dash-c-moves-the-command": (
+        "a `git -C <path>` moves where that git command runs",
+        [("        directory = _resolve(directory, word)",
+          "        pass")],
+        {"S17"},
+    ),
+    "selection-is-per-worktree": (
+        "the selection is keyed by worktree, not by the repository's shared "
+        "git directory",
+        [('    out = _git(cwd, ["rev-parse", "--show-toplevel"])',
+          '    out = _git(cwd, ["rev-parse", "--git-common-dir"])')],
+        {"S18"},
     ),
 }
 

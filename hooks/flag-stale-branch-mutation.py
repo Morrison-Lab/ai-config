@@ -56,17 +56,18 @@ Only an EXPLICIT selection counts: `git checkout <branch>` / `git checkout -b
 only at a git command position (never inside a quoted string, a comment, or a
 heredoc body -- see `_mask_noncommands`). Whenever this session's own Bash
 call contains one, its target branch is written to a small per-session,
-per-repository state file (`tempfile.gettempdir()`, keyed by a hash of the
-session id and the repository's `--git-common-dir`, matching
-`no-unauthorized-merge.py`'s `resolve_session_id` and per-repo registry
-pattern). Nothing else -- not a `commit`, not a `push`, not the subagent's own
+per-worktree state file (`tempfile.gettempdir()`, keyed by a hash of the
+session id and the worktree's `--show-toplevel`; the session id is found as
+in `no-unauthorized-merge.py`'s `resolve_session_id`). Nothing else -- not a `commit`, not a `push`, not the subagent's own
 commands under a different session id -- ever writes to it.
 
 A later Bash call carrying a MUTATING git command (`commit`, `merge`,
 `cherry-pick`, `revert`, `rebase`) or a `git push` naming an explicit branch
 is compared against that state, but ONLY by taking a fresh, live reading of
 the actually-checked-out branch at the moment of the hook call (`git branch
---show-current` in the tool's own `cwd`) -- never by reasoning about what the
+--show-current` in the directory the git command runs in: the tool's `cwd`,
+moved by any `cd <path>` before it and any `git -C <path>`, as
+`_command_dir` explains) -- never by reasoning about what the
 subagent, or anyone else, might have done. That is deliberate: the hook does
 not need to know WHO changed the branch, only that the checkout the session
 last explicitly selected and the checkout that is about to receive a mutation
@@ -120,6 +121,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -152,9 +154,14 @@ MUTATE = re.compile(
 )
 PUSH = re.compile(
     _CMD_START + _ENV + r"git\s+" + _GIT_FLAGS +
-    r"push(?![\w-])(?P<rest>[^\n;&|]*)",
+    r"(?P<sub>push)(?![\w-])(?P<rest>[^\n;&|]*)",
     re.MULTILINE,
 )
+# A `cd <path>` at a command position, and a `-C <path>` among git's own
+# flags. Both move where the git command after them runs (ai-config#3204).
+CD = re.compile(_CMD_START + r"cd\s+", re.MULTILINE)
+GIT_C = re.compile(r"(?:^|\s)-C\s*")
+SEPARATOR = re.compile(r"[;&|\n]")
 
 # `<<TAG` / `<<-TAG` / `<<'TAG'`, but never `<<<` (a herestring, no body).
 # Verbatim from `flag-unchained-branch-switch.py`'s proven heredoc stripper.
@@ -224,10 +231,60 @@ def _preprocess(command):
     """Heredoc bodies stripped, then quotes masked, then comments blanked --
     in that order, because a heredoc's own delimiter can be quoted (`<<'EOF'`)
     and must still be recognized before quote-masking would blank it away."""
-    text = _strip_heredocs(command)
-    text = _mask_quotes(text)
-    text = COMMENT.sub(lambda m: " " * len(m.group(0)), text)
-    return text
+    return _mask_noncommands(_strip_heredocs(command))
+
+
+def _mask_noncommands(stripped):
+    """Quotes and comments blanked in heredoc-stripped text. Both blanks keep
+    every character's position, so a span found in the result indexes the
+    same characters in `stripped`, where a quoted path is still readable."""
+    text = _mask_quotes(stripped)
+    return COMMENT.sub(lambda m: " " * len(m.group(0)), text)
+
+
+def _first_word(stripped, masked, start, end=None):
+    """The first shell word of `stripped[start:]`, ending at the next command
+    separator (found in `masked`, so a quoted `;` does not end it) or at
+    `end`. None when there is no word or it cannot be parsed."""
+    if end is None:
+        sep = SEPARATOR.search(masked, start)
+        end = sep.start() if sep else len(masked)
+    try:
+        words = shlex.split(stripped[start:end])
+    except ValueError:
+        return None
+    return words[0] if words else None
+
+
+def _resolve(base, path):
+    """`path` taken relative to `base`, or None when it cannot be known
+    without running the shell: no path, `cd -`, or a `$` or backtick
+    expansion. None makes the caller silent, never wrong."""
+    if base is None or not path or path == "-" or "$" in path or "`" in path:
+        return None
+    return os.path.normpath(os.path.join(base, os.path.expanduser(path)))
+
+
+def _command_dir(match, stripped, masked, cwd):
+    """The directory a matched git command runs in.
+
+    The hook's own `cwd` is where the Bash call starts, not where its git
+    commands run: `cd ../wt-x && git commit` commits in `../wt-x`, and so
+    does `git -C ../wt-x commit`. Reading the branch in `cwd` instead warned
+    on every commit made in another worktree (ai-config#3204). Each `cd`
+    before the match, then each `-C` among its git flags, moves the
+    directory in turn, as the shell and git apply them.
+    """
+    directory = cwd
+    for cd in CD.finditer(masked):
+        if cd.end() > match.start():
+            break
+        directory = _resolve(directory, _first_word(stripped, masked, cd.end()))
+    flags_end = match.start("sub")
+    for flag in GIT_C.finditer(masked, match.start(), flags_end):
+        word = _first_word(stripped, masked, flag.end(), flags_end)
+        directory = _resolve(directory, word)
+    return directory
 
 
 def _looks_like_pathspec(tok, cwd):
@@ -372,8 +429,14 @@ def _git(cwd, args, timeout=5):
 
 
 def _repo_id(cwd):
-    """A stable identity for the repository at `cwd`, or None outside one."""
-    out = _git(cwd, ["rev-parse", "--git-common-dir"])
+    """A stable identity for the worktree at `cwd`, or None outside one.
+
+    Each worktree has its own checked-out branch, so the selection is kept
+    per worktree, not per repository: `--git-common-dir`, shared by every
+    worktree, made a checkout in one worktree the selection compared against
+    a commit in another (ai-config#3204).
+    """
+    out = _git(cwd, ["rev-parse", "--show-toplevel"])
     if out is None:
         return None
     p = out.strip()
@@ -455,7 +518,8 @@ PUSH_NOTE = (
 
 def evaluate(command, cwd, session_id):
     """Return a warning message, or None."""
-    text = _preprocess(command)
+    stripped = _strip_heredocs(command)
+    text = _mask_noncommands(stripped)
 
     switch_matches = list(SWITCH.finditer(text))
     mutate_matches = list(MUTATE.finditer(text))
@@ -464,10 +528,8 @@ def evaluate(command, cwd, session_id):
     if not switch_matches and not mutate_matches and not push_matches:
         return None
 
-    repo_id = _repo_id(cwd)
-    if repo_id is None:
-        return None
-    state_path = _state_path(session_id, repo_id)
+    def where(match):
+        return _command_dir(match, stripped, text, cwd)
 
     if switch_matches:
         # An explicit switch anywhere in THIS call is recorded REGARDLESS of
@@ -481,39 +543,63 @@ def evaluate(command, cwd, session_id):
         # case must stay silent here. Whether it is safely CHAINED to what
         # follows it in this same command string is
         # flag-unchained-branch-switch.py's job, not this one's.
-        target = None
+        # Each switch is recorded for the worktree it runs in, the last one
+        # per worktree winning.
+        targets = {}
         for m in switch_matches:
-            branch = _selected_branch(m.group("rest"), m.group("sub"), cwd)
-            if branch:
-                target = branch
-        if target:
-            _save_state(state_path, target)
+            directory = where(m)
+            if directory is None:
+                continue
+            branch = _selected_branch(m.group("rest"), m.group("sub"), directory)
+            repo_id = _repo_id(directory) if branch else None
+            if repo_id:
+                targets[_state_path(session_id, repo_id)] = branch
+        for state_path, branch in targets.items():
+            _save_state(state_path, branch)
         return None
 
-    if not mutate_matches and not push_matches:
-        return None
+    for m in push_matches:
+        directory = where(m)
+        drift = _drift(directory, session_id) if directory else None
+        if drift is None:
+            continue
+        selected, actual = drift
+        branch = _push_target(m.group("rest"))
+        if branch and branch == selected:
+            return PUSH_NOTE.format(selected=selected, actual=actual, branch=branch)
 
-    selected = _load_state(state_path)
+    subs_by_dir = {}
+    for m in mutate_matches:
+        directory = where(m)
+        if directory:
+            subs_by_dir.setdefault(directory, set()).add(m.group("sub"))
+    for directory, subs in subs_by_dir.items():
+        drift = _drift(directory, session_id)
+        if drift:
+            selected, actual = drift
+            return MUTATE_NOTE.format(selected=selected, actual=actual,
+                                      sub=", ".join(sorted(subs)))
+
+    return None
+
+
+def _drift(directory, session_id):
+    """`(selected, actual)` when the worktree at `directory` has moved off
+    the branch this session last selected there, else None."""
+    repo_id = _repo_id(directory)
+    if repo_id is None:
+        return None
+    selected = _load_state(_state_path(session_id, repo_id))
     if selected is None:
         return None  # nothing explicitly selected yet this session
 
-    actual = _current_branch(cwd)
+    actual = _current_branch(directory)
     if actual is None:
         return None  # detached HEAD, or the read failed
 
     if actual == selected:
         return None  # no drift
-
-    for m in push_matches:
-        branch = _push_target(m.group("rest"))
-        if branch and branch == selected:
-            return PUSH_NOTE.format(selected=selected, actual=actual, branch=branch)
-
-    if mutate_matches:
-        subs = ", ".join(sorted({m.group("sub") for m in mutate_matches}))
-        return MUTATE_NOTE.format(selected=selected, actual=actual, sub=subs)
-
-    return None
+    return selected, actual
 
 
 def _read_payload() -> tuple[dict, bool]:

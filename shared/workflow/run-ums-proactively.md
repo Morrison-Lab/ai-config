@@ -317,7 +317,7 @@ Resolving a project thread removes its message box, so a learning not banked bef
 The same holds when a thread reports its work done.
 `AGENTS.md`'s "Leave every pause honest and resumable" ("Run UMS before every pause") already covers this, but nothing ran it: the `post-merge` and `wrap-up` skills include a UMS pass, and no event invoked them.
 
-Two mechanisms now do, both in `hooks/require-ums-before-resolve.py` (ai-config#4480):
+Three mechanisms now do, all in `hooks/require-ums-before-resolve.py` (ai-config#4480):
 
 - **Before resolve:** every `set_thread_resolved(true)` is denied when the transcript has no UMS tool call (a `ums` Skill or Agent dispatch, or a write under an ai-config memory or shared path) since the last user message.
   Run `ums`, end the reply with a `UMS executed: <what you recorded, or nothing to record>` line, then resolve.

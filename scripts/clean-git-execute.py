@@ -83,7 +83,10 @@ def claimed(comments, now):
         body = c.get("body") or ""
         if not CLAIM.search(body) or RELEASE.search(body):
             continue
-        at = datetime.fromisoformat(str(c.get("createdAt", "")).replace("Z", "+00:00"))
+        try:
+            at = datetime.fromisoformat(str(c.get("createdAt", "")).replace("Z", "+00:00"))
+        except ValueError:
+            return True  # a claim of unknown age keeps the branch
         if at.tzinfo is None:
             at = at.replace(tzinfo=timezone.utc)
         if now - at.timestamp() < CLAIM_WINDOW:

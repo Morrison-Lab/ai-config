@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tests for clean-git-execute.py on a real throwaway repository and origin.
 Run: python3 scripts/test_clean_git_execute.py"""
+import importlib.util
 import json
 import os
 import subprocess
@@ -121,6 +122,14 @@ with tempfile.TemporaryDirectory() as root:
     check("claimed row says why", "claim comment" in kept.get(("local", "claimed"), ""), True)
     check("a row that changed since the plan is kept", "unmerged" in local, True)
     check("the changed row says what it is now", kept.get(("local", "unmerged")), "now flag")
+
+spec = importlib.util.spec_from_file_location("clean_git_execute", EXECUTE)
+executor = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(executor)
+check("a claim with no readable timestamp keeps the branch",
+      executor.claimed([{"body": "hold off please", "createdAt": ""}], time.time()), True)
+check("an old claim does not", executor.claimed(
+    [{"body": "hold off please", "createdAt": OLD}], time.time()), False)
 
 if FAILS:
     print("\n".join(FAILS))

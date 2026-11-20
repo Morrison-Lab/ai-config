@@ -87,7 +87,10 @@ def is_main_name(name, names, remotes):
     origin/HEAD branch); `feat/main`, whose prefix is no remote, is not."""
     if name.startswith("refs/heads/"):
         return name[len("refs/heads/"):] in names
-    head, sep, tail = name.removeprefix("refs/remotes/").partition("/")
+    name = name.removeprefix("refs/remotes/")
+    head, sep, tail = name.partition("/")
+    if name in remotes or (sep and head in remotes and tail == "HEAD"):
+        return True  # `origin` and `origin/HEAD` name the remote's default branch
     return name in names or (bool(sep) and head in remotes and tail in names)
 
 
@@ -221,10 +224,15 @@ def named_fix_present(cwd, ref, value):
     return True, ""
 
 
-def why_not_needed(cwd, ref, env):
-    """None when the merge is allowed, else why it is routine."""
+def why_not_needed(cwd, ref, env, fetching=False):
+    """None when the merge is allowed, else why it is routine. `fetching`:
+    the command fetches main first, so the local ref may be stale."""
     if git(cwd, "merge-base", "--is-ancestor", ref, "HEAD")[0] == 0:
-        return None  # already merged: nothing changes
+        if not fetching:
+            return None  # already merged: nothing changes
+        return ("the command fetches main before merging, so the hook cannot "
+                "see what the merge brings in; run `git fetch` on its own, "
+                "then `git merge <remote>/<main>`")
     code, _out = git(cwd, "merge-tree", "--write-tree", "--no-messages", "HEAD", ref)
     if code != 0:
         return None  # (a) conflict (1), or old git / error: fail open
@@ -285,7 +293,9 @@ def evaluate(command, cwd, depth=0):
         for label, ref in main_targets(sub, rest, cur, fetched):
             if not git_out(cur, "rev-parse", "--verify", "-q", ref + "^{commit}"):
                 continue  # git itself will refuse an unknown ref
-            why = why_not_needed(cur, ref, genv or env)
+            fetching = sub == "pull" or (fetched is not None
+                                         and label.startswith("FETCH_HEAD"))
+            why = why_not_needed(cur, ref, genv or env, fetching)
             if why:
                 return DENY.format(segment=" ".join(argv), target=label,
                                    branch=branch, why=why)

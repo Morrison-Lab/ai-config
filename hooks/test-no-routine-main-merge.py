@@ -67,6 +67,8 @@ with tempfile.TemporaryDirectory() as root:
             ("git merge --no-edit origin/main", "deny"),
             ("git merge -m 'sync' origin/main 2>&1 | tail -1", "deny"),
             ("git merge refs/remotes/origin/main", "deny"),
+            ("git merge origin", "deny"),
+            ("git merge origin/HEAD", "deny"),
             ("git pull origin main", "deny"),
             ("git pull --no-rebase origin main", "deny"),
             ("git -C . merge origin/main", "deny"),
@@ -146,6 +148,19 @@ with tempfile.TemporaryDirectory() as root:
     # Already up to date: nothing changes.
     git("merge", "-q", "--no-edit", "origin/main", cwd=repo)
     check("up to date", run("git merge origin/main", repo), "allow")
+
+    # main moved on and nothing has fetched it yet: the local origin/main is an
+    # ancestor of HEAD, but a command that fetches first still brings main in.
+    commit(origin, "f.txt", "f\n", "Unfetched content (#44)")
+    for command, want in [
+            ("git pull origin main", "deny"),
+            ("git pull --no-rebase origin main", "deny"),
+            ("git fetch origin main && git merge --no-edit FETCH_HEAD", "deny"),
+            ("git merge origin/main", "allow")]:
+        check("unfetched: " + command, run(command, repo), want)
+    git("branch", "-q", "--set-upstream-to=origin/main", cwd=repo)
+    check("unfetched: bare pull", run("git pull", repo), "deny")
+    git("branch", "-q", "--unset-upstream", cwd=repo)
 
     # (c): main changed a workflow since the merge base.
     commit(origin, ".github/workflows/ci.yml", "on: push\n", "Add CI")

@@ -25,6 +25,9 @@ single just-merged PR rather than the whole session.)
 - "wrap up", "wrap up the session", "finish up", "let's close out", "done",
   "all done", "are we done?"
 - The end of a multi-PR / multi-issue session.
+- A bare "wrap up?" fires it too:
+  run the procedure, UMS pass included, rather than answering with a status summary
+  (2026-11-19: a status-only reply drew "`wrap up` should include a final ums").
 
 ## Procedure
 
@@ -55,9 +58,11 @@ git log --oneline -5 origin/main           # what actually landed on main
   (`LIST_PRS`).
 - **Merge conflict sweep.** Before closing out, check every open PR's
   `mergeable` field.
-  Filter the list by `memories/reviewing-prs.md`'s scope test first, as
-  `ardia` step 1 does; report an out-of-scope conflicting PR to the user and
-  leave it untouched (no comment, no push).
+  Filter the list by `memories/reviewing-prs.md`'s scope test first:
+  save the same `gh pr list` call's `--json` output unfiltered to a file, with `--limit 100` and no `--jq`,
+  and pipe it into `python3 scripts/pr-scope.py` with the `--user`, `--alias`, `--requested` and `--excluded` flags `ardia` step 1 defines.
+  Keep the saved list, since the script's output has no `mergeable` field.
+  Report an out-of-scope conflicting PR to the user and leave it untouched (no comment, no push).
   For each in-scope PR with `mergeable == "CONFLICTING"` **or
   `"UNKNOWN"`** (see `resolve-conflicts`, "Verify before you act" —
   `UNKNOWN` can mean GitHub hasn't finished computing yet), verify with

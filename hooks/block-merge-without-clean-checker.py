@@ -59,6 +59,16 @@ fixed or its input corrected, then re-run.
 The one path past condition 2 is the USER'S OWN TYPED WORDS: an explicit
 "merge it anyway" (or "override the merge check") in a user-role text block,
 including a relayed `<cited author="user">` entry (Ezra, 2026-11-02, epi202#4).
+A wake message that declares a trust other than `principal`, or a sender
+other than `human`, is skipped; one that declares neither is read. A
+decision-card tap is not typed words either, since the agent wrote the card.
+
+A second path is a waiver he TAPS on a decision card (Ezra, 2026-11-19,
+ai-config#5892: a repository with no workflows and no review bot can never
+pass the checker, and his tapped waiver on quarto.test.book#7 and
+test.quarto.website#3 was refused). The agent writes a card's text, so a tap
+is held to more than typed words are: `tapped_waivers` lists the conditions,
+and the waiver covers only the pull requests the card names.
 The agent cannot supply it: the coordinator's `<note>`, a cited coordinator
 entry, system reminders, tool results and the assistant's prose never count,
 and a negated phrase does not. Condition 1 (PR, repo, 40-character sha pin)
@@ -75,6 +85,17 @@ inert.
 
 LIMITS
 ------
+* The typed path reads a wake's `<message>` elements as the harness wrote them.
+  If a harness ever left a literal `</message>` unescaped inside a peer
+  message's body, the text after it would read as a new element.
+* A tap is told from typed words by its shape alone. A whole message the user
+  types that opens with `Chose "`, holds `" on the decision card asking "`
+  and ends with a quote mark is read as a tap and gives no override.
+* The trust and sender checks read the whole `<message>` tag, so the user's
+  own message is skipped if another attribute's value holds text such as
+  `trust=peer`. Both limits refuse a merge and never allow one.
+* A wake `<message>` with neither a `trust` nor a `from` attribute is read, as
+  it was before those attributes were checked.
 * A relayed line is trusted as relayed: a session that forges a message-reading
   result is outside what a transcript can show. The sha tie still means the
   line must name the exact head being merged.
@@ -85,6 +106,7 @@ LIMITS
 * Fails OPEN when the payload or transcript is unreadable (some harnesses
   supply no transcript); a broken `shellcmd` import writes one STDERR line.
 """
+import html
 import json
 import os
 import re
@@ -130,6 +152,13 @@ except Exception as _exc:  # broken install: degrade, never block
     print(f"block-merge-without-clean-checker: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); no gate will run", file=sys.stderr)
     simple_commands = strip_env = shell_c_expansions = None
+try:
+    import card_answer
+except Exception as _exc:  # no tap parser: a tapped waiver is never read
+    print(f"block-merge-without-clean-checker: cannot load "
+          f"scripts/lib/card_answer.py ({_exc}); tapped waivers are refused",
+          file=sys.stderr)
+    card_answer = None
 
 SHELL_TOOLS = frozenset({"Bash", "bash", "PowerShell", "run_command",
                          "execute_command", "terminal", "shell"})
@@ -461,8 +490,143 @@ RX_CLAUSE_START = re.compile(r"[.!?;\n]")
 RX_STRIP = re.compile(
     r"<system-reminder>.*?</system-reminder>"
     r"|<note>.*?</note>"
-    r"|<cited\b[^>]*author=\"(?!user\")[^\"]*\"[^>]*>.*?</cited>",
+    r"|<cited\b[^>]*author=\"(?!user\")[^\"]*\"[^>]*>.*?</cited>"
+    # A wake message that declares a trust other than the principal's (a peer
+    # session's, a bot's), or a sender other than the human, is not the user's
+    # words. One that declares neither is kept, as before this rule. The
+    # attribute may be quoted either way or not at all, with spaces round its
+    # `=`; `data-trust` is a different attribute and is not read.
+    # ANY such declaration that is not exactly the allowed value drops the
+    # message, so a second attribute or a look-alike inside another
+    # attribute's value cannot rescue it.
+    r"|<message\b(?=[^>]*(?<![\w-])trust\s*="
+    r"(?!\s*[\"']?principal[\"']?(?=[\s/>])))[^>]*>.*?</message>"
+    r"|<message\b(?=[^>]*(?<![\w-])from\s*="
+    r"(?!\s*[\"']?human[\"']?(?=[\s/>])))[^>]*>.*?</message>",
     re.IGNORECASE | re.DOTALL)
+# A decision-card tap arrives as a body that reads, in full, `Chose "<label>"
+# on the decision card asking "<question>"`. The agent wrote the label and the
+# question, so neither is the user's TYPED words: a body that is exactly a tap
+# is dropped whole. A typed sentence that merely holds the word "chose" stays.
+RX_TAP_BODY = re.compile(
+    r'\A\s*Chose ".*?" on the decision card asking ".*"\s*\Z', re.DOTALL)
+RX_ELEMENT = re.compile(
+    r"(<(message|cited)\b[^>]*>)(.*?)(</\2>)", re.IGNORECASE | re.DOTALL)
+
+
+def _is_tap(body):
+    return bool(RX_TAP_BODY.match(html.unescape(body)))
+
+
+def _typed_text(text):
+    """*text* with everything the user did not type removed."""
+    text = RX_STRIP.sub(" ", text)
+    if _is_tap(text):
+        return ""
+    return RX_ELEMENT.sub(
+        lambda m: " " if _is_tap(m.group(3)) else m.group(0), text)
+
+
+# --- a waiver tapped on a decision card (Ezra, 2026-11-19, ai-config#5892) ---
+# The tapped label is the waiver and nothing else: "Waive the check", with at
+# most ", merge it" (or both, them, all) after it. A condition
+# ("... only after CI is green"), a hold ("Hold; waive the check later") or a
+# negation ("Do not waive the check") is not that label.
+RX_WAIVE_LABEL = re.compile(
+    r"\A\s*waive\s+the\s+check(?:\s*,\s*merge\s+(?:it|both|them|all))?[\s.]*\Z",
+    re.IGNORECASE)
+# Another option must decline. Its label is one of a fixed few and nothing
+# else ("Hold it", "Hold", "Hold both", "No", "Not now"), and its consequence
+# names no way of going ahead, so "Skip the checker, land it now" and a
+# "Hold it" whose consequence merges are both refused.
+RX_DECLINE_LABEL = re.compile(
+    r"\A\s*(?:hold(?:\s+(?:it|both))?|no|not\s+now)[\s.]*\Z",
+    re.IGNORECASE)
+RX_PROCEEDS = re.compile(
+    r"\b(?:merg|waiv|ship|overrid|land|push|squash|rebas|proceed|go\s+ahead)",
+    re.IGNORECASE)
+# The tapped option's consequence is "I merge <ref>", with further refs joined
+# by a comma or "and", and nothing else. A ref is `owner/repo#N` or a
+# github.com pull URL. A fixed form leaves no room for a condition ("... once
+# CI is green") or for a pull request named only to be left alone.
+_REF = (r"(?:(?:https?://)?github\.com/[\w.-]+/[\w.-]+/pull/\d+"
+        r"|[\w.-]+/[\w.-]+#\d+)")
+RX_WAIVE_CONSEQUENCE = re.compile(
+    r"\A\s*I\s+merge\s+" + _REF
+    + r"(?:(?:\s*,\s*and\s+|\s*,\s*|\s+and\s+)" + _REF + r")*\s*\.?\s*\Z",
+    re.IGNORECASE)
+RX_CARD_PR = re.compile(
+    r"github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)\b"
+    r"|(?<![\w/.-])([\w.-]+/[\w.-]+)#(\d+)\b",
+    re.IGNORECASE)
+
+
+def _declines(option):
+    """True when a card *option* is a plain way to say no."""
+    label = str(option.get("label") or "")
+    consequence = str(option.get("consequence") or "")
+    return bool(RX_DECLINE_LABEL.match(label)
+                and not RX_PROCEEDS.search(consequence))
+
+
+def tapped_waivers(path):
+    """{(repo, number)} the user waived the checker for by tapping a card.
+
+    A tap counts only when ALL of these hold; anything else yields nothing:
+
+    * `scripts/lib/card_answer.py` reads it as a verified tap (the top-level
+      `decision-chosen` wake with the platform's note that the tap came from
+      the member's own client). A relayed tap carries no card and is refused.
+    * This transcript holds the `request_decision` call that posted the card,
+      and the tapped label is that card's option at the tapped index.
+    * The tapped label is the waiver and nothing else (`RX_WAIVE_LABEL`).
+    * Another option on the card declines: its label is exactly "Hold it"
+      (or "Hold", "Hold both", "No", "Not now"; `RX_DECLINE_LABEL`) and its
+      consequence names no way of going ahead (`RX_PROCEEDS`), so the user
+      had a way to say no. The agent writes every label, and a card whose
+      options all merge proves nothing.
+    * The tapped option's consequence is "I merge <ref>", with further refs
+      joined by a comma or "and", and nothing else (`RX_WAIVE_CONSEQUENCE`).
+      The waiver covers the pull requests named there and no other; the
+      card's question, where one may be named only as background, is not read.
+
+    LIMIT: the hook cannot judge prose. It checks that the card had this
+    fixed shape; the user reading the card is what makes the tap a decision.
+    """
+    if card_answer is None:
+        return set()
+    pending, cards, waived = {}, {}, set()
+    for rec in _records(path):
+        if rec.get("isSidechain"):
+            continue
+        card_answer.track_cards(rec, pending, cards)
+        role = rec.get("type") or (rec.get("message") or {}).get("role")
+        if role not in ("user", "USER_INPUT"):
+            continue
+        msg = rec.get("message") if isinstance(rec.get("message"), dict) else {}
+        prompt = card_answer.prompt_text(msg.get("content"))
+        for option, _question, did, idx in card_answer.answers_in_prompt(prompt):
+            card = cards.get(did) if did else None
+            opts = card.get("options") if isinstance(card, dict) else None
+            if not isinstance(opts, list) or idx is None or idx >= len(opts):
+                continue
+            if not all(isinstance(o, dict) for o in opts):
+                continue
+            chosen = opts[idx]
+            if str(chosen.get("label") or "").strip() != option:
+                continue
+            if not RX_WAIVE_LABEL.match(option):
+                continue
+            others = [o for i, o in enumerate(opts) if i != idx]
+            if not any(_declines(o) for o in others):
+                continue
+            named = str(chosen.get("consequence") or "")
+            if not RX_WAIVE_CONSEQUENCE.match(named):
+                continue
+            for m in RX_CARD_PR.finditer(named):
+                waived.add(((m.group(1) or m.group(3)).lower(),
+                            int(m.group(2) or m.group(4))))
+    return waived
 
 
 def typed_override(path):
@@ -485,7 +649,7 @@ def typed_override(path):
         for b in _blocks(rec):
             if b.get("type") != "text":
                 continue
-            text = RX_STRIP.sub(" ", b.get("text") or "")
+            text = _typed_text(b.get("text") or "")
             for m in RX_OVERRIDE.finditer(text):
                 before = text[:m.start()]
                 starts = [s.end() for s in RX_CLAUSE_START.finditer(before)]
@@ -543,6 +707,7 @@ def main() -> int:
     try:
         found = evidence(path)
         overridden = typed_override(path)
+        waived = tapped_waivers(path)
     except Exception:
         return 0
 
@@ -572,6 +737,11 @@ def main() -> int:
         if not ok and overridden:
             print(f"block-merge-without-clean-checker: {target} merged on the "
                   "user's typed override; no checker pass was required",
+                  file=sys.stderr)
+            ok = True
+        if not ok and (repo.lower(), int(num)) in waived:
+            print(f"block-merge-without-clean-checker: {target} merged on the "
+                  "user's tapped waiver; no checker pass was required",
                   file=sys.stderr)
             ok = True
         if not ok:

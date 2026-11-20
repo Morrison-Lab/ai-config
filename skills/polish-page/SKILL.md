@@ -117,7 +117,7 @@ Do not sweep other pages (AGENTS.md, "No sweeps for new rules by default").
 
 ### 6. Ship
 
-- Small PRs: at most 10 files and 300 lines.
+- Small PRs: at most 20 files and 600 lines.
   Content and infrastructure never share one.
   Split a large page into stacked PRs (`stack-prs`).
 - Then `ardi` to clean.
@@ -132,6 +132,7 @@ Add a pointer to this skill only when the procedure changes.
 ## Relationship to other skills
 
 - [`send-notes`](../send-notes/SKILL.md): routes new content to a repo; this skill reworks an existing page.
+- [`dissolve-page`](../dissolve-page/SKILL.md): when the overlap survey says every piece of the page belongs elsewhere, dissolve it into its neighbors instead of polishing it.
 - [`find-overlap`](../find-overlap/SKILL.md): overlap between skills and memory, not notes pages.
 - [`use-preferred-style`](../use-preferred-style/SKILL.md), [`use-math-macros`](../use-math-macros/SKILL.md), [`fact-check-prose`](../fact-check-prose/SKILL.md): the rule skills this one calls.
 - `defer-issue`, `st`, `stack-prs`, `ardi`, `mwc`: the PR workflow around it.

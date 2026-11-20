@@ -41,7 +41,10 @@ if log:
         fh.write(json.dumps(args) + "\\n")
 
 if "view" in args:
-    print(os.environ.get("FAKE_GH_BRANCH", "parent-branch"))
+    # Answer as gh does: the raw value under --jq, else the --json object
+    # (the hook reads it through scripts/lib/pr_view.py, ai-config#4733).
+    branch = os.environ.get("FAKE_GH_BRANCH", "parent-branch")
+    print(branch if "--jq" in args else json.dumps({"headRefName": branch}))
     sys.exit(0)
 if "list" in args:
     if mode == "child":

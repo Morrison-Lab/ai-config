@@ -618,6 +618,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-switch-in-main-checkout.py\"",
+            "timeout": 20,
+            "script": "no-switch-in-main-checkout.py",
+            "why": "ai-config#4233, #3204: the main worktree of a repository with linked worktrees is read by other sessions and subagents, and a switch there left it on a fixer's branch with a stale index; denies git switch and a branch-changing git checkout there."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-delete-branch-under-stacked-pr.py\"",
             "timeout": 25,
             "script": "no-delete-branch-under-stacked-pr.py",
@@ -642,7 +649,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-oversized-pr-push.py\"",
             "timeout": 20,
             "script": "no-oversized-pr-push.py",
-            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 10 files or 300 lines against the merge base with the remote default branch (generated, lock, image and data paths not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 20 files or 600 lines against the merge base with the remote default branch, or for a stacked branch against the branch it is stacked on (generated, lock, image and data paths, and lines moved between files, not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch whose parent is not on the server or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
           },
           {
             "type": "command",
@@ -663,7 +670,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-with-failing-notes-checks.py\"",
             "timeout": 120,
             "script": "no-push-with-failing-notes-checks.py",
-            "why": "Coordinator, 2026-10-26: lds#1409, lds#1422 and lds#1424 each failed CI's check-term-links or check-new-line-breaks within an hour because the thread skipped the local run that lds .claude/project-memory.md already prescribes. DENIES a `git push` when the repo's own doc checks fail locally. It reads the repo's caller workflows for Morrison-Lab/gha check-term-links and check-new-line-breaks jobs and their literal `with:` inputs (so every notes repo is covered with no per-repo list), runs gha's own scripts at the pinned ref from a daily-refreshed cache in ~/.cache/ai-config/gha against origin/main, and names the findings. Clearable with an AI_CONFIG_SKIP_PUSH_CHECKS='<reason>' prefix (a bare 1 is refused; each bypass is appended to ~/.cache/ai-config/push-check-bypass.log). Fails open with a visible note when gha cannot be fetched, a check times out or origin/main is missing. Covers repos that only call the reusable workflow, the gap warn-new-line-breaks-on-push.py leaves (ai-config#3747)."
+            "why": "Coordinator, 2026-10-26: lds#1409, lds#1422 and lds#1424 each failed CI's check-term-links or check-new-line-breaks within an hour because the thread skipped the local run that lds .claude/project-memory.md already prescribes. DENIES a `git push` when the repo's own doc checks fail locally. It reads the repo's caller workflows for Morrison-Lab/gha check-term-links, check-new-line-breaks and check-title-references jobs and their literal `with:` inputs, and every diff-scoped `.gha/run-check/run-check.sh` line of a bundled-checks workflow such as lds's cluster-checks.yml (ai-config#4986), so every notes repo is covered with no per-repo list, runs gha's own scripts at the pinned ref (a bundled line runs only its own check's script, with no arguments, from a named ref, with only its prefix and a fixed set of suffixes, each value held to the form its suffix allows) from a daily-refreshed cache in ~/.cache/ai-config/gha against origin/main, and names the findings. Clearable with an AI_CONFIG_SKIP_PUSH_CHECKS='<reason>' prefix (a bare 1 is refused; each bypass is appended to ~/.cache/ai-config/push-check-bypass.log). Fails open with a visible note when gha cannot be fetched, a check times out or origin/main is missing. Covers repos that only call the reusable workflow, the gap warn-new-line-breaks-on-push.py leaves (ai-config#3747)."
           },
           {
             "type": "command",
@@ -1952,6 +1959,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-post-under-open-card.py\"",
+            "timeout": 10,
+            "script": "no-post-under-open-card.py",
+            "why": "ai-config#5969. Ezra, 2026-11-19: 'sometimes a card moves while I'm clicking and I click the wrong choice; can we avoid that?' and 'if you want to post something after a card, delete the card and repost it last'. A pds thread posted a message and checklist under a request_decision card; it shifted and he tapped the wrong option. Denies post_message, reply, update_message, edit_message, update_progress_checklist, post_widget and request_decision while the transcript holds an open card (a request_decision tool_result named its message_id and no close_decision or decision-chosen wake has closed it), and says to withdraw it with close_decision, post, then re-post the card last. A deny, not a reminder, because the state is decidable from the transcript (ai-config#4741). ALLOW_POST_UNDER_CARD=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-plain-text-choice.py\"",
             "timeout": 10,
             "script": "no-plain-text-choice.py",
@@ -2249,6 +2263,18 @@
             "timeout": 10,
             "script": "no-notes-blob-link.py",
             "why": "ai-config#5705. Ezra, 2026-11-16: 'when you hyperlink to content in the notes, can you prefer hyperlinking to the rendered github pages site (when the relevant content is up to date there)?' Denies a user-visible post, a forge comment, issue or PR body, or the --body/--title of a gh issue/pr post in Bash (ai-config#5706), that links github.com/Morrison-Lab/<notes repo>/blob/main/<path>.qmd, and suggests the rendered URL (a subfile maps to the page that includes it plus its first div id, read from a local checkout). Passes a link pinned to a branch or SHA, a non-.qmd or unrendered path (tools/, .github/, _extensions/, filters/, outtakes/), a #L or ?plain=1 source view, a URL in a code span or fence, and a line that says the content is not deployed yet or that the link points at source lines, text or file. A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_NOTES_BLOB_LINK=1 overrides. Fails open on parse trouble."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Monitor|mcp__github__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-tight-github-polling.py\"",
+            "timeout": 10,
+            "script": "no-tight-github-polling.py",
+            "why": "ai-config#5970. The account's shared 5,000-request hourly GitHub budget hit 0 twice on 2026-11-19, pausing every merge; the merge runner named CI watchers polling every few seconds in parallel threads. Ezra, 2026-11-19: \"you should be more proactive about fixing logjams like this\". DENIES gh pr checks --watch and gh run watch below a 120 s interval (gh defaults 10 s and 3 s), watch below it on a GitHub call, and while/until loops or sleeping for loops that call GitHub with under 120 s of sleep per pass; a for loop over at most five literal words (a retry) or one that never sleeps (a batch) passes. It also DENIES an identical GitHub read (an MCP read tool with the same arguments, or the same gh read command) repeated within 120 s in one session, 1800 s for check-run annotations, which the runner saw re-read several times per head; any GitHub write or git push clears the read log, and ALLOW_REPEAT_GITHUB_READ=1 overrides a Bash read. A deny, not a warning, because the guidance in monitor-pushed-heads.md (ai-config#5045) was read past (ai-config#4741). ALLOW_GITHUB_POLL=1 overrides; AI_CONFIG_GH_POLL_FLOOR tunes the floor. Fails open."
           }
         ]
       }

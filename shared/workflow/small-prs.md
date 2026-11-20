@@ -6,7 +6,9 @@ do them in minimal batches", and "every PR should be as small and focused as it 
 ## The rule
 
 - A PR solves its stated task completely and nothing else.
-- A PR changes at most 10 files and 300 lines (added plus deleted).
+- A PR changes at most 20 files and 600 lines (added plus deleted).
+  Ezra raised it from 10 and 300 on 2026-11-19 ("we need to raise the pr size limit so you stop bothering me").
+  A line moved unchanged between files is not counted, nor is a file whose every changed line moved.
   Generated, lock, `_freeze/`, image and data paths are not counted.
   A committed generator output counts until the repo's `.gitattributes` marks it `linguist-generated`;
   then neither the push hook nor gha's `check-pr-size` counts it, and GitHub folds it in review
@@ -26,6 +28,7 @@ do them in minimal batches", and "every PR should be as small and focused as it 
   Each batch is one concern, with its own issue and its own PR.
   Open the first batch, then the next, rather than one PR for all of them.
 - Stacked PRs are fine: each layer is small, and each names the layer it needs.
+  A layer is measured against the layer it is stacked on, not against `main`.
 - Content and infrastructure stay in separate PRs, as before.
 
 ## Measure early, and split by patch
@@ -41,6 +44,13 @@ that issue tracks both.
   Review fixes add tests, and tests alone carried a later branch from under the cap to 311 lines.
 - **Do:** carry a change onto a new base with `git diff <merge-base> <commit> -- <files> | git apply --index --3way`,
   then compare `git diff --cached --numstat` with the original branch's numstat for those files.
+  To move those files' changes off the original branch as well, save the same diff to a scratch file outside the worktree
+  and run `git apply -R --index --3way` with it on the original branch (2026-11-19).
+- **Don't:** use `git checkout <ref> -- <paths>` for it, since CC Safety Net blocks it.
+  In cc-safety-net 2.7.12 its message begins "git checkout <ref> -- <path> overwrites working tree with ref version".
+- **Do:** count `git diff --stat origin/main...HEAD` before the first push of a multi-skill edit, and plan the split then.
+  The pre-push hook caps a PR at 10 files and 300 lines (2026-11-19).
+- **Don't:** find the cap after a reviewed head is refused.
 - **Do:** after a split, open each file a part cites at `origin/main` and confirm the cited rule is there.
   A citation checked against the unsplit branch can point at text that only an unmerged sibling PR adds
   ([ai-config#5369](https://github.com/Morrison-Lab/ai-config/pull/5369)).
@@ -51,6 +61,11 @@ that issue tracks both.
   It worked for [#5814](https://github.com/Morrison-Lab/ai-config/pull/5814) (the tree matched [`59be24d`](https://github.com/Morrison-Lab/ai-config/commit/59be24d6a2163a412cc71c7c8e6a7dff2128ae01)) and [#5821](https://github.com/Morrison-Lab/ai-config/pull/5821) (2026-11-18).
 - **Don't:** reset or force-push the branch to drop the overflow commits, which erases the later heads' review record and breaks anyone tracking the branch.
 - **Don't:** leave the size check to the push.
+- **Do:** expect a merge of `main` into an over-cap branch to be refused when you resolve a conflict.
+  The hook lets a `main` merge through only when the branch's own diff text is unchanged, and a resolution changes it.
+  A PR that changes the cap is pushed under the installed hook's old cap until it merges, so ask Ezra on a card for an `ALLOW_LARGE_PR=1` push before the push, not after a second refusal
+  ([ai-config#5874](https://github.com/Morrison-Lab/ai-config/pull/5874) needed two such pushes, 2026-11-19).
+- **Don't:** reword a conflict's text to get under the hook: the rewording adds lines, and the refusal stays.
 - **Don't:** run `git checkout <commit> -- <file>` to carry a change onto a newer base.
   It carries the whole old file, so it silently reverts what `main` changed since the branch point
   (`hooks/hooks.json` lost 12 lines that way, and nothing failed).
@@ -58,11 +73,17 @@ that issue tracks both.
 ## The mechanisms
 
 - `hooks/no-oversized-pr-push.py` denies a `git push` of a branch over the cap, before CI is spent.
-  A pure rename (no line changed) does not count toward the file cap.
-  Clear it with an `ALLOW_LARGE_PR=1` prefix for a stacked branch whose base is not the default branch, or for a mechanical, content-identical move or split, and state why in the reply.
+  A pure rename (no line changed) does not count toward the file cap, and lines moved between files do not count at all.
+  A stacked branch is measured against its open PR's base, or on a first push against the nearest remote branch in its history that `main` lacks, read from the server when the clone has no tracking ref for it.
+  Clear it with an `ALLOW_LARGE_PR=1` prefix only for a stacked branch whose parent is not on the server or not in its history, or for a mechanical, content-identical PR the move detection misses, and state why in the reply.
+  On 2026-11-19 the hook measured a stacked layer, [#5926](https://github.com/Morrison-Lab/ai-config/pull/5926), against `origin/main`,
+  so the measured diff included the changes of its unmerged base, [#5947](https://github.com/Morrison-Lab/ai-config/pull/5947)
+  ([ai-config#5873](https://github.com/Morrison-Lab/ai-config/issues/5873)).
+  In that auto-mode session the classifier refused the prefix on the layer ("[Undermining Oversight]").
+  The layer's push succeeded only after #5947 merged: once `origin/main` was merged into the layer, the hook's measured diff held only the layer's changes, under the cap, and the push needed no prefix.
 - gha's `check-pr-size` ([gha#1188](https://github.com/Morrison-Lab/gha/issues/1188)) fails the same PR in CI.
   The `size-exempt` label lifts it; put it on a mechanical, content-identical PR.
-- The caps are a decision, recorded here: 10 files and 300 lines, tight on purpose after Ezra changed "waves" to "minimal batches".
-  The 300 was a starting value with no data behind it ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928)).
-  Before keeping it, measure it against the PRs that hit it.
+- The caps are a decision, recorded here: 20 files and 600 lines since 2026-11-19, doubled from the 10 and 300 set after Ezra changed "waves" to "minimal batches".
+  The 300 was a starting value with no data behind it ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928)), and the doubling is a judgment call Ezra can adjust.
+  gha's moved-line rule is not mirrored yet, so a split pushed under the hook still needs "mechanical, content-identical" in its PR body for CI.
   Change the caps and the `_fig-*` exemption in the hook, in the gha defaults and here together.

@@ -95,6 +95,40 @@ try:
         assert not os.path.exists(p2)
         # Verify PR 2 gets its own distinct state path and is not shadowed by PR 1
         assert p1 != p2
+
+        # ai-config#4009: an unreadable state file must not spawn a second
+        # poller; a missing one reads as empty and readable.
+        url3 = "https://github.com/o/r/pull/3"
+        p3 = subject.monitor_path(url3)
+        with open(p3, "w", encoding="utf-8") as stream:
+            stream.write("{not json")
+        assert subject.read_state(p3) == (None, False)
+        assert subject.start_monitor_for_url(url3, d) is False
+        assert subject.read_state(os.path.join(d, "missing.json")) == ({}, True)
+        # ...but one left unreadable past FRESH_SECONDS no longer blocks.
+        old = subject.time.time() - subject.FRESH_SECONDS - 5
+        os.utime(p3, (old, old))
+        assert subject.recently_written(p3) is False
+        assert subject.recently_written(os.path.join(d, "missing.json")) is False
+
+        # ai-config#4009: a poller yields when the state file names another
+        # live poller seen recently, and keeps polling otherwise.
+        import subprocess as _sp
+        import time as _time
+        other = _sp.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            now = _time.time()
+            assert subject.other_poller({"pid": other.pid, "checked_at": now}) is True
+            assert subject.other_poller({"pid": other.pid, "started_at": now}) is True
+            assert subject.other_poller({"pid": os.getpid(), "checked_at": now}) is False
+            stale = now - subject.FRESH_SECONDS - 5
+            assert subject.other_poller({"pid": other.pid, "checked_at": stale}) is False
+            assert subject.other_poller({"pid": 2 ** 30, "checked_at": now}) is False
+            assert subject.other_poller({}) is False
+        finally:
+            other.kill()
+            other.wait()
+    subject.STATE_DIR = orig_state_dir
 finally:
     os.unlink(opened)
     os.unlink(scheduled)
@@ -128,7 +162,9 @@ for _node in _ast.walk(_tree):
                       and k.value.id == "NO_WINDOW" for k in _node.keywords)
         if not _passes:
             _bare.append(_node.lineno)
-assert _seen >= 3, f"matched only {_seen} subprocess calls; expected the 3 in the file"
+# Two since ai-config#4733: `_run` (which every `gh pr view` read goes through,
+# via scripts/lib/pr_view.py) and the `--poll` Popen.
+assert _seen >= 2, f"matched only {_seen} subprocess calls; expected the 2 in the file"
 assert not _bare, f"subprocess calls without NO_WINDOW at lines {_bare}"
 
 print("PASS: detects an unmonitored PR, gives each PR a stable timer state file, and guards Windows process liveness and NO_WINDOW")

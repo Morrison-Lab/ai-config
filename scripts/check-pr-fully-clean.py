@@ -5228,25 +5228,32 @@ def check_mwr_ci_edits(pr) -> List[str]:
 
     Fails closed: a file list that cannot be read, or that reaches the
     endpoint's cap, blocks too. A rename counts on both its old and new path.
+    Each line is one file entry, with a rename's old path after a tab, so the
+    cap is counted in entries, as the endpoint counts it.
     """
     cmd = ["gh", "api", f"repos/{pr.repo}/pulls/{pr.pr_num}/files",
-           "--paginate", "--jq", ".[] | .filename, (.previous_filename // empty)"]
+           "--paginate", "--jq",
+           '.[] | [.filename, (.previous_filename // empty)] | join("\\t")']
     try:
         raw = fetch(cmd)
     except (RuntimeError, PayloadError) as exc:
         return [f"mwr could not read the PR's changed files ({exc}), so it cannot "
                 f"rule out a change to the CI under {MWR_CI_DIR}; merge it under "
                 "mwc instead (ai-config#3946)"]
-    names = [line.strip() for line in str(raw or "").splitlines() if line.strip()]
+    entries = [line for line in str(raw or "").splitlines() if line.strip()]
+    names = [n.strip() for line in entries for n in line.split("\t") if n.strip()]
     if not names:
         return [f"mwr read no changed files for this PR, so it cannot rule out a "
                 f"change to the CI under {MWR_CI_DIR}; merge it under mwc instead "
                 "(ai-config#3946)"]
-    if len(names) >= PR_FILES_CAP:
+    if len(entries) >= PR_FILES_CAP:
         return [f"the PR's file list reached the endpoint's cap ({PR_FILES_CAP}), "
                 f"so mwr cannot rule out a change under {MWR_CI_DIR}; merge it "
                 "under mwc instead (ai-config#3946)"]
-    edits = sorted({n for n in names if n.lower().startswith(MWR_CI_DIR)})
+    # A path that is `.github` itself (a submodule, or a file replacing the
+    # directory) changes the CI as surely as a path under it.
+    edits = sorted({n for n in names
+                    if n.lower() == MWR_CI_DIR.rstrip("/") or n.lower().startswith(MWR_CI_DIR)})
     if not edits:
         return []
     shown = ", ".join(edits[:5]) + (" ..." if len(edits) > 5 else "")

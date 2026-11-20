@@ -327,9 +327,12 @@ class PayloadFetcher:
                 if isinstance(item, str):
                     names.append(item)
                 elif isinstance(item, dict) and isinstance(item.get("filename"), str):
-                    names.append(item["filename"])
+                    # One line per entry, a rename's old path after a tab,
+                    # in the shape of the checker's --jq query.
+                    entry = item["filename"]
                     if isinstance(item.get("previous_filename"), str):
-                        names.append(item["previous_filename"])
+                        entry += "\t" + item["previous_filename"]
+                    names.append(entry)
                 else:
                     raise PayloadError(
                         f"payload 'pr_files[{i}]' must be a path or an object "

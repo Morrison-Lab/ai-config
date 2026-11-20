@@ -238,7 +238,8 @@ def deleted_base_merged(cwd, ref, name, subjects):
     remote and that main merged after the branch forked. The PR's old
     pull_request runs still name it, so re-running them fails at `git fetch`
     (ai-config#6001, lds#2913)."""
-    if not name or name in default_names(cwd) or not re.fullmatch(r"[\w./-]+", name):
+    if (not name or name == "HEAD" or name.endswith("/HEAD") or name in default_names(cwd)
+            or not re.fullmatch(r"[\w./-]+", name)):
         return False, f"base:{name} names no stacked base"
     remotes = remote_names(cwd)
     remote = ref.removeprefix("refs/remotes/").split("/", 1)[0]
@@ -252,10 +253,15 @@ def deleted_base_merged(cwd, ref, name, subjects):
     merged = re.compile(rf"^Merge pull request #\d+ from [\w.-]+/{re.escape(name)}$")
     if any(merged.match(s) for s in subjects):
         return True, ""
+    # A fast-forward or rebase merge leaves no merge subject, only the stale
+    # tracking ref, whose tip main then holds. A symbolic ref (origin/HEAD)
+    # is never a base. A squash merge gives main a new commit, so it leaves
+    # no trace this can read and is denied: fail closed.
     stale = f"refs/remotes/{remote}/{name}"
-    if (git_out(cwd, "rev-parse", "--verify", "-q", stale + "^{commit}")
+    if (git_out(cwd, "symbolic-ref", "-q", stale) is None
+            and git_out(cwd, "rev-parse", "--verify", "-q", stale + "^{commit}")
             and git(cwd, "merge-base", "--is-ancestor", stale, ref)[0] == 0
-            and git(cwd, "merge-base", "--is-ancestor", stale, "HEAD")[0] != 0):
+            and git(cwd, "merge-base", "--is-ancestor", ref, "HEAD")[0] != 0):
         return True, ""
     return False, f"main has no merge of base {name} that the branch lacks"
 

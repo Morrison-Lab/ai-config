@@ -188,22 +188,42 @@ with tempfile.TemporaryDirectory() as root:
     for command, want in [("MERGE_MAIN_FOR=base:stackbase" + M, "allow"),
                           (M[1:], "deny"), ("MERGE_MAIN_FOR=base:" + M, "deny"),
                           ("MERGE_MAIN_FOR=base:main" + M, "deny"),
+                          ("MERGE_MAIN_FOR=base:HEAD" + M, "deny"),
+                          ("MERGE_MAIN_FOR=base:origin/HEAD" + M, "deny"),
                           ("MERGE_MAIN_FOR=base:nosuch" + M, "deny"),
                           ("MERGE_MAIN_FOR=base:other" + M, "deny")]:
         check("deleted base: " + command, run(command, repo), want)
     # A branch deleted without merging is not (d), even with a stale local ref.
     git("branch", "-q", "-D", "other", cwd=origin)
     check("deleted unmerged base", run("MERGE_MAIN_FOR=base:other" + M, repo), "deny")
-    # A squash-merged base leaves only a stale tracking ref; it counts when main has it.
+    # A fast-forward-merged base leaves only a stale tracking ref; it counts when
+    # main has it, including for a child stacked on the base's own tip.
     git("switch", "-q", "-c", "sq", "main", cwd=origin)
-    sq = commit(origin, "q.txt", "q\n", "squash base")
+    commit(origin, "q.txt", "q\n", "ff base")
     git("switch", "-q", "main", cwd=origin)
+    git("fetch", "-q", "origin", cwd=repo)
+    git("switch", "-q", "-c", "child2", "origin/sq", cwd=repo)
+    commit(repo, "c2.txt", "c2\n", "child2 work")
     git("merge", "-q", "--ff-only", "sq", cwd=origin)
+    commit(origin, "m.txt", "m\n", "later main work")
     git("fetch", "-q", "origin", cwd=repo)
     git("branch", "-q", "-D", "sq", cwd=origin)
+    check("stale ref on main, child on base tip",
+          run("MERGE_MAIN_FOR=base:sq" + M, repo), "allow")
+    git("switch", "-q", "child", cwd=repo)
     check("stale ref on main", run("MERGE_MAIN_FOR=base:sq" + M, repo), "allow")
     git("update-ref", "-d", "refs/remotes/origin/sq", cwd=repo)
     check("no trace of base", run("MERGE_MAIN_FOR=base:sq" + M, repo), "deny")
+    # A squash merge gives main a new commit, so the stale ref is not on main.
+    git("switch", "-q", "-c", "sqx", "main", cwd=origin)
+    commit(origin, "x.txt", "x\n", "squash base")
+    git("switch", "-q", "main", cwd=origin)
+    git("fetch", "-q", "origin", cwd=repo)
+    git("merge", "-q", "--squash", "sqx", cwd=origin)
+    git("commit", "-q", "-m", "Squash base (#51)", cwd=origin)
+    git("fetch", "-q", "origin", cwd=repo)
+    git("branch", "-q", "-D", "sqx", cwd=origin)
+    check("squash-merged base", run("MERGE_MAIN_FOR=base:sqx" + M, repo), "deny")
 
 if FAILS:
     print("\n".join(FAILS))

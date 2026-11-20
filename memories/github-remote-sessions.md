@@ -599,7 +599,7 @@ Measured 2026-11-19 in a claude.ai cloud session.
 
 - **Do:** search issues over REST with `gh api -X GET search/issues -f q='repo:<owner>/<repo> is:issue <terms>'`.
   In a cloud session the query must include `is:issue` or `is:pull-request`.
-- **Don't:** omit the type qualifier in a cloud session: there `search/issues` answers 422 "Query must include 'is:issue' or 'is:pull-request'".
+- **Don't:** omit the type qualifier in a cloud session: there `search/issues` answers 422 "Query must include 'is:issue' or 'is:pull-request'". (2nd occurrence, 2026-11-20, an lds CI-logjam thread).
   The same query without it returned 200 from `gh` on a PC the same day, so the 422 is the cloud session's, not GitHub's everywhere.
 - **Do:** call `mcp__claude-code-remote__subscribe_pr_activity` with `pullNumber`, an integer.
 - **Don't:** pass `pr_number`, which is not the parameter name.

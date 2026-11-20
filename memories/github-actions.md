@@ -956,6 +956,24 @@ See [`claude-review-dispatch.md`](claude-review-dispatch.md)'s "`ai-config` auto
   Under such a group, being last is sufficient on its own.
 - **Don't:** read an absent `concurrency:` block in a caller as meaning its runs cannot be cancelled.
 
+## A concurrency group holds one pending job, so a busy group starves a rare job
+
+`cancel-in-progress: false` does not queue every run: GitHub keeps one running and one pending job per group.
+A newer job replaces the pending one, which ends `cancelled` with the annotation
+"Canceling since a higher priority waiting request for <group> exists".
+Measured 2026-11-20 on Morrison-Lab/lds ([gha#1759](https://github.com/Morrison-Lab/gha/issues/1759), lds#2262):
+the 6-hourly "Clean up PR Previews" run shares the `gh-pages` group with every preview deploy,
+two of three cleanups were replaced, gh-pages went unpruned for about 13 hours,
+and every Pages build then failed at the 1 GB artifact limit, so new previews returned 404.
+Preview deploys were replaced the same way, leaving a PR's preview missing after a green build.
+
+A job cancelled before it got a runner has no log: `get_job_logs` answers 404.
+Read the job's check-run annotations instead (`repos/<o>/<r>/check-runs/<job id>/annotations`), which carry the cancel reason.
+
+- **Do:** give a rare, must-run job its own group, `queue: max` (see the `queue` section below), or a re-run on that annotation.
+- **Do:** re-run a replaced preview deploy when its PR's preview 404s after a green build.
+- **Don't:** read a job's absent log as a runner failure, or a cancelled cleanup as harmless because the next one will run.
+
 ## Python Execution in Runner Environments
 
 - **Add `from __future__ import annotations` when a built-in generic type (`list[str]`, `dict[str, Any]`) appears in a function or variable annotation.**

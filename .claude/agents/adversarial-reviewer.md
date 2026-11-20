@@ -372,10 +372,9 @@ See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever
 
 ## GitHub polling that drains the shared budget
 
-On a transcript, skill, script or brief that waits for CI or re-reads GitHub, flag a poll faster than every two minutes (`gh pr checks --watch` or `gh run watch` with gh's default interval, `watch`, or a `while`/`until` loop around a GitHub call with a short `sleep`), and flag the same GitHub read repeated with nothing changed in between, above all a head's check-run annotations read more than once.
-Every session on the account shares one 5,000-request hourly budget, and both shapes emptied it twice on 2026-11-19 ([ai-config#5970](https://github.com/Morrison-Lab/ai-config/issues/5970)).
-Read the commands yourself; do not report the output of `hooks/no-tight-github-polling.py` as your finding.
-See [`monitor-pushed-heads`](../../shared/workflow/monitor-pushed-heads.md).
+Where a transcript, skill or script waits for CI, flag a GitHub poll faster than every two minutes (`gh pr checks --watch` at its default, `watch`, or a loop with a short `sleep`), which emptied the shared budget twice on 2026-11-19 ([ai-config#5970](https://github.com/Morrison-Lab/ai-config/issues/5970)).
+Also flag the same GitHub read repeated with nothing changed in between, above all a head's check-run annotations read more than once.
+Read the commands yourself rather than reporting the output of `hooks/no-tight-github-polling.py`, as [`monitor-pushed-heads`](../../shared/workflow/monitor-pushed-heads.md) says.
 
 ## Figures with a cut value axis
 

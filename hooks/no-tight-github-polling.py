@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """PreToolUse (Bash, Monitor, mcp__github__.*): deny polling that drains the GitHub budget.
 
-ai-config#5970: the account's shared 5,000-request hourly GitHub budget hit 0
-twice on 2026-11-19, pausing every merge, from CI watchers polling every few
-seconds in parallel threads. Guidance (monitor-pushed-heads.md, #5045) was read
-past, so this DENIES (#4741), below the floor `AI_CONFIG_GH_POLL_FLOOR` (120 s):
-`gh pr checks --watch` / `gh run watch` (defaults 10 s, 3 s), `watch` on a
-GitHub call, and `while`/`until` or sleeping `for` loops calling GitHub. A `for`
-over at most five literal words (a retry) or with no sleep (a batch) passes, as
-does a non-literal `sleep`. `ALLOW_GITHUB_POLL=1` overrides one command and
-`AI_CONFIG_NO_GITHUB_POLL_GUARD=1` disables it. Fails open, reporting on stderr.
+ai-config#5970: CI watchers polling every few seconds emptied the shared hourly
+GitHub budget twice on 2026-11-19. Denies (#4741), below `AI_CONFIG_GH_POLL_FLOOR`
+(120 s): `gh pr checks --watch`, `gh run watch`, `watch` on a GitHub call, and
+`while`/`until` or sleeping `for` loops calling GitHub. A retry `for` over at most
+five literal words, a `for` with no sleep, and a non-literal `sleep` pass.
+`ALLOW_GITHUB_POLL=1` overrides; `AI_CONFIG_NO_GITHUB_POLL_GUARD=1` disables.
+Writer and reviewer layers: shared/workflow/monitor-pushed-heads.md and
+.claude/agents/adversarial-reviewer.md. Fails open, reporting on stderr.
 
 It also denies a GitHub read identical to one this session made less than
 `AI_CONFIG_GH_REPEAT_COOLDOWN` (120 s) ago: the same MCP read tool with the
@@ -29,10 +28,8 @@ import sys
 import tempfile
 import time
 
-_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
-                    "scripts", "lib")
-if _LIB not in sys.path:
-    sys.path.insert(0, _LIB)
+_LIB = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "scripts", "lib")
+sys.path.insert(0, _LIB)
 try:
     from shellcmd import simple_commands
 except ImportError as exc:

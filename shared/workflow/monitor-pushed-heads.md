@@ -34,9 +34,7 @@ To list only the annotations that are not on the base, use `scripts/summarize-pr
 Read a head's annotations once, and reuse that result until the head changes:
 a completed run's annotations never change.
 The budget ran out twice more on 2026-11-19, from CI watchers polling every few seconds in parallel threads and from annotations re-read for the same head ([ai-config#5970](https://github.com/Morrison-Lab/ai-config/issues/5970)).
-`hooks/no-tight-github-polling.py` denies a GitHub poll faster than every 120 s, and an identical GitHub read repeated within 120 s (30 minutes for annotations).
 To wait for CI, subscribe to the PR or schedule one wake for when it should finish, and check `gh api rate_limit`, which costs nothing, before a batch of reads.
-The [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#github-polling-that-drains-the-shared-budget) checklist looks for both shapes too.
 
-- **Do:** subscribe to the PR, or poll no faster than every two minutes (`gh pr checks N --watch --interval 120`), and keep a head's annotations from the first read.
-- **Don't:** run `gh pr checks --watch` at its 10-second default, or loop `sleep 30` around a GitHub call, or read the same head's annotations again.
+- **Do:** subscribe to the PR, or poll no faster than every two minutes (`gh pr checks N --watch --interval 120`), and keep a head's annotations from the first read, as `hooks/no-tight-github-polling.py` and the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#github-polling-that-drains-the-shared-budget) checklist require.
+- **Don't:** run `gh pr checks --watch` at its 10-second default, loop a short `sleep` around a GitHub call, or read the same head's annotations again.

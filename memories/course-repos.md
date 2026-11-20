@@ -56,7 +56,8 @@ until someone makes that decision and retires the graded item.
 When a notes repo holds several examples or exercises that teach the same idea with different numbers or data, sort the versions in order.
 The first is a worked example (`#exm-`) and the second an in-notes exercise (`#exr-`).
 The third may be a lab exercise, and only as a different version: a lab never reuses a lecture example or exercise, because labs have their own set, parallel to the lecture's.
-Move the fourth and every later version to the evaluation repo's exercise bank (`exercises/` in `mlg`) for homeworks and exams.
+Move every version beyond those slots to the evaluation repo's exercise bank (`exercises/` in `mlg`) for homeworks and exams:
+the fourth and later where a lab takes the third, and the third and later where the course or topic has no lab exercise.
 
 - The move is intentional in the sense of the section above: the PR says so, the item and its solution leave the notes, and the item joins the question bank.
 - Never bank a version that stays in the notes (the example, the exercise or a lab exercise), and never leave a banked item's solution in the notes.

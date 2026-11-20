@@ -51,6 +51,7 @@ Nothing in the merge's output says files were removed: the only sign is a ` D` l
 
 - **Do:** after any failed merge in a partial clone, run `git status --porcelain` before anything else.
   Restore each ` D` path with `git show HEAD:<path> > <path>`, since the Safety Net hook blocks `git checkout <path>`.
+  That restores content but not the file mode, so `chmod +x <path>` any path that `git ls-tree HEAD <path>` lists as `100755`.
   Confirm `git status --porcelain` prints nothing, then run the merge again.
   The retry succeeded once the tree was clean.
 - **Don't:** read a merge that left no `MERGE_HEAD` as a merge that changed nothing, or commit on top of the deleted files.

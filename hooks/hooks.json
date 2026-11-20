@@ -2260,14 +2260,14 @@
         ]
       },
       {
-        "matcher": "Bash|Monitor",
+        "matcher": "Bash|Monitor|mcp__github__.*",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-tight-github-polling.py\"",
             "timeout": 10,
             "script": "no-tight-github-polling.py",
-            "why": "ai-config#5970. The account's shared 5,000-request hourly GitHub budget hit 0 twice on 2026-11-19, pausing every merge; the merge runner named CI watchers polling every few seconds in parallel threads. Ezra, 2026-11-19: \"you should be more proactive about fixing logjams like this\". DENIES gh pr checks --watch and gh run watch below a 120 s interval (gh defaults 10 s and 3 s), watch below it on a GitHub call, and while/until loops or sleeping for loops that call GitHub with under 120 s of sleep per pass; a for loop over at most five literal words (a retry) or one that never sleeps (a batch) passes. A deny, not a warning, because the guidance in monitor-pushed-heads.md (ai-config#5045) was read past (ai-config#4741). ALLOW_GITHUB_POLL=1 overrides; AI_CONFIG_GH_POLL_FLOOR tunes the floor. Fails open."
+            "why": "ai-config#5970. The account's shared 5,000-request hourly GitHub budget hit 0 twice on 2026-11-19, pausing every merge; the merge runner named CI watchers polling every few seconds in parallel threads. Ezra, 2026-11-19: \"you should be more proactive about fixing logjams like this\". DENIES gh pr checks --watch and gh run watch below a 120 s interval (gh defaults 10 s and 3 s), watch below it on a GitHub call, and while/until loops or sleeping for loops that call GitHub with under 120 s of sleep per pass; a for loop over at most five literal words (a retry) or one that never sleeps (a batch) passes. It also DENIES an identical GitHub read (an MCP read tool with the same arguments, or the same gh read command) repeated within 120 s in one session, 1800 s for check-run annotations, which the runner saw re-read several times per head; any GitHub write or git push clears the read log, and ALLOW_REPEAT_GITHUB_READ=1 overrides a Bash read. A deny, not a warning, because the guidance in monitor-pushed-heads.md (ai-config#5045) was read past (ai-config#4741). ALLOW_GITHUB_POLL=1 overrides; AI_CONFIG_GH_POLL_FLOOR tunes the floor. Fails open."
           }
         ]
       }

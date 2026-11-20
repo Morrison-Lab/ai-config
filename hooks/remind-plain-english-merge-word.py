@@ -209,25 +209,40 @@ def revokes(prompt: str) -> bool:
 # so a message holding one is no grant (round 3, finding 7).
 _MWR_REF = (
     r"(?:https?://github\.com/[\w.-]+/[\w.-]+/pull/\d+"
-    r"|PRs?\s*#?\d+"
+    r"|(?:PRs?|pulls?)\s*#?\d+"
     r"|(?:[\w.-]+/)?(?!issues?#)[A-Za-z][\w.-]*#\d+"
-    r"|#?\d+)"
+    r"|#\d+)"
 )
+# A bare number is no reference: "mwrs 2026" is a year or a typo, not PR
+# 2026, so it makes the message no grant. A number counts only after "#",
+# "PR" or "pull". References are separated by spaces, commas, "and", or an
+# Oxford ", and" ("mwr lds#1, mds#2, and pds#3").
 MWR_WHOLE = re.compile(
-    r"^\s*/?(?P<word>mwrs?)(?P<refs>(?:(?:\s*,\s*|\s+(?:and\s+)?)" + _MWR_REF + r")*)"
+    r"^\s*/?(?P<word>mwrs?)(?P<refs>(?:(?:\s*,\s*(?:and\s+)?|\s+(?:and\s+)?)" + _MWR_REF + r")*)"
     r"\s*[.!]*\s*$",
     re.I,
 )
 # One reference inside MWR_WHOLE's `refs` group.
 MWR_REF = re.compile(
     r"https?://github\.com/(?P<owner3>[\w.-]+)/(?P<repo3>[\w.-]+)/pull/(?P<n3>\d+)"
-    r"|PRs?\s*#?(?P<n2>\d+)"
+    r"|(?:PRs?|pulls?)\s*#?(?P<n2>\d+)"
     r"|(?:(?P<owner1>[\w.-]+)/)?(?P<repo1>[A-Za-z][\w.-]*)#(?P<n1>\d+)"
-    r"|#?(?P<n4>\d+)",
+    r"|#(?P<n4>\d+)",
     re.I,
 )
 # Words that name a kind of reference, never a repository: "mwr PR#5940".
-MWR_NOT_A_REPO = frozenset({"pr", "prs"})
+MWR_NOT_A_REPO = frozenset({"pr", "prs", "pull", "pulls"})
+# The PR references in a message, removed before MWR_REVOKE reads it, so a
+# repository whose name holds a withdrawal word ("Morrison-Lab/not-a-bug#1")
+# does not revoke its own grant. Only the reference goes: "mwr lds#5 not
+# yet" still revokes on "not".
+MWR_REF_TEXT = re.compile(
+    r"https?://github\.com/[\w.-]+/[\w.-]+/pull/\d+"
+    r"|(?<![\w.'/-])(?:[\w.-]+/)?[A-Za-z][\w.-]*#\d+"
+    r"|\b(?:PRs?|pulls?)\s*#?\d+"
+    r"|#\d+",
+    re.I,
+)
 # An mwr-only revocation: it clears the mwr grants and leaves mwc alone.
 # It fails toward revoking: ANY user message, with or without the mwr token,
 # that holds a withdrawal word ("never mind", "cancel that", "undo that",
@@ -408,10 +423,13 @@ def revokes_mwr(prompt: str) -> bool:
     the mwr token: "never mind", "cancel that", "stop mwr", "wait for review
     before merging". It fails toward revoking. Text in a system reminder,
     and a harness-written prompt, are not the user's and are not read.
+    PR references are removed first (MWR_REF_TEXT), so a repository name
+    such as "not-a-bug" is not read as a withdrawal.
     """
     if revokes(prompt):
         return True
-    return any(MWR_REVOKE.search(_mwr_text(body)) for body in user_bodies(prompt))
+    return any(MWR_REVOKE.search(MWR_REF_TEXT.sub(" ", _mwr_text(body)))
+               for body in user_bodies(prompt))
 
 
 MWR_BARE_REMINDER = (

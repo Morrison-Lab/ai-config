@@ -2308,6 +2308,29 @@ _MWR_CASES = [
      _ng_mcp(113, "mcsg"), "BLOCK"),
     ("'mwc' then 'stop mwr' keeps the mwc grant", [_tg_user("mwc"), _tg_user("stop mwr")],
      _ng_mcp(113, "mcsg"), "allow"),
+    # Cross-harness review: an Oxford-comma list grants every PR it names.
+    ("'mwr csci201#7, lds#5, and mcsg#113' grants mcsg#113",
+     [_tg_user("mwr csci201#7, lds#5, and mcsg#113")], _ng_mcp(113, "mcsg"), "allow"),
+    ("'mwr mcsg#113, and lds#5' grants mcsg#113",
+     [_tg_user("mwr mcsg#113, and lds#5")], _ng_mcp(113, "mcsg"), "allow"),
+    # Cross-harness review: a repository name holding a withdrawal word does
+    # not revoke its own grant, and a real withdrawal still revokes.
+    ("'mwr Morrison-Lab/not-a-bug#1' grants it",
+     [_tg_user("mwr Morrison-Lab/not-a-bug#1")], _ng_mcp(1, "not-a-bug"), "allow"),
+    ("'mwr not-a-bug#1' grants it",
+     [_tg_user("mwr not-a-bug#1")], _ng_mcp(1, "not-a-bug"), "allow"),
+    ("'mwr Morrison-Lab/not-a-bug#1' then 'stop' revokes it",
+     [_tg_user("mwr Morrison-Lab/not-a-bug#1"), _tg_user("stop")],
+     _ng_mcp(1, "not-a-bug"), "BLOCK"),
+    ("'mwr mcsg#113 not yet' grants nothing",
+     [_tg_user("mwr mcsg#113 not yet")], _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("'mwr mcsg#113' then 'mwr lds#5 not yet' revokes mcsg#113",
+     [_tg_user("mwr mcsg#113"), _tg_user("mwr lds#5 not yet")], _ng_mcp(113, "mcsg"), "BLOCK"),
+    # Cross-harness review: a bare number is no PR reference, so a message
+    # holding one beside the grant is not only the grant, and grants nothing.
+    ("'mwr mcsg#113 2026' grants nothing",
+     [_tg_user("mwr mcsg#113 2026")], _ng_mcp(113, "mcsg"), "BLOCK"),
+    ("'mwrs 2026' grants nothing", [_tg_user("mwrs 2026")], _ng_mcp(113, "mcsg"), "BLOCK"),
 ]
 print("mwr merge grant:")
 for _desc, _records, _merge, _want in _MWR_CASES:
@@ -2596,6 +2619,28 @@ for _desc, _records, _want in [
         _got = _mwr_grant_direct(_records, "Morrison-Lab/lds", 5)
     check(_got is _want)
     print(f"  {'ok' if _got is _want else 'WRONG':<6} {_desc}")
+
+# Cross-harness review: check_mcp_merge's annotation names every tuple shape
+# it returns, the 3-tuple that carries the mwr note included.
+import typing  # noqa: E402
+
+_shapes = set()
+for _arg in typing.get_args(typing.get_type_hints(_guard.check_mcp_merge)["return"]):
+    if typing.get_origin(_arg) is tuple:
+        _shapes.add(len(typing.get_args(_arg)))
+for _desc, _input in [
+    ("a denied MCP merge", {"owner": "Morrison-Lab", "repo": "mcsg", "pullNumber": 113}),
+    ("conflicting PR number keys",
+     {"owner": "Morrison-Lab", "repo": "mcsg", "pullNumber": 113, "pull_number": 114}),
+]:
+    _hit = _guard.check_mcp_merge({"tool_name": "mcp__github__merge_pull_request",
+                                   "tool_input": _input})
+    _ok = isinstance(_hit, tuple) and len(_hit) in _shapes
+    check(_ok)
+    print(f"  {'ok' if _ok else 'WRONG':<6} check_mcp_merge's annotation covers {_desc}")
+_ok = 3 in _shapes
+check(_ok)
+print(f"  {'ok' if _ok else 'WRONG':<6} check_mcp_merge's annotation covers the 3-tuple mwr note")
 
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))

@@ -2765,7 +2765,7 @@ def mwr_mcp_input_problem(tool_input) -> str:
     return ""
 
 
-def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
+def check_mcp_merge(payload: dict) -> tuple[str, str] | tuple[str, str, str] | None:
     tool_input = payload.get("tool_input")
     tool_input = tool_input if isinstance(tool_input, dict) else {}
     tool_name = payload.get("tool_name") or "mcp__github__merge_pull_request"

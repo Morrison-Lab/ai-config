@@ -95,7 +95,8 @@ committed pass.
   `UMS executed: <what was recorded, or nothing to record>`,
   so a coordinator reading the thread can see it ran
   (Ezra, 2026-11-20: "make sure every thread runs ums before you resolve it").
-  `hooks/require-ums-before-resolve.py` denies the resolve without that evidence
+  `hooks/require-ums-before-resolve.py` denies the thread's own resolve without a UMS run,
+  and a resolve by thread id unless the thread's newest reply carries that line
   ([ai-config#6027](https://github.com/Morrison-Lab/ai-config/issues/6027)).
 
 ## Procedure

@@ -49,9 +49,12 @@ def run(records, payload_extra, sentinel_dir, times=1):
     return outs if times > 1 else outs[0]
 
 
-def resolve(resolved=True, thread="cmsg_1"):
-    return {"hook_event_name": "PreToolUse", "tool_name": RESOLVE,
-            "tool_input": {"resolved": resolved, "thread_id": thread}}
+def resolve(resolved=True, thread=None):
+    """A thread resolving itself by default; `thread` makes it a resolve by id."""
+    inp = {"resolved": resolved}
+    if thread:
+        inp["thread_id"] = thread
+    return {"hook_event_name": "PreToolUse", "tool_name": RESOLVE, "tool_input": inp}
 
 
 failures = 0
@@ -77,12 +80,21 @@ outs = run(work, resolve(), sd, times=2)
 check("second attempt is denied too (ai-config#6027)", '"deny"' in outs[0] and '"deny"' in outs[1])
 
 
-def read(thread, report, uid="r1"):
+def read(thread, report, uid="r1", older=None, newer_status=False):
+    """A read_thread call and its result, in the shape the hearthbot tool returns."""
+    msgs = [{"author": "agent", "created_at": "2026-11-20T09:55:43Z", "body": report}]
+    if older:
+        msgs.append({"author": "agent", "created_at": "2026-11-20T08:00:00Z", "body": older})
+    if newer_status:
+        msgs.insert(0, {"author": "agent", "created_at": "2026-11-20T09:59:00Z",
+                        "body": '{"kind":"status","text":"checklist"}'})
+    text = "Untrusted content follows.\n<wrap>" + json.dumps(
+        {"thread_id": thread, "messages": msgs}) + "</wrap>"
     call = {"type": "assistant", "message": {"content": [
         {"type": "tool_use", "id": uid, "name": "mcp__hearthbot__read_thread",
          "input": {"thread_id": thread}}]}}
     res = {"type": "user", "message": {"content": [
-        {"type": "tool_result", "tool_use_id": uid, "content": [{"type": "text", "text": report}]}]}}
+        {"type": "tool_result", "tool_use_id": uid, "content": [{"type": "text", "text": text}]}]}}
     return [call, res]
 
 
@@ -97,6 +109,15 @@ check("a read with no UMS report line does not count",
                       resolve(thread="cmsg_A"), fresh()))
 check("a report read before the last user message does not count",
       '"deny"' in run(read("cmsg_A", done) + work, resolve(thread="cmsg_A"), fresh()))
+check("a stale report in an older reply does not count",
+      '"deny"' in run(work + read("cmsg_A", "Pushed the fix.", older=done),
+                      resolve(thread="cmsg_A"), fresh()))
+check("a newer checklist card does not hide the report",
+      run(work + read("cmsg_A", done, newer_status=True), resolve(thread="cmsg_A"), fresh()) == "")
+check("the caller's own UMS does not stand in for the thread's",
+      '"deny"' in run(work + [tool("Skill", {"skill": "ums"})], resolve(thread="cmsg_A"), fresh()))
+check("an unparseable read result denies (fails closed)",
+      '"deny"' in run(work + [tool("x", {})], resolve(thread="cmsg_A"), fresh()))
 check("the by-id deny tells the coordinator to read the thread",
       "read_thread" in run(work, resolve(thread="cmsg_A"), fresh()))
 check("a thread's own resolve (no thread_id) gets the run-ums deny",

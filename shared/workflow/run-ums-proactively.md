@@ -322,7 +322,8 @@ Three mechanisms now do, all in `hooks/require-ums-before-resolve.py` (ai-config
 - **Before resolve:** every `set_thread_resolved(true)` is denied when the transcript has no UMS tool call (a `ums` Skill or Agent dispatch, or a write under an ai-config memory or shared path) since the last user message.
   Run `ums`, end the reply with a `UMS executed: <what you recorded, or nothing to record>` line, then resolve.
   If nothing was learned, run `ums` anyway: the run is the evidence, and a retry without one is denied again (Ezra, 2026-11-20: "make sure every thread runs ums before you resolve it", ai-config#6027).
-- **A coordinator resolving another thread:** a resolve that names `thread_id` also passes when a `read_thread` of that thread, since the last user message, returned the thread's own `UMS executed:` line.
+- **A coordinator resolving another thread:** a resolve that names `thread_id` passes only when a `read_thread` of that thread, since the last user message, shows the thread's newest reply carrying a `UMS executed:` line.
+  The coordinator's own UMS pass does not count for another thread.
   Otherwise message the thread to run `ums` and resolve itself.
 - **On merge:** a GitHub event reporting a merged PR injects a reminder to run the wrap-up (`post-merge`: verify the merge, tidy the branch, confirm follow-ups, UMS) before the thread is resolved or reported done.
 

@@ -12,9 +12,10 @@ its two "Run UMS" bullets; ai-config#4480):
     "Nothing was learned" is still answered by running `ums`, which is the
     evidence; the deny says so, so it is never a loop.
     A resolve that names `thread_id` (a coordinator resolving another thread)
-    also passes when a `read_thread` of that thread, made since the last user
-    message, returned the thread's own report line (UMS_REPORT, for example
-    "UMS executed: recorded X"): the thread ran UMS, not the coordinator.
+    passes only when a `read_thread` of that thread, made since the last user
+    message, shows the thread's NEWEST reply carrying the report line
+    (UMS_REPORT, for example "UMS executed: recorded X"). The caller's own UMS
+    pass does not count there: the thread has to have run it.
 
   * UserPromptSubmit carrying a GitHub event that reports a merged PR. The
     merge arrives as a wake nobody has to act on, and nothing else runs the
@@ -68,7 +69,8 @@ EVENT = re.compile(r"<event\b([^>]*\bsource=\"github\"[^>]*)>(.*?)</event>", re.
 MERGED = re.compile(r"\bkind=\"[^\"]*merged[^\"]*\"|\"merged\"\s*:\s*true|\"state\"\s*:\s*\"merged\"", re.I)
 
 # The report line a thread ends its final message with (skills/ums/SKILL.md).
-UMS_REPORT = re.compile(r"\bUMS(?: pass)?:?\s+(?:executed|done|completed?)\b|\bran UMS\b", re.I)
+UMS_REPORT = re.compile(r"\bUMS(?: pass)?:?\s+(?:executed|done|completed?)\b", re.I)
+STATUS_BODY = re.compile(r'^\s*\{\s*"kind"\s*:\s*"status"')
 
 UMS_PATH = re.compile(r"(?:^|/)(?:memories|shared)/|(?:^|/)(?:AGENTS|CLAUDE)\.md$|ai-config")
 
@@ -164,8 +166,32 @@ def result_text(block):
     return ""
 
 
+def latest_report(text):
+    """Body of the newest agent reply (not a checklist card) in a read_thread result, or "".
+
+    read_thread returns {"thread_id": ..., "messages": [{"author", "created_at", "body"}]};
+    the result may be wrapped in an untrusted-content envelope, so decode from the first
+    `{"thread_id"`. Anything unparseable gives "" and the resolve is denied (fails closed).
+    """
+    start = text.find('{"thread_id"')
+    if start < 0:
+        return ""
+    try:
+        data, _ = json.JSONDecoder().raw_decode(text[start:])
+    except ValueError:
+        return ""
+    msgs = data.get("messages") if isinstance(data, dict) else None
+    replies = [m for m in msgs or [] if isinstance(m, dict) and m.get("author") == "agent"
+               and isinstance(m.get("body"), str) and not STATUS_BODY.match(m["body"])]
+    if not replies:
+        return ""
+    return max(replies, key=lambda m: str(m.get("created_at") or ""))["body"]
+
+
 def thread_reported_ums(path, thread_id):
-    """True when a read_thread of `thread_id` since the last user message returned a UMS_REPORT line."""
+    """True when a read_thread of `thread_id` since the last user message shows the thread's
+    newest reply carrying a UMS_REPORT line. Claude transcript shape only: an Antigravity
+    transcript has no hearthbot tools, and there it fails closed."""
     last_user, evidence, reads = -1, -1, set()
     with open(path, encoding="utf-8", errors="ignore") as fh:
         for i, line in enumerate(fh):
@@ -189,7 +215,7 @@ def thread_reported_ums(path, thread_id):
                     last_user = i
                 for b in blocks:
                     if (b.get("type") == "tool_result" and b.get("tool_use_id") in reads
-                            and UMS_REPORT.search(result_text(b))):
+                            and UMS_REPORT.search(latest_report(result_text(b)))):
                         evidence = i
     return evidence > last_user
 
@@ -221,11 +247,12 @@ DENY = (
 )
 
 DENY_OTHER = (
-    "Run UMS before resolving this thread. You are resolving a thread by id, and "
-    "neither a UMS action of yours nor a read of that thread's own `UMS executed:` "
-    "report appears since the last user message. Read the thread (`read_thread` "
-    "with its thread_id) and resolve only if its latest report says UMS executed; "
-    "otherwise message the thread to run `ums` and resolve itself (ai-config#6027)."
+    "Run UMS before resolving this thread. You are resolving a thread by id, and no "
+    "`read_thread` of it since the last user message shows its newest reply carrying "
+    "a `UMS executed:` line; your own UMS pass does not count for another thread. "
+    "Read it (`read_thread` with its thread_id, `full_bodies: true` if a body is cut) "
+    "and resolve only if that reply says UMS executed; otherwise message the thread "
+    "to run `ums` and resolve itself (ai-config#6027)."
 )
 
 MERGE_REMINDER = (
@@ -254,10 +281,12 @@ def handle_pre_tool_use(payload):
     path = payload.get("transcript_path") or ""
     if not isinstance(path, str) or not os.path.isfile(path):
         return 0
-    if ums_since_last_user_message(path, load_ums_word()):
-        return 0
     thread = inp.get("thread_id")
-    if isinstance(thread, str) and thread and thread_reported_ums(path, thread):
+    if isinstance(thread, str) and thread:
+        # By id: the THREAD must have run UMS; the caller's own pass proves nothing about it.
+        if thread_reported_ums(path, thread):
+            return 0
+    elif ums_since_last_user_message(path, load_ums_word()):
         return 0
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",

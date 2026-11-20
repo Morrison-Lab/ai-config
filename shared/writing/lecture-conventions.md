@@ -102,7 +102,9 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 - **Place each topic in the earliest course site whose readers need it.**
   See [`course-sequence`](course-sequence.md).
 - **Sort redundant versions: example, exercise, lab exercise, then the bank** (Ezra, 2026-11-19, amended 2026-11-20).
-  When examples or exercises repeat one idea with different numbers or data, keep the first as a worked `#exm-`, the second as an in-notes `#exr-`, and the third as a lab exercise, and move the fourth and later to the exercise bank for homeworks and exams.
+  When examples or exercises repeat one idea with different numbers or data, keep the first as a worked `#exm-` and the second as an in-notes `#exr-`.
+  The third may be a lab exercise, where the course has labs.
+  Move the fourth and later to the exercise bank for homeworks and exams.
   A lab never reuses a lecture example or exercise: labs have their own set, parallel to the lecture's.
   See [`course-repos`](../../memories/course-repos.md) for where the bank lives and how to move an item.
   Apply it to a passage you are editing, not as a sweep.

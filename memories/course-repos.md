@@ -59,7 +59,7 @@ The third may be a lab exercise, and only as a different version: a lab never re
 Move the fourth and every later version to the evaluation repo's exercise bank (`exercises/` in `mlg`) for homeworks and exams.
 
 - The move is intentional in the sense of the section above: the PR says so, the item and its solution leave the notes, and the item joins the question bank.
-- Never bank the version that stays in the notes, and never leave a banked item's solution in the notes.
+- Never bank a version that stays in the notes (the example, the exercise or a lab exercise), and never leave a banked item's solution in the notes.
 - Removing a solution from the notes does not withdraw it from the published site or git history.
   A banked version whose solution the notes already showed needs new numbers or data before any assessment grades it.
   Only a version that never had a solution in the notes may be graded as it stands

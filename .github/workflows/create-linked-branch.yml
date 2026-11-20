@@ -1,5 +1,6 @@
-# Creates a branch for an issue already linked in the issue's Development
-# field, so a session that cannot call GraphQL (a cloud session gets HTTP 403)
+# Creates a branch through createLinkedBranch, which also lists it in the
+# issue's Development field, so a session that cannot call GraphQL (a cloud
+# session gets HTTP 403)
 # can still follow shared/workflow/github-relationships.md: dispatch this
 # workflow over REST, wait for the run, fetch the branch, then push onto it
 # (ai-config#5303).

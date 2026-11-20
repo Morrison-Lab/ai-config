@@ -1,12 +1,25 @@
-Whenever `main` has moved ahead of a PR branch you're working on, **merge
-`main` into the PR branch** before the next push or review trigger. Don't wait
-for a conflict to surface or for someone to ask.
+**Merge `main` into a PR branch only when the branch needs it**, in every repository (Ezra, 2026-11-20, chose "Make it permanent" on "should we stop main merges permanently?", [ai-config#5988](https://github.com/Morrison-Lab/ai-config/issues/5988)).
+Every merge of `main` moves the head, which re-runs the PR's whole CI and voids its review, and routine merges across many open PRs helped queue 499 lds runs on 2026-11-19 ([Morrison-Lab/lds#2992](https://github.com/Morrison-Lab/lds/issues/2992)).
+A PR that is only behind `main` merges on its current head.
+The branch takes `main` in exactly three cases:
 
-Merging `main` into any PR branch is standing-authorized and never needs
-asking (Ezra, 2026-10-22: asked "confirm I may merge main into that branch",
-the answer was "yes, always").
-A repo's own "merge main only when it conflicts" guidance does not make the
-merge a question for the user: do it when `main` has moved, and say so after.
+- **(a) Conflict:** the branch conflicts with `main`.
+- **(b) A named fix:** the branch needs a specific commit or PR on `main`, such as the fix for a check it fails.
+  Name it on the merge command: `MERGE_MAIN_FOR=<sha> git merge origin/main` or `MERGE_MAIN_FOR='#<PR>' git merge origin/main`.
+- **(c) Stale:** `main` changed `.github/workflows/` since the merge base, so a check may never have run on the head.
+  This is `check-pr-fully-clean.py`'s base-drift refusal, and the runner's checker refuses such a head.
+
+`hooks/no-routine-main-merge.py` denies any other `git merge` or `git pull` of `main` into a PR branch, and every server-side update-branch call, since those cannot say why.
+It checks (a) with `git merge-tree`, (c) with a diff of `.github/workflows/`, and (b) by finding the named commit or PR on `main` and missing from the branch.
+There is no bare override, so `MERGE_MAIN_FOR` cannot be left on: it passes only when it names a real fix.
+Fetch `main` in its own command first, so the hook reads the current `main`.
+When one of the three cases holds, the merge needs no asking (Ezra, 2026-10-22: "yes, always").
+Say so after.
+
+- **Do:** merge `main` when the PR conflicts, when it needs a named fix, or when the checker calls the head stale.
+- **Don't:** merge `main` because it moved, to freshen a PR before review, or once per sweep.
+
+The rest of this page, which says to fetch and merge before every push, applies only when one of the three cases holds.
 
 The one exception is a PR that is already fully clean on its current head and waiting for a merge word.
 Merging `main` into it moves the head and voids the Clean review and the checker pass (ids#47 lost its Clean verdict this way, 2026-11-07, [ai-config#5093](https://github.com/Morrison-Lab/ai-config/issues/5093)).
@@ -14,11 +27,8 @@ Merging `main` into it moves the head and voids the Clean review and the checker
 unless `check-pr-fully-clean.py` has reported that the branch needs the base (base drift adding a CI gate, a conflict, or a required up-to-date branch).
 At merge time the no-update rule covers every repository, not only lds (Ezra, 2026-11-14, [#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)): a PR behind only by other PRs' content merges on its current head, and the branch is updated only on a real conflict, a base-drift failure, or a base that requires an up-to-date branch, per the content-only rule in [`fully-clean`](fully-clean.md).
 
-**Exception for `Morrison-Lab/lds`** (Ezra, 2026-11-09, [ai-config#5210](https://github.com/Morrison-Lab/ai-config/issues/5210)):
-do not merge `main` into an lds PR branch unless the runner's checker reports that PR stale.
-Every main merge resets CI and review, and that was growing the lds backlog.
-While you have two or more open lds PRs, open no new ones:
-drive the existing ones to final, or do non-lds work.
+**lds came first** (Ezra, 2026-11-09, [ai-config#5210](https://github.com/Morrison-Lab/ai-config/issues/5210)): lds stopped routine main merges for the same reason before the rule covered every repository.
+lds keeps one rule of its own: while you have two or more open lds PRs, open no new ones: drive the existing ones to final, or do non-lds work.
 
 **Small lds workflow fixes ride along** (coordinator, 2026-11-10, [ai-config#5245](https://github.com/Morrison-Lab/ai-config/issues/5245)):
 every lds workflow merge re-stales all open lds PRs, so do not open a standalone lds workflow PR for a small workflow fix.

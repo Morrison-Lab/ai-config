@@ -2089,6 +2089,18 @@
         ]
       },
       {
+        "matcher": "mcp__github__update_pull_request_branch|Bash",
+        "hooks": [
+          {
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-routine-main-merge.py\"",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-update-branch-on-clean-pr.py\"",
+            "timeout": 10,
+            "script": "no-routine-main-merge.py",
+            "why": "ai-config#5988. Ezra, 2026-11-20, chose \"Make it permanent\" on stopping main merges: each one re-runs a PR's CI and voids its review, and routine merges helped queue 499 lds runs on 2026-11-19 (lds#2992). Denies git merge / git pull of main into another branch, and update_pull_request_branch, gh pr update-branch and gh api .../update-branch, unless the branch conflicts with main, main changed .github/workflows since the merge base (the checker's stale rule), or the command's MERGE_MAIN_FOR=<sha|#PR> prefix names a fix on main the branch lacks. No bare override. Fails open on parse or git trouble."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__github__create_pull_request|mcp__github__create_pull_request_with_copilot|Bash",
         "hooks": [
           {

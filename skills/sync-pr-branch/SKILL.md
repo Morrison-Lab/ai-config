@@ -11,13 +11,11 @@ allowed-tools:
 
 # sync-pr-branch
 
-Keep a PR branch current with **both** `main` and **its own remote**, so
-reviewers (human and the `@claude` bot) evaluate it against today's `main`, and
-so commits that reached the remote from elsewhere (the `@claude` CI bot,
-another machine, a teammate, GitHub's web editor) are merged in rather than
-causing a rejected `git push`. The standing rule: whenever `main` *or* the
-remote branch has moved, **merge it in** — don't wait for a conflict to surface
-or for the user to ask.
+Keep a PR branch current with **both** `main` and **its own remote**, so reviewers (human and the `@claude` bot) evaluate it against today's `main`, and so commits that reached the remote from elsewhere (the `@claude` CI bot, another machine, a teammate, GitHub's web editor) are merged in rather than causing a rejected `git push`.
+Merge the remote branch in whenever it has moved.
+Merge `main` in only when the branch conflicts with it, needs a named fix on it (`MERGE_MAIN_FOR=<sha|#PR>` on the merge command), or the checker refuses the head as stale because `main` changed `.github/workflows/` (Ezra, 2026-11-20, ai-config#5988;
+`hooks/no-routine-main-merge.py` denies the rest).
+See [`sync-with-main`](../../shared/workflow/sync-with-main.md).
 
 Synonyms: `sync`, `resync-branch`, `merge-main` — all route here.
 

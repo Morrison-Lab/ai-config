@@ -17,6 +17,9 @@ of resyncing one branch, resync **every currently-open PR** in the repo that pas
 against `main` (and each PR's own remote), so a burst of merges into `main`
 doesn't leave the rest of the queue stale and conflict-prone.
 
+Since 2026-11-20 a branch takes `main` only when it conflicts, needs a named fix, or is stale by the checker's workflow rule (ai-config#5988, [`sync-with-main`](../../shared/workflow/sync-with-main.md)), so this skill merges `main` only into the PRs where one of those holds and leaves the rest on their current heads.
+`hooks/no-routine-main-merge.py` denies the others.
+
 This is not a duplicate of `sync-pr-branch` — it's an orchestration layer on
 top of it. The per-branch mechanics (fetch, merge `origin/main`, merge
 `origin/<branch>`, resolve conflicts, run checks, push) are unchanged; only

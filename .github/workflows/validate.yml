@@ -431,6 +431,9 @@ jobs:
         # parts run here, and its infra test is checked against the real
         # merge-infra-pr and merge hook (ai-config#5578).
         run: python3 -m pytest scripts/test_mwc_batch.py
+      - name: Run check-mwc-carry tests
+        # ai-config#5967, over throwaway git repos.
+        run: python3 -m pytest scripts/test_check_mwc_carry.py
       - name: Run upload-skills tests
         # Only the tests run here. upload_skills.sh itself requires a live
         # workspace API key, so the offline test suite exercises change

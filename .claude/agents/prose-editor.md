@@ -62,6 +62,10 @@ Your job is to revise that first draft into clear, concise, style-compliant pros
 4. **Apply revisions:** Edit the target files in-place using `Edit` or `Write`.
 5. **Verify integrity:**
    Ensure no factual errors, distorted arguments, broken links, or syntax issues were introduced.
+   Never delete a technical term that `check-term-links` flags as unlinked.
+   Link it to its definition instead,
+   and flag in review any diff that drops such a term
+   ([`definition-crossrefs`](../../shared/writing/definition-crossrefs.md), "Flagged term").
    If applicable, run linters (`markdownlint`, link-checkers) via `Bash`.
 6. **Report changes:**
    Summarize the specific files edited, the major style improvements made,

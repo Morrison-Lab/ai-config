@@ -226,6 +226,10 @@ ESCALATION_RX = re.compile(
       | \bnot\s+routing\s+around\b
       | \brouting\s+around\b
       | \bi\s+cannot\b
+      # ai-config#6013: the gha v3 slide handoff said "needs your OK or
+      # your hands" and "run this yourself", and matched nothing above.
+      | \bneeds?\s+your\s+(?:ok|okay|approval|go-ahead|sign-?off|hands)\b
+      | \b(?:run|dispatch|merge|push)\s+(?:this|it|that)\s+yourself\b
     )""",
     re.I | re.X,
 )
@@ -242,6 +246,10 @@ ATTRIBUTION_RX = re.compile(
       | \bpermission\b[^.\n]{0,20}\bwas\b\s+\bdenied\b
       | \bpermission\s+denied\b
       | \bclassifier\s+refus(?:ed|al)\b
+      # ai-config#6013: "the session's safety check then refused the hook's
+      # own override" names the classifier without the word.
+      | \b(?:safety|permission)\s+check\b[^.\n]{0,40}\b(?:refused|denied|blocked)\b
+      | \b(?:refused|denied)\b[^.\n]{0,40}\boverride\b
     )""",
     re.I | re.X,
 )

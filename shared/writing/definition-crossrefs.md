@@ -99,6 +99,15 @@ one of:
   ("defined later in this section (@def-x)"), per
   [keep the crossref](forward-references.md#keep-the-crossref);
   never delete the link or add `<!-- check-term-links: allow -->` to hide the forward reference from a dependency-graph check.
+- **Flagged term** --- `check-term-links` flags a term as unlinked or undefined;
+  link it to its definition, and write the definition first if none exists.
+  Never delete or swap out the term to quiet the check (Ezra, 2026-11-20:
+  "never remove technical terms that get flagged as unlinked;
+  always link to them to a definition instead, writing one if necessary").
+  Deleting "finite" from an exercise in lds#3017 passed the check and lost the precision the word carried.
+  `hooks/no-delete-flagged-term.py` denies an edit that rewords a flagged line and drops the term.
+  - **Do:** keep the term and write `[finite](sets.qmd#def-finite-set)`.
+  - **Don't:** reword "a finite set" to "a set" because the check flagged "finite".
 - **Undefined term** --- the term is mentioned but no div defines it
   anywhere in the document; add the missing definition.
   In a series of related documents, such as course sites, first look for a

@@ -109,6 +109,12 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   A lab never reuses a lecture example or exercise: labs have their own set, parallel to the lecture's.
   See [`course-repos`](../../memories/course-repos.md) for where the bank lives and how to move an item.
   Apply it to a passage you are editing, not as a sweep.
+- **Give worked examples only to definitions and results, and keep each question an exercise** (Ezra, 2026-11-20).
+  A hand-workable toy question stays an `#exr-` and `#sol-` pair, not an `#exm-`.
+  A real-data version of the same question follows it as a second exercise in the notes,
+  because the two practice different skills.
+  They are not redundant versions under the bullet above.
+  See psw's teaching chapter, section "Keep each question an exercise, and give examples to definitions and results".
 - **Do not answer graded work in student-facing notes.**
   Check the grading repository before writing a solution, and use a different example when an exercise is graded.
 - **Never name a private repository or its paths on a student-facing page, not even in an HTML comment.**

@@ -274,27 +274,28 @@ def pr_exempt(pr):
 
 
 def live_remote(cwd, branch):
-    """The server's tip of `branch` as a local commit-ish, or None.
+    """`origin/<branch>` when the tracking ref matches the server's tip, else None.
 
     The tracking ref can be stale after a force push elsewhere, so the server's
-    tip must be the commit measured. A cloud single-branch clone has no
-    `refs/remotes/origin/<branch>` at all: `git fetch origin <branch>` there
-    writes only FETCH_HEAD. So when the tracking ref is missing, the server's
-    sha from `git ls-remote` is used when its commit is present locally
-    (2026-11-20, a 2-line fix to gha#2158 was refused until a refspec fetch
-    created the ref).
+    tip must be the commit measured. A clone that fetches only `main`, as a
+    cloud session's does, has no tracking ref at all, so a missing or stale
+    one is fetched from the server before it is compared (ai-config#5884).
+    The server is asked for `refs/heads/<branch>` in full, since a bare
+    pattern also matches `<other>/<branch>` and could take its sha first.
     """
-    live = git(cwd, "ls-remote", "--heads", "origin", f"refs/heads/{branch}")
-    sha = live.split()[0] if live else None
-    if not sha:
-        return None
     remote = f"origin/{branch}"
+    live = git(cwd, "ls-remote", "--heads", "origin", f"refs/heads/{branch}")
+    if not live:
+        return None
+    tip = live.split()[0]
     local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
-    if local:
-        return remote if local == sha else None
-    if git(cwd, "rev-parse", "--verify", "-q", sha + "^{commit}"):
-        return sha
-    return None
+    if local != tip:
+        git(cwd, "fetch", "-q", "--no-tags", "origin",
+            f"+refs/heads/{branch}:refs/remotes/{remote}")
+        local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
+    if local != tip:
+        return None
+    return remote
 
 
 def pr_patch_id(cwd, base, tip):

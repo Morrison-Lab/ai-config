@@ -178,6 +178,12 @@ def main():
     pushed_big = make_repo({f"f{i}.qmd": 1 for i in range(22)})
     push_tip(pushed_big)
     add_files(pushed_big, [f"g{i}.qmd" for i in range(21)], "more")
+    # The same small fix in a clone that fetches only main, so it has no
+    # tracking ref for the pushed branch (ai-config#5884).
+    untracked = make_repo({f"f{i}.qmd": 1 for i in range(22)})
+    push_tip(untracked)
+    git(untracked, "update-ref", "-d", "refs/remotes/origin/feature")
+    add_files(untracked, ["f0.qmd"], "fix")
     # Pushed under the cap, then pushed over it by a small commit.
     crossing = make_repo({f"f{i}.qmd": 1 for i in range(20)})
     push_tip(crossing)
@@ -302,6 +308,8 @@ def main():
          run("git push", sweep, pr={"labels": [{"name": "P1"}], "body": "A sweep."}), True),
         ("a small fix on top of an already-pushed over-cap tip passes",
          run("git push", pushed), False),
+        ("the same fix passes with no tracking ref, fetched from the server (#5884)",
+         run("git push", untracked), False),
         ("an over-cap addition on top of an over-cap tip is denied",
          run("git push", pushed_big), True),
         ("a small push that takes an under-cap tip over the cap is denied",

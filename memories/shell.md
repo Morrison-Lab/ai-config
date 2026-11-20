@@ -602,6 +602,8 @@ The first version of `hooks/no-tight-github-polling.py` kept one loop, sleep and
 
 - **Do:** open a frame at each `while`, `until` or `for` (also after `do`), judge it at its own `done`, and treat a value under `if` as conditional.
 - **Don't:** sum `sleep` or GitHub calls across the whole command, or record only the first loop keyword.
+- **Do:** when a closing inner frame passes values to its parent, apply the parent's guards to them too: an inner loop under an `if` passes its calls but not its sleep (agy on 856027e1, 2026-11-19).
+- **Don't:** guard only the direct `sleep` path and let the same value reach the parent unguarded through a child frame.
 
 ## A hook that parses Bash commands reuses `scripts/lib/shellcmd.py`
 

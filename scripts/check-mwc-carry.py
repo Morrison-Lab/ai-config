@@ -7,7 +7,8 @@ Run it in a full clone of the PR's repository. The line CARRIES when the
 approved head is on the head's first-parent chain and each commit added on it
 is a two-parent merge whose second parent is on the base and whose tree is
 `git merge-tree --write-tree` of its parents, and the PR's diff against the
-base (as a zero-context patch id) is the same at the head as at the approved
+base (a zero-context patch id plus each path's status, modes and binary blob)
+is the same at the head as at the approved
 head. Anything else VOIDS it (fail closed). That covers the just-in-time main
 merge of a PR the checker called CLEAN EXCEPT BASE DRIFT (Ezra, 2026-11-20,
 "One line covers it", ai-config#6028). The new head must still be fully clean, and the merge pins the full
@@ -16,6 +17,7 @@ head SHA printed. Exit codes: 0 CARRIES, 1 VOID, 2 called wrong or git failed.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import subprocess
 import sys
@@ -65,19 +67,43 @@ def auto_merge_tree(repo: str, ours: str, theirs: str) -> str | None:
 
 
 def pr_diff_id(repo: str, tip: str, base: str) -> str:
-    """The patch id of `tip`'s diff from its merge base with `base`, with no context lines.
+    """An id of `tip`'s diff from its merge base with `base`, with no context lines.
 
     Zero context keeps a main edit next to a PR hunk from reading as a PR change.
+    `git patch-id` sees only text hunks, so the id also hashes each changed path's
+    status, modes and, for a binary file, new blob: an empty file, a mode change,
+    a pure rename or a binary edit is part of the diff too (agy review of ai-config#6029).
     """
     mb = git(repo, "merge-base", tip, base).stdout.strip()
-    diff = git(repo, "diff", "-U0", "--no-color", "--no-ext-diff", mb, tip).stdout
-    if not diff:
+    entries = git(repo, "diff", "--raw", "--no-abbrev", "-M", "-z", mb, tip).stdout
+    if not entries:
         return ""
+    binary = set()
+    rows = git(repo, "diff", "--numstat", "-M", "-z", mb, tip).stdout.split("\0")
+    for j, row in enumerate(rows):
+        if row == "-\t-\t":  # a renamed binary: the old and new paths follow
+            binary.add(rows[j + 2])
+        elif row.startswith("-\t-\t"):
+            binary.add(row[4:])
+    shape = []
+    fields = entries.split("\0")
+    i = 0
+    while i < len(fields) - 1:
+        src_mode, dst_mode, _, dst_blob, status = fields[i].lstrip(":").split(" ")
+        paths = [fields[i + 1]]
+        i += 2
+        if status[0] in "RC":
+            paths.append(fields[i])
+            i += 1
+        blob = dst_blob if paths[-1] in binary else ""
+        shape.append(" ".join([status[0], src_mode, dst_mode, *paths, blob]))
+    diff = git(repo, "diff", "-U0", "--no-color", "--no-ext-diff", mb, tip).stdout
     proc = subprocess.run(["git", "-C", repo, "patch-id", "--stable"], input=diff,
                           capture_output=True, text=True)
     if proc.returncode != 0:
         raise GitError(f"git patch-id failed: {proc.stderr.strip()}")
-    return proc.stdout.split()[0] if proc.stdout.split() else ""
+    patch = proc.stdout.split()[0] if proc.stdout.split() else ""
+    return hashlib.sha256("\n".join([patch, *sorted(shape)]).encode("utf-8")).hexdigest()
 
 
 def verdict(repo: str, approved: str, head: str, base: str) -> tuple[bool, list[str]]:

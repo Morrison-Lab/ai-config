@@ -10813,12 +10813,14 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
           checker.parse_args(["1", "--mwr"]).mwr is True
           and checker.parse_args(["1"]).mwr is False)
 
-    def run_mwr(review_issues, mwr=True, ci=(True, [])):
+    full_sha = "abcdef1234567890abcdef1234567890abcdef12"
+
+    def run_mwr(review_issues, mwr=True, ci=(True, []), ci_edits=(), reviews=()):
         from types import SimpleNamespace
         pr = PullRequest.__new__(PullRequest)
         pr.pr_num, pr.repo = "7", TEST_REPO
-        pr._data = {"headRefOid": "abcdef1234567890", "headRefName": "b",
-                    "state": "OPEN", "reviewDecision": ""}
+        pr._data = {"headRefOid": full_sha, "headRefName": "b",
+                    "state": "OPEN", "reviewDecision": "", "reviews": list(reviews)}
         args = SimpleNamespace(from_json="", pr_number="7", repo=TEST_REPO,
                                quorum=1, mwr=mwr)
         out = io.StringIO()
@@ -10834,6 +10836,7 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
                              return_value=(not review_issues, list(review_issues))), \
                 patch.object(checker, "check_base_drift", return_value=(True, [])), \
                 patch.object(checker, "check_required_checks", return_value=(True, [])), \
+                patch.object(checker, "check_mwr_ci_edits", return_value=list(ci_edits)), \
                 contextlib.redirect_stdout(out):
             try:
                 checker.main()
@@ -10857,6 +10860,87 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     code, text = run_mwr([], ci=(False, ["Check run 'validate' failed"]))
     check("--mwr still blocks on failing CI",
           code == 1 and "MERGE-READY" not in text)
+
+    # Round 6: the full head sha on the MERGE-READY line.
+    code, text = run_mwr([no_review])
+    check("--mwr prints the full 40-character head sha on the MERGE-READY line",
+          code == 0 and f"on HEAD {full_sha}!" in text)
+    code, text = run_mwr([], mwr=False)
+    check("the FULLY CLEAN line keeps the 8-hex prefix",
+          code == 0 and f"FULLY CLEAN on HEAD {full_sha[:8]}!" in text
+          and full_sha not in text.split("FULLY CLEAN", 1)[1])
+
+    # Round 6: a PR that edits `.github/` is never mwr-ready.
+    ci_edit = ("mwr cannot merge a PR that edits CI: it changes "
+               ".github/workflows/ci.yml")
+    code, text = run_mwr([no_review], ci_edits=[ci_edit])
+    check("--mwr blocks a PR that edits .github/",
+          code == 1 and ci_edit in text and "MERGE-READY" not in text)
+
+    def mwr_files_issues(payload_files, absent=False):
+        pr = PullRequest.__new__(PullRequest)
+        pr.pr_num, pr.repo = "7", TEST_REPO
+        payload = {} if absent else {"pr_files": payload_files}
+        with patch.object(checker, "_FETCHER", checker.PayloadFetcher(payload)):
+            return checker.check_mwr_ci_edits(pr)
+
+    edits = mwr_files_issues([{"filename": ".github/workflows/ci.yml"},
+                              {"filename": "README.md"}])
+    check("a changed workflow file blocks, and the issue names mwc",
+          len(edits) == 1 and "mwr cannot merge a PR that edits CI" in edits[0]
+          and ".github/workflows/ci.yml" in edits[0] and "mwc" in edits[0])
+    check("a non-workflow file under .github/ blocks too",
+          len(mwr_files_issues([".github/CODEOWNERS"])) == 1)
+    check("a rename out of .github/ blocks on its previous name",
+          len(mwr_files_issues([{"filename": "x.yml",
+                                 "previous_filename": ".github/workflows/x.yml"}])) == 1)
+    check("a PR touching no .github/ path passes the CI-edit gate",
+          mwr_files_issues(["README.md", "docs/.github-notes.md"]) == [])
+    check("a payload with no pr_files fails closed",
+          len(mwr_files_issues(None, absent=True)) == 1)
+    check("a recorded failed files read fails closed",
+          len(mwr_files_issues({"error": "fetch failed: 502"})) == 1)
+    check("an empty file list fails closed",
+          len(mwr_files_issues([])) == 1)
+    check("a file list at the endpoint's cap fails closed",
+          len(mwr_files_issues([f"f{i}" for i in range(checker.PR_FILES_CAP)])) == 1)
+
+    def gh_files_issues(stdout=None, error=None):
+        pr = PullRequest.__new__(PullRequest)
+        pr.pr_num, pr.repo = "7", TEST_REPO
+        seen = []
+
+        def fake(cmd):
+            seen.append(cmd)
+            if error:
+                raise RuntimeError(error)
+            return stdout
+        with patch.object(checker, "_FETCHER", None), \
+                patch.object(checker, "run_cmd", side_effect=fake):
+            return checker.check_mwr_ci_edits(pr), seen
+
+    issues, seen = gh_files_issues(".github/workflows/a.yml\nsrc/x.py\n")
+    check("the gh path reads every page of the PR's files",
+          len(issues) == 1 and seen and "--paginate" in seen[0]
+          and seen[0][2] == f"repos/{TEST_REPO}/pulls/7/files")
+    issues, _ = gh_files_issues(error="HTTP 502")
+    check("a failed gh files read fails closed",
+          len(issues) == 1 and "could not read the PR's changed files" in issues[0])
+
+    # Round 6: a dismissed review blocks under --mwr.
+    dismissed = {"state": "DISMISSED", "author": {"login": "alice"},
+                 "body": "", "commit": {"oid": full_sha}}
+    code, text = run_mwr([no_review], reviews=[dismissed])
+    check("--mwr blocks on a dismissed review",
+          code == 1 and "dismissed review from alice" in text
+          and "MERGE-READY" not in text)
+    approved = dict(dismissed, state="APPROVED")
+    code, text = run_mwr([no_review], reviews=[approved])
+    check("--mwr does not block on an approval",
+          code == 0 and "MERGE-READY" in text)
+    code, text = run_mwr([], mwr=False, reviews=[dismissed])
+    check("without --mwr the dismissed-review gate is not run",
+          "dismissed review" not in text)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

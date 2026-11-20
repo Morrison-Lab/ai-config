@@ -310,4 +310,30 @@ class PayloadFetcher:
                 )
             return json.dumps(comments)
 
+        if "/pulls/" in path and path.endswith("/files"):
+            # Read only under --mwr (ai-config#3946). The gh call prints one
+            # path per line (each filename, and a rename's previous name), so
+            # this answers in the same shape. Absent or malformed raises, and
+            # the checker blocks the merge on it.
+            files = _require(self.payload, "pr_files", "the PR's changed files (--mwr)")
+            if isinstance(files, dict) and "error" in files:
+                raise PayloadError(
+                    f"payload 'pr_files' records a failed read: {files['error']}.")
+            if not isinstance(files, list):
+                raise PayloadError(
+                    f"payload 'pr_files' must be a list, got {type(files).__name__}.")
+            names = []
+            for i, item in enumerate(files):
+                if isinstance(item, str):
+                    names.append(item)
+                elif isinstance(item, dict) and isinstance(item.get("filename"), str):
+                    names.append(item["filename"])
+                    if isinstance(item.get("previous_filename"), str):
+                        names.append(item["previous_filename"])
+                else:
+                    raise PayloadError(
+                        f"payload 'pr_files[{i}]' must be a path or an object "
+                        f"with a 'filename', got {item!r}.")
+            return "\n".join(names)
+
         raise PayloadError(f"no payload mapping for gh api path: {path}")

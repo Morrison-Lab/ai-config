@@ -501,6 +501,20 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
         payload["base_compare"] = {"error": f"fetch failed: {exc}"}
     else:
         payload["base_compare"] = compact_compare(compare)
+    # Read by check-pr-fully-clean.py --mwr, which refuses to merge a PR that
+    # edits `.github/` (ai-config#3946). A failed read is recorded, and the
+    # checker then blocks the merge.
+    try:
+        files_raw = rest_get(f"{base}/pulls/{pr_number}/files", token)
+    except Exception as exc:  # noqa: BLE001
+        payload["pr_files"] = {"error": f"fetch failed: {exc}"}
+    else:
+        payload["pr_files"] = [
+            {"filename": f.get("filename") or "",
+             **({"previous_filename": f["previous_filename"]}
+                if f.get("previous_filename") else {})}
+            for f in (files_raw if isinstance(files_raw, list) else [])
+            if isinstance(f, dict)]
     return payload
 
 

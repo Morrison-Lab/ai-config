@@ -40,3 +40,18 @@ On 2026-11-05, in a run of Morrison-Lab/mds page moves (Morrison-Lab/mcs#60), a 
 
 - **Do:** run `git fetch origin main` after every merge of a PR you drove, then branch from `origin/main`, then check `git log --oneline -1 origin/main` names the merge.
 - **Don't:** reuse the `origin/main` that an earlier fetch in the same session left behind.
+
+## A merge in a partial clone can fail partway and delete tracked files
+
+Measured 2026-11-20 in a cloud lds clone made with `--filter=blob:none`.
+`git merge origin/main` had to fetch blobs it lacked from the promisor remote.
+That fetch failed with `upload-pack: not our ref` and `could not fetch <sha> from promisor remote`.
+The merge stopped without writing `MERGE_HEAD`, so `git merge --abort` had nothing to abort, and four tracked files were missing from the working tree.
+Nothing in the merge's output says files were removed: the only sign is a ` D` line in `git status --porcelain`.
+
+- **Do:** after any failed merge in a partial clone, run `git status --porcelain` before anything else.
+  Restore each ` D` path with `git show HEAD:<path> > <path>`, since the Safety Net hook blocks `git checkout <path>`.
+  That restores content but not the file mode, so `chmod +x <path>` any path that `git ls-tree HEAD <path>` lists as `100755`.
+  Confirm `git status --porcelain` prints nothing, then run the merge again.
+  The retry succeeded once the tree was clean.
+- **Don't:** read a merge that left no `MERGE_HEAD` as a merge that changed nothing, or commit on top of the deleted files.

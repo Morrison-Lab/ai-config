@@ -5,6 +5,8 @@ One budget is shared (ai-config#5045): runs are read one at a time with a
 --pause, and the read stops above --floor (GET /rate_limit is free). Messages
 are grouped; a group is known only if every member is, and each unknown
 member's path:line is printed. Last line: ids for --annotations-read.
+Completed runs are read through a cache keyed by check-run id
+(ai-config#6032), so a re-read of a head spends no annotation calls.
 Exit 0 all read; 2 a failed, unfinished or short read; 3 stopped at the floor."""
 import argparse
 import collections
@@ -14,6 +16,10 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+import annotation_cache  # noqa: E402
 
 PER_PAGE = 100
 
@@ -70,7 +76,7 @@ def known_label(ann):
     return None
 
 
-def main(argv=None, api=gh_api, sleep=time.sleep):
+def main(argv=None, api=gh_api, sleep=time.sleep, cache_dir=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--repo", required=True, help="OWNER/REPO")
     p.add_argument("--sha", required=True, help="head commit; reads every run with annotations")
@@ -88,13 +94,15 @@ def main(argv=None, api=gh_api, sleep=time.sleep):
                for r in runs if r.get("status") != "completed"]
         for n, run in enumerate(r for r in runs if r.get("status") == "completed"):
             rid, count = run["id"], run["output"]["annotations_count"]
-            if n:
-                sleep(args.pause)
-            remaining, reset = core_budget(api)
-            if remaining - -(-count // PER_PAGE) < args.floor:
-                stopped = (remaining, reset)
-                break
-            anns = pages(api, f"repos/{args.repo}/check-runs/{rid}/annotations")
+            anns = annotation_cache.cached(cache_dir, args.repo, run)
+            if anns is None:
+                if n:
+                    sleep(args.pause)
+                remaining, reset = core_budget(api)
+                if remaining - -(-count // PER_PAGE) < args.floor:
+                    stopped = (remaining, reset)
+                    break
+                anns = annotation_cache.read_annotations(api, args.repo, run, cache_dir)
             for ann in anns:
                 g = groups[(ann["annotation_level"], (ann["message"] or "").split("\n")[0][:200])]
                 g["n"] += 1
@@ -128,4 +136,4 @@ def main(argv=None, api=gh_api, sleep=time.sleep):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(cache_dir=annotation_cache.default_cache_dir()))

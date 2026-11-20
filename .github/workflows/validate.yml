@@ -143,6 +143,9 @@ jobs:
       - name: Run batch-read-annotations tests
         # ai-config#5045: annotation reads within the shared REST budget.
         run: python3 scripts/test_batch_read_annotations.py
+      - name: Run annotation-cache tests
+        # ai-config#6032: annotation reads cached by check-run id.
+        run: python3 scripts/test_annotation_cache.py
       - name: Run check-mr-fully-clean tests
         # ai-config#3021: GitLab's equivalent fully-clean merge gate.
         run: python3 scripts/test_check_mr_fully_clean.py

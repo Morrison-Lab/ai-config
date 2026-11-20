@@ -6,6 +6,8 @@ gave 174 against 168; over every page, per check-run name, both had 249.
 This walks `&page=N` (`--paginate` 403s in CCR sessions) for check runs and
 annotations on both commits, checks the counts GitHub reports, normalizes
 run-to-run values, and diffs per check-run name (same-name runs pooled).
+Completed runs are read through a cache keyed by check-run id
+(ai-config#6032), so the base tip is read once, not once per PR.
 The default normalizers also hide 9+ digit numbers and hex words of 7-40
 characters; pass --no-default-normalizers when that matters.
 
@@ -19,6 +21,10 @@ import json
 import re
 import subprocess
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+import annotation_cache  # noqa: E402
 
 PER_PAGE = 100
 DEFAULT_NORMALIZERS = [
@@ -60,15 +66,8 @@ def check_runs(api, repo, sha):
     return runs
 
 
-def annotations(api, repo, run):
-    out, page = [], 1
-    while True:
-        batch = api(f"repos/{repo}/check-runs/{run['id']}/annotations"
-                    f"?per_page={PER_PAGE}&page={page}")
-        out += batch
-        if len(batch) < PER_PAGE:
-            break
-        page += 1
+def annotations(api, repo, run, cache_dir=None):
+    out = annotation_cache.read_annotations(api, repo, run, cache_dir, PER_PAGE)
     expected = (run.get("output") or {}).get("annotations_count") or 0
     if len(out) != expected:
         raise ReadError(f"run {run['id']} ({run['name']}): read {len(out)} "
@@ -82,7 +81,7 @@ def normalize(text, patterns):
     return text
 
 
-def collect(api, repo, sha, levels, patterns):
+def collect(api, repo, sha, levels, patterns, cache_dir=None):
     """Return ({name: Counter of (path, message)}, runs read, annotations read)."""
     by_name = collections.defaultdict(collections.Counter)
     runs = check_runs(api, repo, sha)
@@ -90,7 +89,7 @@ def collect(api, repo, sha, levels, patterns):
     for run in runs:
         if not (run.get("output") or {}).get("annotations_count"):
             continue
-        for ann in annotations(api, repo, run):
+        for ann in annotations(api, repo, run, cache_dir):
             n_ann += 1
             if ann["annotation_level"] in levels:
                 key = (normalize(ann["path"], patterns),
@@ -113,7 +112,7 @@ def total(by_name):
     return sum(sum(c.values()) for c in by_name.values())
 
 
-def main(argv=None, api=gh_api):
+def main(argv=None, api=gh_api, cache_dir=None):
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--repo", required=True, help="OWNER/REPO")
     p.add_argument("--head", required=True, help="head commit sha")
@@ -135,8 +134,8 @@ def main(argv=None, api=gh_api):
     defaults = [] if args.no_default_normalizers else DEFAULT_NORMALIZERS
     patterns = defaults + args.normalize
     try:
-        base, b_runs, b_ann = collect(api, args.repo, args.base, levels, patterns)
-        head, h_runs, h_ann = collect(api, args.repo, args.head, levels, patterns)
+        base, b_runs, b_ann = collect(api, args.repo, args.base, levels, patterns, cache_dir)
+        head, h_runs, h_ann = collect(api, args.repo, args.head, levels, patterns, cache_dir)
     except (ReadError, KeyError, json.JSONDecodeError) as exc:
         print(f"ERROR: incomplete read: {exc}", file=sys.stderr)
         return 2
@@ -158,4 +157,4 @@ def main(argv=None, api=gh_api):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(cache_dir=annotation_cache.default_cache_dir()))

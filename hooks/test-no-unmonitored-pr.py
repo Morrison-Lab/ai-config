@@ -190,8 +190,14 @@ for phrase in ("Opened the PR. No pending items remain.",
     assert not subject.WAITING.search(phrase), phrase
 assert run_main(waiting).get("decision") == "block"
 assert "re-invoke" in run_main(waiting)["reason"]
-# An already-running poller (start returns False) is no wake either.
-assert run_main(waiting, started=False).get("decision") == "block"
+# An already-running poller is no wake either. start_monitor_for_url returns
+# False when the PR's recorded poller is alive (asserted above with a live pid)
+# and None when it cannot start one, so False is the already-running case.
+already = run_main(waiting, started=False)
+assert already.get("decision") == "block" and "re-invoke" in already["reason"]
+# A poller that cannot start blocks for that reason, not the waiting one.
+failed = run_main(waiting, started=None)
+assert failed.get("decision") == "block" and "No local timer" in failed["reason"]
 # A reply that waits on nothing passes with the poller's notice.
 done = run_main("Merged the PR and closed the issue.")
 assert "decision" not in done and "systemMessage" in done

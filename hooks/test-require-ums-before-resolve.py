@@ -162,6 +162,15 @@ for desc, rec in [
          {"name": "invoke_subagent", "args": {"Subagents": [{"Prompt": "Run UMS"}]}}]}),
 ]:
     check(f"allowed after {desc}", run(work + [rec], resolve(), fresh()) == "")
+skill_body = {"type": "user", "isMeta": True, "sourceToolUseID": "x",
+              "message": {"content": [{"type": "text", "text": "Base directory for this skill: ums"}]}}
+check("allowed after Skill ums followed by its isMeta skill body (ai-config#6039)",
+      run(work + [tool("Skill", {"skill": "ums"}), result(), skill_body], resolve(), fresh()) == "")
+check("an isMeta record does not hide a later real user message",
+      '"deny"' in run(work + [tool("Skill", {"skill": "ums"}), result(), skill_body, user("more")],
+                      resolve(), fresh()))
+check("a thread report read before an isMeta skill body still counts",
+      run(work + read("cmsg_A", done) + [skill_body], resolve(thread="cmsg_A"), fresh()) == "")
 check("UMS before the last user message does not count",
       '"deny"' in run([tool("Skill", {"skill": "ums"}), user("more work")], resolve(), fresh()))
 check("Antigravity USER_INPUT user message invalidates earlier UMS",

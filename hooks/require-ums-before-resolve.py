@@ -117,7 +117,9 @@ def ums_since_last_user_message(path, ums_word):
                 role = "assistant"
 
             if role == "user":
-                if (text_of(rec) or "").strip():
+                # A skill's injected body is an isMeta user record written right
+                # after the Skill call; it is not a user message (ai-config#6039).
+                if not rec.get("isMeta") and (text_of(rec) or "").strip():
                     last_user = i
                 continue
             if role != "assistant":
@@ -215,7 +217,7 @@ def thread_reported_ums(path, thread_id):
                             and isinstance(inp, dict) and inp.get("thread_id") == thread_id):
                         reads.add(b.get("id"))
             elif role == "user":
-                if (text_of(rec) or "").strip():
+                if not rec.get("isMeta") and (text_of(rec) or "").strip():
                     last_user = i
                 for b in blocks:
                     if (b.get("type") == "tool_result" and b.get("tool_use_id") in reads

@@ -19,8 +19,11 @@ the `message_id` its result returned and the wake's `decision_id`), the chosen o
 consequence line is added, since that line is usually where the card names the act.
 
 An option that declines (No, Not now, Skip, Stop, Later, File it, Wait, Hold, Cancel) yields
-nothing: choosing it is not a request for the act. This module never feeds a merge grant:
-the mwc gates read typed words only, by design.
+nothing: choosing it is not a request for the act. A tap is never a merge grant: the mwc
+gates read typed words only, by design. `hooks/block-merge-without-clean-checker.py` reads
+taps through `answers_in_prompt`, `prompt_text` and `track_cards` for one other purpose, a
+waiver of the fully-clean check, on its own stricter terms (ai-config#5892). That waiver
+stands in for the checker's pass and leaves the merge grant as it was.
 """
 import html
 import re
@@ -89,6 +92,9 @@ def _prompt(content):
     if not isinstance(content, list) or any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
         return ""
     return "\n".join(str(b.get("text") or "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+
+
+prompt_text = _prompt
 
 
 def card_text(option, question, consequence=""):

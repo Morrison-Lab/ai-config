@@ -17,6 +17,8 @@ What it does, for each `git push` in the command:
      configuration stays the single source; nothing is hard-coded per repo, so
      every repo that calls those workflows is covered (as of 2026-10-26: lds,
      sds, pds, mds and rme; psw and ids once they adopt the two checks).
+     It also runs each diff-scoped `.gha/run-check/run-check.sh` line of a
+     bundled-checks workflow such as lds's `cluster-checks.yml` (ai-config#4986).
   2. Runs gha's own scripts at the ref the workflow pins (`@v3`) from a cached
      shallow clone in `~/.cache/ai-config/gha/` (refetched whenever `git ls-remote`
      shows the tag or branch moved, since `v3` slides; the daily stamp is the
@@ -46,6 +48,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -119,6 +122,10 @@ USES = re.compile(
     re.IGNORECASE,
 )
 KEY_VALUE = re.compile(r"^(?P<indent>\s*)(?P<key>[\w-]+):\s*(?P<value>.*?)\s*$")
+RUN_CHECK = re.compile(r"^\s*\.gha/run-check/run-check\.sh\s+(?P<rest>\S.*)$")
+GHA_REPOSITORY = re.compile(r"^(?P<indent>\s*)repository:\s*['\"]?Morrison-Lab/gha['\"]?\s*(?:#.*)?$", re.IGNORECASE)
+EXPR = re.compile(r"'\$\{\{.*?\}\}'")
+BASE_PLACEHOLDER = "@@PUSH_CHECK_BASE@@"
 
 
 _LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
@@ -213,6 +220,7 @@ def find_calls(git_root: str) -> list[dict]:
     if not os.path.isdir(wf_dir):
         return []
     calls: list[dict] = []
+    bundled: list[dict] = []
     gated = False
     for name in sorted(os.listdir(wf_dir)):
         if not name.endswith((".yml", ".yaml")):
@@ -223,10 +231,155 @@ def find_calls(git_root: str) -> list[dict]:
         except OSError:
             continue
         calls.extend(parse_workflow(text))
+        bundled.extend(parse_run_check_lines(text))
         gated = gated or bool(ANNOTATION_GATE.search(text))
+    # A check that has its own caller workflow runs from that caller's inputs, once.
+    named = {c["name"] for c in calls}
+    for call in bundled:
+        if call["name"] not in named:
+            named.add(call["name"])
+            calls.append(call)
     for call in calls:
         call["gated"] = gated
     return calls
+
+
+def gha_checkout_ref(text: str) -> str | None:
+    """The `ref:` of the step that checks Morrison-Lab/gha out at `path: .gha`, or None,
+    read from the sibling keys of each `repository: Morrison-Lab/gha` line, in any order."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        m = GHA_REPOSITORY.match(line)
+        if not m:
+            continue
+        indent = len(m.group("indent"))
+        siblings: dict[str, str] = {}
+        for step in (-1, 1):
+            j = i + step
+            while 0 <= j < len(lines):
+                cur = lines[j]
+                if cur.strip() and not cur.lstrip().startswith("#"):
+                    if len(cur) - len(cur.lstrip()) != indent:
+                        break
+                    kv = KEY_VALUE.match(cur)
+                    if kv:
+                        value = re.sub(r"(?:^|\s+)#.*$", "", kv.group("value")).strip()
+                        siblings[kv.group("key")] = value.strip("'\"")
+                j += step
+        if siblings.get("path", "").rstrip("/") in (".gha", "./.gha") and siblings.get("ref"):
+            return siblings["ref"]
+    return None
+
+
+def parse_run_check_lines(text: str) -> list[dict]:
+    """Return [{name, ref, kind: "bundled", assigns, command, unhandled}] for each
+    `.gha/run-check/run-check.sh <name> VAR=value ... -- <command>` line (lds#1839).
+    Only diff-scoped lines (with a `*_BASE_REF=`) are kept: a whole-tree check can
+    read files a local render left behind, which CI never sees."""
+    ref = gha_checkout_ref(text)
+    if not ref:
+        return []
+    calls = []
+    for line in text.splitlines():
+        m = RUN_CHECK.match(line)
+        if not m:
+            continue
+        unhandled: list[str] = []
+
+        def placeholder(expr: re.Match) -> str:
+            body = expr.group(0)
+            if "'pull_request'" in body:
+                return BASE_PLACEHOLDER
+            if "'workflow_dispatch'" in body:
+                return "false"  # a local run stands in for a pull request, never a manual run
+            unhandled.append(body)
+            return "''"
+
+        try:
+            # comments=True drops a trailing shell comment, but also cuts at a mid-word '#' (#5955).
+            argv = shlex.split(EXPR.sub(placeholder, m.group("rest")), comments=True)
+        except ValueError as exc:  # an unclosed quote: note a diff-scoped line (#5955)
+            if "_BASE_REF=" in m.group("rest"):  # RUN_CHECK makes rest start with a word
+                calls.append({"name": m.group("rest").split()[0], "ref": ref, "kind": "bundled", "inputs": {},
+                              "assigns": {}, "command": [], "unhandled": [f"shell words do not split: {exc}"]})
+            continue
+        if not argv or "--" not in argv:
+            continue
+        name, split = argv[0], argv.index("--")
+        assigns = {}
+        for token in argv[1:split]:
+            key, sep, value = token.partition("=")
+            if sep and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+                assigns[key] = value
+        if not any(k.endswith("_BASE_REF") for k in assigns):
+            continue
+        command = argv[split + 1:]
+        # The pushed repo writes this line: run only .gha/<name>/<name>.py from a named
+        # gha ref, with no arguments, one prefix and only the VALUE_SAFE_KEYS under it.
+        if not SAFE_REF.fullmatch(ref or "") or re.fullmatch(r"[0-9a-fA-F]{40}", ref or ""):
+            unhandled.append(f"gha ref {ref} is not a named tag or branch")
+        prefixes = check_prefixes(assigns)
+        if len(prefixes) != 1:
+            unhandled.append(f"{len(prefixes)} *_BASE_REF keys, not exactly one")
+        unhandled.extend(f"{p}BASE_REF does not name a check's variables" for p in prefixes
+                         if not re.fullmatch(r"[A-Z][A-Z0-9]*_(?:[A-Z0-9]+_)*", p)
+                         or p.startswith(RESERVED_PREFIXES))
+        unhandled.extend(f"{k} is not the line's prefix with a value-safe suffix"
+                         for k in assigns if not any(k == p + s for p in prefixes for s in VALUE_SAFE_KEYS))
+        unhandled.extend(f"{k}={v}" for k, v in assigns.items() if unsafe_value(k, v))
+        # Run only what the wrapper is for: python on this check's own script.
+        if not gha_script_command(command, name):
+            unhandled.append(f"command is not python on .gha/{name}/{name}.py: "
+                             + (" ".join(command) or "(empty)"))
+        calls.append({"name": name, "ref": ref, "kind": "bundled", "inputs": {},
+                      "assigns": assigns, "command": command, "unhandled": unhandled})
+    return calls
+
+
+SAFE_PYTHON_FLAGS = ("-u", "-I", "-B")
+# The pushed line chooses the check, so a key such as TYPOS_BIN_DIR would choose code to run:
+# only these suffixes, which select files to read or how to report, may follow the prefix.
+VALUE_SAFE_KEYS = ("BASE_REF", "WHOLE_TREE", "GLOBS", "PATHS_IGNORE", "FAIL", "CLAUSE_BREAKS",
+                   "CLAUSE_MIN_LENGTH", "LIBRARY", "MACROS_FILE")
+# A ref that names a cache directory inside CACHE_ROOT/gha: no "..", no leading "." or "-".
+SAFE_REF = re.compile(r"(?!.*\.\.)[A-Za-z0-9][\w.\-/]*")
+# Prefixes whose variables change how a loader, interpreter or git behaves.
+# A check's own prefix is never one of these.
+RESERVED_PREFIXES = ("LD_", "DYLD_", "GIT_", "GITHUB_", "RUNNER_", "ACTIONS_", "PYTHON", "BASH",
+                     "XDG_", "SSH_", "GCONV_", "MALLOC_", "PERL", "RUBY", "NODE_", "JAVA_", "TCL_", "TK_")
+# A piece of a path or glob value: relative, with no "..", and no leading "-", "." or "~".
+SAFE_PIECE = re.compile(r"(?!.*\.\.)[\w*?][\w.*?/\-]*")
+
+
+def unsafe_value(key: str, value: str) -> bool:
+    """False only for a value that fits its key's suffix, matched as the checks read it: the
+    pull-request base, WHOLE_TREE "false", a bare word for a switch, or in-repo path pieces."""
+    if key.endswith("_BASE_REF"):
+        return value != BASE_PLACEHOLDER
+    if key.endswith("_WHOLE_TREE"):
+        return value != "false"
+    if key.endswith(("_FAIL", "_CLAUSE_BREAKS", "_CLAUSE_MIN_LENGTH")):
+        return not re.fullmatch(r"\w*", value)
+    pieces = re.split(r"[\s,]+", value.strip()) if value.strip() else []  # split as the checks do
+    return key.endswith("_MACROS_FILE") and len(pieces) != 1 or not all(map(SAFE_PIECE.fullmatch, pieces))
+
+
+def check_prefixes(assigns: dict) -> tuple:
+    """The prefixes of a line's *_BASE_REF keys, not yet tied to the named check (#5955)."""
+    return tuple(k[:-len("BASE_REF")] for k in assigns if k.endswith("_BASE_REF"))
+
+
+def gha_script_command(command: list, name: str) -> bool:
+    """True only for `python3 [-u|-I|-B ...] .gha/<name>/<name>.py`, with `<name>` the line's
+    own `check-<words>` name: no other script, `-c`, `-m`, or argument such as `--output-json`."""
+    if not re.fullmatch(r"check-[a-z0-9]+(?:-[a-z0-9]+)*", name):
+        return False
+    if not command or command[0] not in ("python3", "python"):
+        return False
+    rest = command[1:]
+    while rest and rest[0] in SAFE_PYTHON_FLAGS:
+        rest = rest[1:]
+    return rest == [f".gha/{name}/{name}.py"]
 
 
 def remote_moved(dest: str, ref: str) -> bool | None:
@@ -255,6 +408,8 @@ def ensure_gha(ref: str) -> str | None:
     override = os.environ.get("GHA_CHECKS_DIR")
     if override:
         return override if os.path.isdir(override) else None
+    if not SAFE_REF.fullmatch(ref):
+        return None
     dest = os.path.join(CACHE_ROOT, "gha", re.sub(r"[^\w.\-]", "_", ref))
     stamp = os.path.join(dest, ".git", "refreshed")
     try:
@@ -365,6 +520,8 @@ def resolve_base(git_root: str) -> str | None:
 
 def run_check(git_root: str, gha_dir: str, call: dict, base: str, terms_dirs: str = ""):
     """Run one check; return (name, status, output) with status ok|fail|error."""
+    if call.get("kind") == "bundled":
+        return run_bundled(git_root, gha_dir, call, base)
     spec = CHECKS[call["name"]]
     script = os.path.join(gha_dir, spec["script"])
     if not os.path.isfile(script):
@@ -392,6 +549,35 @@ def run_check(git_root: str, gha_dir: str, call: dict, base: str, terms_dirs: st
         return call["name"], "error", str(exc)
     out = (proc.stdout + proc.stderr).strip()
     return call["name"], ("ok" if proc.returncode == 0 else "fail"), out
+
+
+def run_bundled(git_root: str, gha_dir: str, call: dict, base: str):
+    """Run one `run-check.sh` line's command with its assignments, as the wrapper does,
+    against the cached gha checkout in place of `.gha/`."""
+    if call["unhandled"]:
+        return call["name"], "error", "line not runnable locally: " + call["unhandled"][0]
+    name, (prefix,) = call["name"], check_prefixes(call["assigns"])
+    assigns = {k: v.replace(BASE_PLACEHOLDER, base) for k, v in call["assigns"].items()}
+    if call.get("gated"):
+        # The annotation gate fails CI on a warn-only check's warnings, even with FAIL left unset.
+        assigns[prefix + "FAIL"] = "true"
+    script = os.path.join(gha_dir, name, name + ".py")
+    if not os.path.isfile(script):
+        return name, "error", f"{name}/{name}.py not found in gha checkout"
+    # Inherited variables with the check's own prefix are dropped; nothing else is touched.
+    env = {k: v for k, v in os.environ.items() if not k.startswith(prefix)}
+    env.update(assigns)
+    command = [sys.executable] + [os.path.join(gha_dir, a[len(".gha/"):]) if a.startswith(".gha/") else a
+                                  for a in call["command"][1:]]
+    try:
+        proc = subprocess.run(command, capture_output=True, text=True,
+                              cwd=git_root, env=env, timeout=CHECK_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return name, "error", f"timed out after {CHECK_TIMEOUT}s"
+    except OSError as exc:
+        return name, "error", str(exc)
+    out = (proc.stdout + proc.stderr).strip()
+    return name, ("ok" if proc.returncode == 0 else "fail"), out
 
 
 def findings(output: str, limit: int = 25) -> str:
@@ -529,6 +715,9 @@ def evaluate(command: str):
         by_ref: dict[str, str | None] = {}
         runnable = []
         for call in calls:
+            if call.get("unhandled"):  # refused before any fetch; run_bundled says why
+                runnable.append((call, ""))
+                continue
             if call["ref"] not in by_ref:
                 by_ref[call["ref"]] = ensure_gha(call["ref"])
             if by_ref[call["ref"]]:

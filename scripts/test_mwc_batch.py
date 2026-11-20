@@ -115,6 +115,27 @@ def test_render_lines():
     text = mwc_batch.render(results, ["Morrison-Lab/lds", "Morrison-Lab/sds"], 4)
     assert "3 open non-draft PRs examined" in text
     assert "(4 drafts skipped)" in text
-    assert "mwc lds 1 aaaaaaaa" in text
+    assert "mwc lds 1   (head aaaaaaaa" in text
+    assert "mwc lds 1 aaaaaaaa" not in text
     assert "merge-infra-pr lds 2" in text
     assert "sds#3 aaaaaaaa waiting: CI running" in text
+
+
+def test_ci_caller_is_any_workflow_dir_change():
+    # The same path test as check-pr-fully-clean.py's base drift (WORKFLOW_DIR).
+    assert mwc_batch.is_ci_caller([".github/workflows/check-x.yml"])
+    assert mwc_batch.is_ci_caller(["README.md", ".github/workflows/validate.yaml"])
+    assert mwc_batch.is_ci_caller([".github/workflows/scripts/x.py"])
+    assert not mwc_batch.is_ci_caller([".github/dependabot.yml", "tools/x.py"])
+
+
+def test_render_groups_ci_callers_apart():
+    sha = "b" * 40
+    results = [
+        {"repo": "lds", "number": 5, "sha": sha, "title": "caller", "status": "ci-caller", "reasons": []},
+        {"repo": "lds", "number": 6, "sha": sha, "title": "tool", "status": "infra", "reasons": []},
+    ]
+    text = mwc_batch.render(results, ["Morrison-Lab/lds"], 0)
+    caller_at = text.index("CI-caller PRs")
+    assert text.index("merge-infra-pr lds 5") > caller_at
+    assert text.index("merge-infra-pr lds 6") < caller_at

@@ -298,14 +298,10 @@ def parse_run_check_lines(text: str) -> list[dict]:
         try:
             # comments=True drops a trailing shell comment, but also cuts at a mid-word '#' (#5955).
             argv = shlex.split(EXPR.sub(placeholder, m.group("rest")), comments=True)
-        except ValueError as exc:
-            # An unclosed quote: shlex cannot split the line, so it cannot run here.
-            # Note it, as for the other refused shapes, when it looks diff-scoped (#5955).
-            words = m.group("rest").split()
-            if words and "_BASE_REF=" in m.group("rest"):
-                calls.append({"name": words[0], "ref": ref, "kind": "bundled", "inputs": {},
-                              "assigns": {}, "command": [],
-                              "unhandled": [f"shell words do not split: {exc}"]})
+        except ValueError as exc:  # an unclosed quote: note a diff-scoped line (#5955)
+            if "_BASE_REF=" in m.group("rest"):  # RUN_CHECK makes rest start with a word
+                calls.append({"name": m.group("rest").split()[0], "ref": ref, "kind": "bundled", "inputs": {},
+                              "assigns": {}, "command": [], "unhandled": [f"shell words do not split: {exc}"]})
             continue
         if not argv or "--" not in argv:
             continue

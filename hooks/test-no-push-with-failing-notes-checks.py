@@ -324,26 +324,18 @@ bundled_gated = make_repo({"cluster-checks.yml": BUNDLED, "annotation-gate.yml":
 run("git push origin feat", bundled_gated, 0)
 env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))
 expect("T57 an annotation gate makes a bundled warn-only check blocking", env_caw.get("CAW_FAIL"), "true")
-odd = make_repo({"cluster-checks.yml": BUNDLED.replace(
-    "CAW_WHOLE_TREE='${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}'",
-    "CAW_WHOLE_TREE='${{ inputs.whole }}'")})
-verdict, out = run("git push origin feat", odd, 0)
-expect("T58 an unknown expression fails open with a note naming the check",
-       (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
 expect("T60 the lds line form parses: name, ref, command",
        [(c["name"], c["ref"], c["command"][-1]) for c in hook.parse_run_check_lines(BUNDLED)],
        [(n, "v3", f".gha/{n}/{n}.py") for n in ("check-avoided-words", "check-new-line-breaks")])
-unquoted = make_repo({"cluster-checks.yml": BUNDLED.replace(
-    "CAW_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}'",
-    "CAW_BASE_REF=${{ github.base_ref }}")})
-verdict, out = run("git push origin feat", unquoted, 0)
-expect("T61 an unquoted expression fails open with a note, never runs as text",
-       (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
-unclosed = make_repo({"cluster-checks.yml": BUNDLED.replace(
-    "CAW_WHOLE_TREE='${{", "CAW_WHOLE_TREE=\"'${{")})
-verdict, out = run("git push origin feat", unclosed, 0)
-expect("T67 a line with an unclosed quote fails open with a note, never silently",
-       (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
+for case, before, after in (
+        ("T58 an unknown expression", "CAW_WHOLE_TREE='${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}'",
+         "CAW_WHOLE_TREE='${{ inputs.whole }}'"),
+        ("T61 an unquoted expression", "CAW_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}'",
+         "CAW_BASE_REF=${{ github.base_ref }}"),
+        ("T67 an unclosed quote", "CAW_WHOLE_TREE='${{", "CAW_WHOLE_TREE=\"'${{")):
+    verdict, out = run("git push origin feat", make_repo({"cluster-checks.yml": BUNDLED.replace(before, after)}), 0)
+    expect(f"{case} fails open with a note naming the check, never runs or skips silently",
+           (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
 commented = hook.parse_run_check_lines(BUNDLED.replace(
     "check-avoided-words.py\n", "check-avoided-words.py # trailing note\n"))
 expect("T62 a trailing shell comment is not passed as arguments",

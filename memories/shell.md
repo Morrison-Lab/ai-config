@@ -587,6 +587,14 @@ It was dropped before the push (2026-11-14).
 - **Do:** let the run finish, or stop it, before staging, and stage named paths.
 - **Don't:** run `git add -A` in a checkout where `run-local-validation.py` is still running.
 
+## Run `run-local-validation.py --changed` in the background in a cloud session
+
+A diff that touches `hooks/` makes the run sweep every hook test, which takes longer than a foreground Bash call is allowed.
+On [ai-config#5974](https://github.com/Morrison-Lab/ai-config/pull/5974) a foreground `timeout 500` run was killed twice in the hook-test sweep (exit 143) with nothing reported (2026-11-19).
+
+- **Do:** start it with the Bash tool's `run_in_background`, wait for its exit notice, and read the table.
+- **Don't:** wrap it in a foreground `timeout` and then report "no failure before the timeout" as a local pass.
+
 ## A hook that parses Bash commands reuses `scripts/lib/shellcmd.py`
 
 [ai-config#5678](https://github.com/Morrison-Lab/ai-config/pull/5678) first matched `gh api .../update-branch` with a hand-written command-position regex and quote scanner.

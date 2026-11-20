@@ -2120,3 +2120,17 @@ rme#1450 had `build` still running and ai-config#5186 was reported before its CI
 The merge-state read is already owed by the conflict bullets earlier in this file;
 ai-config#5246 skipped it and was reported final at 6c456cc9 while it conflicted with `main` (coordinator, 2026-11-10).
 No hook requires that read yet: extending the hook above to do so is tracked in [ai-config#5252](https://github.com/Morrison-Lab/ai-config/issues/5252).
+
+(Measured 2026-11-19 in a cloud session on ai-config#5997.
+Every real run was green, yet `scripts/check-pr-fully-clean.py` still refused:
+the `lint-qmd / lint-qmd` check run (run 44699146232, job 136163026756) read status `in_progress` with conclusion `success` and a `completed_at`,
+while its owning `validate` run, a push-event run, was already `completed` and `success`.
+The checker keys on the status field (`if status != "completed":`), not the conclusion,
+and GitHub can leave a job record at `in_progress` after its workflow run completes.)
+
+- **Do:** read the owning workflow run (`actions_get` `get_workflow_run`) and the job (`get_workflow_job`) to confirm the run completed and every step succeeded.
+  Then re-run that workflow run once (`actions_run_trigger` `rerun_workflow_run`), which refreshed the record,
+  and rerun the checker after it settles.
+  The re-run restarts the run's other jobs too, about 15 minutes for `validate`.
+- **Don't:** merge over the checker, push an empty commit, or re-run the job a second time.
+  Report the run id as a blocker instead.

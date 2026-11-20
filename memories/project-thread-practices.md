@@ -78,3 +78,18 @@ An idle thread is any unresolved thread, not only one in `review_ready` or `bloc
 - **Don't:** write a disposition with a free-word label, such as "**Blocking, line breaks**", or an explained "fixed" or "kept";
   the checker keeps that line in its verdict scan and reads the reply as not-clean ([ai-config#5819](https://github.com/Morrison-Lab/ai-config/issues/5819)).
 - **Don't:** pass `delaySeconds` to `send_later`, `pr_number` to `subscribe_pr_activity`, or `assignees` to `update_pull_request`; each errors on the first call.
+
+## A stacked base whose findings are fixed only in its child cannot pass the gate
+
+The final-head gate judges each head on its own.
+When review findings on a base PR at the size cap went into its stacked child, the base's own head could never get a clean line: the runner could not send [ai-config#5974](https://github.com/Morrison-Lab/ai-config/pull/5974) for one (2026-11-19).
+
+- **Do:** when the combined diff fits the cap (20 files, 600 lines), retarget the child to `main`, rewrite its body to cover the whole combined diff, and land only the child with a merge commit, as [ai-config#5976](https://github.com/Morrison-Lab/ai-config/pull/5976) did;
+  GitHub marks the base merged once its head reaches `main`.
+  Comment on the base that it must not merge alone.
+- **Don't:** plan "base first, then child" while the base still carries findings fixed only in the child.
+- **Do:** settle the structure before asking for agy, so agy reviews the head that will land.
+- **Don't:** write a lesson as a file in the project memory store;
+  `hooks/block-project-memory-write.py` denies it, and the lesson belongs in a tracked file such as this one.
+- **Don't:** chain a `>>` append with `git commit` in one cloud Bash call;
+  `hooks/no-chained-edit-and-commit-in-cloud.py` denies it, so edit with the Edit tool and commit separately.

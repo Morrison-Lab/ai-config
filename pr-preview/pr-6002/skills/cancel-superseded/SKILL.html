@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -515,7 +515,7 @@ cookieconsent.run({
 <li><strong>Don’t cancel <code>success</code> or <code>failed</code></strong> pipelines — they’re already done.</li>
 <li>The <code>claude-review</code> job runs early and fast; the <code>check-package</code> job is usually what’s hogging the runner. Canceling a superseded pipeline frees the runner for the newer one.</li>
 <li>Always pipe <code>glab api</code> through <code>| cat</code> to avoid pager issues.</li>
-<li><strong>Re-dispatching after a mass cancel</strong> (GitHub, lds queue logjam, 2026-11-20): re-run a cancelled run only when its <code>head_sha</code> is still the PR’s head, and never when that head already has a dispatched CLEAN review, since the re-run repeats finished work. Re-run a few PRs at a time, closest to final first, and only while the queue stays short, so it does not refill. Never re-run a cancelled or queued run of a stacked PR whose base has since merged or been retargeted. A re-run replays the original event with its old base ref. It then fails at <code>git fetch origin &lt;deleted base&gt;</code> and leaves the review gates red, as on lds#2913 and lds#2922. Compare the run’s <code>pull_requests[].base.ref</code> with the PR’s current base, and skip the run when they differ or the run lists no PR. Merge main into the PR instead, which starts a new <code>pull_request</code> event.</li>
+<li><strong>Re-dispatching after a mass cancel</strong> (GitHub, lds queue logjam, 2026-11-20): re-run a cancelled run only when its <code>head_sha</code> is still the PR’s head, and never when that head already has a dispatched CLEAN review, since the re-run repeats finished work. Re-run a few PRs at a time, closest to final first, and only while the queue stays short, so it does not refill. Never re-run a cancelled or queued run of a stacked PR whose base has since merged or been retargeted. A re-run replays the original event with its old base ref. It then fails at <code>git fetch origin &lt;deleted base&gt;</code> and leaves the review gates red, as on lds#2913 and lds#2922. Compare the run’s <code>pull_requests[].base.ref</code> with the PR’s current base, and skip the run when they differ or the run lists no PR. Merge main into the PR instead, which starts a new <code>pull_request</code> event: <code>MERGE_MAIN_FOR=base:&lt;old base&gt; git merge origin/main</code>, the fourth case of <a href="../../shared/workflow/sync-with-main.md"><code>sync-with-main</code></a>.</li>
 </ul>
 
 

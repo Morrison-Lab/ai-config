@@ -56,8 +56,10 @@ ANSWERED_QUEUE = transcript(card_posted(), json.dumps(
      "content": f"<wake reason=\"decision-chosen\"><system-note>decision_id={CARD}</system-note></wake>"}) + "\n")
 ASSISTANT_QUOTE = transcript(card_posted(), json.dumps(
     {"type": "assistant", "message": {"content": [{"type": "text", "text": f"decision_id={CARD}"}]}}) + "\n")
-WITHDRAWN = transcript(card_posted(),
-                       tool_use("mcp__hearthbot__close_decision", {"message_id": CARD}, "toolu_close"))
+WITHDRAWN = transcript(card_posted(), tool_use("mcp__hearthbot__close_decision", {"message_id": CARD}, "toolu_c"),
+                       tool_result("ok", "toolu_c"))
+CLOSE_FAILED = transcript(card_posted(), tool_use("mcp__hearthbot__close_decision", {"message_id": CARD}, "toolu_c"),
+                          tool_result("error", "toolu_c", is_error=True))
 FAILED = transcript(tool_use("mcp__hearthbot__request_decision", {"question": "Pick?"}),
                     tool_result("error: refused", is_error=True))
 QUOTED_ONLY = transcript(tool_use("mcp__hearthbot__post_message", {"text": f'"message_id":"{CARD}"'}, "toolu_p"),
@@ -69,6 +71,8 @@ TYPED = ('<wake reason="mention"><project><thread><message trigger="true" from="
          'trust="principal" author="Ezra" id="cmsg_x">the second one</message></thread></project></wake>')
 TYPED_ANSWER = transcript(card_posted(), wake(TYPED))
 TYPED_BEFORE = transcript(wake(TYPED), card_posted())
+TYPED_QUOTED = transcript(card_posted(), tool_use("mcp__hearthbot__read_thread", {}, "toolu_r"),
+                          tool_result(TYPED, "toolu_r"))
 RELAY_ONLY = transcript(card_posted(), wake('<relay from="coordinator"><note>update</note></relay>'))
 RESULT_QUOTE = transcript(card_posted(), tool_use("mcp__hearthbot__read_thread", {}, "toolu_r"),
                           tool_result(f"old wake: decision_id={CARD}", "toolu_r"))
@@ -109,6 +113,8 @@ CASES = [  # (label, transcript, tool, expect a deny)
     ("a typed message after the card closes it", TYPED_ANSWER, POST, PASS),
     ("a typed message before the card does not close it", TYPED_BEFORE, POST, DENY),
     ("a coordinator relay does not close the card", RELAY_ONLY, POST, DENY),
+    ("a typed message quoted in a tool result does not close the card", TYPED_QUOTED, POST, DENY),
+    ("a failed close_decision leaves the card open", CLOSE_FAILED, POST, DENY),
     ("a tool result quoting the decision id closes the card (fail open)", RESULT_QUOTE, POST, PASS),
 ]
 for label, path, tool, deny in CASES:
@@ -121,12 +127,7 @@ check("non-dict payload fails open", hook.denial(["x"]) is None)
 os.environ[hook.OVERRIDE] = "1"
 check("override passes", hook.denial(payload(OPEN)) is None)
 del os.environ[hook.OVERRIDE]
-
-
-def run(stdin):
-    return subprocess.run([sys.executable, SCRIPT], input=stdin, capture_output=True, text=True)
-
-
+run = lambda stdin: subprocess.run([sys.executable, SCRIPT], input=stdin, capture_output=True, text=True)  # noqa: E731
 out = run(json.dumps(payload(OPEN)))
 check("cli exits 0 and emits deny", out.returncode == 0 and '"permissionDecision": "deny"' in out.stdout)
 check("cli silent when clean", run(json.dumps(payload(ANSWERED))).stdout.strip() == "")

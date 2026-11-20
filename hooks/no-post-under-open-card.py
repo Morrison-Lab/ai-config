@@ -1,20 +1,15 @@
 #!/usr/bin/env python3
 """PreToolUse: deny a thread-visible post while a decision card waits for an answer.
 
-Ezra, 2026-11-19: "sometimes a card moves while I'm clicking and I click the
-wrong choice" and "if you want to post something after a card, delete the card
-and repost it last". Denies post_message, reply, update_message, edit_message
-(an edit changes height too), update_progress_checklist, post_widget and
-request_decision while the transcript holds an open card, and names Ezra's
-fix: close_decision, post, then request_decision last.
-
-Open: a request_decision tool_use whose own tool_result names its message_id.
-Closed: a close_decision with that id; a `decision_id=<id>` in any record the
-assistant did not write (the tap wake, or a tool result quoting one, which errs
-toward allowing); or a later wake with a typed message from the person.
-A deny because the state is decidable (ai-config#4741). Writer layer:
-shared/workflow/lab-operating-rules.md; reviewer layer: adversarial-reviewer.md.
-ALLOW_POST_UNDER_CARD=1 overrides. Fails open on parse trouble.
+Ezra, 2026-11-19: "if you want to post something after a card, delete the card
+and repost it last". Covers the TOOL list (an edit changes height too).
+Open: a request_decision whose own tool_result names its message_id. Closed: a
+close_decision with that id whose tool_result is not an error; a
+`decision_id=<id>` in any non-assistant record (the tap wake; a quoting tool
+result errs toward allowing); or a later wake, not a tool result, carrying the
+person's typed message. A deny since the state is decidable (ai-config#4741).
+Layers: lab-operating-rules.md, adversarial-reviewer.md. ALLOW_POST_UNDER_CARD=1
+overrides. Fails open on parse trouble.
 """
 import json
 import os
@@ -42,10 +37,10 @@ REASON = (
 )
 
 
-def read_text(path, limit=20_000_000):
-    try:
+def read_text(path):
+    try:  # the whole file: a card closed past any cutoff would stay open for good
         with open(path, encoding="utf-8", errors="replace") as f:
-            return f.read(limit)
+            return f.read()
     except (OSError, TypeError, ValueError):
         return ""
 
@@ -72,6 +67,7 @@ def result_text(block) -> str:
 def open_cards(transcript: str):
     """Return the ids of cards opened by request_decision and not closed since, in order."""
     request_ids = set()
+    close_ids = {}
     opened = []
     closed = set()
     for line in transcript.splitlines():
@@ -88,16 +84,19 @@ def open_cards(transcript: str):
                 elif CLOSE.search(name):
                     card = (block.get("input") or {}).get("message_id")
                     if isinstance(card, str):
-                        closed.add(card)
-            elif kind == "tool_result":
-                if block.get("tool_use_id") in request_ids and not block.get("is_error"):
+                        close_ids[block.get("id")] = card
+            elif kind == "tool_result" and not block.get("is_error"):
+                if block.get("tool_use_id") in close_ids:
+                    closed.add(close_ids[block.get("tool_use_id")])
+                if block.get("tool_use_id") in request_ids:
                     m = MESSAGE_ID.search(result_text(block))
                     if m:
                         opened.append(m.group(1))
         # The tap wake can be any non-assistant record type (measured 2026-11-19).
         if not (isinstance(record, dict) and record.get("type") == "assistant"):
             closed.update(CHOSEN.findall(line))
-            if HUMAN.search(line):  # a typed answer, or a message past the card
+            is_result = any(b.get("type") == "tool_result" for b in blocks(record))
+            if not is_result and HUMAN.search(line):  # a typed answer, not a quoted one
                 closed.update(opened)
     return [c for c in opened if c not in closed]
 

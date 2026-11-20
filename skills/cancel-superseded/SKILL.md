@@ -173,5 +173,8 @@ per branch.
   A re-run replays the original event with its old base ref.
   It then fails at `git fetch origin <deleted base>` and leaves the review gates red, as on lds#2913 and lds#2922.
   Compare the run's `pull_requests[].base.ref` with the PR's current base, and skip the run when they differ or the run lists no PR.
-  Merge main into the PR instead, which starts a new `pull_request` event:
+  When the old base merged into main and was deleted, merge main into the PR instead, which starts a new `pull_request` event:
   `MERGE_MAIN_FOR=base:<old base> git merge origin/main`, the fourth case of [`sync-with-main`](../../shared/workflow/sync-with-main.md).
+  The hook allows that case only for a base that main merged with a merge commit or a fast-forward.
+  When the run lists no PR, or the PR was retargeted while its old base still exists or never merged, skip the run and do not use `base:`, which the hook denies.
+  Push the PR's next real change, or ask the PR's owner, so a new event runs.

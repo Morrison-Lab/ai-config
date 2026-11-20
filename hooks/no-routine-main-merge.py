@@ -1,29 +1,15 @@
 #!/usr/bin/env python3
 """PreToolUse deny: no routine merge of main into a PR branch (ai-config#5988).
 
-Ezra, 2026-11-20, chose "Make it permanent" on stopping main merges: each one
-re-runs a PR's whole CI and voids its review, and routine merges helped queue
-499 lds runs on 2026-11-19 (Morrison-Lab/lds#2992). Denies, on Bash,
-`git merge` and `git pull` of main, master or origin/HEAD's branch (any ref
-form under a configured remote, a `FETCH_HEAD` holding one, or a bare
-`git pull` / `git pull <remote>` whose upstream is one; `feat/main` is a
-branch, not main), through `cd`, `git -C` and `bash -c`,
-unless the current branch is that branch, the merge changes nothing, or:
-(a) the branch conflicts with main (`git merge-tree --write-tree`);
-(b) a `MERGE_MAIN_FOR=<sha>` or `MERGE_MAIN_FOR='#<N>'` prefix on the git
-    command names a commit on main the branch lacks, or a PR whose `(#N)` or
-    `Merge pull request #N` subject is on main and not on the branch;
-(c) main changed `.github/workflows/` since the merge base, a superset of
-    `check-pr-fully-clean.py`'s stale-head refusal (ai-config#2982).
-Also denies `update_pull_request_branch`, `gh pr update-branch` and
-`gh api .../update-branch`, which cannot say why; merge locally instead.
-No bare override: `MERGE_MAIN_FOR` passes only when it names a real fix, and
-a session-wide value is ignored. A `FETCH_HEAD` fetched on the same line is
-read as the remote-tracking ref, so fetch main in its own command first.
-Fails open on helper, parse or git trouble (git before 2.38 lacks
-`merge-tree --write-tree`). Rule: shared/workflow/sync-with-main.md.
-Reviewer layer: .claude/agents/adversarial-reviewer.md ("Routine merges of
-main into a PR branch").
+Ezra, 2026-11-20, "Make it permanent" (lds#2992 queued 499 runs). Denies
+`git merge` / `git pull` of main, master or origin/HEAD's branch (a ref under
+a configured remote, FETCH_HEAD, or a bare pull whose upstream is main) and
+every server-side update-branch call, unless (a) the branch conflicts with
+main, (b) `MERGE_MAIN_FOR=<sha|#PR>` on the command names a fix on main the
+branch lacks, or (c) main changed .github/workflows since the merge base.
+No bare override. Fails open on helper, parse or git trouble.
+Writer: shared/workflow/sync-with-main.md. Reviewer:
+.claude/agents/adversarial-reviewer.md (Routine merges of main...).
 """
 
 import json
@@ -55,20 +41,15 @@ PULL_VALUE_OPTS = {"-s", "--strategy", "-X", "--strategy-option", "--depth",
                    "--deepen", "--shallow-since", "--shallow-exclude", "-j",
                    "--jobs", "--upload-pack", "--negotiation-tip",
                    "--recurse-submodules-default", "-o", "--server-option"}
-RULE = ("A PR branch takes main only when (a) it conflicts with main, (b) it "
-        "needs a fix on main, named with a MERGE_MAIN_FOR=<sha> or "
-        "MERGE_MAIN_FOR='#<PR>' prefix on this git command, or (c) main "
-        "changed .github/workflows since the merge base (the runner checker's "
-        "stale rule). Every main merge re-runs the PR's CI and voids its "
-        "review; routine merges helped queue 499 lds runs on 2026-11-19 "
-        "(Ezra, 2026-11-20: \"Make it permanent\"). Fetch main in its own "
-        "command first, so the check reads the current main. "
+RULE = ("A PR branch takes main only when (a) it conflicts with main, (b) it needs "
+        "a fix on main, named by a MERGE_MAIN_FOR=<sha> or MERGE_MAIN_FOR='#<PR>' "
+        "prefix on this git command, or (c) main changed .github/workflows since "
+        "the merge base. Each main merge re-runs CI and voids review (Ezra, "
+        "2026-11-20). Fetch main in its own command first. "
         "Rule: shared/workflow/sync-with-main.md.")
 DENY = "Refused: `{segment}` merges {target} into `{branch}`, and {why}. " + RULE
-SERVER_DENY = ("Refused: updating a PR branch from its base on the server "
-               "cannot show that the branch needs main. " + RULE +
-               " If it does, merge locally (`git merge origin/main`, with "
-               "MERGE_MAIN_FOR when the reason is (b)) and push.")
+SERVER_DENY = ("Refused: a server-side branch update cannot show that the branch "
+               "needs main. " + RULE + " If it does, merge locally and push.")
 
 
 def git(cwd, *args):
@@ -102,31 +83,19 @@ def remote_names(cwd):
 
 
 def is_main_name(name, names, remotes):
-    """True for `main`, `<remote>/main`, `refs/remotes/<remote>/main`,
-    `refs/heads/main`, and the same forms of the origin/HEAD branch.
-    A prefix that is not a configured remote (`feat/main`) is a branch."""
-    for prefix in ("refs/heads/", "refs/remotes/"):
-        if name.startswith(prefix):
-            name = name[len(prefix):]
-            if prefix == "refs/heads/":
-                return name in names
-            break
-    if name in names:
-        return True
-    head, sep, tail = name.partition("/")
-    return bool(sep) and head in remotes and tail in names
+    """`main`, `refs/heads/main`, or `[refs/remotes/]<remote>/main` (or the
+    origin/HEAD branch); `feat/main`, whose prefix is no remote, is not."""
+    if name.startswith("refs/heads/"):
+        return name[len("refs/heads/"):] in names
+    head, sep, tail = name.removeprefix("refs/remotes/").partition("/")
+    return name in names or (bool(sep) and head in remotes and tail in names)
 
 
 def upstream_target(cwd, remote=None):
-    """`(label, ref)` for the current branch's upstream when it is main-like
-    (a bare `git pull`, or `git pull <remote>` naming the upstream's remote)."""
+    """The upstream of a bare `git pull` (or `git pull <its remote>`), if main."""
     up = git_out(cwd, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
-    if not up or "/" not in up:
-        return []
-    up_remote, _sep, branch = up.partition("/")
-    if remote is not None and remote != up_remote:
-        return []
-    if branch not in default_names(cwd):
+    up_remote, sep, branch = (up or "").partition("/")
+    if not sep or remote not in (None, up_remote) or branch not in default_names(cwd):
         return []
     return [(f"upstream {up}", f"refs/remotes/{up}")]
 
@@ -134,22 +103,14 @@ def upstream_target(cwd, remote=None):
 def fetch_head_branches(cwd):
     """Branch names `FETCH_HEAD` marks for merge, from the file."""
     path = git_out(cwd, "rev-parse", "--git-path", "FETCH_HEAD")
-    if not path:
-        return []
-    path = path if os.path.isabs(path) else os.path.join(cwd, path)
     try:
-        with open(path, encoding="utf-8") as fh:
+        with open(os.path.join(cwd, path), encoding="utf-8") as fh:
             lines = fh.read().splitlines()
-    except OSError:
+    except (OSError, TypeError):
         return []
-    out = []
-    for line in lines:
-        if "\tnot-for-merge\t" in line:
-            continue
-        m = re.search(r"\tbranch '([^']+)' of ", line)
-        if m:
-            out.append(m.group(1))
-    return out
+    found = (re.search(r"\tbranch '([^']+)' of ", ln) for ln in lines
+             if "\tnot-for-merge\t" not in ln)
+    return [m.group(1) for m in found if m]
 
 
 def positionals(rest, value_opts):
@@ -216,26 +177,20 @@ def main_targets(sub, rest, cwd, fetched):
             return []
         if len(args) < 2:
             return upstream_target(cwd, args[0] if args else None)
-        remote = args[0]
-        out = []
-        for spec in args[1:]:
-            src = spec.lstrip("+").split(":", 1)[0]
-            src = re.sub(r"^refs/heads/", "", src)
-            if src in names:
-                out.append((f"{remote} {src}", f"refs/remotes/{remote}/{src}"))
-        return out
+        r = args[0]
+        return [(f"{r} {s}", f"refs/remotes/{r}/{s}") for s in map(_src, args[1:])
+                if s in names]
     return []
+
+
+def _src(spec):
+    return spec.lstrip("+").split(":", 1)[0].removeprefix("refs/heads/")
 
 
 def fetched_branches(sub, rest):
     """`(remote, [branch...])` for a `git fetch <remote> <refspec>...`."""
-    if sub != "fetch":
-        return None
-    args = positionals(rest, PULL_VALUE_OPTS) or []
-    if len(args) < 2:
-        return None
-    return args[0], [re.sub(r"^refs/heads/", "", s.lstrip("+").split(":", 1)[0])
-                     for s in args[1:]]
+    args = (positionals(rest, PULL_VALUE_OPTS) or []) if sub == "fetch" else []
+    return (args[0], [_src(s) for s in args[1:]]) if len(args) >= 2 else None
 
 
 def named_fix_present(cwd, ref, value):
@@ -254,18 +209,15 @@ def named_fix_present(cwd, ref, value):
             on_main = git(cwd, "merge-base", "--is-ancestor", tok, ref)[0] == 0
             on_head = git(cwd, "merge-base", "--is-ancestor", tok, "HEAD")[0] == 0
             if not on_main or on_head:
-                return False, (f"commit {tok} is "
-                               + ("already on the branch" if on_head else "not on main"))
+                where = "already on the branch" if on_head else "not on main"
+                return False, f"commit {tok} is {where}"
             continue
         m = PR_TOKEN.fullmatch(tok)
-        if m:
-            n = m.group(1)
-            pat = re.compile(rf"\(#{n}\)|Merge pull request #{n}\b")
-            if not any(pat.search(s) for s in subjects):
-                return False, (f"no commit on main that the branch lacks "
-                               f"names PR #{n}")
-            continue
-        return False, f"{REASON_VAR} value {tok!r} names no commit or PR"
+        if not m:
+            return False, f"{REASON_VAR} value {tok!r} names no commit or PR"
+        pat = re.compile(rf"\(#{m.group(1)}\)|Merge pull request #{m.group(1)}\b")
+        if not any(pat.search(s) for s in subjects):
+            return False, f"no commit on main that the branch lacks names PR #{m.group(1)}"
     return True, ""
 
 
@@ -274,16 +226,13 @@ def why_not_needed(cwd, ref, env):
     if git(cwd, "merge-base", "--is-ancestor", ref, "HEAD")[0] == 0:
         return None  # already merged: nothing changes
     code, _out = git(cwd, "merge-tree", "--write-tree", "--no-messages", "HEAD", ref)
-    if code is None or code not in (0, 1):
-        return None  # old git or error: fail open
-    if code == 1:
-        return None  # (a) conflict
+    if code != 0:
+        return None  # (a) conflict (1), or old git / error: fail open
     base = git_out(cwd, "merge-base", "HEAD", ref)
-    if base is None:
-        return None
-    changed = git_out(cwd, "diff", "--name-only", base, ref, "--", ".github/workflows")
-    if changed is None or changed:
-        return None  # (c) stale by the checker's rule (or unreadable)
+    changed = base and git_out(cwd, "diff", "--name-only", base, ref, "--",
+                               ".github/workflows")
+    if changed != "":
+        return None  # (c) stale by the checker's rule, or unreadable
     value = env_value(env, REASON_VAR)
     if value is not None:
         ok, detail = named_fix_present(cwd, ref, value)
@@ -346,25 +295,18 @@ def evaluate(command, cwd, depth=0):
 def main():
     try:
         payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        return 0
-    if not isinstance(payload, dict):
-        return 0
-    tool = payload.get("tool_name") or ""
-    reason = None
-    if isinstance(tool, str) and tool.endswith("update_pull_request_branch"):
-        reason = SERVER_DENY
-    elif tool in SHELL_TOOLS:
-        inp = payload.get("tool_input")
-        command = inp.get("command") if isinstance(inp, dict) else None
-        cwd = payload.get("cwd")
-        if not isinstance(cwd, str) or not os.path.isabs(cwd):
-            cwd = os.getcwd()
-        try:
+        tool = str(payload.get("tool_name") or "")
+        reason = None
+        if tool.endswith("update_pull_request_branch"):
+            reason = SERVER_DENY
+        elif tool in SHELL_TOOLS:
+            command = (payload.get("tool_input") or {}).get("command")
+            cwd = payload.get("cwd")
+            cwd = cwd if isinstance(cwd, str) and os.path.isabs(cwd) else os.getcwd()
             reason = evaluate(command, cwd) if isinstance(command, str) else None
-        except Exception as exc:  # fail open
-            print(f"no-routine-main-merge: could not evaluate ({exc})", file=sys.stderr)
-            return 0
+    except Exception as exc:  # bad payload or evaluation trouble: fail open
+        print(f"no-routine-main-merge: could not evaluate ({exc})", file=sys.stderr)
+        return 0
     if reason:
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",

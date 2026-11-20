@@ -15,7 +15,8 @@ import sys
 import tempfile
 import time
 
-OPEN = re.compile(r"\bgh\s+pr\s+create\b|create_pull_request", re.I)
+GH_PR_CREATE = re.compile(r"\bgh\s+pr\s+create\b", re.I)
+CREATE_TOOL = re.compile(r"create_pull_request", re.I)
 SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|subscribe_pr_activity|^schedule\b", re.I)
 # A closing reply that says the session is waiting on PR state (ai-config#4790).
 # Each branch names the PR state and a future event, so a bare status word
@@ -63,6 +64,21 @@ def unwrap_command(cmd):
             return cmd.replace('\\n', '\n').replace('\\"', '"')
     return cmd
 
+def opens_pr(name, args):
+    """True when a tool call opens a PR: a `create_pull_request` tool, or a
+    shell command running `gh pr create`.
+
+    Only the tool name and its command field are read. An Edit or Write whose
+    text mentions `gh pr create` opens nothing (ai-config#5979).
+    """
+    if CREATE_TOOL.search(name or ""):
+        return True
+    if not isinstance(args, dict):
+        return False
+    cmd = unwrap_command(args.get("command") or args.get("CommandLine") or args.get("cmd") or "")
+    return bool(GH_PR_CREATE.search(cmd))
+
+
 def records(path):
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
@@ -78,11 +94,11 @@ def records(path):
 def pending(path):
     opened = armed = False
     for record in records(path):
-        blobs = []
+        calls = []
         if record.get("type") == "assistant" or record.get("role") == "assistant":
             for block in (record.get("message") or {}).get("content") or record.get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
-                    blobs.append(block.get("name", "") + " " + json.dumps(block.get("input") or {}))
+                    calls.append((block.get("name", ""), block.get("input") or {}))
         if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
             for block in (record.get("tool_calls") or []):
                 if isinstance(block, dict):
@@ -97,11 +113,11 @@ def pending(path):
                         args = {}
                     cmd = args.get("CommandLine") or args.get("command") or args.get("cmd") or ""
                     cmd = unwrap_command(cmd)
-                    blobs.append(name + " " + json.dumps({**args, "command": cmd}))
-        for blob in blobs:
-            if OPEN.search(blob):
+                    calls.append((name, {**args, "command": cmd}))
+        for name, args in calls:
+            if opens_pr(name, args):
                 opened, armed = True, False
-            if opened and SCHEDULE.search(blob):
+            if opened and SCHEDULE.search(name + " " + json.dumps(args)):
                 armed = True
     return opened and not armed
 
@@ -136,7 +152,12 @@ def monitor_path(url):
 
 
 def extract_pr_urls(path):
-    """Extract PR URLs strictly produced by gh pr create / create_pull_request tool calls."""
+    """PR URLs from the results of PR-opening tool calls (see `opens_pr`).
+
+    A URL is read only from such a call's result, never from a tool's input,
+    so an Edit or a `gh pr view` that names a PR URL adds nothing
+    (ai-config#5979).
+    """
     urls = []
     pending_tool_ids = set()
     pending_open = False
@@ -155,13 +176,11 @@ def extract_pr_urls(path):
         if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
             for tc in record.get("tool_calls") or []:
                 if isinstance(tc, dict):
-                    blob = (tc.get("name") or "") + " " + json.dumps(tc.get("args") or tc.get("input") or {})
-                    if OPEN.search(blob):
+                    args = tc.get("args") or tc.get("input") or {}
+                    if isinstance(args, str):
+                        args = {"command": args}
+                    if opens_pr(tc.get("name") or "", args):
                         pending_open = True
-                        for match in PR_URL.finditer(blob):
-                            u = match.group(0)
-                            if u not in urls:
-                                urls.append(u)
 
         # Antigravity tool result or generic output text
         if pending_open and (record.get("source") in {"MODEL", "SYSTEM"} or record.get("type") in {"GENERIC", "USER_INPUT"}):
@@ -179,17 +198,12 @@ def extract_pr_urls(path):
                 continue
             btype = block.get("type")
             if btype == "tool_use":
-                blob = block.get("name", "") + " " + json.dumps(block.get("input") or {})
-                if OPEN.search(blob):
+                if opens_pr(block.get("name", ""), block.get("input") or {}):
                     tool_id = block.get("id")
                     if tool_id:
                         pending_tool_ids.add(tool_id)
                     else:
                         pending_open = True
-                    for match in PR_URL.finditer(blob):
-                        u = match.group(0)
-                        if u not in urls:
-                            urls.append(u)
             elif btype == "tool_result":
                 tool_id = block.get("tool_use_id")
                 if (tool_id and tool_id in pending_tool_ids) or pending_open:

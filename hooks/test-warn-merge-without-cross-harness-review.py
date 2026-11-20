@@ -16,6 +16,10 @@ HOOK = os.path.join(HOOKS_DIR, "warn-merge-without-cross-harness-review.py")
 sys.path.insert(0, os.path.join(os.path.dirname(HOOKS_DIR), "scripts", "lib"))
 from mwr_checker_fixture import trusted_checker_root  # noqa: E402
 
+# Stay offline: no amwr marker read (ai-config#3946, step 3). The off
+# switch only takes an amwr grant away; the amwr tests patch repo_amwr.
+os.environ["AI_CONFIG_AMWR_OFF"] = "1"
+
 # The plugin root the clean-checker hook trusts for an mwr merge (round 4,
 # finding 2): a fixture checkout whose checker blob is origin/main's.
 _MWR_ROOT_DIR = tempfile.TemporaryDirectory()

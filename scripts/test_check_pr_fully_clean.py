@@ -10996,6 +10996,25 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
           len(mwr_files_issues([{"filename": ""}, {"filename": "README.md"}])) == 1)
     check("an empty string entry fails closed",
           len(mwr_files_issues(["", "README.md"])) == 1)
+    # Step 3: the root AGENTS.md holds the repository's amwr marker, so an mwr
+    # merge never changes it, whatever case the name is in or however it arrives.
+    marker = mwr_files_issues(["AGENTS.md", "README.md"])
+    check("a change to the root AGENTS.md blocks, naming the amwr marker and mwc",
+          len(marker) == 1 and "AGENTS.md" in marker[0] and "amwr" in marker[0]
+          and "mwc" in marker[0] and "edits CI" not in marker[0])
+    check("a lowercase root agents.md blocks too",
+          len(mwr_files_issues(["agents.md"])) == 1)
+    check("a rename into the root AGENTS.md blocks",
+          len(mwr_files_issues([{"filename": "AGENTS.md",
+                                 "previous_filename": "docs/draft.md"}])) == 1)
+    check("a rename out of the root AGENTS.md blocks",
+          len(mwr_files_issues([{"filename": "docs/AGENTS.md",
+                                 "previous_filename": "AGENTS.md"}])) == 1)
+    check("a nested docs/AGENTS.md alone does not block",
+          mwr_files_issues(["docs/AGENTS.md", "AGENTS.md.bak"]) == [])
+    both = mwr_files_issues([".github/workflows/ci.yml", "AGENTS.md"])
+    check("a PR changing both CI and the root AGENTS.md reports both",
+          len(both) == 2 and "edits CI" in both[0] and "amwr" in both[1])
     files_fetcher = checker.PayloadFetcher({"pr_files": ["README.md"]})
     check("the payload answers the PR files route",
           files_fetcher._api(f"repos/{TEST_REPO}/pulls/7/files") == "README.md")

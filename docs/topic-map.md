@@ -147,6 +147,7 @@ its description does not use (ai-config#949).
 | `skills/mma/SKILL.md` | Merge main into open PR branches. |  |
 | `skills/model-fit/SKILL.md` | -> assess-model-fit. |  |
 | `skills/mwc/SKILL.md` | Session merge grant with confidence gate. Aliases: maw, merge-at-will, merge-when-confident. |  |
+| `skills/mwr/SKILL.md` | Merge-when-ready grant: skip review, keep green CI. Covers mwr, mwrs and the amwr marker. |  |
 | `skills/next/SKILL.md` | Insert after in-flight task. |  |
 | `skills/oppo/SKILL.md` | -> opposition-research. |  |
 | `skills/opposition-research/SKILL.md` | Mine competitor community demand. Aliases: oppo. |  |

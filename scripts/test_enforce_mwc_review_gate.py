@@ -17,6 +17,10 @@ import sys
 import unittest
 from unittest.mock import patch, MagicMock
 
+# Stay offline: no amwr marker read (ai-config#3946, step 3). The off
+# switch only takes an amwr grant away; the amwr tests patch repo_amwr.
+os.environ["AI_CONFIG_AMWR_OFF"] = "1"
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GATE_SCRIPT = os.path.join(ROOT, "plugins", "ai-config", "enforce-mwc-review-gate.py")
 

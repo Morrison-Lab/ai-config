@@ -37,6 +37,9 @@ HEAD = "8d7864c66c90ce495ae53deeaa8f1e86f3cf18b7"
 # covers, so the grant would read the PR's files from GitHub (round 10). It
 # stays off unless a case serves the files from `infra_gh` below.
 os.environ["NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT"] = "1"
+# Stay offline: no amwr marker read (ai-config#3946, step 3). The off
+# switch only takes an amwr grant away; the amwr tests patch repo_amwr.
+os.environ["AI_CONFIG_AMWR_OFF"] = "1"
 
 # A `gh` stand-in for the infra-PR grant's two reads, served from
 # FAKE_INFRA_FILES (a JSON list of paths) and FAKE_INFRA_HEAD.
@@ -420,6 +423,16 @@ def mwr_live_checks(ready):
     retarget = live_gh(base=MAIN_BASE, compare={
         DECOY_BASE: [("src/a.py", None)],
         MAIN_BASE: [("src/a.py", None), (".github/workflows/ci.yml", None)]})
+    # Step 3: a live change to the root AGENTS.md, which holds the amwr marker.
+    for desc, files in (
+            ("a changed root AGENTS.md", [("src/a.py", None), ("AGENTS.md", None)]),
+            ("a rename into the root agents.md", [("agents.md", "notes.md")])):
+        check(f"mwr live: {desc} denies",
+              mwr_decision([grant, ready], not_clean_pr_state(),
+                           live=live_gh(compare={MAIN_BASE: files})) == "deny")
+    check("mwr live: a nested docs/AGENTS.md allows (control)",
+          mwr_decision([grant, ready], not_clean_pr_state(),
+                       live=live_gh(compare={MAIN_BASE: [("docs/AGENTS.md", None)]})) == "allow")
     check("mwr live: a base retargeted to a decoy and back, showing .github/, denies",
           mwr_decision([grant, ready], not_clean_pr_state(), live=retarget) == "deny")
     check("mwr live: the same PR still on the decoy base would allow (control)",

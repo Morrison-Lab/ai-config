@@ -10,6 +10,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Stay offline: no amwr marker read (ai-config#3946, step 3). The off
+# switch only takes an amwr grant away; the amwr tests patch repo_amwr.
+os.environ["AI_CONFIG_AMWR_OFF"] = "1"
+
 HOOK = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else str(Path(__file__).parent / "no-unauthorized-merge.py")
 
 if not os.path.isfile(HOOK):
@@ -2338,6 +2342,75 @@ for _desc, _records, _merge, _want in _MWR_CASES:
     check(_got == _want)
     print(f"  {_got:<6} {_desc}")
 
+# Step 3, end to end: a fake `gh` serves the root AGENTS.md of the default
+# branch, and the amwr read is switched on for these runs only.
+_AMWR_GH = r'''#!/usr/bin/env python3
+import os, sys
+route = sys.argv[-1] if len(sys.argv) > 1 else ""
+text = os.environ.get("FAKE_AGENTS_MD")
+if (sys.argv[1:4] == ["api", "-H", "Accept: application/vnd.github.raw"]
+        and route == "repos/Morrison-Lab/mcsg/contents/AGENTS.md" and text is not None):
+    sys.stdout.write(text)
+    sys.exit(0)
+sys.stderr.write("HTTP 404")
+sys.exit(1)
+'''
+
+
+def _amwr_verdict(records, merge, agents_md):
+    """_mwr_verdict with the amwr read on, against a fake `gh` whose
+    Morrison-Lab/mcsg default branch has `agents_md` (None: no file)."""
+    saved = dict(os.environ)
+    with tempfile.TemporaryDirectory() as gh_dir:
+        gh = os.path.join(gh_dir, "gh")
+        with open(gh, "w", encoding="utf-8") as fh:
+            fh.write(_AMWR_GH)
+        os.chmod(gh, 0o755)
+        try:
+            os.environ.pop("AI_CONFIG_AMWR_OFF", None)
+            os.environ["PATH"] = gh_dir + os.pathsep + saved.get("PATH", "")
+            if agents_md is None:
+                os.environ.pop("FAKE_AGENTS_MD", None)
+            else:
+                os.environ["FAKE_AGENTS_MD"] = agents_md
+            return _mwr_verdict(records, merge)
+        finally:
+            os.environ.clear()
+            os.environ.update(saved)
+
+
+_AMWR_ON = "# Agents\n\n<!-- amwr: on -->\n"
+_AMWR_STRICT = ("mcp__github__merge_pull_request",
+                {"owner": "Morrison-Lab", "repo": "mcsg", "pullNumber": 114,
+                 "expectedHeadSha": _MWR_SHA})
+print("amwr repository grant:")
+for _desc, _records, _merge, _md, _want in [
+    ("a marked mcsg grants a strict MCP merge with no typed grant",
+     [_tg_user("hello")], _AMWR_STRICT, _AMWR_ON, "allow"),
+    ("an unmarked mcsg grants nothing (control)",
+     [_tg_user("hello")], _AMWR_STRICT, "# Agents\n", "BLOCK"),
+    ("no AGENTS.md on mcsg grants nothing",
+     [_tg_user("hello")], _AMWR_STRICT, None, "BLOCK"),
+    ("the marker only in a fence grants nothing",
+     [_tg_user("hello")], _AMWR_STRICT, "```\n<!-- amwr: on -->\n```\n", "BLOCK"),
+    ("a marked mcsg does not cover another repository",
+     [_tg_user("hello")], ("mcp__github__merge_pull_request",
+                           {"owner": "Morrison-Lab", "repo": "csci201", "pullNumber": 114,
+                            "expectedHeadSha": _MWR_SHA}), _AMWR_ON, "BLOCK"),
+    ("a marked mcsg does not grant a Bash `gh pr merge`",
+     [_tg_user("hello")], _ng_bash("gh pr merge 114 -R Morrison-Lab/mcsg --squash"),
+     _AMWR_ON, "BLOCK"),
+    ("a marked mcsg does not grant an MCP merge without the pinned sha",
+     [_tg_user("hello")], ("mcp__github__merge_pull_request",
+                           {"owner": "Morrison-Lab", "repo": "mcsg", "pullNumber": 114,
+                            "expected_head_sha": _MWR_SHA}), _AMWR_ON, "BLOCK"),
+    ("a typed revocation suspends the marker",
+     [_tg_user("hello"), _tg_user("stop, review it first")], _AMWR_STRICT, _AMWR_ON, "BLOCK"),
+]:
+    _got = _amwr_verdict(_records, _merge, _md)
+    check(_got == _want)
+    print(f"  {_got:<6} {_desc}")
+
 # Round 4: a repo-less '#N' grants nothing in any cwd: no checkout, a
 # checkout of the merged repository by any remote shape, or another one.
 for _desc, _remote in [
@@ -2525,6 +2598,126 @@ for _desc, _records, _want in [
     _got = _mwr_grant_direct(_records)
     check(_got is _want)
     print(f"  {'ok' if _got is _want else 'WRONG':<6} {_desc}")
+
+
+# Step 3 (ai-config#3946): the repo-wide amwr marker in the root AGENTS.md
+# of the default branch. These patch the read, so they stay offline.
+def _nua_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_nua_amwr_test", HOOK)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_amwr = _nua_module()
+_M = _amwr.AMWR_MARKER
+for _desc, _text, _want in [
+    ("amwr: the marker on a line of its own grants", f"# Agents\n\n{_M}\n", True),
+    ("amwr: trailing whitespace and up to three leading spaces still grant", f"   {_M}  \n", True),
+    ("amwr: four leading spaces (an indented code block) do not grant", f"    {_M}\n", False),
+    ("amwr: a tab-indented marker does not grant", f"\t{_M}\n", False),
+    ("amwr: the marker inside a backtick fence does not grant", f"```\n{_M}\n```\n", False),
+    ("amwr: the marker inside a tilde fence does not grant", f"~~~md\n{_M}\n~~~\n", False),
+    ("amwr: a shorter fence inside a longer one does not close it",
+     f"````\n```\n{_M}\n````\n", False),
+    ("amwr: the marker after a closed fence grants", f"```\nx\n```\n{_M}\n", True),
+    ("amwr: the marker with other text on its line does not grant", f"Set {_M} here\n", False),
+    ("amwr: an off marker does not grant", "<!-- amwr: off -->\n", False),
+    ("amwr: a differently spaced marker does not grant", "<!--amwr: on-->\n", False),
+    ("amwr: no text does not grant", None, False),
+    ("amwr: an empty file does not grant", "", False),
+]:
+    _got = _amwr.amwr_marked(_text)
+    check(_got is _want)
+    print(f"  {'ok' if _got is _want else 'WRONG':<6} {_desc}")
+
+
+def _amwr_grant(records, marked=True, target="Morrison-Lab/mcsg", number=113):
+    """transcript_mwr_grant() with repo_amwr patched; returns (grant, targets read)."""
+    module = _nua_module()
+    seen = []
+
+    def fake(t):
+        seen.append(t)
+        return marked
+    module.repo_amwr = fake
+    if records is None:
+        return module.transcript_mwr_grant({"transcript_path": "/nonexistent.jsonl"},
+                                           target, number), seen
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "transcript-amwr-test.jsonl")
+        with open(path, "w", encoding="utf-8") as fh:
+            for rec in records:
+                fh.write(json.dumps(rec) + "\n")
+        return module.transcript_mwr_grant({"transcript_path": path}, target, number), seen
+
+
+_got, _seen = _amwr_grant([_tg_user("hello")])
+check(_got is True and _seen == ["Morrison-Lab/mcsg"])
+print(f"  {'ok' if _got is True and _seen == ['Morrison-Lab/mcsg'] else 'WRONG':<6} "
+      "amwr: a marked repository grants mwr with no typed grant, reading that repository")
+_got, _ = _amwr_grant([_tg_user("hello")], marked=False)
+check(_got is False)
+print(f"  {'ok' if _got is False else 'WRONG':<6} amwr: an unmarked repository grants nothing")
+_got, _seen = _amwr_grant([_tg_user("mwr mcsg#113")], marked=False)
+check(_got is True and _seen == [])
+print(f"  {'ok' if _got is True and _seen == [] else 'WRONG':<6} "
+      "amwr: a typed grant does not read the marker")
+_got, _seen = _amwr_grant([_tg_user("hello"), _tg_user("stop, review it first")])
+check(_got is False and _seen == [])
+print(f"  {'ok' if _got is False and _seen == [] else 'WRONG':<6} "
+      "amwr: a typed revocation in the session suspends the marker, unread")
+_got, _ = _amwr_grant([_tg_user("stop, review it first"), _tg_user("mwr mcsg#113")])
+check(_got is True)
+print(f"  {'ok' if _got is True else 'WRONG':<6} "
+      "amwr: after a revocation, a later typed grant still grants")
+_got, _ = _amwr_grant([_tg_user("stop, review it first"), _tg_user("mwr mcsg#7")])
+check(_got is False)
+print(f"  {'ok' if _got is False else 'WRONG':<6} "
+      "amwr: after a revocation, a typed grant for another PR does not revive the marker")
+_got, _seen = _amwr_grant(None)
+check(_got is False and _seen == [])
+print(f"  {'ok' if _got is False and _seen == [] else 'WRONG':<6} "
+      "amwr: no transcript is no grant, and the marker is not read")
+
+_amwr_off = _nua_module()
+
+
+def _no_fetch(target):
+    raise AssertionError("fetched")
+
+
+_amwr_off.fetch_default_branch_agents_md = _no_fetch
+_got = _amwr_off.repo_amwr("Morrison-Lab/mcsg")
+check(_got is False)
+print(f"  {'ok' if _got is False else 'WRONG':<6} amwr: the off switch grants nothing and reads nothing")
+
+_amwr_on = _nua_module()
+_reads = []
+
+
+def _fake_fetch(target):
+    _reads.append(target)
+    return {"Morrison-Lab/a": _M + "\n", "Morrison-Lab/b": "# none\n"}.get(target)
+
+
+_amwr_on.fetch_default_branch_agents_md = _fake_fetch
+_old_off = os.environ.pop("AI_CONFIG_AMWR_OFF", None)
+try:
+    _res = (_amwr_on.repo_amwr("Morrison-Lab/a"), _amwr_on.repo_amwr("Morrison-Lab/A"),
+            _amwr_on.repo_amwr("Morrison-Lab/b"), _amwr_on.repo_amwr("Morrison-Lab/missing"))
+finally:
+    if _old_off is not None:
+        os.environ["AI_CONFIG_AMWR_OFF"] = _old_off
+_want = (True, True, False, False)
+check(_res == _want and _reads == ["Morrison-Lab/a", "Morrison-Lab/b", "Morrison-Lab/missing"])
+print(f"  {'ok' if _res == _want and len(_reads) == 3 else 'WRONG':<6} "
+      "amwr: repo_amwr reads each repository once, and a failed read is no grant")
+for _bad in ("", "mcsg", "a/b/c", "a/b;rm", None, "../x/y", "../x", "x/.."):
+    _ok = _amwr.fetch_default_branch_agents_md(_bad) is None
+    check(_ok)
+    print(f"  {'ok' if _ok else 'WRONG':<6} amwr: target {_bad!r} is refused before any read")
 
 
 # Round 6: in a cloud thread the user's own message arrives as an SDK-sent

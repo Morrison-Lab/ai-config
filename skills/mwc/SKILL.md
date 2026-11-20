@@ -34,7 +34,12 @@ without asking confirmation before every merge.
   Every required check must still pass, and a formal CHANGES_REQUESTED or REJECTED review still blocks.
   A dismissed review blocks too, since dismissing a CHANGES_REQUESTED review removes it from the formal decision.
   `mwr` never merges a PR that changes any file under `.github/`, since such a PR could edit the very CI that `mwr` relies on.
+  Nor does it merge a PR that changes the root `AGENTS.md`, which holds the `amwr` marker.
   Merge that PR under `mwc`.
+  The `amwr` marker is the repository-wide form: a line that is exactly `<!-- amwr: on -->`, outside code blocks, in the root `AGENTS.md` of the repository's default branch, grants `mwr` for every PR of that repository (step 3; Ezra's card, 2026-11-20: "read from main only").
+  It is read from the default branch only, so a PR cannot grant itself, and a read that fails grants nothing.
+  A revocation in the session suspends it, after which only a later typed grant counts.
+  The [`mwr`](../mwr/SKILL.md) skill is the short form.
   The checker fails closed when it cannot read the PR's file list.
   Under `mwr` a human's answered "not clean" review body that is not a formal review no longer blocks, since only a formal CHANGES_REQUESTED does.
   `mwr` covers the PRs its message names ("mwr owner/repo#N", "mwr repo#N", or the PR's URL), and `mwrs` covers the session.
@@ -75,7 +80,7 @@ without asking confirmation before every merge.
   The checker runs before the merge, and the PR can change in between, so `hooks/enforce-mwc-review-gate.py` checks again at merge time, on live data it reads in the same hook call.
   `hooks/block-merge-without-clean-checker.py` runs the same checks whenever the MERGE-READY line, not FULLY CLEAN, is what credits the merge, and so does the review gate even when its ordinary path would allow.
   It denies when any review on the PR, not only each reviewer's latest, is DISMISSED, CHANGES_REQUESTED or REJECTED.
-  It denies when the files changed between the PR's live base sha and the pinned head (`compare/<base>...<head>`, renames' old names included) include anything under `.github/`, so retargeting the base after the checker run does not help.
+  It denies when the files changed between the PR's live base sha and the pinned head (`compare/<base>...<head>`, renames' old names included) include anything under `.github/` or the root `AGENTS.md`, so retargeting the base after the checker run does not help.
   It denies when the live head sha is not the pinned sha.
   Any of this data that cannot be read denies too.
   The checker's own `.github/` and dismissed-review checks stay as a second layer.

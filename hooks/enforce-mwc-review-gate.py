@@ -1647,6 +1647,9 @@ def mwr_only(payload, pr_data):
 # call as the merge, and every missing or malformed field denies.
 MWR_BLOCKING_REVIEW_STATES = ("DISMISSED", "CHANGES_REQUESTED", "REJECTED")
 MWR_CI_DIR = ".github/"
+# The root AGENTS.md holds the repository's amwr marker; an mwr merge never
+# changes it, so it cannot switch the marker on.
+MWR_AMWR_FILE = "agents.md"
 # GitHub's compare endpoint lists at most this many changed files.
 MWR_COMPARE_FILES_CAP = 300
 SHA40_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -1705,6 +1708,12 @@ def mwr_live_problem(pr_data):
         return (f"against the live base, the PR changes {shown}; mwr never merges a PR "
                 "that edits CI. Ask the user to type `mwc` for it, which still needs "
                 "a clean review; do not create an mwc grant yourself.")
+    marker_edits = sorted({n for f in files for n in f if n.lower() == MWR_AMWR_FILE})
+    if marker_edits:
+        return (f"against the live base, the PR changes the root {marker_edits[0]}, "
+                "which holds the repository's amwr marker; mwr never merges that. "
+                "Ask the user to type `mwc` for it, which still needs a clean "
+                "review; do not create an mwc grant yourself.")
     return ""
 
 

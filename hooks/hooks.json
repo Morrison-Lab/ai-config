@@ -1959,6 +1959,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-post-under-open-card.py\"",
+            "timeout": 10,
+            "script": "no-post-under-open-card.py",
+            "why": "ai-config#5969. Ezra, 2026-11-19: 'sometimes a card moves while I'm clicking and I click the wrong choice; can we avoid that?' and 'if you want to post something after a card, delete the card and repost it last'. A pds thread posted a message and checklist under a request_decision card; it shifted and he tapped the wrong option. Denies post_message, reply, update_message, edit_message, update_progress_checklist, post_widget and request_decision while the transcript holds an open card (a request_decision tool_result named its message_id and no close_decision or decision-chosen wake has closed it), and says to withdraw it with close_decision, post, then re-post the card last. A deny, not a reminder, because the state is decidable from the transcript (ai-config#4741). ALLOW_POST_UNDER_CARD=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-plain-text-choice.py\"",
             "timeout": 10,
             "script": "no-plain-text-choice.py",

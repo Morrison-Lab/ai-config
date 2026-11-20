@@ -63,6 +63,15 @@ except ImportError as _exc:
           f"({_exc}); its sibling hook will not load", file=sys.stderr)
     load_sibling = None
 
+try:
+    from transcript_meta import is_skill_load_meta
+except Exception as _exc:  # broken install: degrade, never block silently
+    print(f"require-ums-before-resolve: cannot load scripts/lib/transcript_meta.py "
+          f"({_exc}); a skill body will be read as a user message", file=sys.stderr)
+
+    def is_skill_load_meta(entry):  # noqa: D103 -- fallback
+        return False
+
 RESOLVE_TOOL = "set_thread_resolved"
 
 EVENT = re.compile(r"<event\b([^>]*\bsource=\"github\"[^>]*)>(.*?)</event>", re.DOTALL)
@@ -117,7 +126,10 @@ def ums_since_last_user_message(path, ums_word):
                 role = "assistant"
 
             if role == "user":
-                if (text_of(rec) or "").strip():
+                # A skill's injected body is an isMeta user record carrying
+                # sourceToolUseID; it is not a user message (ai-config#6039).
+                # A scheduled continuation is isMeta too, but is a real turn.
+                if not is_skill_load_meta(rec) and (text_of(rec) or "").strip():
                     last_user = i
                 continue
             if role != "assistant":
@@ -215,7 +227,7 @@ def thread_reported_ums(path, thread_id):
                             and isinstance(inp, dict) and inp.get("thread_id") == thread_id):
                         reads.add(b.get("id"))
             elif role == "user":
-                if (text_of(rec) or "").strip():
+                if not is_skill_load_meta(rec) and (text_of(rec) or "").strip():
                     last_user = i
                 for b in blocks:
                     if (b.get("type") == "tool_result" and b.get("tool_use_id") in reads

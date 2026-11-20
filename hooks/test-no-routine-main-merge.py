@@ -63,26 +63,18 @@ with tempfile.TemporaryDirectory() as root:
     git("fetch", "-q", "origin", cwd=repo)
 
     M = " git merge origin/main"
-    deny = [
-        "git merge origin/main", "git merge --no-edit origin/main",
-        "git merge -m 'sync' origin/main 2>&1 | tail -1",
-        "git merge refs/remotes/origin/main", "git merge origin",
-        "git merge origin/HEAD", "git pull origin main",
-        "git pull --no-rebase origin main", "git -C . merge origin/main",
+    deny = [  # (b) that does not hold comes last; a value counts only on the merge.
+        M[1:], "git merge --no-edit origin/main", "git merge -m 'sync' origin/main 2>&1 | tail -1",
+        "git merge refs/remotes/origin/main", "git merge origin", "git merge origin/HEAD",
+        "git pull origin main", "git pull --no-rebase origin main", "git -C . merge origin/main",
         "bash -c 'git merge origin/main'", "cd / && cd " + repo + " &&" + M,
-        # (b) that does not hold; a value counts only on the merge itself.
         "MERGE_MAIN_FOR='#99'" + M, "MERGE_MAIN_FOR=" + M, "MERGE_MAIN_FOR=1" + M,
-        "MERGE_MAIN_FOR=yes" + M, "MERGE_MAIN_FOR=deadbeefdead" + M,
-        "MERGE_MAIN_FOR='#42' true &&" + M]
-    allow = [
-        # Not main: the PR branch's own remote, a feature branch, no-ops.
-        "git pull", "git pull origin pr", "git merge --abort",
-        "git merge --continue", "git log origin/main", "echo" + M,
-        "git merge origin/nosuch",
-        # (b): the named fix is on main and missing from the branch.
-        f"MERGE_MAIN_FOR={fix[:10]}" + M, "MERGE_MAIN_FOR='#42'" + M,
-        "MERGE_MAIN_FOR=42" + M, "MERGE_MAIN_FOR=Morrison-Lab/x#42" + M,
-        "MERGE_MAIN_FOR='#42,#43'" + M]
+        "MERGE_MAIN_FOR=yes" + M, "MERGE_MAIN_FOR=deadbeefdead" + M, "MERGE_MAIN_FOR='#42' true &&" + M]
+    allow = [  # Not main (own remote, a feature branch, no-ops), then (b) holding.
+        "git pull", "git pull origin pr", "git merge --abort", "git merge --continue",
+        "git log origin/main", "echo" + M, "git merge origin/nosuch",
+        f"MERGE_MAIN_FOR={fix[:10]}" + M, "MERGE_MAIN_FOR='#42'" + M, "MERGE_MAIN_FOR=42" + M,
+        "MERGE_MAIN_FOR=Morrison-Lab/x#42" + M, "MERGE_MAIN_FOR='#42,#43'" + M]
     for command, want in [(c, "deny") for c in deny] + [(c, "allow") for c in allow]:
         check(command, run(command, repo), want)
 
@@ -131,12 +123,20 @@ with tempfile.TemporaryDirectory() as root:
     # main moved on and nothing has fetched it yet: the local origin/main is an
     # ancestor of HEAD, but a command that fetches first still brings main in.
     commit(origin, "f.txt", "f\n", "Unfetched content (#44)")
+    F = "git fetch origin && git merge "
     for command, want in [("git pull origin main", "deny"), ("git merge origin/main", "allow"),
-                          ("git fetch origin main && git merge FETCH_HEAD", "deny")]:
+                          ("git fetch origin main && git merge FETCH_HEAD", "deny"),
+                          ("git fetch origin main &&" + M, "deny"), (F + "origin", "deny"),
+                          (F + "origin/HEAD", "deny"), (F + "FETCH_HEAD", "deny"),
+                          ("git fetch && git merge FETCH_HEAD", "deny"),
+                          ("git fetch origin pr && git merge FETCH_HEAD", "allow")]:
         check("unfetched: " + command, run(command, repo), want)
     git("branch", "-q", "--set-upstream-to=origin/main", cwd=repo)
     check("unfetched: bare pull", run("git pull", repo), "deny")
     git("branch", "-q", "--unset-upstream", cwd=repo)
+    # A single-branch clone has no local origin/main; a pull still fetches it.
+    git("update-ref", "-d", "refs/remotes/origin/main", cwd=repo)
+    check("no local ref: pull", run("git pull origin main", repo), "deny")
 
     # (c): main changed a workflow since the merge base.
     commit(origin, ".github/workflows/ci.yml", "on: push\n", "Add CI")
@@ -149,7 +149,7 @@ with tempfile.TemporaryDirectory() as root:
     commit(origin, "c.txt", "main side\n", "main edits c")
     git("fetch", "-q", "origin", cwd=repo)
     check("conflict", run("git merge origin/main", repo), "allow")
-    check("conflict pull", run("git pull origin main", repo), "allow")
+    check("conflict pull", run("git pull origin main", repo), "deny")  # fetches first
 
     # origin/HEAD naming another default branch counts as main.
     git("switch", "-q", "-c", "trunk", "main", cwd=origin)

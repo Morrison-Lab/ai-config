@@ -7,7 +7,7 @@ a configured remote, FETCH_HEAD, or a bare pull whose upstream is main) and
 every server-side update-branch call, unless (a) the branch conflicts with
 main, (b) `MERGE_MAIN_FOR=<sha|#PR>` on the command names a fix on main the
 branch lacks, or (c) main changed .github/workflows since the merge base.
-No bare override. Fails open on helper, parse or git trouble.
+No bare override. Pull or fetch-then-merge of main: always denied. Else fails open.
 Writer: shared/workflow/sync-with-main.md. Reviewer:
 .claude/agents/adversarial-reviewer.md (Routine merges of main...).
 """
@@ -48,6 +48,8 @@ RULE = ("A PR branch takes main only when (a) it conflicts with main, (b) it nee
         "2026-11-20). Fetch main in its own command first. "
         "Rule: shared/workflow/sync-with-main.md.")
 DENY = "Refused: `{segment}` merges {target} into `{branch}`, and {why}. " + RULE
+FETCH_WHY = ("the command fetches before it merges, so the hook could judge "
+             "it only on a stale or missing local ref")
 SERVER_DENY = ("Refused: a server-side branch update cannot show that the branch "
                "needs main. " + RULE + " If it does, merge locally and push.")
 
@@ -224,15 +226,10 @@ def named_fix_present(cwd, ref, value):
     return True, ""
 
 
-def why_not_needed(cwd, ref, env, fetching=False):
-    """None when the merge is allowed, else why it is routine. `fetching`:
-    the command fetches main first, so the local ref may be stale."""
+def why_not_needed(cwd, ref, env):
+    """None when the merge is allowed, else why it is routine."""
     if git(cwd, "merge-base", "--is-ancestor", ref, "HEAD")[0] == 0:
-        if not fetching:
-            return None  # already merged: nothing changes
-        return ("the command fetches main before merging, so the hook cannot "
-                "see what the merge brings in; run `git fetch` on its own, "
-                "then `git merge <remote>/<main>`")
+        return None  # already merged: nothing changes
     code, _out = git(cwd, "merge-tree", "--write-tree", "--no-messages", "HEAD", ref)
     if code != 0:
         return None  # (a) conflict (1), or old git / error: fail open
@@ -263,7 +260,7 @@ def evaluate(command, cwd, depth=0):
     """The deny reason, or None."""
     if _STASH is None:
         return None
-    fetched = None
+    fetched, fetch_seen = None, False
     for argv, env, _rest, cur in walk_dirs(
             simple_commands_with_scope(command) or [], cwd):
         if is_server_update(argv):
@@ -281,21 +278,25 @@ def evaluate(command, cwd, depth=0):
             cur = os.path.normpath(os.path.join(cur, os.path.expanduser(d)))
         if not ok or sub is None:
             continue
-        got = fetched_branches(sub, rest)
-        if got:
-            fetched = got
+        if sub == "fetch":
+            fetched, fetch_seen = fetched_branches(sub, rest), True
             continue
         if sub not in ("merge", "pull"):
             continue
         branch = git_out(cur, "symbolic-ref", "-q", "--short", "HEAD") or "HEAD"
         if branch in default_names(cur):
             continue
-        for label, ref in main_targets(sub, rest, cur, fetched):
-            if not git_out(cur, "rev-parse", "--verify", "-q", ref + "^{commit}"):
+        targets = main_targets(sub, rest, cur, fetched)
+        if fetch_seen and fetched is None and "FETCH_HEAD" in (
+                positionals(rest, MERGE_VALUE_OPTS) or []):
+            targets = [("FETCH_HEAD (from a fetch of unnamed branches)", None)]
+        for label, ref in targets:
+            if sub == "pull" or fetch_seen:  # judged only on fresh refs
+                why = FETCH_WHY
+            elif not git_out(cur, "rev-parse", "--verify", "-q", ref + "^{commit}"):
                 continue  # git itself will refuse an unknown ref
-            fetching = sub == "pull" or (fetched is not None
-                                         and label.startswith("FETCH_HEAD"))
-            why = why_not_needed(cur, ref, genv or env, fetching)
+            else:
+                why = why_not_needed(cur, ref, genv or env)
             if why:
                 return DENY.format(segment=" ".join(argv), target=label,
                                    branch=branch, why=why)

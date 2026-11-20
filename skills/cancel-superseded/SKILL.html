@@ -515,6 +515,7 @@ cookieconsent.run({
 <li><strong>Don’t cancel <code>success</code> or <code>failed</code></strong> pipelines — they’re already done.</li>
 <li>The <code>claude-review</code> job runs early and fast; the <code>check-package</code> job is usually what’s hogging the runner. Canceling a superseded pipeline frees the runner for the newer one.</li>
 <li>Always pipe <code>glab api</code> through <code>| cat</code> to avoid pager issues.</li>
+<li><strong>Re-dispatching after a mass cancel</strong> (GitHub, lds queue logjam, 2026-11-20): re-run a cancelled run only when its <code>head_sha</code> is still the PR’s head, and never when that head already has a dispatched CLEAN review, since the re-run repeats finished work. Re-run a few PRs at a time, closest to final first, and only while the queue stays short, so it does not refill.</li>
 </ul>
 
 

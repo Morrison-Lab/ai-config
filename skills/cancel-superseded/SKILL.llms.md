@@ -122,5 +122,6 @@ To dry-run instead, `echo "$CANCEL_CMDS"` (or skip the `if`/`else` and just prin
 - **Don’t cancel `success` or `failed`** pipelines — they’re already done.
 - The `claude-review` job runs early and fast; the `check-package` job is usually what’s hogging the runner. Canceling a superseded pipeline frees the runner for the newer one.
 - Always pipe `glab api` through `| cat` to avoid pager issues.
+- **Re-dispatching after a mass cancel** (GitHub, lds queue logjam, 2026-11-20): re-run a cancelled run only when its `head_sha` is still the PR’s head, and never when that head already has a dispatched CLEAN review, since the re-run repeats finished work. Re-run a few PRs at a time, closest to final first, and only while the queue stays short, so it does not refill.
 
 Back to top

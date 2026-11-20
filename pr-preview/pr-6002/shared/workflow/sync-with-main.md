@@ -14,7 +14,9 @@ The branch takes `main` in exactly four cases:
 
 `hooks/no-routine-main-merge.py` denies any other `git merge` or `git pull` of `main` into a PR branch, and every server-side update-branch call, since those cannot say why.
 It checks (a) with `git merge-tree`, (c) with a diff of `.github/workflows/`, and (b) by finding the named commit or PR on `main` and missing from the branch.
-It checks (d) with `git ls-remote`, which must find no such branch on the remote, and by finding a `Merge pull request #N from <owner>/<branch>` commit on `main` that the branch lacks, or a stale remote-tracking ref for the base whose tip is on `main` and not on the branch.
+It checks (d) with `git ls-remote`, which must find no such branch on the remote, and by finding a `Merge pull request #N from <owner>/<branch>` commit on `main` that the branch lacks, or a stale remote-tracking ref for the base whose tip is on `main`, with `main` ahead of the branch.
+A squash-merged base leaves neither trace, so the hook denies it.
+Merge stacked PRs with a merge commit.
 There is no bare override, so `MERGE_MAIN_FOR` cannot be left on: it passes only when it names a real fix.
 Fetch `main` in its own command first: the hook denies a `git pull` of `main`, and a merge of `main` after a fetch in the same command, since it could judge those only on a stale or missing local ref.
 Reviewers flag a routine main merge the hook did not see, per the [adversarial reviewer's section](../../.claude/agents/adversarial-reviewer.md#routine-merges-of-main-into-a-pr-branch).

@@ -34,6 +34,14 @@ Worked-example case records for the rules below live in
   system boundary, a retry for a known-transient failure --- make it
   explicit and observable: message the degradation, bound the retries,
   and document why the fallback is safe.
+- A guard that fails closed covers every step it depends on, not only the
+  first one that can fail.
+  - **Do:** wrap the call to an optional helper as well as its import, and
+    refuse with a stderr line on either.
+  - **Don't:** wrap only `from helper import f` and then call `f()` bare.
+    The push guard in ai-config#5953 did that at 933ff17, so an exception
+    inside the scope helper would have crashed the hook instead of
+    refusing the credit (2026-11-19).
 - In CI, a step that can fail should fail the job, not
   `continue-on-error` its way to a green check.
   The exception is a deliberate pattern that re-checks the outcome

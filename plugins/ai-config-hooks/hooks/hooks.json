@@ -642,7 +642,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-oversized-pr-push.py\"'",
             "timeout": 20,
             "script": "no-oversized-pr-push.py",
-            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 10 files or 300 lines against the merge base with the remote default branch (generated, lock, image and data paths not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 20 files or 600 lines against the merge base with the remote default branch, or for a stacked branch against the branch it is stacked on (generated, lock, image and data paths, and lines moved between files, not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch whose parent is not on the server or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
           },
           {
             "type": "command",
@@ -1949,6 +1949,13 @@
             "timeout": 10,
             "script": "no-merge-queue-claim-in-post-message.py",
             "why": "ai-config#5754. 2026-11-17: owner threads for lds#2687 and lds#2685 told Ezra a content PR had 'gone into the merge queue' when it only waited for his mwc line, which reads as if GitHub auto-merge were on; a project-memory note had recommended the phrase as a way past no-merge-ask-in-post-message. Blocks (deny) a thread session's post_message, reply, update_message, edit_message or request_decision that says 'merge queue' unless the transcript shows an enqueue (enable_pr_auto_merge, an auto_merge request or gh pr merge --auto), and suggests 'final head sent on; it waits on a merge in the runner'. The coordinator and other sessions are never blocked. ALLOW_MERGE_QUEUE_CLAIM=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-post-under-open-card.py\"'",
+            "timeout": 10,
+            "script": "no-post-under-open-card.py",
+            "why": "ai-config#5969. Ezra, 2026-11-19: 'sometimes a card moves while I'm clicking and I click the wrong choice; can we avoid that?' and 'if you want to post something after a card, delete the card and repost it last'. A pds thread posted a message and checklist under a request_decision card; it shifted and he tapped the wrong option. Denies post_message, reply, update_message, edit_message, update_progress_checklist, post_widget and request_decision while the transcript holds an open card (a request_decision tool_result named its message_id and no close_decision or decision-chosen wake has closed it), and says to withdraw it with close_decision, post, then re-post the card last. A deny, not a reminder, because the state is decidable from the transcript (ai-config#4741). ALLOW_POST_UNDER_CARD=1 overrides. Fails open on parse trouble."
           },
           {
             "type": "command",

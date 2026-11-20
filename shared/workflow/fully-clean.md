@@ -592,9 +592,11 @@ Worked-example case records for the rules below live in
    One exception settles a free reviewer that keeps raising new minor items.
    Ezra chose it on a decision card on 2026-11-20, "Second free model breaks ties" ([ai-config#6046](https://github.com/Morrison-Lab/ai-config/issues/6046)).
    A relayed cross-model reviewer's not-clean stops vetoing once both of these are posted on the PR, in this order, after it:
-   - a rebuttal record for that model, whose first line is exactly ``Rebuttals for model `<model>` on head <sha>:``, naming the live head, ending with the disclosure footer, and posted from a member's account;
+   - a rebuttal record for that model, naming the live head, ending with the disclosure footer, and posted from a member's account;
    - a clean relay from a different model, naming the live head.
 
+   The record's first line is exactly `Rebuttals for model <model> on head <sha>:`, with the model id in backticks and no blank line before it.
+   The record needs at least one disposition line that rebuts, in the form `- **Finding 1** -- rebutted` followed by the reason.
    A model id that differs only by a `-free` or `:free` suffix is the same model.
    `check-pr-fully-clean.py` reports the release as a NOTE.
    Write a rebuttal for every open finding in the record, since the checker cannot tell whether one is missing.

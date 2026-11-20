@@ -4095,13 +4095,15 @@ def _names_head(oid: str, body: str, head_oid: str) -> bool:
 
 # A rebuttal record for one relayed reviewer's findings (ai-config#6046):
 # an agent-disclosed comment whose first line is exactly
-# "Rebuttals for model `<model>` on head <sha>:" (backticks optional), with
-# the disclosure footer at the end. It is the agent's answer to that
-# reviewer, never a verdict, so it leaves the verdict scan.
+# "Rebuttals for model `<model>` on head <sha>:", with the disclosure footer
+# at the end. It is the agent's answer to that reviewer, never a verdict, so
+# it leaves the verdict scan. The header starts at the very first character
+# (no leading blank line) and ends that line; the model is in backticks and
+# the sha is bare, as fully-clean.md writes it.
 _RELAY_REBUTTAL_HEADER_RE = re.compile(
-    r"\A\s*Rebuttals[ \t]+for[ \t]+model[ \t]+`?([A-Za-z0-9][\w.:/-]*)`?[ \t]+"
-    r"on[ \t]+head[ \t]+`?([0-9a-f]{7,40})`?[ \t]*:[ \t]*$",
-    re.IGNORECASE | re.MULTILINE,
+    r"\ARebuttals[ \t]+for[ \t]+model[ \t]+`([A-Za-z0-9][\w.:/-]*)`[ \t]+"
+    r"on[ \t]+head[ \t]+([0-9a-f]{7,40})[ \t]*:[ \t]*(?:\r?\n|\Z)",
+    re.IGNORECASE,
 )
 # Free-tier suffixes name the same model as their base id.
 _FREE_MODEL_SUFFIX_RE = re.compile(r"[-:]free\Z", re.IGNORECASE)
@@ -4110,13 +4112,26 @@ _FREE_MODEL_SUFFIX_RE = re.compile(r"[-:]free\Z", re.IGNORECASE)
 def relay_rebuttal_record(body: str) -> Optional[Tuple[str, str]]:
     """``(relay identity, sha)`` for a rebuttal record, else None.
 
-    Needs the fixed header on the first line and the disclosure footer at
-    the end (``_AGENT_REPLY_FOOTER_RE``).
+    Needs the fixed header as the first line, the disclosure footer at the
+    end (``_AGENT_REPLY_FOOTER_RE`` is anchored at ``\\Z``), and at least one
+    disposition line (``_REPLY_DISPOSITION_LINE_RE``) whose disposition is a
+    rebuttal, so an empty record releases nothing. The checker cannot tell
+    whether every finding has a line; fully-clean.md leaves that to the
+    author.
     """
     if not body or not _AGENT_REPLY_FOOTER_RE.search(body):
         return None
     m = _RELAY_REBUTTAL_HEADER_RE.match(body)
     if not m:
+        return None
+    rebuts = False
+    for line in body[m.end():].splitlines():
+        d = _REPLY_DISPOSITION_LINE_RE.match(line)
+        word = (d.group("word") or d.group("verb") or "").lower() if d else ""
+        if word.startswith("rebut"):
+            rebuts = True
+            break
+    if not rebuts:
         return None
     return RELAY_IDENTITY_PREFIX + m.group(1).lower(), m.group(2).lower()
 

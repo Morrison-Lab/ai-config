@@ -4734,6 +4734,33 @@ def main() -> int:
     check("a rebuttal header split over two lines does not parse",
           checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
               "on head", "on\nhead")) is None)
+    check("a rebuttal header after a leading blank line does not parse",
+          checker.relay_rebuttal_record("\n" + tie_rebuttal["body"]) is None)
+    check("a rebuttal header with text after the colon does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "d917514:", "d917514: all fine")) is None)
+    check("a rebuttal header without backticks on the model does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "`kimi-k3`", "kimi-k3")) is None)
+    check("a rebuttal record with no rebuttal line does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "- **Finding 1** -- rebutted. The reviewer misread the diff.",
+              "Nothing to add.")) is None)
+    check("a record whose only disposition is 'fixed' does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "rebutted. The reviewer misread the diff.", "fixed.")) is None)
+    check("a footer quoted mid-body is not the record's footer",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              relay_footer, "") + relay_footer + "\n\nMore text.") is None)
+    # Only a relayed model breaks the tie: Claude's clean on the head, with
+    # a rebuttal record, does not release a relay's NOT CLEAN.
+    tie_claude_only = [relay_notclean, tie_rebuttal,
+                       dict(relay_bot, createdAt="2026-11-19T05:05:00Z")]
+    with patch.object(checker, "run_cmd", return_value=json.dumps(
+            {"comments": tie_claude_only, "reviews": []})):
+        claude_ok, _ = checker.check_review_comments("2115", relay_head, TEST_REPO)
+        check("a Claude clean after the rebuttal does not break the tie "
+              "(only a relayed model does)", not claude_ok)
     with patch.object(checker, "run_cmd", return_value=json.dumps(
             {"comments": [relay_notclean, tie_rebuttal, tie_other, relay_bot],
              "reviews": []})):

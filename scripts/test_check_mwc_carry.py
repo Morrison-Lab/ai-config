@@ -19,7 +19,7 @@ def g(repo, *args):
 
 def write(repo, name, text, msg=None):
     """Stage `name`; commit it as `msg` when one is given, returning the SHA."""
-    (repo / name).write_text(text)
+    (repo / name).write_text(text, encoding="utf-8")
     g(repo, "add", name)
     if msg:
         g(repo, "commit", "-q", "-m", msg)

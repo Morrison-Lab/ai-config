@@ -56,7 +56,10 @@ REWORD_RATIO = 0.5
 TIMEOUT = 30
 BYPASS_VAR = "ALLOW_DELETE_FLAGGED_TERM"
 FINDING = re.compile(r"^\s+(?P<path>.+?):(?P<line>\d+): \[(?P<rule>[\w-]+)\] (?P<msg>.*)$")
-QUOTED = re.compile(r"'([^']+)'")
+# The term sits between the message's first quote and the quote that ends the
+# phrase gha writes after it, so a term holding an apostrophe ("Bayes' theorem")
+# survives whole.
+QUOTED = re.compile(r"^(?:Bold term )?'(?P<term>.+?)' (?:is a defined term|has no definition)")
 
 
 def _notes_checks():
@@ -89,7 +92,12 @@ def replaced_blocks(before: str, after: str):
 
 
 def count(term: str, text: str) -> int:
-    return len(re.findall(r"(?<![\w-])" + re.escape(term) + r"(?![\w-])", text, re.IGNORECASE))
+    """Whole-word, case-blind uses of `term`, its words allowed to wrap across lines."""
+    words = term.split()
+    if not words:
+        return 0
+    body = r"\s+".join(re.escape(w) for w in words)
+    return len(re.findall(r"(?<![\w-])" + body + r"(?![\w-])", text, re.IGNORECASE))
 
 
 def flagged(git_root: str, rel: str, lines: set, notes) -> list[tuple[int, str]] | None:
@@ -97,6 +105,8 @@ def flagged(git_root: str, rel: str, lines: set, notes) -> list[tuple[int, str]]
     calls = [c for c in notes.find_calls(git_root) if c["name"] == "check-term-links"
              and c.get("kind") != "bundled"]
     if not calls:
+        print("no-delete-flagged-term: no check-term-links caller in this repository; "
+              "not evaluating", file=sys.stderr)
         return None
     call = calls[0]
     gha = notes.ensure_gha(call["ref"])
@@ -131,6 +141,11 @@ def flagged(git_root: str, rel: str, lines: set, notes) -> list[tuple[int, str]]
         return None
     finally:
         os.unlink(env["TERM_LINKS_DIFF_FILE"])
+    if proc.returncode != 0:
+        tail = (proc.stderr.strip().splitlines() or ["no stderr"])[-1]
+        print(f"no-delete-flagged-term: check-term-links exited {proc.returncode} ({tail}); "
+              "not evaluating", file=sys.stderr)
+        return None
     found = []
     for line in proc.stdout.splitlines():
         m = FINDING.match(line)
@@ -138,7 +153,7 @@ def flagged(git_root: str, rel: str, lines: set, notes) -> list[tuple[int, str]]
             continue
         q = QUOTED.search(m.group("msg"))
         if q:
-            found.append((int(m.group("line")), q.group(1)))
+            found.append((int(m.group("line")), q.group("term")))
     return found
 
 

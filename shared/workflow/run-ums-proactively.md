@@ -319,14 +319,16 @@ The same holds when a thread reports its work done.
 
 Two mechanisms now do, both in `hooks/require-ums-before-resolve.py` (ai-config#4480):
 
-- **Before resolve:** the first `set_thread_resolved(true)` of a thread is denied when the transcript has no UMS tool call (a `ums` Skill or Agent dispatch, or a write under an ai-config memory or shared path) since the last user message.
-  Run `ums`, say in the reply what you recorded, then resolve.
-  If nothing was learned, say so in the reply and retry;
-  the retry is allowed, because "nothing was learned" is a legitimate answer that no matcher can judge.
+- **Before resolve:** every `set_thread_resolved(true)` is denied when the transcript has no UMS tool call (a `ums` Skill or Agent dispatch, or a write under an ai-config memory or shared path) since the last user message.
+  Run `ums`, end the reply with a `UMS executed: <what you recorded, or nothing to record>` line, then resolve.
+  If nothing was learned, run `ums` anyway: the run is the evidence, and a retry without one is denied again (Ezra, 2026-11-20: "make sure every thread runs ums before you resolve it", ai-config#6027).
+- **A coordinator resolving another thread:** a resolve that names `thread_id` also passes when a `read_thread` of that thread, since the last user message, returned the thread's own `UMS executed:` line.
+  Otherwise message the thread to run `ums` and resolve itself.
 - **On merge:** a GitHub event reporting a merged PR injects a reminder to run the wrap-up (`post-merge`: verify the merge, tidy the branch, confirm follow-ups, UMS) before the thread is resolved or reported done.
 
 - **Do:** run `ums` in the turn that finishes the work, before the reply that delivers the result and before resolving.
 - **Don't:** resolve a thread as the last act of a turn in which learnings accumulated and nothing recorded them.
+- **Don't:** resolve another thread, as a coordinator, on its status alone, without reading its `UMS executed:` report.
 
 ## Other moments that owe a pass
 

@@ -74,7 +74,34 @@ out = run(work, resolve(), sd)
 check("denied when no UMS since the last user message", '"deny"' in out)
 sd = fresh()
 outs = run(work, resolve(), sd, times=2)
-check("second attempt is allowed (one refusal per thread)", '"deny"' in outs[0] and outs[1] == "")
+check("second attempt is denied too (ai-config#6027)", '"deny"' in outs[0] and '"deny"' in outs[1])
+
+
+def read(thread, report, uid="r1"):
+    call = {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": uid, "name": "mcp__hearthbot__read_thread",
+         "input": {"thread_id": thread}}]}}
+    res = {"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": uid, "content": [{"type": "text", "text": report}]}]}}
+    return [call, res]
+
+
+print("Coordinator resolving another thread by id:")
+done = "Stopping Point: clean. UMS executed: recorded the hook quirk."
+check("allowed after reading that thread's UMS report",
+      run(work + read("cmsg_A", done), resolve(thread="cmsg_A"), fresh()) == "")
+check("a report read from a different thread does not count",
+      '"deny"' in run(work + read("cmsg_B", done), resolve(thread="cmsg_A"), fresh()))
+check("a read with no UMS report line does not count",
+      '"deny"' in run(work + read("cmsg_A", "PR is open, UMS run is owed"),
+                      resolve(thread="cmsg_A"), fresh()))
+check("a report read before the last user message does not count",
+      '"deny"' in run(read("cmsg_A", done) + work, resolve(thread="cmsg_A"), fresh()))
+check("the by-id deny tells the coordinator to read the thread",
+      "read_thread" in run(work, resolve(thread="cmsg_A"), fresh()))
+check("a thread's own resolve (no thread_id) gets the run-ums deny",
+      "end your reply" in run(work, {"hook_event_name": "PreToolUse", "tool_name": RESOLVE,
+                                     "tool_input": {"resolved": True}}, fresh()))
 sd = fresh()
 check("a different thread is refused again",
       '"deny"' in run(work, resolve(thread="cmsg_A"), sd)

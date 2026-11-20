@@ -89,6 +89,14 @@ committed pass.
   rather than once per wait or once per re-arm of a timer.
   See
   [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
+- **Before a thread is resolved, by itself or by the coordinator.**
+  Run the pass even when nothing was learned,
+  and end the thread's last report with
+  `UMS executed: <what was recorded, or nothing to record>`,
+  so a coordinator reading the thread can see it ran
+  (Ezra, 2026-11-20: "make sure every thread runs ums before you resolve it").
+  `hooks/require-ums-before-resolve.py` denies the resolve without that evidence
+  ([ai-config#6027](https://github.com/Morrison-Lab/ai-config/issues/6027)).
 
 ## Procedure
 

@@ -1210,3 +1210,12 @@ Three hook PRs in one wave surfaced gaps where a hook read a command differently
 - **Don't:** match a flag as a separate exact token, such as `-X`, when git or `gh` also accepts it inside a cluster or as a prefix.
 
 See also `scripts/check-text-encoding.py`, which flags bare `write_text` (give `encoding=`), and `skills/mwc/SKILL.md`, which names the `expectedHeadSha` pin the GitHub MCP `merge_pull_request` takes.
+
+## `no-unlinked-session-mention` reads "coordinator" and "that thread" as session mentions
+
+In a project thread, `hooks/no-unlinked-session-mention.py` refused two `post_message` drafts (the report for ai-config#6035, 2026-11-20).
+It counts the bare word "coordinator" and the phrase "that thread" as mentions of a session that needs a link.
+The second draft fixed only the first word, so the post was refused twice.
+
+- **Do:** before resending, reread the whole draft for every word that names a session, a thread or the coordinator, and either link it as `[title](#cmsg_...)` from `list_threads` or reword it ("a resolve by id", "the resolved conversation").
+- **Don't:** fix only the phrase the refusal quotes and resend, since the hook reports one phrase per refusal.

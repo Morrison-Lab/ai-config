@@ -151,6 +151,12 @@ def main():
     synced = make_repo({f"f{i}.qmd": 1 for i in range(22)})
     push_tip(synced)
     merge_main(synced, [f"m{i}.qmd" for i in range(20)])
+    # A single-branch clone: `git fetch origin feature` wrote only FETCH_HEAD,
+    # so there is no origin/feature tracking ref (gha#2158).
+    no_tracking = make_repo({f"f{i}.qmd": 1 for i in range(22)})
+    push_tip(no_tracking)
+    git(no_tracking, "update-ref", "-d", "refs/remotes/origin/feature")
+    add_files(no_tracking, ["f0.qmd"], "small fix")
     # The same merge, then a commit that grows the PR diff over the cap.
     synced_grown = make_repo({f"f{i}.qmd": 1 for i in range(22)})
     push_tip(synced_grown)
@@ -285,6 +291,8 @@ def main():
          run("git push", other_fragments), True),
         ("a merge from main that leaves an over-cap PR diff unchanged passes (#5721)",
          run("git push", synced), False),
+        ("a small fix on an over-cap pushed tip passes with no tracking ref",
+         run("git push", no_tracking), False),
         ("a merge from main plus an over-cap addition is denied",
          run("git push", synced_grown), True),
         ("a rebase that leaves the PR diff unchanged passes",

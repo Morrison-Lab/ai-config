@@ -280,9 +280,11 @@ def live_remote(cwd, branch):
     tip must be the commit measured. A clone that fetches only `main`, as a
     cloud session's does, has no tracking ref at all, so a missing or stale
     one is fetched from the server before it is compared (ai-config#5884).
+    The server is asked for `refs/heads/<branch>` in full, since a bare
+    pattern also matches `<other>/<branch>` and could take its sha first.
     """
     remote = f"origin/{branch}"
-    live = git(cwd, "ls-remote", "--heads", "origin", branch)
+    live = git(cwd, "ls-remote", "--heads", "origin", f"refs/heads/{branch}")
     if not live:
         return None
     tip = live.split()[0]

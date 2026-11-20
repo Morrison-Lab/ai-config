@@ -274,19 +274,27 @@ def pr_exempt(pr):
 
 
 def live_remote(cwd, branch):
-    """`origin/<branch>` when the tracking ref matches the server's tip, else None.
+    """The server's tip of `branch` as a local commit-ish, or None.
 
     The tracking ref can be stale after a force push elsewhere, so the server's
-    tip must be the commit measured.
+    tip must be the commit measured. A cloud single-branch clone has no
+    `refs/remotes/origin/<branch>` at all: `git fetch origin <branch>` there
+    writes only FETCH_HEAD. So when the tracking ref is missing, the server's
+    sha from `git ls-remote` is used when its commit is present locally
+    (2026-11-20, a 2-line fix to gha#2158 was refused until a refspec fetch
+    created the ref).
     """
+    live = git(cwd, "ls-remote", "--heads", "origin", f"refs/heads/{branch}")
+    sha = live.split()[0] if live else None
+    if not sha:
+        return None
     remote = f"origin/{branch}"
     local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
-    if not local:
-        return None
-    live = git(cwd, "ls-remote", "--heads", "origin", branch)
-    if not live or live.split()[0] != local:
-        return None
-    return remote
+    if local:
+        return remote if local == sha else None
+    if git(cwd, "rev-parse", "--verify", "-q", sha + "^{commit}"):
+        return sha
+    return None
 
 
 def pr_patch_id(cwd, base, tip):

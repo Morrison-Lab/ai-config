@@ -186,7 +186,9 @@ for phrase in ("Opened the PR. No pending items remain.",
                "The pending review was resolved and merged.",
                "Merged after CI passed.",
                "I am not waiting on CI any more.",
-               "No longer waiting for the review: it is clean."):
+               "No longer waiting for the review: it is clean.",
+               "Merged without waiting on CI, as the grant allows.",
+               "I fixed it now rather than waiting for the review."):
     assert not subject.WAITING.search(phrase), phrase
 assert run_main(waiting).get("decision") == "block"
 assert "re-invoke" in run_main(waiting)["reason"]

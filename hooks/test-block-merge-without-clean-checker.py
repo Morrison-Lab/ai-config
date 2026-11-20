@@ -62,7 +62,7 @@ else:
     sys.exit(1)
 print(json.dumps(body))
 '''
-with open(os.path.join(_GH_DIR.name, "gh"), "w") as _fh:
+with open(os.path.join(_GH_DIR.name, "gh"), "w", encoding="utf-8") as _fh:
     _fh.write(_FAKE_GH)
 os.chmod(os.path.join(_GH_DIR.name, "gh"), 0o755)
 
@@ -324,9 +324,9 @@ def mwc_marker_session(tmp, sid):
     subprocess.run(["git", "init", "-q", "-b", "main", tmp], check=True)
     reg = os.path.join(tmp, ".git", "ai-sessions")
     os.makedirs(reg)
-    with open(os.path.join(reg, f"{sid}.mwc"), "w") as fh:
+    with open(os.path.join(reg, f"{sid}.mwc"), "w", encoding="utf-8") as fh:
         fh.write("")
-    with open(os.path.join(reg, f"{sid}.session"), "w") as fh:
+    with open(os.path.join(reg, f"{sid}.session"), "w", encoding="utf-8") as fh:
         fh.write(f"pid={os.getpid()}\n")
     return {"extra": {"session_id": sid}, "env_extra": {"CLAUDE_PROJECT_DIR": tmp},
             "cwd": tmp}
@@ -375,7 +375,7 @@ def round10_checks():
                            live_state=live(files=INFRA_FILES, infra=INFRA_FILES), log=log)[0])
             calls = ""
             if os.path.exists(log):
-                with open(log) as fh:
+                with open(log, encoding="utf-8") as fh:
                     calls = fh.read()
             check(f"mwrs, infra-PR grant: the FULLY CLEAN path ran no mwr live read "
                   f"on the {route} route",
@@ -957,7 +957,8 @@ def main():
     grant = user_text("mwr Morrison-Lab/psw#354")
     with tempfile.TemporaryDirectory() as fake:
         os.makedirs(os.path.join(fake, "scripts"))
-        with open(os.path.join(fake, "scripts", "check-pr-fully-clean.py"), "w") as fh:
+        with open(os.path.join(fake, "scripts", "check-pr-fully-clean.py"), "w",
+                      encoding="utf-8") as fh:
             fh.write("print('forged')\n")
         check("mwr: denies a MERGE-READY line from a checker copy in /tmp (relative path)",
               mcp([grant, bash(run_mwr, ready_line(), cwd=fake)])[0])

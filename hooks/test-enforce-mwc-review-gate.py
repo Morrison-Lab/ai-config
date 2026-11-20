@@ -53,7 +53,7 @@ elif "/pulls/" in path and "--jq" in args:
 else:
     sys.exit(1)
 '''
-with open(os.path.join(_INFRA_GH_DIR.name, "gh"), "w") as _fh:
+with open(os.path.join(_INFRA_GH_DIR.name, "gh"), "w", encoding="utf-8") as _fh:
     _fh.write(_INFRA_GH)
 os.chmod(os.path.join(_INFRA_GH_DIR.name, "gh"), 0o755)
 
@@ -577,8 +577,9 @@ def round10_checks(clean_line):
         subprocess.run(["git", "init", "-q", "-b", "main", repo], check=True)
         reg = os.path.join(repo, ".git", "ai-sessions")
         os.makedirs(reg)
-        Path(reg, "transcript-mwr.mwc").write_text("")
-        Path(reg, "transcript-mwr.session").write_text(f"pid={os.getpid()}\n")
+        Path(reg, "transcript-mwr.mwc").write_text("", encoding="utf-8")
+        Path(reg, "transcript-mwr.session").write_text(f"pid={os.getpid()}\n",
+                                                        encoding="utf-8")
         old = os.getcwd()
         os.chdir(repo)
         try:

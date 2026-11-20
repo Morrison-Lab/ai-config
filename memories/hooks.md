@@ -1213,7 +1213,7 @@ See also `scripts/check-text-encoding.py`, which flags bare `write_text` (give `
 
 ## `no-unlinked-session-mention` reads "coordinator" and "that thread" as session mentions
 
-In a project thread, `hooks/no-unlinked-session-mention.py` refused two `post_message` drafts (the report for ai-config#6035, 2026-11-20).
+In a project thread, `hooks/no-unlinked-session-mention.py` refused two `post_message` drafts (the report that ai-config#6030 had merged, 2026-11-20).
 It counts the bare word "coordinator" and the phrase "that thread" as mentions of a session that needs a link.
 The second draft fixed only the first word, so the post was refused twice.
 

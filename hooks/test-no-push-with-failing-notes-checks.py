@@ -339,6 +339,11 @@ unquoted = make_repo({"cluster-checks.yml": BUNDLED.replace(
 verdict, out = run("git push origin feat", unquoted, 0)
 expect("T61 an unquoted expression fails open with a note, never runs as text",
        (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
+unclosed = make_repo({"cluster-checks.yml": BUNDLED.replace(
+    "CAW_WHOLE_TREE='${{", "CAW_WHOLE_TREE=\"'${{")})
+verdict, out = run("git push origin feat", unclosed, 0)
+expect("T67 a line with an unclosed quote fails open with a note, never silently",
+       (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
 commented = hook.parse_run_check_lines(BUNDLED.replace(
     "check-avoided-words.py\n", "check-avoided-words.py # trailing note\n"))
 expect("T62 a trailing shell comment is not passed as arguments",

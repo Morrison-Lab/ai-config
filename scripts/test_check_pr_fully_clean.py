@@ -4670,6 +4670,103 @@ def main() -> int:
                 "2115", relay_head, TEST_REPO)
             check(label, relay_ok == expect_ok and
                   (relay_issues == [] or not expect_ok))
+    # --- ai-config#6046 (Ezra's card, 2026-11-20, "Second free model breaks
+    # ties"): a relayed NOT CLEAN stops vetoing once a rebuttal record for
+    # that model names the head and a different model's later CLEAN does too.
+    tie_rebuttal = {
+        "createdAt": "2026-11-19T05:00:00Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "MEMBER",
+        "body": ("Rebuttals for model `kimi-k3` on head d917514:\n\n"
+                 "- **Finding 1** -- rebutted. The reviewer misread the diff."
+                 + relay_footer),
+    }
+    tie_other = dict(relay_other_model, createdAt="2026-11-19T05:02:00Z")
+    tie_other_early = dict(relay_other_model, createdAt="2026-11-19T04:59:00Z")
+    tie_other_free = dict(tie_other, body=tie_other["body"].replace(
+        "`glm-5.3`", "`kimi-k3-free`"))
+    tie_other_stale = dict(tie_other, body=tie_other["body"].replace(
+        "head d917514", "head 6870174"))
+    tie_rebuttal_stale = dict(tie_rebuttal, body=tie_rebuttal["body"].replace(
+        "d917514", "6870174"))
+    tie_rebuttal_wrong = dict(tie_rebuttal, body=tie_rebuttal["body"].replace(
+        "`kimi-k3`", "`glm-5.3`"))
+    tie_rebuttal_early = dict(tie_rebuttal, createdAt="2026-11-19T04:50:00Z")
+    tie_rebuttal_nofooter = dict(tie_rebuttal, body=tie_rebuttal[
+        "body"].replace(relay_footer, ""))
+    tie_rebuttal_contrib = dict(tie_rebuttal, authorAssociation="CONTRIBUTOR")
+    for label, rounds, expect_ok in (
+        ("a rebuttal record and a different model's later CLEAN on the head "
+         "break the tie (ai-config#6046)",
+         [relay_notclean, tie_rebuttal, tie_other, relay_bot], True),
+        ("without the rebuttal record, the other model's CLEAN does not "
+         "supersede (negative control)",
+         [relay_notclean, tie_other, relay_bot], False),
+        ("a CLEAN posted before the rebuttal does not break the tie",
+         [relay_notclean, tie_rebuttal, tie_other_early, relay_bot], False),
+        ("the same model under a free-tier suffix does not break the tie",
+         [relay_notclean, tie_rebuttal, tie_other_free, relay_bot], False),
+        ("a CLEAN naming an older head does not break the tie",
+         [relay_notclean, tie_rebuttal, tie_other_stale, relay_bot], False),
+        ("a rebuttal naming an older head does not count",
+         [relay_notclean, tie_rebuttal_stale, tie_other, relay_bot], False),
+        ("a rebuttal for another model does not count",
+         [relay_notclean, tie_rebuttal_wrong, tie_other, relay_bot], False),
+        ("a rebuttal posted before the NOT CLEAN does not count",
+         [tie_rebuttal_early, relay_notclean, tie_other, relay_bot], False),
+        ("a rebuttal without the disclosure footer does not count",
+         [relay_notclean, tie_rebuttal_nofooter, tie_other, relay_bot], False),
+        ("a rebuttal from a non-member does not count",
+         [relay_notclean, tie_rebuttal_contrib, tie_other, relay_bot], False),
+    ):
+        mock_tie = json.dumps({"comments": rounds, "reviews": []})
+        with patch.object(checker, "run_cmd", return_value=mock_tie):
+            tie_ok, tie_issues = checker.check_review_comments(
+                "2115", relay_head, TEST_REPO)
+            tie_pass = tie_ok == expect_ok and (
+                not expect_ok or all(i.startswith("NOTE: ") for i in tie_issues))
+            check(label, tie_pass)
+            if not tie_pass:
+                print(f"    issues: {tie_issues}")
+    check("a rebuttal record parses to its relay identity and sha",
+          checker.relay_rebuttal_record(tie_rebuttal["body"])
+          == ("relay:kimi-k3", "d917514"))
+    check("a rebuttal header split over two lines does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "on head", "on\nhead")) is None)
+    check("a rebuttal header after a leading blank line does not parse",
+          checker.relay_rebuttal_record("\n" + tie_rebuttal["body"]) is None)
+    check("a rebuttal header with text after the colon does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "d917514:", "d917514: all fine")) is None)
+    check("a rebuttal header without backticks on the model does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "`kimi-k3`", "kimi-k3")) is None)
+    check("a rebuttal record with no rebuttal line does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "- **Finding 1** -- rebutted. The reviewer misread the diff.",
+              "Nothing to add.")) is None)
+    check("a record whose only disposition is 'fixed' does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "rebutted. The reviewer misread the diff.", "fixed.")) is None)
+    check("a footer quoted mid-body is not the record's footer",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              relay_footer, "") + relay_footer + "\n\nMore text.") is None)
+    # Only a relayed model breaks the tie: Claude's clean on the head, with
+    # a rebuttal record, does not release a relay's NOT CLEAN.
+    tie_claude_only = [relay_notclean, tie_rebuttal,
+                       dict(relay_bot, createdAt="2026-11-19T05:05:00Z")]
+    with patch.object(checker, "run_cmd", return_value=json.dumps(
+            {"comments": tie_claude_only, "reviews": []})):
+        claude_ok, _ = checker.check_review_comments("2115", relay_head, TEST_REPO)
+        check("a Claude clean after the rebuttal does not break the tie "
+              "(only a relayed model does)", not claude_ok)
+    with patch.object(checker, "run_cmd", return_value=json.dumps(
+            {"comments": [relay_notclean, tie_rebuttal, tie_other, relay_bot],
+             "reviews": []})):
+        _, tie_notes = checker.check_review_comments("2115", relay_head, TEST_REPO)
+        check("the tie-break release is reported as a NOTE",
+              any("second free model breaks the tie" in n for n in tie_notes))
     mock_relay_solo = json.dumps({"comments": [relay_clean], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_relay_solo):
         relay_solo_ok, _ = checker.check_review_comments(

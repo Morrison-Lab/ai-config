@@ -4093,6 +4093,54 @@ def _names_head(oid: str, body: str, head_oid: str) -> bool:
     return head_oid[:7].lower() in (body or "").lower()
 
 
+# A rebuttal record for one relayed reviewer's findings (ai-config#6046):
+# an agent-disclosed comment whose first line is exactly
+# "Rebuttals for model `<model>` on head <sha>:", with the disclosure footer
+# at the end. It is the agent's answer to that reviewer, never a verdict, so
+# it leaves the verdict scan. The header starts at the very first character
+# (no leading blank line) and ends that line; the model is in backticks and
+# the sha is bare, as fully-clean.md writes it.
+_RELAY_REBUTTAL_HEADER_RE = re.compile(
+    r"\ARebuttals[ \t]+for[ \t]+model[ \t]+`([A-Za-z0-9][\w.:/-]*)`[ \t]+"
+    r"on[ \t]+head[ \t]+([0-9a-f]{7,40})[ \t]*:[ \t]*(?:\r?\n|\Z)",
+    re.IGNORECASE,
+)
+# Free-tier suffixes name the same model as their base id.
+_FREE_MODEL_SUFFIX_RE = re.compile(r"[-:]free\Z", re.IGNORECASE)
+
+
+def relay_rebuttal_record(body: str) -> Optional[Tuple[str, str]]:
+    """``(relay identity, sha)`` for a rebuttal record, else None.
+
+    Needs the fixed header as the first line, the disclosure footer at the
+    end (``_AGENT_REPLY_FOOTER_RE`` is anchored at ``\\Z``), and at least one
+    disposition line (``_REPLY_DISPOSITION_LINE_RE``) whose disposition is a
+    rebuttal, so an empty record releases nothing. The checker cannot tell
+    whether every finding has a line; fully-clean.md leaves that to the
+    author.
+    """
+    if not body or not _AGENT_REPLY_FOOTER_RE.search(body):
+        return None
+    m = _RELAY_REBUTTAL_HEADER_RE.match(body)
+    if not m:
+        return None
+    rebuts = False
+    for line in body[m.end():].splitlines():
+        d = _REPLY_DISPOSITION_LINE_RE.match(line)
+        word = (d.group("word") or d.group("verb") or "").lower() if d else ""
+        if word.startswith("rebut"):
+            rebuts = True
+            break
+    if not rebuts:
+        return None
+    return RELAY_IDENTITY_PREFIX + m.group(1).lower(), m.group(2).lower()
+
+
+def _relay_model_key(identity: str) -> str:
+    """The model a relay identity names, with a free-tier suffix removed."""
+    return _FREE_MODEL_SUFFIX_RE.sub("", identity[len(RELAY_IDENTITY_PREFIX):].lower())
+
+
 def check_latest_verdict(
     all_items: List[Tuple[Any, ...]],
     approved_authors: Optional[Set[str]] = None,
@@ -4100,6 +4148,8 @@ def check_latest_verdict(
     head_oid: str = "",
     review_comments: Optional[List[Dict[str, Any]]] = None,
     out_of_quota: Optional[Iterable[str]] = None,
+    relay_rebuttals: Optional[List[Tuple[str, str, str]]] = None,
+    tie_released: Optional[Set[str]] = None,
 ) -> Tuple[bool, List[str]]:
     """Fail when any reviewer's latest verdict-bearing statement is not clean.
 
@@ -4128,6 +4178,21 @@ def check_latest_verdict(
     ([ai-config#5064](https://github.com/Morrison-Lab/ai-config/issues/5064)).
     The veto stays when that reviewer's not-clean verdict is on the live head
     itself, or when no substitute verdict on the live head exists.
+
+    A second free model breaks a tie (Ezra's card, 2026-11-20, "Second free
+    model breaks ties"; ai-config#6046). A relayed reviewer's not-clean
+    verdict stops vetoing when both of these hold:
+
+    - a rebuttal record for that model (``relay_rebuttals``, from
+      ``relay_rebuttal_record``) was posted after the verdict and names the
+      live head;
+    - a CLEAN relay from a different model, posted after that record, names
+      the live head.
+
+    Only relayed reviewers qualify, a model differing only by a free-tier
+    suffix is the same model, and a NOTE records the release. Each released
+    identity is added to ``tie_released`` when the caller passes a set, so
+    the HEAD criterion can drop that reviewer's verdict on the head too.
 
     Formal-review authors whose latest GitHub state is APPROVED have
     superseded their own earlier CHANGES_REQUESTED; pass those logins as
@@ -4332,6 +4397,45 @@ def check_latest_verdict(
                 return True
         return False
 
+    tie_notes: List[str] = []
+
+    def _tie_broken(identity: str, when: str) -> bool:
+        """True when a rebuttal and a different model's later clean on the
+        live head release this relayed reviewer's not-clean (ai-config#6046)."""
+        if not relay_rebuttals or not _is_relay_identity(identity):
+            return False
+        model = _relay_model_key(identity)
+        rebutted = sorted(
+            r_when for r_when, r_identity, r_sha in relay_rebuttals
+            if r_when > when
+            and _relay_model_key(r_identity) == model
+            and _names_head(r_sha, "", head_oid)
+        )
+        if not rebutted:
+            return False
+        for other, (o_verdict, o_when, _o_author) in sorted(per_reviewer.items()):
+            o_oid, o_body = per_reviewer_src.get(other, ("", ""))
+            if (
+                _is_relay_identity(other)
+                and _relay_model_key(other) != model
+                and o_verdict == "clean"
+                and o_when > rebutted[0]
+                and _names_head(o_oid, o_body, head_oid)
+            ):
+                note = (
+                    f"NOTE: {identity}'s NOT-clean verdict ({when}) no longer "
+                    f"vetoes: its findings were rebutted ({rebutted[0]}) and "
+                    f"{other} posted a clean verdict on live head "
+                    f"{head_oid[:8]} ({o_when}) -- second free model breaks "
+                    "the tie (ai-config#6046)"
+                )
+                if note not in tie_notes:
+                    tie_notes.append(note)
+                if tie_released is not None:
+                    tie_released.add(identity)
+                return True
+        return False
+
     latest_outage = unavailable_since.get(latest_identity, "")
     if (
         latest_verdict == "not-clean"
@@ -4354,6 +4458,8 @@ def check_latest_verdict(
         if _approval_clears(identity, author, approved_authors):
             continue
         if _quota_released(identity, author):
+            continue
+        if _tie_broken(identity, when):
             continue
         # The reviewer reported, AFTER this stale verdict, that it could not
         # review at all. It is unavailable rather than pending, so waiting on it
@@ -4392,6 +4498,7 @@ def check_latest_verdict(
     issues.extend(payload_notes)
     issues.extend(review_comment_notes)
     issues.extend(quota_notes)
+    issues.extend(tie_notes)
     blocking = [i for i in issues if not i.startswith("NOTE: ")]
     return len(blocking) == 0, issues
 
@@ -4884,12 +4991,21 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
 
     # Collect automated review reports only (filtering out human/author disposition comments)
     all_items = []
+    relay_rebuttals: List[Tuple[str, str, str]] = []
+    tie_released: Set[str] = set()
     superseded_replies = _superseded_agent_replies(comments, sha)
     for idx, c in enumerate(comments):
         body = c.get("body", "")
         author_login = (c.get("author") or {}).get("login", "")
 
         if is_ard_disposition_summary(body):
+            continue
+
+        # A rebuttal record answers a relayed reviewer; it is no verdict
+        # (ai-config#6046). Only the maintainer's account posts one.
+        record = relay_rebuttal_record(body)
+        if record and (c.get("authorAssociation") or "").upper() in ("OWNER", "MEMBER"):
+            relay_rebuttals.append((c.get("createdAt") or "", record[0], record[1]))
             continue
 
         # A workflow status notice is not a review, whoever posted it.
@@ -5036,6 +5152,8 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         head_oid=sha,
         review_comments=_lazy_rcs,
         out_of_quota=_OUT_OF_QUOTA,
+        relay_rebuttals=relay_rebuttals,
+        tie_released=tie_released,
     )
     issues.extend(verdict_issues)
 
@@ -5112,6 +5230,10 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         if classify_verdict(item[2], item[4], item[5] if len(item) > 5 else "") in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
             provider = _reviewer_identity(item[2], item[5] if len(item) > 5 else "")
             latest_by_provider[provider] = item
+    # A relayed reviewer whose not-clean verdict a second model's clean
+    # released (ai-config#6046) no longer vetoes the head either.
+    for provider in tie_released:
+        latest_by_provider.pop(provider, None)
     matching_items = list(latest_by_provider.values())
 
     has_findings = False

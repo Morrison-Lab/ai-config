@@ -71,6 +71,8 @@ with tempfile.TemporaryDirectory() as root:
             ("git checkout --orphan=new", main, "deny"),
             ("git checkout -d", main, "deny"),
             ("git checkout HEAD", main, "allow"),
+            # Unlike a bare HEAD, `@` detaches HEAD (git 2.43), so it is denied.
+            ("git checkout @", main, "deny"),
             ("git checkout main", main, "allow"),
             ("git checkout -- a.txt 2>/dev/null", main, "allow"),
             ("git checkout --ours a.txt", main, "allow"),

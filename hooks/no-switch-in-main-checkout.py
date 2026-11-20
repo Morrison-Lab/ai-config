@@ -110,7 +110,8 @@ def is_current(cwd, name):
     """True when checking out `name` keeps HEAD where it is: `HEAD`, or the
     name of the branch already checked out. Git special-cases a bare
     `git checkout HEAD`: it leaves HEAD on its branch and does not detach it
-    (checked with git 2.43; `HEAD^0` or `--detach` would detach)."""
+    (checked with git 2.43). `HEAD^0`, `--detach` and `@` do detach, even
+    though `@` otherwise names HEAD, so `@` is not current here."""
     return name == "HEAD" or git(cwd, "symbolic-ref", "-q", "--short",
                                  "HEAD") == name
 

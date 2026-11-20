@@ -253,8 +253,9 @@ def deleted_base_merged(cwd, ref, name, subjects):
     merged = re.compile(rf"^Merge pull request #\d+ from [\w.-]+/{re.escape(name)}$")
     if any(merged.match(s) for s in subjects):
         return True, ""
-    # A fast-forward or rebase merge leaves no merge subject, only the stale
-    # tracking ref, whose tip main then holds. A symbolic ref (origin/HEAD)
+    # A fast-forward merge leaves no merge subject, only the stale tracking
+    # ref, whose tip main then holds. A rebase merge, like a squash, writes
+    # new commits, so main does not hold that tip. A symbolic ref (origin/HEAD)
     # is never a base. A squash merge gives main a new commit, so it leaves
     # no trace this can read and is denied: fail closed.
     stale = f"refs/remotes/{remote}/{name}"

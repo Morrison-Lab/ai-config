@@ -8,7 +8,7 @@ nothing; run `git fetch --prune` first, after saving a ref snapshot.
 Actions: `skip`, `flag` (a person decides), `prune` (stale worktree record),
 `remove` (worktree), `delete-d`/`delete-D` (local) and `delete` (remote).
 A branch an open PR comes from or targets is always `skip` (#3515).
-Claim comments are not checked; `notes` says so.
+Claim comments and remote PR authors are checked by `clean-git-execute.py`.
 """
 import argparse
 import json
@@ -164,7 +164,7 @@ class Repo:
             status, action = self.branch(name, ref, local=False)
             remote.append({"branch": name, "status": status, "action": action})
         return {"repo": self.path, "worktrees": worktrees, "local": local,
-                "remote": remote, "notes": ["claim comments not checked"]}
+                "remote": remote, "notes": ["claim comments and remote PR authors are checked by clean-git-execute.py"]}
 
 
 def main():

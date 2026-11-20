@@ -180,6 +180,17 @@ and only the hook suite's per-record fail-open fixture showed it (ai-config#5900
 - **Don't:** treat `except ValueError` as "any unreadable JSON",
   or widen it to `except Exception`, which also hides the reader's own bugs.
 
+Text that decodes is not yet the shape the code expects.
+In a deny hook the gap flips the verdict.
+`require-ums-before-resolve.py` iterated `data.get("messages")` from a `read_thread` result.
+A `true` there raised `TypeError`, the hook's top-level `except Exception` swallowed it,
+and the resolve went through, failing open on the one path meant to fail closed (ai-config#6030).
+
+- **Do:** check the type of each decoded value before using it (`isinstance(msgs, list)`),
+  return the deny-side answer when it is wrong, and add a wrong-shape fixture
+  (a number, a boolean) next to the not-JSON one.
+- **Don't:** count on the hook's outer fail-open handler to cover a bad shape inside a check that must fail closed.
+
 ## When exit codes carry meaning, an error path must set its own
 
 The "In code" bullets say to stop with a clear error rather than proceed on bad

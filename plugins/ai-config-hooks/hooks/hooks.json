@@ -2258,6 +2258,18 @@
             "why": "ai-config#5705. Ezra, 2026-11-16: 'when you hyperlink to content in the notes, can you prefer hyperlinking to the rendered github pages site (when the relevant content is up to date there)?' Denies a user-visible post, a forge comment, issue or PR body, or the --body/--title of a gh issue/pr post in Bash (ai-config#5706), that links github.com/Morrison-Lab/<notes repo>/blob/main/<path>.qmd, and suggests the rendered URL (a subfile maps to the page that includes it plus its first div id, read from a local checkout). Passes a link pinned to a branch or SHA, a non-.qmd or unrendered path (tools/, .github/, _extensions/, filters/, outtakes/), a #L or ?plain=1 source view, a URL in a code span or fence, and a line that says the content is not deployed yet or that the link points at source lines, text or file. A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_NOTES_BLOB_LINK=1 overrides. Fails open on parse trouble."
           }
         ]
+      },
+      {
+        "matcher": "Bash|Monitor|mcp__github__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-tight-github-polling.py\"'",
+            "timeout": 10,
+            "script": "no-tight-github-polling.py",
+            "why": "ai-config#5970. The account's shared 5,000-request hourly GitHub budget hit 0 twice on 2026-11-19, pausing every merge; the merge runner named CI watchers polling every few seconds in parallel threads. Ezra, 2026-11-19: \"you should be more proactive about fixing logjams like this\". DENIES gh pr checks --watch and gh run watch below a 120 s interval (gh defaults 10 s and 3 s), watch below it on a GitHub call, and while/until loops or sleeping for loops that call GitHub with under 120 s of sleep per pass; a for loop over at most five literal words (a retry) or one that never sleeps (a batch) passes. It also DENIES an identical GitHub read (an MCP read tool with the same arguments, or the same gh read command) repeated within 120 s in one session, 1800 s for check-run annotations, which the runner saw re-read several times per head; any GitHub write or git push clears the read log, and ALLOW_REPEAT_GITHUB_READ=1 overrides a Bash read. A deny, not a warning, because the guidance in monitor-pushed-heads.md (ai-config#5045) was read past (ai-config#4741). ALLOW_GITHUB_POLL=1 overrides; AI_CONFIG_GH_POLL_FLOOR tunes the floor. Fails open."
+          }
+        ]
       }
     ],
     "PostToolUse": [

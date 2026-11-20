@@ -378,6 +378,13 @@ Also flag a cloud Bash command that chains an in-place edit (`sed -i`, `perl -i`
 Read the commands yourself; do not report the output of `hooks/prefer-mcp-over-bash-in-cloud.py` or `hooks/no-chained-edit-and-commit-in-cloud.py` as your finding.
 See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever-one-exists).
 
+## GitHub polling that drains the shared budget
+
+Where a transcript, skill or script waits for CI, flag a GitHub poll faster than every two minutes (`gh pr checks --watch` at its default, `watch`, or a loop with a short `sleep`), which emptied the shared budget twice on 2026-11-19 ([ai-config#5970](https://github.com/Morrison-Lab/ai-config/issues/5970)).
+Also flag the same GitHub read repeated with nothing changed in between, above all a head's check-run annotations read more than once.
+Read the commands yourself rather than reporting the output of `hooks/no-tight-github-polling.py`.
+The writer rule is in [`monitor-pushed-heads`](../../shared/workflow/monitor-pushed-heads.md).
+
 ## Figures with a cut value axis
 
 On a diff that draws a figure in any tool or format (a Quarto chunk, matplotlib or plotly for a slide or Word file, a native PowerPoint chart, a Shiny app), check that a bar chart's value axis starts at zero, and that a dot or line plot of a count, rate or proportion that readers compare also starts at zero unless the quantity has no meaningful zero.

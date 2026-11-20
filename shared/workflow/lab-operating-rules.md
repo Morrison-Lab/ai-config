@@ -25,7 +25,8 @@ The rest are prose because no condition in the transcript can decide them.
   So the runner merges clean CI-caller PRs together, once per `scripts/mwc-batch.py` sweep, never one at a time as each turns clean.
   In that sweep it first merges every content PR in that repository that already holds an mwc line and is fully clean;
   it never holds the batch for a line not yet given.
-  After the batch, each waiting PR merges main once, in one pass ([`batch-merge-and-resolve`](batch-merge-and-resolve.md)).
+  After the batch, a waiting PR merges main only if the checker now refuses its head as stale or it conflicts, once, in one pass ([`batch-merge-and-resolve`](batch-merge-and-resolve.md)).
+  A PR that is only behind by content merges on its current head: routine main merges are denied in every repository (Ezra, 2026-11-20, [ai-config#5988](https://github.com/Morrison-Lab/ai-config/issues/5988), [`sync-with-main`](sync-with-main.md)).
   `scripts/mwc-batch.py` lists CI-caller PRs as their own group, so the batch is visible in its report.
   - **Do:** hold a clean CI-caller PR until the runner's next sweep, and merge the batch after the repository's mwc-approved content PRs.
   - **Don't:** merge CI-caller PRs one by one, each forcing another main-merge round on every waiting PR.

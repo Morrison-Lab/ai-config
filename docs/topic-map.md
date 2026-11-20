@@ -426,7 +426,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/structured-data-in-structured-formats.md` | Ezra (d-morrison), 2026-10-13 (DATA 571 project, "Track every course resource" thread): store structured data in structured formats where feasible, and rende... |  |
 | `shared/workflow/subagent-core-rules.md` | `hooks/inject-subagent-rules.py` prints this file into every subagent's context at SubagentStart. A dispatched agent otherwise starts with only its brief, so... |  |
 | `shared/workflow/surface-merge-order.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
-| `shared/workflow/sync-with-main.md` | Whenever `main` has moved ahead of a PR branch you're working on, **merge `main` into the PR branch** before the next push or review trigger. Don't wait for... |  |
+| `shared/workflow/sync-with-main.md` | **Merge `main` into a PR branch only when the branch needs it**, in every repository (Ezra, 2026-11-20, chose "Make it permanent" on "should we stop main mer... |  |
 | `shared/workflow/terminate-superseded-tasks.md` | When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate th... |  |
 | `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568). `AGENTS.md`'s section of the same name states the rule and links here for the full pairs, the plat... |  |
 | `shared/workflow/track-useful-resources.md` | A notes repo is a site listed in `course-sequence` or in the notes repository registry of `send-notes`. Track every useful resource (textbooks, articles, sof... |  |

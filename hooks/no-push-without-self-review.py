@@ -453,9 +453,22 @@ def _first_task_id(source, keys=TASK_ID_KEYS) -> str:
 # `--print` and `-p` are both recorded in `memories/antigravity.md`; a plausible
 # third spelling was dropped rather than shipped on inference, since a flag that
 # does NOT mean print mode would let an interactive run count as a review.
+#
+# `codex exec` is Codex's non-interactive mode, recorded in
+# `memories/claude-code.md` and `skills/recm/SKILL.md`. It is a subcommand
+# rather than a flag, but it takes the flag's place in the one accepted shape,
+# so it rides the same table (ai-config#3877). Codex is credited only where
+# `scripts/lib/codex_scope.py` allows Codex at all: UCDH projects, or an
+# explicit `AI_CONFIG_ALLOW_CODEX=1` (ai-config#5084). Elsewhere a `codex exec`
+# run is not a review this guard credits, since the session should not have
+# run it.
 EXTERNAL_REVIEWER_PRINT_FLAGS = {
     "agy": ("--print", "-p"),
+    "codex": ("exec",),
 }
+
+# Reviewers whose use is scoped by project rather than open everywhere.
+SCOPED_EXTERNAL_REVIEWERS = frozenset({"codex"})
 
 # The ONE accepted shape, matched against the raw command text:
 #
@@ -489,7 +502,7 @@ EXTERNAL_REVIEWER_PRINT_FLAGS = {
 # default IFS, and are the only separators that keep one command one command.
 EXTERNAL_REVIEWER_COMMAND_RE = re.compile(
     r"\A[ \t]*(?P<program>[A-Za-z0-9_.-]+)"
-    r"[ \t]+(?P<flag>--print|-p)"
+    r"[ \t]+(?P<flag>--print|-p|exec)"
     r"[ \t]+'(?P<prompt>[^']*)'[ \t]*\Z")
 
 def external_reviewer_command(command: str) -> bool:
@@ -583,10 +596,39 @@ def external_reviewer_command(command: str) -> bool:
     match = EXTERNAL_REVIEWER_COMMAND_RE.match(command)
     if match is None:
         return False
-    if match.group("flag") not in EXTERNAL_REVIEWER_PRINT_FLAGS.get(
-            match.group("program"), ()):
+    program = match.group("program")
+    if match.group("flag") not in EXTERNAL_REVIEWER_PRINT_FLAGS.get(program, ()):
+        return False
+    if program in SCOPED_EXTERNAL_REVIEWERS and not _codex_in_scope():
         return False
     return bool(REVIEW_PROMPT_RE.search(match.group("prompt")))
+
+
+def _codex_in_scope() -> bool:
+    """May this project use Codex at all? (`scripts/lib/codex_scope.py`).
+
+    Read in the hook's cwd, the session's project. A push redirected with
+    `git -C` to another repository is still graded by the session's project,
+    the scope the Codex run itself was made in. An unloadable helper refuses,
+    so an installation fault never widens Codex's scope.
+    """
+    try:
+        # scripts/lib is on sys.path: _LIB is inserted at module load.
+        from codex_scope import codex_allowed
+    except ImportError as exc:
+        print(f"{os.path.basename(__file__)}: cannot load "
+              f"scripts/lib/codex_scope.py ({exc}); a codex exec review is "
+              "not credited", file=sys.stderr)
+        return False
+    # The helper reads a git remote and parses it; any fault in that refuses
+    # the credit, with a stderr line, rather than crashing the push guard.
+    try:
+        return bool(codex_allowed("."))
+    except Exception as exc:  # noqa: BLE001 -- fail closed, reported below
+        print(f"{os.path.basename(__file__)}: codex_allowed() raised "
+              f"{type(exc).__name__}: {exc}; a codex exec review is not "
+              "credited", file=sys.stderr)
+        return False
 
 OVERRIDE_ENV = re.compile(r"\AALLOW_UNREVIEWED_PUSH=1\Z")
 

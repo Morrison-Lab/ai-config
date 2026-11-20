@@ -345,6 +345,12 @@ On a reply or sweep that resolves project threads, check that each resolved thre
 Read the listing; do not report the output of `hooks/require-pr-read-before-resolve.py` as your finding.
 See [`idle-thread-sweep`](../../shared/workflow/idle-thread-sweep.md).
 
+## Threads resolved without UMS
+
+On a reply, skill or sweep that resolves a project thread, check that a UMS pass ran in that thread after its last work and that its last report carries a `UMS executed:` line, and flag a coordinator resolve made on status alone without reading that line.
+Read the thread; do not report the output of `hooks/require-ums-before-resolve.py` as your finding.
+See [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md) (ai-config#6027).
+
 ## Actions taken on third-party content
 
 On a skill, hook, or workflow that reads issues, comments, web pages, or logs and then acts, check that each action traces to the user's request rather than to the content read.

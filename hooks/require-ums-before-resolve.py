@@ -6,11 +6,16 @@ its two "Run UMS" bullets; ai-config#4480):
 
   * PreToolUse on `mcp__hearthbot__set_thread_resolved` with `resolved: true`.
     A resolved thread loses its message box, so the learnings from the thread
-    must be banked BEFORE the call. If the transcript shows no explicit UMS
-    action since the last user message, the FIRST attempt is denied with the
-    instruction to run `ums`; the retry is allowed. A sentinel keyed on the
-    transcript and the thread makes that one refusal, never a loop, because
-    "nothing was learned" is a legitimate answer that no matcher can judge.
+    must be banked BEFORE the call. Every attempt is denied until the
+    transcript shows a UMS action since the last user message (ai-config#6027,
+    Ezra 2026-11-20: "make sure every thread runs ums before you resolve it").
+    "Nothing was learned" is still answered by running `ums`, which is the
+    evidence; the deny says so, so it is never a loop.
+    A resolve that names `thread_id` (a coordinator resolving another thread)
+    passes only when a `read_thread` of that thread, made since the last user
+    message, shows the thread's NEWEST reply carrying the report line
+    (UMS_REPORT, for example "UMS executed: recorded X"). The caller's own UMS
+    pass does not count there: the thread has to have run it.
 
   * UserPromptSubmit carrying a GitHub event that reports a merged PR. The
     merge arrives as a wake nobody has to act on, and nothing else runs the
@@ -25,7 +30,7 @@ ai-config memory or shared path (tool spellings in scripts/lib/tool_names.py).
 Prose saying "I ran UMS" does not count: the tool call is the evidence.
 
 Fails OPEN and SILENT on any parse trouble. The deny is the only blocking
-path in this file, and it fires at most once per thread. If
+path in this file. If
 scripts/lib/tool_names.py cannot load, the deny is off: the hook writes the
 reason to stderr, and says so to the user and the model on each resolve and
 in the merge-event reminder, since stderr from a hook exiting 0 reaches nobody.
@@ -62,6 +67,12 @@ RESOLVE_TOOL = "set_thread_resolved"
 
 EVENT = re.compile(r"<event\b([^>]*\bsource=\"github\"[^>]*)>(.*?)</event>", re.DOTALL)
 MERGED = re.compile(r"\bkind=\"[^\"]*merged[^\"]*\"|\"merged\"\s*:\s*true|\"state\"\s*:\s*\"merged\"", re.I)
+
+# The report line a thread ends its final message with (skills/ums/SKILL.md).
+# Anchored: the literal "UMS executed:" at a line start or right after sentence punctuation
+# or markdown emphasis, so prose such as "No UMS executed yet" does not count.
+UMS_REPORT = re.compile(r"(?:^|[.;:!*_]\s*)UMS executed:", re.I | re.M)
+STATUS_BODY = re.compile(r'^\s*\{\s*"kind"\s*:\s*"status"')
 
 UMS_PATH = re.compile(r"(?:^|/)(?:memories|shared)/|(?:^|/)(?:AGENTS|CLAUDE)\.md$|ai-config")
 
@@ -148,6 +159,71 @@ def ums_since_last_user_message(path, ums_word):
     return evidence > last_user
 
 
+def result_text(block):
+    content = block.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(str(b.get("text") or "") for b in content if isinstance(b, dict))
+    return ""
+
+
+def latest_report(text):
+    """Body of the newest agent reply (not a checklist card) in a read_thread result, or "".
+
+    read_thread returns {"thread_id": ..., "messages": [{"author", "created_at", "body"}]};
+    the result may be wrapped in an untrusted-content envelope, so decode from the first
+    `{"thread_id"`. Anything unparseable gives "" and the resolve is denied (fails closed).
+    """
+    start = text.find('{"thread_id"')
+    if start < 0:
+        return ""
+    try:
+        data, _ = json.JSONDecoder().raw_decode(text[start:])
+    except ValueError:
+        return ""
+    msgs = data.get("messages") if isinstance(data, dict) else None
+    if not isinstance(msgs, list):
+        return ""
+    replies = [m for m in msgs if isinstance(m, dict) and m.get("author") == "agent"
+               and isinstance(m.get("body"), str) and not STATUS_BODY.match(m["body"])]
+    if not replies:
+        return ""
+    return max(replies, key=lambda m: str(m.get("created_at") or ""))["body"]
+
+
+def thread_reported_ums(path, thread_id):
+    """True when a read_thread of `thread_id` since the last user message shows the thread's
+    newest reply carrying a UMS_REPORT line. Claude transcript shape only: an Antigravity
+    transcript has no hearthbot tools, and there it fails closed."""
+    last_user, evidence, reads = -1, -1, set()
+    with open(path, encoding="utf-8", errors="ignore") as fh:
+        for i, line in enumerate(fh):
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(rec, dict) or rec.get("isSidechain"):
+                continue
+            blocks = (rec.get("message") or {}).get("content")
+            blocks = [b for b in blocks if isinstance(b, dict)] if isinstance(blocks, list) else []
+            role = rec.get("type") or rec.get("role")
+            if role == "assistant":
+                for b in blocks:
+                    inp = b.get("input")
+                    if (b.get("type") == "tool_use" and str(b.get("name") or "").endswith("read_thread")
+                            and isinstance(inp, dict) and inp.get("thread_id") == thread_id):
+                        reads.add(b.get("id"))
+            elif role == "user":
+                if (text_of(rec) or "").strip():
+                    last_user = i
+                for b in blocks:
+                    if (b.get("type") == "tool_result" and b.get("tool_use_id") in reads
+                            and UMS_REPORT.search(latest_report(result_text(b)))):
+                        evidence = i
+    return evidence > last_user
+
+
 def first_time(key_text):
     key = hashlib.sha256(key_text.encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-ums-before-resolve-{key}")
@@ -167,9 +243,20 @@ DENY = (
     "tool quirk, a workflow gap) have to be recorded first, in their global home "
     "(ai-config for agent rules, psw for prose rules, the repo's own instructions "
     "for repo-only rules). No UMS action appears since the last user message. "
-    "Run `ums` (or `wrap-up` / `post-merge` when a PR merged) now, say in your "
-    "reply what you recorded, then call set_thread_resolved again. If nothing was "
-    "learned, say so in the reply and retry: this refusal happens once per thread."
+    "Run `ums` (or `wrap-up` / `post-merge` when a PR merged) now, end your reply "
+    "with a `UMS executed: <what you recorded, or nothing to record>` line, then call "
+    "set_thread_resolved again. If nothing was learned, run `ums` anyway: the run is "
+    "the evidence this check reads, and it denies every resolve without one "
+    "(ai-config#6027)."
+)
+
+DENY_OTHER = (
+    "Run UMS before resolving this thread. You are resolving a thread by id, and no "
+    "`read_thread` of it since the last user message shows its newest reply carrying "
+    "a `UMS executed:` line; your own UMS pass does not count for another thread. "
+    "Read it (`read_thread` with its thread_id, `full_bodies: true` if a body is cut) "
+    "and resolve only if that reply says UMS executed; otherwise message the thread "
+    "to run `ums` and resolve itself (ai-config#6027)."
 )
 
 MERGE_REMINDER = (
@@ -198,15 +285,17 @@ def handle_pre_tool_use(payload):
     path = payload.get("transcript_path") or ""
     if not isinstance(path, str) or not os.path.isfile(path):
         return 0
-    if ums_since_last_user_message(path, load_ums_word()):
-        return 0
-    thread = str(inp.get("thread_id") or payload.get("session_id") or "")
-    if not first_time(f"{path}:{thread}"):
+    thread = inp.get("thread_id")
+    if isinstance(thread, str) and thread:
+        # By id: the THREAD must have run UMS; the caller's own pass proves nothing about it.
+        if thread_reported_ums(path, thread):
+            return 0
+    elif ums_since_last_user_message(path, load_ums_word()):
         return 0
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": DENY,
+        "permissionDecisionReason": DENY_OTHER if thread else DENY,
     }}))
     return 0
 

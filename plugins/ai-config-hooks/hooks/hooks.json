@@ -2168,7 +2168,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-ums-before-resolve.py\"'",
             "timeout": 10,
             "script": "require-ums-before-resolve.py",
-            "why": "A resolved thread loses its message box, so UMS must run first. Denies the first set_thread_resolved(true) of a thread when no UMS tool call follows the last user message; the retry is allowed (ai-config#4480)."
+            "why": "A resolved thread loses its message box, so UMS must run first. Denies a thread's own set_thread_resolved(true) when no UMS tool call follows the last user message, and a resolve by thread_id unless a read_thread of that thread shows its newest reply carrying a 'UMS executed' line; the caller's own UMS does not count there (ai-config#4480, #6027)."
           },
           {
             "type": "command",

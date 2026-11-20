@@ -169,6 +169,11 @@ check("allowed after Skill ums followed by its isMeta skill body (ai-config#6039
 check("an isMeta record does not hide a later real user message",
       '"deny"' in run(work + [tool("Skill", {"skill": "ums"}), result(), skill_body, user("more")],
                       resolve(), fresh()))
+wakeup = {"type": "user", "isMeta": True, "promptSource": "sdk",
+          "message": {"content": [{"type": "text", "text": "Check CI on the PR"}]}}
+check("a scheduled continuation (isMeta, no sourceToolUseID) is a real turn",
+      '"deny"' in run(work + [tool("Skill", {"skill": "ums"}), result(), wakeup],
+                      resolve(), fresh()))
 check("a thread report read before an isMeta skill body still counts",
       run(work + read("cmsg_A", done) + [skill_body], resolve(thread="cmsg_A"), fresh()) == "")
 check("UMS before the last user message does not count",

@@ -347,7 +347,7 @@ def _test_own_actions_job():
                 "is NOT clean, and no later comment supersedes it")
     human = "PR has active formal review state 'CHANGES_REQUESTED' from alice"
 
-    def run_main(env, review_issues, runs=only_own):
+    def run_main(env, review_issues, runs=only_own, drift=None):
         reset()
         route, _ = router(jobs)
 
@@ -374,7 +374,8 @@ def _test_own_actions_job():
                 patch.object(checker, "check_review_threads", return_value=(True, [])), \
                 patch.object(checker, "check_review_comments",
                              return_value=(not review_issues, review_issues)), \
-                patch.object(checker, "check_base_drift", return_value=(True, [])), \
+                patch.object(checker, "check_base_drift",
+                             return_value=(not drift, list(drift or []))), \
                 contextlib.redirect_stdout(out):
             try:
                 checker.main()
@@ -406,6 +407,21 @@ def _test_own_actions_job():
                          "html_url": f"{run_url}/job/1"}]}))
     check("a job in the repo whose check run is not on this head gets no reviewer note",
           code == 1 and note not in text)
+
+    # Base drift as the only blocker prints a distinct line and still exits 1;
+    # Inside its own CI job, so the job's own in-progress run is not a blocker.
+    # drift beside any other blocker does not (ai-config#6028).
+    drift_issue = ("Base 'main' gained 1 commit(s) since this head, including a "
+                   "change under .github/workflows/")
+    code, text = run_main(_actions_env(**in_actions), [], drift=[drift_issue])
+    check("drift as the only blocker prints CLEAN EXCEPT BASE DRIFT and exits 1 (#6028)",
+          code == 1 and "CLEAN EXCEPT BASE DRIFT" in text and "FULLY CLEAN" not in text)
+    code, text = run_main(_actions_env(**in_actions), [human], drift=[drift_issue])
+    check("drift beside another blocker does not print CLEAN EXCEPT BASE DRIFT (#6028)",
+          code == 1 and "CLEAN EXCEPT BASE DRIFT" not in text)
+    code, text = run_main(_actions_env(**in_actions), [human])
+    check("a blocker with no drift does not print CLEAN EXCEPT BASE DRIFT (#6028)",
+          code == 1 and "CLEAN EXCEPT BASE DRIFT" not in text)
 
     # The prefixes are matched against message text built elsewhere in the
     # checker, so a reworded message would silently drop out of the note.

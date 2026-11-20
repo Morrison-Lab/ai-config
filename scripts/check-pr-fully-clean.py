@@ -5365,6 +5365,15 @@ def main():
         print("\n\u274c PR is NOT fully clean:")
         for issue in blocking:
             print(f"  - {issue}")
+        # When base drift is the only blocker, every other criterion already
+        # passed on this head. Say so, so that a backlog of PRs behind one
+        # new workflow on the base is not each given a main merge (and a
+        # full CI cycle) long before its turn to merge (ai-config#6028).
+        # Still exit 1: the head has not run the new gate.
+        if all(i in drift_issues for i in blocking):
+            base = getattr(pr, "base_ref", "") or "the base branch"
+            print(f"\n⏸️ {repo}#{pr_num} is CLEAN EXCEPT BASE DRIFT on HEAD {sha[:8]}: "
+                  f"merge {base} into it only when it is next to merge (ai-config#6028)")
         sys.exit(1)
 
     if mwr:

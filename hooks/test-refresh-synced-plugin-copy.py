@@ -48,11 +48,11 @@ def check(name, cond, detail=""):
 
 def make_plugin(root, name, files):
     (root / ".claude-plugin").mkdir(parents=True, exist_ok=True)
-    (root / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": name}))
+    (root / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": name}), encoding="utf-8")
     for rel, text in files.items():
         path = root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
+        path.write_text(text, encoding="utf-8")
 
 
 def scenario(remote=True, opt_out=False, root="fresh", synced_name="ai-config",
@@ -66,9 +66,9 @@ def scenario(remote=True, opt_out=False, root="fresh", synced_name="ai-config",
     make_plugin(synced, synced_name, {"hooks/guard.py": "old", "hooks/only-synced.py": "keep"})
     if recorded:
         (plugins / "installed_plugins.json").write_text(json.dumps({"plugins": {
-            "ai-config@Morrison-Lab": [{"scope": "user", "installPath": str(fresh)}]}}))
+            "ai-config@Morrison-Lab": [{"scope": "user", "installPath": str(fresh)}]}}), encoding="utf-8")
     fake = d / "claude"
-    fake.write_text(FAKE)
+    fake.write_text(FAKE, encoding="utf-8")
     fake.chmod(0o755)
     env = {k: v for k, v in os.environ.items()
            if k not in ("CLAUDE_CODE_REMOTE", "AI_CONFIG_NO_SYNCED_REFRESH",
@@ -86,7 +86,7 @@ def scenario(remote=True, opt_out=False, root="fresh", synced_name="ai-config",
         env["FAKE_FAIL"] = "1"
     out = subprocess.run([sys.executable, str(HOOK)], input="{}", capture_output=True,
                          text=True, env=env)
-    calls = (plugins / "calls.log").read_text() if (plugins / "calls.log").exists() else ""
+    calls = (plugins / "calls.log").read_text(encoding="utf-8") if (plugins / "calls.log").exists() else ""
     return out, synced, calls
 
 
@@ -99,16 +99,16 @@ def context(out):
 
 def refreshed(label, out, synced):
     check(f"{label}: exit 0", out.returncode == 0, out.stderr)
-    check(f"{label}: changed file overwritten", (synced / "hooks/guard.py").read_text() == "new")
-    check(f"{label}: synced-only file kept", (synced / "hooks/only-synced.py").read_text() == "keep")
-    check(f"{label}: new file added", (synced / "hooks/added.py").read_text() == "added")
+    check(f"{label}: changed file overwritten", (synced / "hooks/guard.py").read_text(encoding="utf-8") == "new")
+    check(f"{label}: synced-only file kept", (synced / "hooks/only-synced.py").read_text(encoding="utf-8") == "keep")
+    check(f"{label}: new file added", (synced / "hooks/added.py").read_text(encoding="utf-8") == "added")
     check(f"{label}: .git skipped", not (synced / ".git").exists())
     check(f"{label}: report names the copy", str(synced) in context(out), out.stdout)
 
 
 def untouched(label, out, synced):
     check(f"{label}: exit 0", out.returncode == 0, out.stderr)
-    check(f"{label}: untouched", (synced / "hooks/guard.py").read_text() == "old")
+    check(f"{label}: untouched", (synced / "hooks/guard.py").read_text(encoding="utf-8") == "old")
     check(f"{label}: silent", out.stdout.strip() == "", out.stdout)
 
 

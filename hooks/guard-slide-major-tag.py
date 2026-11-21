@@ -668,7 +668,7 @@ def main() -> int:
         # (ai-config#6004: a claude.ai-synced copy predating #5414 denied slides
         # that main's guard allows).
         hso["permissionDecisionReason"] = (
-            f"{text}\n\nGuard copy: {os.path.abspath(__file__)}. A copy under "
+            f"{text}\n\nGuard copy: {os.path.realpath(__file__)}. A copy under "
             "~/.claude/plugins/synced/ can be stale; compare it with ai-config main's "
             "hooks/guard-slide-major-tag.py before treating this deny as real.")
     else:

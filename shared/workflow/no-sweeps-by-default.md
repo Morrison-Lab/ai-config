@@ -44,7 +44,7 @@ Whoever writes the brief, a coordinator or an agent launching a subagent, is bou
 ## The mechanisms
 
 - `hooks/no-unrequested-sweep-in-brief.py` denies a brief (a subagent launch, `SendMessage`, a thread start, a thread or coordinator message, remote-control instructions) that says "sweep", pairs "all/every ... repos", "everywhere" or "existing content" with a content-edit verb, or names three or more notes repos beside an edit verb, unless the user's own words since their latest message ask for that breadth.
-  The phrase is read clause by clause (split at commas, semicolons and colons): a clause that is a question, offers the work ("offer it as a follow-up"), negates the phrase, or is about PRs, CI, merges, hooks or branches passes.
+  The phrase is read clause by clause (split at commas, semicolons and colons): a clause that is a question, offers the work ("offer it as a follow-up") or negates the phrase passes, and an all-repos or named-repos phrase in a clause about PRs, CI, merges, hooks or branches passes too (the word "sweep" does not).
   A typed `gia`, `gii`, `gip`, `gmd` or `ardia` grants it, as for the PR guard.
   It catches the widening when the work is handed over, before `no-unrequested-sweep-pr.py` can see any PR.
 

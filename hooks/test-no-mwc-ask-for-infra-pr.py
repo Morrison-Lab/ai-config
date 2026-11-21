@@ -10,8 +10,10 @@ import sys
 
 HOOK = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-mwc-ask-for-infra-pr.py")
 POST = "mcp__hearthbot__post_message"
+DECIDE = "mcp__hearthbot__request_decision"
+COORD = "mcp__hearthbot__message_coordinator"
 
-# (name, tool, text, should_deny); the fetch is disabled, so only repo-level infra is decided here.
+# (name, tool, text or tool_input, should_deny); the fetch is disabled, so only repo-level infra is decided here.
 CASES = [
     ("gha PR waiting on mwc", POST, "Needs your mwc: Morrison-Lab/gha#1628 is clean.", True),
     ("short ref macros", POST, "Type mwc to merge macros#349.", True),
@@ -39,11 +41,37 @@ CASES = [
     ("merge line, unspaced #", POST, "merge ai-config#6002", True),
     ("merge line list, unspaced #", POST, "merge lds 2922, Morrison-Lab/gha#2152", True),
     ("no text", POST, None, False),
+    # Merge questions and cards that say neither mwc nor a merge line (ai-config#6054).
+    ("card names caller PRs", DECIDE, {"question": "Merge the six lone-subfloats caller PRs (mds, pds, sds, mcs, psw, rme)?",
+                                        "options": [{"label": "Merge all six", "consequence": "I merge them now."},
+                                                    {"label": "Hold", "consequence": "Nothing merges."}]}, True),
+    ("card names gha PR", DECIDE, {"question": "Merge gha#2174 now?",
+                                   "options": [{"label": "Merge", "consequence": "It merges."},
+                                               {"label": "Wait", "consequence": "Nothing merges."}]}, True),
+    ("card for content PR", DECIDE, {"question": "Merge lds#3057, the figure fix, now?",
+                                     "options": [{"label": "Merge", "consequence": "It merges."},
+                                                 {"label": "Wait", "consequence": "Nothing merges."}]}, False),
+    ("card says the grant", DECIDE, {"question": "Merge the caller PRs under the infra grant, or hold for the sweep?",
+                                     "options": [{"label": "Now", "consequence": "They merge."},
+                                                 {"label": "After the sweep", "consequence": "They merge later."}]}, False),
+    ("card not about merging", DECIDE, {"question": "Which caption wording reads better?",
+                                        "options": [{"label": "A", "consequence": "Use A."},
+                                                    {"label": "B", "consequence": "Use B."}]}, False),
+    ("want me to merge infra", POST, "The workflow PRs are clean. Want me to merge the caller PRs?", True),
+    ("needs your go-ahead for gha", POST, "gha#2174 needs your go-ahead to merge.", True),
+    ("coordinator relay", COORD, "The caller PRs need Ezra's word before I merge them; please ask him.", True),
+    ("coordinator relay infra", COORD, "Shall I merge the caller PRs, or does Ezra want to look first?", True),
+    ("content merge ask", POST, "lds#3057 needs your go-ahead to merge.", False),
+    ("merged report", POST, "Merged the six caller PRs under the infra grant.", False),
 ]
 
 
 def run(tool, text, stdin=None):
-    payload = {"tool_name": tool, "tool_input": {"text": text} if text is not None else {}}
+    if isinstance(text, dict):
+        tool_input = text
+    else:
+        tool_input = {"text": text} if text is not None else {}
+    payload = {"tool_name": tool, "tool_input": tool_input}
     env = dict(os.environ, NO_MWC_INFRA_HOOK_DISABLE_FETCH="1")
     p = subprocess.run([sys.executable, HOOK], input=stdin or json.dumps(payload),
                        capture_output=True, text=True, env=env)

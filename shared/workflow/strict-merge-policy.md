@@ -91,6 +91,12 @@ Do not enable session-wide `/mwc` for it.
   Before telling the user a PR waits on `mwc`, list its changed paths.
   If every path matches `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py` (`.github/`, `.claude/`, `CLAUDE.md`/`AGENTS.md`, lint, spell and link-check configuration) or the repo is gha, macros or ai-config, report it as merging under the infra grant, not as waiting on the user (Ezra, 2026-11-07, about lds#2009: "it's infra and shouldn't need my word").
   `hooks/no-mwc-ask-for-infra-pr.py` denies a reply that asks otherwise (ai-config#5097), including a reply that asks the user to type a merge line such as `merge gha 2152 <sha>` for one (ai-config#6021).
+  It also denies a decision card or a coordinator relay that asks to merge infra PRs, such as "Merge the six caller PRs?",
+  because Ezra answered that card with "infra has permanent mwc in all repos" (2026-11-21, ai-config#6054).
+- **Do:** merge a caller, workflow or other infra PR with its number and head SHA written literally (`pulls/2174/merge -f sha=<40-hex>`, `gh pr merge 2174 --match-head-commit <40-hex>`).
+  The merge guard reads both to fetch the changed paths and pin the head, so a loop over `pulls/$n/merge`, or `sha=$(...)`, fails closed and reads as a missing grant
+  (rme#1510, 2026-11-21: refused with `sha=$(gh api ...)`, merged with the SHA spelled out).
+- **Don't:** post a decision card asking whether to merge an infra PR, or enable session `mwc` to get past a guard refusal you caused by hiding the PR number.
 - **Do:** merge a fully clean infrastructure PR without asking, and say in the same reply that you did and why it qualified.
   In a project with a runner thread, an owner thread never merges: it sends the PR's final head to the coordinator, and the runner thread merges once the fully-clean checker exits 0 (ai-config#5111).
   In a project with no runner thread, the thread that owns the infra PR merges it itself once it is fully clean, and never asks (Ezra, 2026-11-20: "always handle infra PRs yourself;

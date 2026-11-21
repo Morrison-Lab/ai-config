@@ -22,7 +22,10 @@ import re
 import sys
 import time
 
-REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
+REPLY_TOOL = re.compile(
+    r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|"
+    r"request_decision|message_coordinator)$")
+CARD_TOOL = re.compile(r"request_decision$")
 MWC = re.compile(r"\bmwc\b", re.I)
 GRANT_STATED = re.compile(
     r"infra(?:structure)?[- ](?:pr )?grant|standing (?:infra|mwc|merge)|\bno mwc\b|"
@@ -39,14 +42,30 @@ SHORT_REF = re.compile(r"(?<![\w/.#-])([A-Za-z][\w.-]*)#(\d+)\b")
 MERGE_ITEM = r"(?:[\w.-]+/)?[A-Za-z][\w.-]*(?:\s+#?|\s*#)\d+(?:\s+[0-9a-f]{7,40})?"
 MERGE_LINE = re.compile(rf"\bmerge\s+({MERGE_ITEM}(?:\s*(?:,\s*(?:and\b)?|\band\b)\s*{MERGE_ITEM})*)", re.I)
 MERGE_REF = re.compile(r"(?:([\w.-]+)/)?([A-Za-z][\w.-]*)(?:\s+#?|\s*#)(\d+)")
+# A merge ask that says neither `mwc` nor a typed merge line (ai-config#6054):
+# "Merge the six caller PRs?" on a decision card, "lds#3058 needs your go-ahead
+# to merge". A decision card that names a merge is an ask by construction.
+MERGE_WORD = re.compile(r"\bmerg(?:e|es|ed|ing)\b", re.I)
+MERGE_ASK = re.compile(
+    r"\b(?:shall|should|can|may)\s+I\s+merge\b|\bwant\s+me\s+to\s+merge\b"
+    r"|\b(?:ok|okay)\s+to\s+merge\b|\bmerge\s+(?:it|them|these|those|all)\s*\?"
+    r"|\byour\s+(?:merge\s+)?(?:word|go[- ]ahead|ok|okay|approval|permission|sign[- ]off)\b[^.?!\n]{0,40}\bmerg"
+    r"|\bmerg\w*[^.?!\n]{0,40}\b(?:needs?|awaits?|awaiting|waits?\s+(?:on|for))\s+(?:your|you|ezra|the\s+user)\b"
+    r"|\b(?:needs?|awaits?|awaiting|waits?\s+(?:on|for))\s+(?:your|you|ezra|the\s+user)\b[^.?!\n]{0,40}\bmerg",
+    re.I)
+# Words that call the PRs infrastructure, so no lookup is needed to know.
+INFRA_WORD = re.compile(
+    r"\binfra(?:structure)?\b|\b(?:caller|workflow|ci|tooling|hook|config(?:uration)?)\s+(?:pr|prs|pull\s+requests?)\b"
+    r"|\.github/",
+    re.I)
 NOT_A_REPO = frozenset({"pr", "prs", "main", "master", "the", "it", "this", "that", "all", "and"})
 
 REASON = (
-    "[hook: no-mwc-ask-for-infra-pr] This message asks for a merge word (an `mwc` grant or a "
-    "typed merge line) and names {ref}, which is an "
+    "[hook: no-mwc-ask-for-infra-pr] This message asks for a merge word (an `mwc` grant, a "
+    "typed merge line, or a merge question or card) and names {ref}, which is an "
     "infrastructure PR ({why}). Infra PRs carry a standing merge grant once fully clean "
     "(strict-merge-policy.md; Ezra, 2026-11-07 about lds#2009: \"it's infra and shouldn't need "
-    "my word\"). Do not ask for or wait on his word. In a project, an owner thread never merges: "
+    "my word\"; 2026-11-21: \"infra has permanent mwc in all repos\"). Do not ask for or wait on his word. In a project, an owner thread never merges: "
     "send the PR's final head to the coordinator, whose runner thread merges it once the "
     "fully-clean checker exits 0, and say it merges under the infra grant. Outside a project, "
     "merge it yourself once fully clean. Drop it from the mwc list. ai-config#5097, #5111."
@@ -162,6 +181,36 @@ def classify(owner, repo, number, deadline):
     return None
 
 
+def user_text(tool_input):
+    """The user-visible text of a message, or of a decision card's question and options."""
+    if not isinstance(tool_input, dict):
+        return ""
+    parts = [tool_input.get("text"), tool_input.get("question")]
+    for opt in tool_input.get("options") or []:
+        if isinstance(opt, dict):
+            parts += [opt.get("label"), opt.get("consequence")]
+    return "\n".join(p for p in parts if isinstance(p, str))
+
+
+def first_infra_ref(found, exempt, deadline):
+    """(ref, why) for the first provably infra PR among `found`, else None."""
+    for checked, (position, (owner, repo, number)) in enumerate(found, 1):
+        if position in exempt or checked > MAX_REFS:
+            continue
+        why = classify(owner, repo, number, deadline)
+        if why:
+            return f"{repo}#{number}", why
+    return None
+
+
+def deny(reason):
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason,
+    }}))
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -170,8 +219,25 @@ def main() -> int:
         if not REPLY_TOOL.search(str(payload.get("tool_name") or "")):
             return 0
         tool_input = payload.get("tool_input")
-        text = tool_input.get("text") if isinstance(tool_input, dict) else None
-        if not isinstance(text, str) or not (MWC.search(text) or MERGE_LINE.search(text)):
+        text = user_text(tool_input)
+        is_card = bool(CARD_TOOL.search(payload["tool_name"]))
+        if not text:
+            return 0
+        if is_card and MERGE_WORD.search(text):
+            # A merge question on a card is the ask; judge the whole card.
+            sentence = " ".join(text.split())
+            if INFRA_WORD.search(text) and not GRANT_STATED.search(text):
+                deny(REASON.format(ref="these PRs", why="the card calls them infrastructure"))
+                return 0
+            why_ref = first_infra_ref(refs(text), set(), time.monotonic() + TOTAL_BUDGET_S)
+            if why_ref:
+                deny(REASON.format(ref=why_ref[0], why=why_ref[1]))
+            return 0
+        for sentence in SENTENCE_SPLIT.split(text):
+            if MERGE_ASK.search(sentence) and INFRA_WORD.search(sentence) and not GRANT_STATED.search(sentence):
+                deny(REASON.format(ref="the PRs it names", why="the message calls them infrastructure"))
+                return 0
+        if not (MWC.search(text) or MERGE_LINE.search(text) or MERGE_ASK.search(text)):
             return 0
         deadline = time.monotonic() + TOTAL_BUDGET_S
         checked = 0
@@ -179,7 +245,9 @@ def main() -> int:
         said_mwc = bool(MWC.search(text))
         for sentence in SENTENCE_SPLIT.split(text):
             found = refs(sentence)
-            if not said_mwc:
+            if not said_mwc and MERGE_ASK.search(sentence):
+                pass  # every PR a merge ask names is asked about
+            elif not said_mwc:
                 # Only the PRs a merge line names are asked about.
                 spans = [line.span(1) for line in MERGE_LINE.finditer(sentence)]
                 found = [f for f in found if any(a <= f[0] < b for a, b in spans)]
@@ -192,11 +260,7 @@ def main() -> int:
                     return 0
                 why = classify(owner, repo, number, deadline)
                 if why:
-                    print(json.dumps({"hookSpecificOutput": {
-                        "hookEventName": "PreToolUse",
-                        "permissionDecision": "deny",
-                        "permissionDecisionReason": REASON.format(ref=f"{repo}#{number}", why=why),
-                    }}))
+                    deny(REASON.format(ref=f"{repo}#{number}", why=why))
                     return 0
     except Exception:
         return 0

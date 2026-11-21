@@ -2294,6 +2294,13 @@
             "timeout": 10,
             "script": "no-notes-blob-link.py",
             "why": "ai-config#5705. Ezra, 2026-11-16: 'when you hyperlink to content in the notes, can you prefer hyperlinking to the rendered github pages site (when the relevant content is up to date there)?' Denies a user-visible post, a forge comment, issue or PR body, or the --body/--title of a gh issue/pr post in Bash (ai-config#5706), that links github.com/Morrison-Lab/<notes repo>/blob/main/<path>.qmd, and suggests the rendered URL (a subfile maps to the page that includes it plus its first div id, read from a local checkout). Passes a link pinned to a branch or SHA, a non-.qmd or unrendered path (tools/, .github/, _extensions/, filters/, outtakes/), a #L or ?plain=1 source view, a URL in a code span or fence, and a line that says the content is not deployed yet or that the link points at source lines, text or file. A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_NOTES_BLOB_LINK=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-stale-pin-macro-excuse.py\"'",
+            "timeout": 10,
+            "script": "no-stale-pin-macro-excuse.py",
+            "why": "Ezra, 2026-11-20 23:22 PST: never skip a semantic macro (\\ccprod, \\stprod, \\soprod, \\oprod) because a repo's pinned latex-macros copy lacks it; bump the pin in the same PR and use the macro. \"Inconvenience is never a valid excuse.\" A backstop for common wordings: DENIES a user-visible post, forge comment, issue or PR body, gh issue/pr --body/--title/--body-file, or git commit -m/-am/-F message where one sentence or two adjacent ones name a macro and the pin, say the pin lacks it, and say the macro was kept out (kept, used, left, raw, until, for now). A window that moves the pin (bumped, synced, updated the submodule, stacked) with no negation or deferral, or quotes the rule, passes; a heredoc -F - message is not read. ALLOW_STALE_PIN_MACRO=1 overrides for a quote. See skills/use-math-macros/SKILL.md. Fails open on parse trouble."
           }
         ]
       },

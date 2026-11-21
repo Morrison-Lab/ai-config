@@ -9,19 +9,23 @@ everywhere. His reply: "did I say to sweep?". The PR-side guards
 are being opened, after the widened brief has already handed a thread the work;
 this guard fires on the brief itself.
 
-DENIES an Agent/Task launch, SendMessage, thread start or thread message whose
-text holds, in a clause that is not negated, not a question and not an offer
-("offer", "follow-up", "ask the user", "file an issue"):
-  - the word "sweep";
-  - "all|every|each ... repo(s)/repositories", "everywhere" or "existing
-    content|pages|chapters|notes" in a sentence with a content-edit verb
-    (label, fix, convert, update, rewrite, apply, backfill, migrate, rename,
-    replace, roll out, bring, edit, change).
-unless the user's own words since their latest message carry the same breadth
-(a sweep ask, or an all-repos/everywhere clause), read with user_bodies() from
-remind-plain-english-merge-word.py, so a coordinator <note> never counts, or a
-verified decision-card tap mentions a sweep or all repos. No agent-side bypass:
-reword the brief to the asked step and put the rest in it as an offer.
+DENIES a brief (an Agent/Task launch, SendMessage, thread start, thread or
+coordinator message, remote-control instructions, a scheduled send) holding a
+widening in a clause (split at , ; :) that is not a question, holds no offer
+("offer", "follow-up", "ask the user", "file an issue") and has no negation
+before the phrase:
+  - "sweep" (kind "sweep");
+  - "all|every|each ... repo(s)", "everywhere" or "existing content|pages|
+    chapters|notes|equations|figures" in a clause with a content-edit verb
+    and no PR, CI, merge, hook or branch word (kind "scope");
+  - three or more notes repos named in one sentence with an edit verb and no
+    offer, negation or infra word (kind "scope").
+unless the user's own words since their latest message ask for that kind: a
+"sweep" clause or a typed gia/gii/gip/gmd/ardia grants both kinds, an
+all-repos/everywhere clause or three named repos grants "scope". Read with
+user_bodies() from remind-plain-english-merge-word.py, so a coordinator <note>
+never counts; a verified decision-card tap mentioning a sweep or all repos
+grants both. No agent-side bypass: brief the asked step and offer the rest.
 Fails open on a missing transcript, a missing helper or parse trouble.
 """
 import importlib.util
@@ -36,19 +40,25 @@ import card_answer  # noqa: E402
 
 BRIEF_TOOLS = re.compile(
     r"^(?:Agent|Task|SendMessage|mcp__hearthbot__start_thread|mcp__hearthbot__message_thread"
-    r"|mcp__claude-code-remote__send_message|mcp__claude-code-remote__create_session"
-    r"|mcp__Claude_Code_Remote__create_session)$")
+    r"|mcp__hearthbot__message_coordinator|mcp__hearthbot__start_remote_control"
+    r"|mcp__claude-code-remote__send_message|mcp__claude-code-remote__send_later"
+    r"|mcp__claude-code-remote__create_session|mcp__Claude_Code_Remote__create_session)$")
 BROAD = re.compile(r"\bsweep(?:s|ing)?\b", re.I)
-ALL_REPOS = re.compile(
-    r"\b(?:all|every|each)\b[\w ]{0,30}?\b(?:repos?|repositories)\b|\beverywhere\b"
-    r"|\b(?:all\s)?existing\s(?:content|pages|chapters|notes)\b", re.I)
+SCOPE = re.compile(
+    r"\b(?:all|every|each)\b[^.;:?!\n]{0,80}?\b(?:repos?|repositories)\b|\beverywhere\b"
+    r"|\bexisting\s(?:content|pages|chapters|notes|equations|figures)\b", re.I)
+NOTES_REPO = re.compile(r"\b(?:lds|mds|pds|sds|rme|mcs|psw|psc|win|cie|ids|cds|wai)\b", re.I)
 EDIT_VERB = re.compile(
     r"\b(?:label|relabel|fix|convert|update|rewrite|apply|backfill|migrate|rename|replace"
-    r"|roll|bring|edit|change)\w*\b", re.I)
+    r"|roll|bring|edit|change|add|enable|install|wire|clean|sweep)\w*\b", re.I)
+# A clause about PRs, CI or hooks is driving infrastructure, not editing content.
+INFRA = re.compile(r"\bPRs?\b|\bCI\b|\bpull\s+requests?\b|\bmerg\w*|\bhooks?\b|\bbranch(?:es)?\b", re.I)
 NEGATED = re.compile(r"\b(?:don'?t|do\s+not|never|no|not|stop|without|isn'?t|must\s+not)\b", re.I)
 OFFER = re.compile(
     r"\b(?:offer|follow[- ]?up|suggest|propose|ask\s+(?:the\s+user|ezra|him|them)|file\s+an?\s+issue)\w*",
     re.I)
+# A typed backlog-run skill asks for many PRs across repos by design (as in no-unrequested-sweep-pr.py).
+BACKLOG_SKILL = re.compile(r"(?:^|\s)/?(?:gia|gii|gip|gmd|giardia|ardia|ardiaei)\b", re.I)
 SENTENCE = re.compile(r"[^.!?\n]+[.!?]*")
 CLAUSE = re.compile(r"[,;:]")
 CARD_BROAD = re.compile(r"\bsweep|\ball\s+(?:the\s+)?(?:notes\s+)?repos|\beverywhere\b", re.I)
@@ -83,37 +93,54 @@ def strings(value):
             yield from strings(v)
 
 
-def clauses(text):
-    for sentence in SENTENCE.findall(text):
-        if sentence.rstrip().endswith("?"):
-            continue
-        yield from CLAUSE.split(sentence)
-
-
 def live(clause, match):
     return bool(match) and not NEGATED.search(clause[:match.start()])
 
 
+def named_repos(sentence):
+    """Three or more notes repos named in one sentence, or None."""
+    names = {m.group(0).lower() for m in NOTES_REPO.finditer(sentence)}
+    return ", ".join(sorted(names)) if len(names) >= 3 else None
+
+
 def widening(text):
-    """The first widening phrase in a brief, or None."""
+    """(kind, phrase) for the first widening in a brief, or None; kind is "sweep" or "scope"."""
     for sentence in SENTENCE.findall(text):
-        if sentence.rstrip().endswith("?") or OFFER.search(sentence):
+        if sentence.rstrip().endswith("?"):
             continue
         for clause in CLAUSE.split(sentence):
+            if OFFER.search(clause):
+                continue
             hit = BROAD.search(clause)
             if live(clause, hit):
-                return hit.group(0)
-        repos = ALL_REPOS.search(sentence)
-        if live(sentence, repos) and EDIT_VERB.search(sentence):
-            return repos.group(0)
+                return "sweep", hit.group(0)
+            hit = SCOPE.search(clause)
+            if live(clause, hit) and EDIT_VERB.search(clause) and not INFRA.search(clause):
+                return "scope", hit.group(0)
+        names = named_repos(sentence)
+        if names and EDIT_VERB.search(sentence) and not (
+                OFFER.search(sentence) or NEGATED.search(sentence) or INFRA.search(sentence)):
+            return "scope", names
     return None
 
 
 def user_grants(text, typed):
-    for clause in clauses(typed(text)):
-        if live(clause, BROAD.search(clause)) or live(clause, ALL_REPOS.search(clause)):
-            return True
-    return False
+    """The kinds of breadth the user's words ask for: a subset of {"sweep", "scope"}."""
+    text = typed(text)
+    if BACKLOG_SKILL.search(text):
+        return {"sweep", "scope"}
+    kinds = set()
+    for sentence in SENTENCE.findall(text):
+        if sentence.rstrip().endswith("?"):
+            continue
+        if named_repos(sentence) and not NEGATED.search(sentence):
+            kinds.add("scope")
+        for clause in CLAUSE.split(sentence):
+            if live(clause, BROAD.search(clause)):
+                kinds.update({"sweep", "scope"})
+            elif live(clause, SCOPE.search(clause)):
+                kinds.add("scope")
+    return kinds
 
 
 def prompt_text(content):
@@ -128,8 +155,8 @@ def prompt_text(content):
 
 
 def granted(transcript_path, user_bodies, typed):
-    """Whether the user's words since their latest message carry a sweep's breadth."""
-    cards_pending, cards, grant, seen = {}, {}, False, set()
+    """The kinds of breadth the user's words since their latest message ask for."""
+    cards_pending, cards, grant, seen = {}, {}, set(), set()
     with open(transcript_path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -151,7 +178,9 @@ def granted(transcript_path, user_bodies, typed):
             if not bodies and not taps:
                 continue
             seen.update(b.strip() for b in bodies)
-            grant = any(user_grants(b, typed) for b in bodies) or any(CARD_BROAD.search(t) for t in taps)
+            grant = set().union(*(user_grants(b, typed) for b in bodies))
+            if any(CARD_BROAD.search(t) for t in taps):
+                grant |= {"sweep", "scope"}
     return grant
 
 
@@ -164,10 +193,11 @@ def decide(payload):
     path = payload.get("transcript_path") or payload.get("transcriptPath")
     if not isinstance(path, str) or not os.path.isfile(path):
         return None
+    kind, phrase = hit
     user_bodies, typed = load_helpers()
-    if granted(path, user_bodies, typed):
+    if kind in granted(path, user_bodies, typed):
         return None
-    return REASON.format(hit=hit)
+    return REASON.format(hit=phrase)
 
 
 def main():

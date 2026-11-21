@@ -2281,14 +2281,14 @@
         ]
       },
       {
-        "matcher": "Agent|Task|SendMessage|mcp__hearthbot__start_thread|mcp__hearthbot__message_thread|mcp__claude-code-remote__send_message|mcp__claude-code-remote__create_session|mcp__Claude_Code_Remote__create_session",
+        "matcher": "Agent|Task|SendMessage|mcp__hearthbot__start_thread|mcp__hearthbot__message_thread|mcp__hearthbot__message_coordinator|mcp__hearthbot__start_remote_control|mcp__claude-code-remote__send_message|mcp__claude-code-remote__send_later|mcp__claude-code-remote__create_session|mcp__Claude_Code_Remote__create_session",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unrequested-sweep-in-brief.py\"",
             "timeout": 10,
             "script": "no-unrequested-sweep-in-brief.py",
-            "why": "Ezra, 2026-11-20 23:56 PST: \"did I say to sweep?\", after he said \"do that\" to moving the ids equation-label check into gha and the coordinator's brief also told the new thread to label every unlabeled equation in all the notes repos and roll the check out everywhere. no-unrequested-sweep-pr.py fires only at the 11th PR, after the widened brief has handed over the work. DENIES a subagent launch, SendMessage, thread start or thread message whose text says \"sweep\", or pairs \"all/every ... repos\", \"everywhere\" or \"existing content\" with a content-edit verb, in a clause that is not negated, a question or an offer, unless the user's own words since their latest message (never a coordinator note) ask for that breadth. See shared/workflow/no-sweeps-by-default.md. Fails open on a missing transcript."
+            "why": "Ezra, 2026-11-20 23:56 PST: \"did I say to sweep?\", after he said \"do that\" to moving the ids equation-label check into gha and the coordinator's brief also told the new thread to label every unlabeled equation in all the notes repos and roll the check out everywhere. no-unrequested-sweep-pr.py fires only at the 11th PR, after the widened brief has handed over the work. DENIES a brief (subagent launch, SendMessage, thread start, thread or coordinator message, remote-control instructions, scheduled send) that says \"sweep\", pairs \"all/every ... repos\", \"everywhere\" or \"existing content\" with a content-edit verb, or names three or more notes repos beside an edit verb; read clause by clause, a question, an offer, a negation before the phrase or a PR/CI/merge/hook/branch clause passes, and a typed gia/gii/gip/gmd/ardia grants it, unless the user's own words since their latest message (never a coordinator note) ask for that breadth. See shared/workflow/no-sweeps-by-default.md. Fails open on a missing transcript."
           }
         ]
       },

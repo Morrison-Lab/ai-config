@@ -301,12 +301,18 @@ ABBREV_SHA_LEN = 7
 # the bare phrase, and a quoted or struck-through line is not it.
 HEADLINE_TRIM_RE = re.compile(r"^[\s*_`]+|[\s*_`.!]+$")
 LIST_ITEM_RE = re.compile(r"^([-+*]|\d+[.)])\s")
+# The cloud harness ends every comment it posts with this footer, and an agent
+# that follows the harness and not the disclosure rule writes only it, so it
+# marks agent authorship as well (ai-config#4785).
+HARNESS_FOOTER = (r"_generated (?:by|with) \[claude code\]"
+                  r"\(https://claude\.(?:ai/code|com/claude-code)\)_")
+
 # The corpus-mandated agent-disclosure marker, plus the headers review
 # workflows post under. `gh pr review --comment` is a first-class agent
 # surface (hooks/require-agent-disclosure.py gates it), so a review body
 # declaring itself agent-written is not human approval, whoever submitted it.
 AGENT_AUTHORSHIP_RE = re.compile(
-    r"posted by\b[^\n]*\(ai agent\)|\*\*claude finished|\U0001f916",
+    r"posted by\b[^\n]*\(ai agent\)|\*\*claude finished|\U0001f916|" + HARNESS_FOOTER,
     re.IGNORECASE,
 )
 
@@ -314,7 +320,8 @@ AGENT_AUTHORSHIP_RE = re.compile(
 # Such a reply answers the maintainer items before it (ai-config#5577).
 # Narrower than AGENT_AUTHORSHIP_RE: the robot emoji and "Claude finished" also
 # mark automated review output, which answers nothing.
-AGENT_REPLY_RE = re.compile(r"posted by\b[^\n]*\(ai agent\)", re.IGNORECASE)
+AGENT_REPLY_RE = re.compile(r"posted by\b[^\n]*\(ai agent\)|" + HARNESS_FOOTER,
+                            re.IGNORECASE)
 
 # `authorAssociation` values that mark a reviewer as belonging to the
 # repository. A COMMENTED review is an ordinary drive-by comment that anyone

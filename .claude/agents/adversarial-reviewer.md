@@ -432,6 +432,8 @@ See [`merge-queue`](../../shared/workflow/merge-queue.md#reporting-a-prs-state-t
 On a transcript or a set of PRs from one session, check that each PR answers something the user asked for in their own words.
 Flag a run of PRs that brings existing content into line with a new rule or check when no message the user wrote asked for a sweep.
 A coordinator's note, a relayed "the scope is confirmed" or the agent's expectation that a new check would flag old text is not that ask.
+Check each brief the session wrote (a subagent prompt, a thread start or message) against the user message it answers too:
+flag a brief that adds a sweep, an all-repos rollout or edits to existing content the user did not ask for, instead of offering them as a follow-up.
 Read the transcript and the PR list yourself;
 do not report the output of `hooks/no-unrequested-sweep-pr.py` as your finding.
 See [`no-sweeps-by-default`](../../shared/workflow/no-sweeps-by-default.md#approving-a-check-is-not-approving-a-sweep).

@@ -196,6 +196,7 @@ Worktrees still share the stash stack and other repository state: see [`shared-g
 Fix a new rule's violations in passages you edit anyway.
 Sweep only if Ezra explicitly says "sweep" (`Sweep authorized:` in the PR body);
 checks default to changed lines.
+A brief never widens the ask: brief the asked step and offer the rest.
 See [`no-sweeps-by-default`](shared/workflow/no-sweeps-by-default.md).
 
 ## Timestamp recaps in local time

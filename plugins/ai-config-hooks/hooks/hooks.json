@@ -34,6 +34,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/refresh-synced-plugin-copy.py\"'",
+            "timeout": 180,
+            "script": "refresh-synced-plugin-copy.py",
+            "why": "ai-config#6004. Every claude.ai cloud or project session loads the account-synced copy under ~/.claude/plugins/synced/, which is only as fresh as the last Sync, and a deny from any copy wins. On 2026-11-20 the synced guard-slide-major-tag.py predated #5414 and blocked the gha v3 slides after gha#2174 and gha#2177, so they waited on Ezra. In CLAUDE_CODE_REMOTE sessions, copies the marketplace plugin's files over each synced ai-config copy (keeping files only it has), installing ai-config@Morrison-Lab first when the environment never did, so the synced hooks run current code from the next tool call. Opt out with AI_CONFIG_NO_SYNCED_REFRESH=1, or of the install alone with AI_CONFIG_NO_SYNCED_INSTALL=1."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/sync-auto-mode-approvals.py\"'",
             "timeout": 10,
             "script": "sync-auto-mode-approvals.py",

@@ -664,7 +664,13 @@ def main() -> int:
     hso = {"hookEventName": "PreToolUse"}
     if kind == "deny":
         hso["permissionDecision"] = "deny"
-        hso["permissionDecisionReason"] = text
+        # Name the copy that denied, so a stale synced copy can be recognized
+        # (ai-config#6004: a claude.ai-synced copy predating #5414 denied slides
+        # that main's guard allows).
+        hso["permissionDecisionReason"] = (
+            f"{text}\n\nGuard copy: {os.path.abspath(__file__)}. A copy under "
+            "~/.claude/plugins/synced/ can be stale; compare it with ai-config main's "
+            "hooks/guard-slide-major-tag.py before treating this deny as real.")
     else:
         hso["additionalContext"] = text
     print(json.dumps({"hookSpecificOutput": hso}))

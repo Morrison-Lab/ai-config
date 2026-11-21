@@ -25,12 +25,15 @@ TOOL = re.compile(
 
 SLIDE = re.compile(
     r"\bslid(?:e|es|ing)\s+(?:the\s+)?(?:`?v\d+`?|(?:floating\s+|major\s+)?tags?)\b"
-    r"|\bv\d+`?\s+(?:tag\s+)?slides?\b|\btag[- ]slides?\b|\bslide-major-tag\b|\bslide-tag\b|\bslides?\b(?=[^.?!\n]{0,30}\bv\d+\b)",
+    r"|\bv\d+`?\s+(?:tag\s+)?slides?\b|\btag[- ]slides?\b|\bslide-major-tag\b|\bslide-tag\b|\bslides?\b(?=[^.?!\n]{0,30}\bv\d+\b)"
+    r"|\bv\d+\b[^.?!\n]{0,30}\bslid(?:e|es|ing)\b",
     re.I)
 
 ASK = re.compile(
     r"\b(?:shall|should|can|may)\s+I\b|\bwant\s+me\s+to\b|\b(?:ok|okay)\s+(?:to|if)\b"
-    r"|\byour\s+(?:word|go[- ]ahead|ok|okay|approval|permission|sign[- ]off|call)\b"
+    r"|\byour\s+(?:word|go[- ]ahead|ok|okay|approval|permission|sign[- ]off|call|order|say[- ]so|green[- ]light)\b"
+    r"|\b(?:once|when|after|as\s+soon\s+as)\s+you\s+(?:give|send|say|type|approve|confirm|order|ok|okay)\b"
+    r"|\bgive\s+(?:the|a|an)\s+(?:order|word|go[- ]ahead|green[- ]light)\b"
     r"|\b(?:approve|authori[sz]e|confirm)\s+(?:the\s+)?(?:tag\s+)?slid"
     r"|\b(?:needs?|requires?|awaits?|awaiting)\s+(?:your|explicit|human|ezra|a\s+human)\b"
     r"|\b(?:type|say|reply)\s+[\"'`\u201c]?slide\b|\bsay\s+the\s+word\b|\bif\s+you\s+(?:want|like|agree)\b"

@@ -319,6 +319,8 @@
 - **Ask the user every question on a card (`AskUserQuestion`), not in prose** (User directive, 2026-11-19: "always ask me questions as a card").
   - **Do:** put each question to the user through the card tool, with the recommended option first and marked.
   - **Don't:** pose a question as a closing prose paragraph when the card tool is available.
+  - **No hook:** whether a message holds a question is not lexically decidable, so this stays prose.
+  - **No card tool** (a CI or `@claude` run): ask in plain prose.
 - Operate as a COORDINATOR, not an implementer.
   Delegate all hands-on implementation to subagents (Agent tool, worktree isolation) --- even core, high-stakes, architecturally-significant changes.
   Stay at the bird's-eye level: decide WHAT to build and in what order, write precise specs, launch/direct agents, sequence merges, verify results, surface decisions to the user, and relay feedback to the right agent.

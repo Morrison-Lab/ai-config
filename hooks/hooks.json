@@ -2004,7 +2004,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mwc-ask-for-infra-pr.py\"",
             "timeout": 10,
             "script": "no-mwc-ask-for-infra-pr.py",
-            "why": "ai-config#5097. Ezra, 2026-11-07, about lds#2009 (workflow-only): \"it's infra and shouldn't need my word. why didn't you realize that\" Blocks (deny) a user-visible reply tool call whose text mentions mwc and names a PR that is provably infrastructure (any PR in gha, macros or ai-config, or a Morrison-Lab PR whose changed paths all match no-unauthorized-merge.py INFRA_PATH_PATTERNS), unless the text says it merges under the infra grant. Fails open on any parse or lookup trouble."
+            "why": "ai-config#5097. Ezra, 2026-11-07, about lds#2009 (workflow-only): \"it's infra and shouldn't need my word. why didn't you realize that\" Blocks (deny) a user-visible reply tool call whose text mentions mwc and names a PR that is provably infrastructure (any PR in gha, macros or ai-config, or a Morrison-Lab PR whose changed paths all match no-unauthorized-merge.py INFRA_PATH_PATTERNS), unless the text says it merges under the infra grant. ai-config#6054 (Ezra, 2026-11-21: \"infra has permanent mwc in all repos\"): it also reads decision cards and coordinator relays, treats a merge question on a card or a merge ask in a message (\"want me to merge\", \"needs your go-ahead to merge\") as an ask, and denies one that calls its PRs infrastructure (\"caller PRs\", \"workflow PR\", \"infra PR\") without a lookup. Fails open on any parse or lookup trouble."
           },
           {
             "type": "command",

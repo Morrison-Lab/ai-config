@@ -556,7 +556,7 @@ window.Quarto = {
 <li><strong>Do:</strong> bump the repo’s <code>latex-macros</code> submodule to a commit that has <code>\ccprod</code> (or whichever macro), in the PR that uses it.</li>
 <li><strong>Don’t:</strong> keep <code>\tp{X} X</code> or another hand-written form because the repo’s pinned copy lacks the macro, or promise to switch once someone else bumps the pin.</li>
 </ul>
-<p><code>hooks/no-stale-pin-macro-excuse.py</code> denies a reply, a forge post, a PR body or a <code>git commit -m</code> message with a sentence that names a macro and the pin, says the pin lacks it, and says the macro was kept out (kept, left, raw, until, for now); a sentence that bumps the pin passes.</p>
+<p>Unlike the rule above, this excuse names the pin, so it has a lexical shape a hook can catch in its common wordings. <code>hooks/no-stale-pin-macro-excuse.py</code> is that backstop, not a proof: it denies a reply, a forge post, a PR body or a commit message where one sentence or two adjacent ones name a macro and the pin, say the pin lacks it, and say the macro was kept out; a sentence that moves the pin with no “not”, “later” or “will”, or one that quotes the rule, passes.</p>
 </section>
 <section id="verify-the-render-and-spellcheck-then-ship" class="level3">
 <h3 class="anchored" data-anchor-id="verify-the-render-and-spellcheck-then-ship">7. Verify the render and spellcheck, then ship</h3>

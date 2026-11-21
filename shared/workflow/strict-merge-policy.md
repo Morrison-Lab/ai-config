@@ -93,8 +93,9 @@ Do not enable session-wide `/mwc` for it.
   `hooks/no-mwc-ask-for-infra-pr.py` denies a reply that asks otherwise (ai-config#5097), including a reply that asks the user to type a merge line such as `merge gha 2152 <sha>` for one (ai-config#6021).
   It also denies a decision card or a coordinator relay that asks to merge infra PRs, such as "Merge the six caller PRs?",
   because Ezra answered that card with "infra has permanent mwc in all repos" (2026-11-21, ai-config#6054).
-- **Do:** merge a caller, workflow or other infra PR with its number written literally (`pulls/2174/merge`, `gh pr merge 2174`).
-  The merge guard reads the number to fetch the changed paths, so a loop over `pulls/$n/merge` fails closed and reads as a missing grant.
+- **Do:** merge a caller, workflow or other infra PR with its number and head SHA written literally (`pulls/2174/merge -f sha=<40-hex>`, `gh pr merge 2174 --match-head-commit <40-hex>`).
+  The merge guard reads both to fetch the changed paths and pin the head, so a loop over `pulls/$n/merge`, or `sha=$(...)`, fails closed and reads as a missing grant
+  (rme#1510, 2026-11-21: refused with `sha=$(gh api ...)`, merged with the SHA spelled out).
 - **Don't:** post a decision card asking whether to merge an infra PR, or enable session `mwc` to get past a guard refusal you caused by hiding the PR number.
 - **Do:** merge a fully clean infrastructure PR without asking, and say in the same reply that you did and why it qualified.
   In a project with a runner thread, an owner thread never merges: it sends the PR's final head to the coordinator, and the runner thread merges once the fully-clean checker exits 0 (ai-config#5111).

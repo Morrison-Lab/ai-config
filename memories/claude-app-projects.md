@@ -133,3 +133,18 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16, wit
   it asks whether the instruction belongs in this thread and suggests a separate one, and does not quietly do the instruction (Ezra, 2026-10-19).
   Questioning is not refusing: the user decides where the task goes.
   An explicit "switch to this" from the user is the exception, as in [`dont-get-sidetracked`](../shared/workflow/dont-get-sidetracked.md).
+
+## Project threads run the account-synced ai-config copy; fix delivery in a hook, not in the environment
+
+Measured 2026-11-21 ([#6004](https://github.com/Morrison-Lab/ai-config/issues/6004), [#6060](https://github.com/Morrison-Lab/ai-config/pull/6060)): a project thread's hooks came only from the claude.ai account-synced copy under `~/.claude/plugins/synced/`, which is as fresh as Ezra's last press of **Sync** on the plugin card in claude.ai's plugin settings (then 2026-11-12).
+The project's cloud environment had a Setup script older than the plugin-install step, so `ai-config@Morrison-Lab` was not installed.
+The stale `guard-slide-major-tag.py` denied two gha `v3` slides that `main`'s guard allows, and both waited on Ezra.
+
+The `update_environment` approval card cannot be approved from the Claude phone app ("This request can't be approved here.
+Review it on your computer."), and the service rejected the call twice that night.
+`hooks/refresh-synced-plugin-copy.py` now installs the marketplace plugin when it is missing and overwrites the synced copy at each cloud `SessionStart`.
+
+- **Do:** when a hook in a cloud thread denies something `main` would allow, re-run `main`'s copy of the hook on the same state before treating the deny as real.
+- **Do:** fix a delivery problem in a hook or PR;
+  when a one-time human step is unavoidable, name it exactly, such as "press Sync on the ai-config plugin card".
+- **Don't:** make an environment change the fix, or retry a rejected `update_environment` call.

@@ -70,6 +70,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      - a definition of a term that a site earlier in the course sequence (mcs, mds, pds, sds) already defines, where the page should link that definition instead, so the same term has two statements that can drift apart ([ai-config#5242](https://github.com/Morrison-Lab/ai-config/issues/5242)).
    - In the same pages, read the diff for these defects in the families the gha checks leave uncovered or unwired ([ai-config#5181](https://github.com/Morrison-Lab/ai-config/issues/5181)):
      - math written with raw LaTeX where a shared macro names the concept, or a bare `\exp` where the macros redefine it;
+       a repo's `latex-macros` pin that lacks the macro is not an excuse, since the PR can bump the pin;
      - a figure with no real `fig-alt`, a matplotlib call without a trailing `;`, or `code-fold: false` on a chunk whose output is the point;
      - a bracketed citation that should be bare, or the reverse, where the author is not the sentence's subject;
      - three or more parallel items in running prose instead of a bullet list, or `---` where `{{< slidebreak >}}` belongs;

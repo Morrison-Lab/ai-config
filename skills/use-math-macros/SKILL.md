@@ -233,6 +233,16 @@ open the macros PR, then use the macro in the stacked or follow-up change once t
   Whether a macro would help is a judgment about the expression,
   and a phrase match would catch only one wording of the excuse.
 
+**A stale pin is never a reason to skip a macro either.**
+When the macro exists in `Morrison-Lab/macros` but a repo's `latex-macros` pin predates it, bump the pin in the same PR and use the macro (Ezra, 2026-11-20: "inconvenience is never a valid excuse").
+If the macro is still in an open macros PR, stack the change on it.
+
+- **Do:** bump the repo's `latex-macros` submodule to a commit that has `\ccprod` (or whichever macro), in the PR that uses it.
+- **Don't:** keep `\tp{X} X` or another hand-written form because the repo's pinned copy lacks the macro, or promise to switch once someone else bumps the pin.
+
+`hooks/no-stale-pin-macro-excuse.py` denies a reply, a forge post, a PR body or a `git commit -m` message with a sentence that names a macro and the pin, says the pin lacks it, and says the macro was kept out (kept, left, raw, until, for now);
+a sentence that bumps the pin passes.
+
 ### 7. Verify the render and spellcheck, then ship
 
 Run the raw-notation lint over what you changed, from the repository root:
@@ -411,7 +421,7 @@ add a macro to `Morrison-Lab/macros` (step 6) whenever a category has none.
 `\vx` and `\vy` remain defined;
 existing uses are converted in the sweep, [`Morrison-Lab/ai-config#4440`](https://github.com/Morrison-Lab/ai-config/issues/4440), not as a side edit.
 The macros land with `Morrison-Lab/macros#117`;
-until a repo's `latex-macros` pin includes it, keep the existing letters there.
+a repo whose `latex-macros` pin predates that PR gets the pin bumped in the PR that first uses the macros.
 
 - **Do:** write `\resid_i = \outvar_i - \eoutvar_i` in new or edited math.
 - **Don't:** write `e_i = y_i - \hat{y}_i`.

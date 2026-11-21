@@ -31,7 +31,21 @@ A new check reads changed lines, so existing violations do not trip it, and a re
 - **Don't:** clear a new check's existing violations because you expect it to flag them.
 - **Don't:** read a coordinator's note, or your own reading of the ask, as the user saying "sweep".
 
+## A brief does not widen the ask
+
+On 2026-11-20 Ezra said "do that" to moving the ids equation-label check into gha.
+The coordinator's brief to the new thread also told it to label every unlabeled equation in all the notes repos and roll the check out everywhere.
+His reply: "did I say to sweep?"
+Whoever writes the brief, a coordinator or an agent launching a subagent, is bound by the ask as the user wrote it.
+
+- **Do:** brief the step the user asked for, and name the wider work in the brief as a follow-up to offer the user.
+- **Don't:** add a sweep, a rollout to every repo, or edits to existing content to a brief because they seem to follow from the ask.
+
 ## The mechanisms
+
+- `hooks/no-unrequested-sweep-in-brief.py` denies a subagent launch, `SendMessage`, thread start or thread message whose text says "sweep", or pairs "all/every ... repos", "everywhere" or "existing content" with a content-edit verb, unless the user's own words since their latest message ask for that breadth.
+  A negated clause, a question and an offer ("offer it as a follow-up") pass.
+  It catches the widening when the work is handed over, before `no-unrequested-sweep-pr.py` can see any PR.
 
 - `hooks/no-unrequested-sweep-pr.py` denies a PR creation (`gh pr create` or `mcp__github__create_pull_request`) once ten PRs were opened since the user's latest message, unless a sentence the user wrote asks for a sweep.
   Only the user's words count, never a coordinator's `<note>`, a question ("did I say to sweep?") or a negation ("don't sweep").

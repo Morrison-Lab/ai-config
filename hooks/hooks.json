@@ -2295,7 +2295,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-stale-pin-macro-excuse.py\"",
             "timeout": 10,
             "script": "no-stale-pin-macro-excuse.py",
-            "why": "Ezra, 2026-11-20 23:22 PST: never skip a semantic macro (\\ccprod, \\stprod, \\soprod, \\oprod) because a repo's pinned latex-macros copy lacks it; bump the pin in the same PR and use the macro. \"Inconvenience is never a valid excuse.\" DENIES a user-visible post, forge comment, issue or PR body, gh issue/pr --body/--title, or git commit -m message with a sentence that names a macro and the pin, says the pin lacks it, and says the macro was kept out (kept, left, raw, until, for now). A sentence that bumps the pin or states the rule passes. ALLOW_STALE_PIN_MACRO=1 overrides for a quote. See skills/use-math-macros/SKILL.md. Fails open on parse trouble."
+            "why": "Ezra, 2026-11-20 23:22 PST: never skip a semantic macro (\\ccprod, \\stprod, \\soprod, \\oprod) because a repo's pinned latex-macros copy lacks it; bump the pin in the same PR and use the macro. \"Inconvenience is never a valid excuse.\" A backstop for common wordings: DENIES a user-visible post, forge comment, issue or PR body, gh issue/pr --body/--title/--body-file, or git commit -m/-am/-F message where one sentence or two adjacent ones name a macro and the pin, say the pin lacks it, and say the macro was kept out (kept, used, left, raw, until, for now). A window that moves the pin (bumped, synced, updated the submodule, stacked) with no negation or deferral, or quotes the rule, passes; a heredoc -F - message is not read. ALLOW_STALE_PIN_MACRO=1 overrides for a quote. See skills/use-math-macros/SKILL.md. Fails open on parse trouble."
           }
         ]
       },

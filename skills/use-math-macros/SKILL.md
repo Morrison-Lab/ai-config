@@ -240,8 +240,9 @@ If the macro is still in an open macros PR, stack the change on it.
 - **Do:** bump the repo's `latex-macros` submodule to a commit that has `\ccprod` (or whichever macro), in the PR that uses it.
 - **Don't:** keep `\tp{X} X` or another hand-written form because the repo's pinned copy lacks the macro, or promise to switch once someone else bumps the pin.
 
-`hooks/no-stale-pin-macro-excuse.py` denies a reply, a forge post, a PR body or a `git commit -m` message with a sentence that names a macro and the pin, says the pin lacks it, and says the macro was kept out (kept, left, raw, until, for now);
-a sentence that bumps the pin passes.
+Unlike the rule above, this excuse names the pin, so it has a lexical shape a hook can catch in its common wordings.
+`hooks/no-stale-pin-macro-excuse.py` is that backstop, not a proof: it denies a reply, a forge post, a PR body or a commit message where one sentence or two adjacent ones name a macro and the pin, say the pin lacks it, and say the macro was kept out;
+a sentence that moves the pin with no "not", "later" or "will", or one that quotes the rule, passes.
 
 ### 7. Verify the render and spellcheck, then ship
 

@@ -33,7 +33,16 @@ before the gap was noticed.
              (the Ollama Cloud route, ai-config#4849)
     AND NOT  the waiver's probe pass ran after the last push: each CLI in
              `clis` attempted with any result, or shown absent by a lone,
-             unredirected `command -v` / `which` that exited 1; `opencode` attempted.
+             unredirected `command -v` / `which` that exited 1; `opencode` attempted,
+             or its attempt refused by the auto-mode classifier.
+
+A classifier refusal (`toolDenialKind: automode-blocked`) of an `opencode`
+attempt counts as that attempt: the route cannot run from this session, which
+is the waiver's "host blocked" case. Cloud threads hit it after ai-config#6071,
+whose hook allow does not reach the classifier, and every content merge was
+refused (lds#3089, 2026-11-22). Ezra chose this fix on a decision card,
+2026-11-22. A user's or a hook's refusal still counts as nothing, since either
+can be answered by running the call.
 
     AND NOT  the user typed an `mwr` or `mwrs` grant covering the PR, and
              the transcript holds the checker's `--mwr` MERGE-READY line for
@@ -145,6 +154,10 @@ HTTP_ROUTES = (
 # Presence probes, and the routes a presence probe alone cannot clear.
 PROBE_WORDS = frozenset({"which", "command"})
 NEEDS_ATTEMPT = frozenset({"opencode"})
+# The auto-mode classifier's refusal text, for a transcript with no toolDenialKind.
+RX_CLASSIFIER_DENIAL = re.compile(
+    r"^(?:\s|\\n)*(?:Error: )?Permission for this action was denied by the "
+    r"Claude Code auto mode classifier")
 # curl options whose next word is a value, never the request URL: every
 # option `curl --help all` (curl 8.5.0) shows taking an argument, plus
 # `--haproxy-clientip` (its help line omits the argument), `--ech` (curl 8.8)
@@ -217,7 +230,7 @@ NOTE = (
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
     "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone, unredirected (exit 1); "
-    "opencode needs an attempt (its CLI or the OpenCode Go curl). An Ollama Cloud chat curl is no attempt: it is itself a qualifying review. Then the "
+    "opencode needs an attempt (its CLI or the OpenCode Go curl; a refusal by the auto-mode classifier counts).An Ollama Cloud chat curl is no attempt: it is itself a qualifying review. Then the "
     "gate is waived and this hook lets the merge through "
     "(Ezra, 2026-10-16; adversarial-self-review.md "
     "'Waiver when no cross-model reviewer can run'). The waiver grants no "
@@ -510,6 +523,12 @@ def _route_calls(sib, command, clis):
     return attempts, probes if len(argvs) == 1 else []  # a probe counts only alone
 
 
+def _classifier_blocked(rec, text):
+    """True when the auto-mode classifier, not a user, hook or rule, refused the call."""
+    return (rec.get("toolDenialKind") == "automode-blocked"
+            or bool(RX_CLASSIFIER_DENIAL.match(text or "")))
+
+
 def all_routes_probed(clis, cleared, last_push):
     """True when each route in *clis* was attempted, or found absent, after the last push."""
     return all(cleared.get(c, -1) > last_push or (c not in NEEDS_ATTEMPT and cleared.get(
@@ -591,6 +610,13 @@ def scan(sib, path, clis, recs=None):
                 seq_call, review_seq, attempts, probes = pending.pop(
                     b["tool_use_id"])
                 text = sib._result_text(b)
+                if _classifier_blocked(rec, text):
+                    # The auto-mode classifier refused the route itself: it
+                    # cannot run here, the waiver's "host blocked" case. Only a
+                    # NEEDS_ATTEMPT route is credited (Ezra, 2026-11-22, on a card).
+                    for route in attempts & NEEDS_ATTEMPT:
+                        cleared[route] = max(cleared.get(route, -1), seq_call)
+                    continue
                 if rec.get("toolDenialKind") or b.get("is_error") and not RX_RAN_FAILED.match(text):
                     continue  # a refused call ran nothing: no attempt, no probe
                 if review_seq is not None and not b.get("is_error"):

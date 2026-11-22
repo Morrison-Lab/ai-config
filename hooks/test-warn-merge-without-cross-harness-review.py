@@ -530,7 +530,7 @@ def main():
         MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "permission-rule"})])[0] and run(
         MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "permission-rule"}, out=(
             "Permission for this action was denied by the Claude Code auto mode classifier."))])[0])
-    classifier ="Permission for this action was denied by the Claude Code auto mode classifier."
+    classifier = "Permission for this action was denied by the Claude Code auto mode classifier."
     check("silent when the classifier refused the opencode attempt", not run(
         MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"})])[0]
           and not run(MERGE, probe_all[:1] + [dict(oc[0], out=classifier)])[0])

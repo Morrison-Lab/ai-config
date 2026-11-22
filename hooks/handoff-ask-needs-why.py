@@ -28,6 +28,34 @@ A sentence about a secret, token, password, sign-in or connector is exempt,
 since those steps were never the agent's to do.
 The Stop registration scans a plain final message (fenced blocks removed) and
 blocks once per turn through stop_notice.
+
+ai-config#6075. Ezra, 2026-11-22: "why not use tools to commit", then "dont bs
+me", after the coordinator told him a thread "has no other way to commit" when
+the GitHub API tools could commit. That message asked him for nothing, so the
+hand-off check above never saw it. A second check now covers a claim that a
+step cannot be done ("no other way to commit", "can't push", "unable to
+merge"), in the same reply tools and in relays (message_coordinator,
+message_thread), where a thread's claim reaches the coordinator first:
+
+  * the message must name the alternatives it checked ("I tried", "checked",
+    "ruled out"), and
+  * a claim about committing or pushing must name the GitHub API tools
+    (`mcp__github__push_files`, `create_or_update_file`, the contents API)
+    among them, since those commit without local git.
+
+A sentence that ties the step to the user's grant ("without your mwc") is a
+statement of permission, not of impossibility, and is left alone.
+
+A third check follows Ezra's rule of the same night: "you must adversarially
+check every claim that my input is needed". A message claims his input is
+needed when a sentence says so ("needs your approval", "waiting on you",
+"blocked on Ezra", "only you can"), when it hands him a step (the hand-off
+check above), and always for a request_decision card. Such a message, from a
+thread or from the coordinator relaying it, is denied unless a subagent
+launched since the person's last turn, without error, was briefed to refute the
+claim adversarially by finding a route without the user ("adversarially ...
+a route without Ezra"). The brief is matched by words, so the hook proves that
+a check was asked for, not that it was done well.
 ALLOW_HANDOFF_WITHOUT_WHY=1 overrides. Fails open on parse trouble.
 """
 import json
@@ -43,9 +71,12 @@ if _LIB not in sys.path:
 try:
     from agent_notice import stop_notice
     from transcript_meta import is_real_user_turn
+    from tool_names import is_subagent_tool, subagent_brief
 except Exception:  # broken install: fail open
     stop_notice = None
     is_real_user_turn = None
+    is_subagent_tool = None
+    subagent_brief = None
 try:
     from fences import strip_fences
 except Exception:
@@ -54,6 +85,50 @@ except Exception:
 TOOL = re.compile(
     r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|request_decision)$")
 EXPLAIN_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
+RELAY_TOOL = re.compile(r"^mcp__hearthbot__(?:message_coordinator|message_thread)$")
+
+# A claim that a step cannot be done at all.
+IMPOSSIBLE = re.compile(
+    r"\bno\s+other\s+(?:way|route|option|path|means)\b|\bthe\s+only\s+(?:way|route|option|path)\b"
+    r"|\b(?:has|have|had)\s+no\s+(?:way|means|route)\s+to\b|\bno\s+way\s+to\b"
+    r"|\b(?:can't|cannot|can\s+not|couldn't|could\s+not|unable\s+to|not\s+able\s+to)\b"
+    r"|\b(?:impossible|not\s+possible)\b",
+    re.I)
+CLAIM_STEP = re.compile(
+    r"\b(?:commit(?:s|ting|ted)?|push(?:es|ing|ed)?|merg(?:e|es|ing|ed)|re-?run|deploy|rebase|"
+    r"open\s+(?:a|the)\s+PR|slide|dispatch|trigger)\b",
+    re.I)
+GIT_WRITE = re.compile(r"\b(?:commit(?:s|ting|ted)?|push(?:es|ing|ed)?)\b", re.I)
+# Tied to the user's grant or word: a statement of permission, not of impossibility.
+PERMISSION = re.compile(
+    r"\b(?:without|until|before|unless)\s+(?:your|you|Ezra)\b|\byour\s+(?:mwc|approval|grant|word|go-?ahead|yes)\b",
+    re.I)
+CHECKED = re.compile(
+    r"\b(?:I|we)\s+(?:have\s+|'ve\s+|also\s+)?(?:tried|attempted|retried|checked|ruled\s+out)\b"
+    r"|\b(?:I|we)'ve\s+(?:tried|attempted|retried|checked|ruled\s+out)\b"
+    r"|\b(?:what|ways?|routes?|everything|all)\s+(?:I|we)\s+(?:tried|checked)\b"
+    r"|\b(?:tried|checked|ruled\s+out)\s*:|\battempts?\s*:|\balternatives?\s+checked\b",
+    re.I)
+# A claim that the user's input is needed (Ezra, 2026-11-22, ai-config#6075).
+NEEDS_INPUT = re.compile(
+    r"\b(?:needs?|needed|requires?|required|waiting\s+(?:on|for)|waits?\s+(?:on|for)|"
+    r"blocked\s+on|awaiting|pending|depends\s+on|held\s+(?:on|for))\s+"
+    r"(?:your|Ezra's|the\s+user's|you|Ezra|the\s+user)\b"
+    r"|\bonly\s+(?:you|Ezra)\s+can\b|\b(?:it's|it\s+is)\s+(?:up\s+to\s+you|your\s+call)\b",
+    re.I)
+NOT_NEEDED = re.compile(
+    r"\b(?:no|nothing|not|never|doesn't|does\s+not|don't|do\s+not|isn't|is\s+not|no\s+longer|without)\b",
+    re.I)
+# The brief of an adversarial check: it hunts for a route that needs no one.
+ADVERSARIAL_BRIEF = re.compile(r"\badversarial(?:ly)?\b|\brefute\b|\bdisprove\b", re.I)
+ROUTE_BRIEF = re.compile(
+    r"\b(?:route|way|path|alternative)s?\b[^.\n]{0,80}\b(?:without|needs?\s+no|not\s+need)\b"
+    r"|\bwithout\s+(?:Ezra|the\s+user|the\s+owner|human)\b",
+    re.I)
+GITHUB_API = re.compile(
+    r"\bGitHub\s+(?:API|MCP|tools?)\b|\bMCP\b|\bREST\s+API\b|\bpush_files\b"
+    r"|\bcreate_or_update_file\b|\bcontents\s+API\b|\bgit\s+data\s+API\b",
+    re.I)
 
 # Steps on a system that are the agent's own work. Approve, review, pick, choose,
 # decide, confirm and type are the user's to give, and ordinary English verbs
@@ -128,6 +203,28 @@ REASON = (
 )
 
 
+CLAIM_REASON = (
+    '[hook: handoff-ask-needs-why] "{sentence}" claims a step cannot be done, and the message '
+    "does not name {missing}. Ezra, 2026-11-22 (ai-config#6075): \"why not use tools to commit\", "
+    "\"dont bs me\", after a relay said a thread had no other way to commit while the GitHub API "
+    "tools could. Before calling a step impossible, try the other routes, then name each one you "
+    "checked and its result (\"Checked: ...\"). If one of them works, use it instead of the claim. "
+    "See shared/workflow/lab-operating-rules.md."
+)
+
+
+INPUT_REASON = (
+    '[hook: handoff-ask-needs-why] "{sentence}" claims the user\'s input is needed, and no '
+    "adversarial check ran this turn. Ezra, 2026-11-22 (ai-config#6075): \"you must adversarially "
+    "check every claim that my input is needed\". Launch a separate subagent briefed to refute the "
+    "claim: adversarially look for a route that does not need the user (another tool or API, a "
+    "retry, a standing grant, a fixed check). Send the claim only if it finds none, and then say "
+    "what it checked. That day's false claims were \"no other way to commit\" (the GitHub API tools "
+    "could) and \"waiting on your approval\" (the thread was not stuck). This holds for a thread and "
+    "for the coordinator relaying it. See shared/workflow/lab-operating-rules.md."
+)
+
+
 def user_text(tool_input: dict) -> str:
     parts = [tool_input.get("text"), tool_input.get("question"), tool_input.get("reason")]
     for opt in tool_input.get("options") or []:
@@ -168,12 +265,12 @@ def missing(text: str) -> str:
     return " or ".join(gaps)
 
 
-# transcript-shapes-skip: antigravity -- only a Claude Code request_decision call reads the transcript, and Antigravity has no hearthbot tools.
-def explained_earlier_this_turn(path: str) -> bool:
-    """True when a reply tool call since the person's last turn carried both parts."""
+# transcript-shapes-skip: antigravity -- the transcript is read only for hearthbot tools and Claude Code subagent calls, which Antigravity does not have.
+def turn_tool_uses(path: str) -> list:
+    """(name, input, failed) for each tool call since the person's last turn."""
     if not path or is_real_user_turn is None:
-        return False
-    texts = []
+        return []
+    uses, failed = [], set()
     try:
         with open(path, encoding="utf-8", errors="ignore") as handle:
             for line in handle:
@@ -184,21 +281,94 @@ def explained_earlier_this_turn(path: str) -> bool:
                 if not isinstance(entry, dict) or entry.get("isSidechain"):
                     continue
                 if is_real_user_turn(entry):
-                    texts = []
+                    uses, failed = [], set()
                     continue
                 message = entry.get("message")
                 blocks = message.get("content") if isinstance(message, dict) else None
-                if entry.get("type") != "assistant" or not isinstance(blocks, list):
+                if not isinstance(blocks, list):
                     continue
                 for block in blocks:
-                    if (isinstance(block, dict) and block.get("type") == "tool_use"
-                            and EXPLAIN_TOOL.search(str(block.get("name") or ""))
-                            and isinstance(block.get("input"), dict)):
-                        texts.append(str(block["input"].get("text") or ""))
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") == "tool_use" and isinstance(block.get("input"), dict):
+                        uses.append((str(block.get("id") or ""), str(block.get("name") or ""),
+                                     block["input"]))
+                    elif block.get("type") == "tool_result" and block.get("is_error"):
+                        failed.add(str(block.get("tool_use_id") or ""))
     except OSError:
-        return False
+        return []
+    return [(name, tool_input, use_id in failed) for use_id, name, tool_input in uses]
+
+
+def explained_earlier_this_turn(path: str) -> bool:
+    """True when the reply tool calls since the person's last turn carried both parts."""
+    texts = [str(inp.get("text") or "") for name, inp, _ in turn_tool_uses(path)
+             if EXPLAIN_TOOL.search(name)]
     # The why and the tries may sit in two messages of the same turn.
     return bool(texts) and not missing("\n".join(texts))
+
+
+def adversarial_check_ran(path: str) -> bool:
+    """True when a subagent since the person's last turn was briefed to find a route without them."""
+    for name, tool_input, failed in turn_tool_uses(path):
+        if failed or is_subagent_tool is None or not is_subagent_tool(name):
+            continue
+        brief = subagent_brief(tool_input) if subagent_brief else str(tool_input.get("prompt") or "")
+        if ADVERSARIAL_BRIEF.search(brief) and ROUTE_BRIEF.search(brief):
+            return True
+    return False
+
+
+def input_claim(text: str, tool: str) -> str:
+    """The first sentence claiming the user's input is needed, or ""; a card is one by construction."""
+    for sentence in SPLIT.split(own_words(text)):
+        match = NEEDS_INPUT.search(sentence)
+        if match and not NOT_NEEDED.search(sentence[max(match.start() - 30, 0):match.end()]):
+            return " ".join(sentence.split())
+    if tool.endswith("request_decision"):
+        return " ".join(text.split())
+    return handoff_sentence(text)
+
+
+def input_claim_reason(text: str, tool: str, path: str) -> str:
+    """The denial for a needs-your-input claim with no adversarial check behind it, or ""."""
+    sentence = input_claim(text, tool)
+    if not sentence or adversarial_check_ran(path):
+        return ""
+    return INPUT_REASON.format(sentence=sentence[:160])
+
+
+def handoff_reason(text: str) -> str:
+    """The denial for a hand-off ask that lacks the why or the tries, or ""."""
+    sentence = handoff_sentence(text)
+    gaps = missing(text) if sentence else ""
+    return REASON.format(sentence=sentence[:160], missing=gaps) if gaps else ""
+
+
+def claim_sentence(text: str) -> str:
+    """The first sentence, in the agent's own words, claiming a step cannot be done."""
+    for sentence in SPLIT.split(own_words(text)):
+        if EXEMPT.search(sentence) or PERMISSION.search(sentence):
+            continue
+        if IMPOSSIBLE.search(sentence) and CLAIM_STEP.search(sentence):
+            return " ".join(sentence.split())
+    return ""
+
+
+def claim_reason(text: str) -> str:
+    """The denial for a can't-do claim that names no alternatives checked, or ""."""
+    sentence = claim_sentence(text)
+    if not sentence:
+        return ""
+    gaps = []
+    if not CHECKED.search(text):
+        gaps.append("the alternatives you checked, each with its result")
+    if GIT_WRITE.search(sentence) and not GITHUB_API.search(text):
+        gaps.append("the GitHub API tools (mcp__github__push_files, create_or_update_file), "
+                    "which commit and push without local git, and why they fail here")
+    if not gaps:
+        return ""
+    return CLAIM_REASON.format(sentence=sentence[:160], missing="; ".join(gaps))
 
 
 def main() -> int:
@@ -214,31 +384,32 @@ def main() -> int:
         text = payload.get("last_assistant_message")
         if not isinstance(text, str) or stop_notice is None:
             return 0
-        sentence = handoff_sentence(text)
-        gaps = missing(text) if sentence else ""
-        if gaps:
-            print(stop_notice(payload, REASON.format(sentence=sentence[:160], missing=gaps),
-                              "handoff-ask-needs-why"))
+        path = str(payload.get("transcript_path") or "")
+        reason = handoff_reason(text) or claim_reason(text) or input_claim_reason(text, "", path)
+        if reason:
+            print(stop_notice(payload, reason, "handoff-ask-needs-why"))
         return 0
     tool = str(payload.get("tool_name") or "")
     tool_input = payload.get("tool_input")
-    if not TOOL.search(tool) or not isinstance(tool_input, dict):
+    if not isinstance(tool_input, dict) or not (TOOL.search(tool) or RELAY_TOOL.search(tool)):
         return 0
     text = user_text(tool_input)
-    sentence = handoff_sentence(text)
-    if not sentence:
-        return 0
-    gaps = missing(text)
-    if not gaps:
-        return 0
-    if tool.endswith("request_decision") and explained_earlier_this_turn(
-            str(payload.get("transcript_path") or "")):
-        return 0
-    print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "deny",
-        "permissionDecisionReason": REASON.format(sentence=sentence[:160], missing=gaps),
-    }}))
+    reason = ""
+    if TOOL.search(tool):
+        reason = handoff_reason(text)
+        if reason and tool.endswith("request_decision") and explained_earlier_this_turn(
+                str(payload.get("transcript_path") or "")):
+            reason = ""
+    if not reason and not tool.endswith("request_decision"):
+        reason = claim_reason(text)
+    if not reason:
+        reason = input_claim_reason(text, tool, str(payload.get("transcript_path") or ""))
+    if reason:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }}))
     return 0
 
 

@@ -125,6 +125,16 @@ The rest are prose because no condition in the transcript can decide them.
   A decision card is too short for both, so post them in a message in the same turn.
   This holds for a thread and for the coordinator.
   Enforced by `hooks/handoff-ask-needs-why.py` ([ai-config#6068](https://github.com/Morrison-Lab/ai-config/issues/6068)).
+- A claim that a step cannot be done ("no other way to commit", "can't push") names every alternative you checked, each with its result, in a reply and in a relay to the coordinator or a thread.
+  A claim about committing or pushing names the GitHub API tools (`mcp__github__push_files`, `create_or_update_file`) among them, since they commit without local git
+  (Ezra, 2026-11-22: "why not use tools to commit", then "dont bs me", after the coordinator relayed that a thread had "no other way to commit").
+  If a checked route works, use it instead of making the claim.
+- Before any claim reaches Ezra that his input is needed (a decision card, a hand-off, "waiting on your approval"), launch a separate subagent briefed to refute it adversarially by finding a route that does not need him.
+  Send the claim only if it finds none, and say what it checked.
+  The coordinator runs its own check before relaying a thread's claim
+  (Ezra, 2026-11-22: "you must adversarially check every claim that my input is needed").
+  The same night's false claims were "no other way to commit", when the GitHub API tools could commit, and "waiting on your approval", when the thread was not stuck.
+  Enforced by `hooks/handoff-ask-needs-why.py`, which reads the turn for a subagent whose brief asks for that refutation ([ai-config#6075](https://github.com/Morrison-Lab/ai-config/issues/6075)).
 
 ## Questions and decisions
 

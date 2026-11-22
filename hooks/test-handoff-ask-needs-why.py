@@ -107,10 +107,103 @@ def transcript(entries) -> str:
     return handle.name
 
 
+USER = {"type": "user", "message": {"role": "user", "content": "cai: tell me why"}}
+CHECK_BRIEF = ("Adversarially try to refute this claim: find a route that does not need Ezra "
+               "to merge #6066 (another tool or API, a retry, a standing grant).")
+
+
+def check_entries(brief=CHECK_BRIEF, failed=False, tool="Agent"):
+    """An adversarial subagent launch and its result."""
+    return [
+        {"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "tool_use", "id": "toolu_check", "name": tool, "input": {"prompt": brief}}]}},
+        {"type": "user", "message": {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "toolu_check", "is_error": failed,
+             "content": "No route found."}]}},
+    ]
+
+
+# Claims that a step cannot be done (ai-config#6075). Run with an adversarial
+# check in the transcript, so only the claim check decides.
+CLAIM_CASES = [
+    ("the 2026-11-22 relay", COORD, {"text": "The thread has no other way to commit."}, True),
+    ("can't push, user-visible", POST, {"text": "I can't push the branch from here."}, True),
+    ("unable to merge", POST, {"text": "I was unable to merge #12."}, True),
+    ("commit claim names checks but not the API", POST,
+     {"text": "I can't commit here. Checked: git push (403) and a retry (403)."}, True),
+    ("commit claim with the API checked", POST,
+     {"text": "I can't commit here. Checked: git push (403), a retry (403), and the GitHub API "
+              "push_files tool (404, the repo is not in scope)."}, False),
+    ("merge claim with checks", POST,
+     {"text": "I can't merge #12: I tried the MCP merge (denied) and retried it once (denied)."}, False),
+    ("permission, not impossibility", POST, {"text": "I can't merge #12 without your mwc."}, False),
+    ("no step named", POST, {"text": "I can't find the old thread."}, False),
+    ("quoted claim", POST, {"text": "The relay said \"no other way to commit\", which was wrong."}, False),
+    ("can't find is not a claim", POST, {"text": "I can't find the merge commit in the log."}, False),
+    ("can't reproduce is not a claim", POST, {"text": "I cannot reproduce the failure when I rerun."}, False),
+    ("a gate that lifts", POST, {"text": "CI can't merge until checks pass."}, False),
+    ("the route that worked", POST,
+     {"text": "I couldn't push earlier, so I used the contents endpoint instead."}, False),
+    ("won't work", POST, {"text": "Pushing won't work from this sandbox."}, True),
+    ("no permission to push", POST, {"text": "The thread has no permission to push."}, True),
+    ("relay to a thread", "mcp__hearthbot__message_thread",
+     {"thread_id": "cmsg_x", "text": "You cannot push from that container."}, True),
+]
+
+# Claims that the user's input is needed (ai-config#6075), with and without
+# an adversarial check this turn.
+INPUT_CASES = [
+    ("waiting on your approval, no check", POST, {"text": "This is waiting on your approval."}, None, True),
+    ("waiting on your approval, checked", POST, {"text": "This is waiting on your approval."},
+     check_entries(), False),
+    ("relay of a needs-Ezra claim, no check", COORD, {"text": "lds#12 needs Ezra's sign-off."}, None, True),
+    ("card, no check", DECIDE, {"question": "Which title do you prefer?",
+                                "options": [{"label": "A", "consequence": "Uses A."},
+                                            {"label": "B", "consequence": "Uses B."}]}, None, True),
+    ("card, checked", DECIDE, {"question": "Which title do you prefer?",
+                               "options": [{"label": "A", "consequence": "Uses A."},
+                                           {"label": "B", "consequence": "Uses B."}]},
+     check_entries(), False),
+    ("check that failed", POST, {"text": "This needs your approval."}, check_entries(failed=True), True),
+    ("brief that is not adversarial", POST, {"text": "This needs your approval."},
+     check_entries(brief="Summarize the PR."), True),
+    ("check in an earlier turn", POST, {"text": "This needs your approval."},
+     check_entries() + [USER], True),
+    ("on hold until you decide", POST, {"text": "This is on hold until you decide."}, None, True),
+    ("Ezra has to approve", COORD, {"text": "Ezra has to approve before this goes on."}, None, True),
+    ("needs a human", POST, {"text": "Blocked: needs a human."}, None, True),
+    ("only the owner can", POST, {"text": "Only the owner can approve this."}, None, True),
+    ("pending CI is not a claim", POST, {"text": "The deploy is pending CI."}, None, False),
+    ("depends on a config file", POST, {"text": "The fix depends on the user's config file."}, None, False),
+    ("no input needed", POST, {"text": "Merged #12; nothing needs your input."}, None, False),
+    ("doesn't need you", POST, {"text": "The fix doesn't need you at all."}, None, False),
+    ("plain report", POST, {"text": "Merged #12 and slid v3."}, None, False),
+]
+
+
+def run_with(tool, tool_input, entries) -> bool:
+    payload = {"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": tool_input}
+    path = transcript([USER] + entries) if entries is not None else ""
+    if path:
+        payload["transcript_path"] = path
+    try:
+        return denied(run(payload))
+    finally:
+        if path:
+            os.unlink(path)
+
+
 def main() -> int:
     failures = 0
-    for name, tool, tool_input, want in CASES:
-        got = denied(run({"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": tool_input}))
+    # The hand-off cases run with an adversarial check in the transcript, so the
+    # input-claim check passes and only the hand-off check decides.
+    for name, tool, tool_input, want in CASES + CLAIM_CASES:
+        got = run_with(tool, tool_input, check_entries())
+        if got != want:
+            failures += 1
+            print(f"FAIL {name}: denied={got}, want {want}")
+    for name, tool, tool_input, entries, want in INPUT_CASES:
+        got = run_with(tool, tool_input, entries)
         if got != want:
             failures += 1
             print(f"FAIL {name}: denied={got}, want {want}")
@@ -118,12 +211,12 @@ def main() -> int:
     card = {"question": "Can you press merge on #6066?",
             "options": [{"label": "Done", "consequence": "The thread goes on."},
                         {"label": "Leave it", "consequence": "It stays open."}]}
-    user = {"type": "user", "message": {"role": "user", "content": "cai: tell me why"}}
+    user = USER
     explained = {"type": "assistant", "message": {"role": "assistant", "content": [
         {"type": "tool_use", "name": POST, "input": {"text": "Please press merge on #6066." + EXPLAINED}}]}}
     for name, entries, want in (
-            ("card after explaining message this turn", [user, explained], False),
-            ("card after explaining message last turn", [explained, user], True)):
+            ("card after explaining message this turn", [user] + check_entries() + [explained], False),
+            ("card after explaining message last turn", check_entries() + [explained, user], True)):
         path = transcript(entries)
         try:
             got = denied(run({"hook_event_name": "PreToolUse", "tool_name": DECIDE,
@@ -147,9 +240,13 @@ def main() -> int:
         if data.get("decision") != "block" or "handoff-ask-needs-why" not in str(data.get("reason")):
             failures += 1
             print(f"FAIL stop hand-off: {out!r}")
-        clean = dict(stop, session_id="test-handoff-" + uuid.uuid4().hex,
-                     last_assistant_message="Please press merge on #6066." + EXPLAINED)
-        out = run(clean)
+        path = transcript([USER] + check_entries())
+        try:
+            clean = dict(stop, session_id="test-handoff-" + uuid.uuid4().hex, transcript_path=path,
+                         last_assistant_message="Please press merge on #6066." + EXPLAINED)
+            out = run(clean)
+        finally:
+            os.unlink(path)
         if out.strip() and json.loads(out).get("decision") == "block":
             failures += 1
             print(f"FAIL stop explained: {out!r}")
@@ -158,7 +255,7 @@ def main() -> int:
         failures += 1
         print("FAIL malformed payload did not fail open")
 
-    total = len(CASES) + 6
+    total = len(CASES) + len(CLAIM_CASES) + len(INPUT_CASES) + 6
     print(f"{total - failures}/{total} passed")
     return 1 if failures else 0
 

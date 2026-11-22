@@ -506,5 +506,6 @@ See [`slide-tag`](../../skills/slide-tag/SKILL.md#never-ask-before-sliding-an-in
 
 On a transcript or report where the agent asked the user to do one of the agent's own steps (merge, press a button, run, push, re-run), check that the same message said why no other way works and listed every way the agent tried, each with its result.
 Report an ask that lacks either, and an ask made before the other routes were tried (a single retry, another tool or API, a fresh session, fixing the blocking check).
+Also report a claim that a step cannot be done which names no alternatives checked, a commit or push claim that leaves out the GitHub API tools, and any claim that the user's input is needed that went out with no adversarial subagent check behind it, or with a check whose brief did not ask for a route without the user (ai-config#6075).
 `hooks/handoff-ask-needs-why.py` catches the common wordings; report the ones it missed.
 See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#denied-steps) ([ai-config#6068](https://github.com/Morrison-Lab/ai-config/issues/6068)).

@@ -867,6 +867,7 @@ which is correct and easy to misread as the guard malfunctioning.
 It also requires `AI_SESSION_ID` or `CLAUDE_SESSION_ID` to be set; with neither
 set the function returns `False` and the guard denies even with a valid marker.
 Run `enable-mwc` and `check-mwc` from the repository of the session's working directory (where the merge command runs), not merely once per session or from the `-R` target repository.
+A scratchpad clone of the target repository is the same mistake: on psw#701 (2026-11-22) a marker written in a scratchpad psw clone left the guard reporting "found no ai-sessions directory", and the same command run in the project thread's primary checkout (`/home/user/lds`) let the merge through.
 
 **The grant does not expire, but its LIVENESS PROOF does, and a long session loses merge authority mid-session because of it.**
 This is the property most likely to bite, because the two facts that produce it are individually reassuring.

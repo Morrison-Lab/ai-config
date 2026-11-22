@@ -87,17 +87,23 @@ TOOL = re.compile(
 EXPLAIN_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
 RELAY_TOOL = re.compile(r"^mcp__hearthbot__(?:message_coordinator|message_thread)$")
 
-# A claim that a step cannot be done at all.
+# A claim that a step cannot be done at all: the impossibility words sit right
+# before the step, so "I can't find the merge commit" is not one.
+CLAIM_STEP = (
+    r"(?:commit(?:s|ting|ted)?|push(?:es|ing|ed)?|merg(?:e|es|ing|ed)|re-?run|deploy|rebase|"
+    r"open\s+(?:a|the)\s+PR|slide|dispatch|trigger)\b"
+)
+ADVERB = r"(?:(?:just|actually|really|directly|safely|also|even|yet|ever|currently|itself)\s+){0,2}"
 IMPOSSIBLE = re.compile(
-    r"\bno\s+other\s+(?:way|route|option|path|means)\b|\bthe\s+only\s+(?:way|route|option|path)\b"
-    r"|\b(?:has|have|had)\s+no\s+(?:way|means|route)\s+to\b|\bno\s+way\s+to\b"
-    r"|\b(?:can't|cannot|can\s+not|couldn't|could\s+not|unable\s+to|not\s+able\s+to)\b"
-    r"|\b(?:impossible|not\s+possible)\b",
+    r"\b(?:no\s+other\s+(?:way|route|option|path|means)|the\s+only\s+(?:way|route|option|path)|"
+    r"(?:has|have|had)\s+no\s+(?:way|means|route)|no\s+way|(?:impossible|not\s+possible))\s+to\s+"
+    + ADVERB + CLAIM_STEP
+    + r"|\b(?:can't|cannot|can\s+not|couldn't|could\s+not|unable\s+to|not\s+able\s+to|"
+    r"has\s+no\s+permission\s+to|have\s+no\s+permission\s+to)\s+" + ADVERB + CLAIM_STEP
+    + r"|\b" + CLAIM_STEP + r"[^.\n]{0,40}\b(?:won't|will\s+not|can't|cannot)\s+work\b",
     re.I)
-CLAIM_STEP = re.compile(
-    r"\b(?:commit(?:s|ting|ted)?|push(?:es|ing|ed)?|merg(?:e|es|ing|ed)|re-?run|deploy|rebase|"
-    r"open\s+(?:a|the)\s+PR|slide|dispatch|trigger)\b",
-    re.I)
+# A sentence reporting the route that did work, or a gate that lifts, claims nothing impossible.
+CLAIM_CANCEL = re.compile(r"\binstead\b|\bworked\b|\bsucceeded\b|\buntil\b|\bunless\b", re.I)
 GIT_WRITE = re.compile(r"\b(?:commit(?:s|ting|ted)?|push(?:es|ing|ed)?)\b", re.I)
 # Tied to the user's grant or word: a statement of permission, not of impossibility.
 PERMISSION = re.compile(
@@ -112,9 +118,14 @@ CHECKED = re.compile(
 # A claim that the user's input is needed (Ezra, 2026-11-22, ai-config#6075).
 NEEDS_INPUT = re.compile(
     r"\b(?:needs?|needed|requires?|required|waiting\s+(?:on|for)|waits?\s+(?:on|for)|"
-    r"blocked\s+on|awaiting|pending|depends\s+on|held\s+(?:on|for))\s+"
-    r"(?:your|Ezra's|the\s+user's|you|Ezra|the\s+user)\b"
-    r"|\bonly\s+(?:you|Ezra)\s+can\b|\b(?:it's|it\s+is)\s+(?:up\s+to\s+you|your\s+call)\b",
+    r"blocked\s+on|awaiting|held\s+(?:on|for))\s+"
+    r"(?:your|Ezra's|the\s+user's|the\s+owner's|you|Ezra|the\s+user|the\s+owner)\b"
+    r"|\b(?:needs?|requires?)\s+(?:a\s+)?(?:human|manual\s+(?:step|action|approval))\b"
+    r"|\bonly\s+(?:you|Ezra|the\s+user|the\s+owner|a\s+human)\s+can\b"
+    r"|\b(?:you|Ezra|the\s+user|the\s+owner|a\s+human)\s+(?:has|have|need|needs|must)\s+to\s+"
+    r"(?:approve|decide|confirm|choose|pick|answer|sign\s+off|review)\b"
+    r"|\bon\s+hold\s+(?:until|till|for)\s+(?:you|Ezra|the\s+user)\b"
+    r"|\b(?:it's|it\s+is)\s+(?:up\s+to\s+you|your\s+call)\b",
     re.I)
 NOT_NEEDED = re.compile(
     r"\b(?:no|nothing|not|never|doesn't|does\s+not|don't|do\s+not|isn't|is\s+not|no\s+longer|without)\b",
@@ -216,10 +227,11 @@ CLAIM_REASON = (
 INPUT_REASON = (
     '[hook: handoff-ask-needs-why] "{sentence}" claims the user\'s input is needed, and no '
     "adversarial check ran this turn. Ezra, 2026-11-22 (ai-config#6075): \"you must adversarially "
-    "check every claim that my input is needed\". Launch a separate subagent briefed to refute the "
-    "claim: adversarially look for a route that does not need the user (another tool or API, a "
-    "retry, a standing grant, a fixed check). Send the claim only if it finds none, and then say "
-    "what it checked. That day's false claims were \"no other way to commit\" (the GitHub API tools "
+    "check every claim that my input is needed\". Launch a separate subagent (Agent or Task) whose "
+    "brief contains \"adversarially\" (or \"refute\") and asks for \"a route without the user\" "
+    "(another tool or API, a retry, a standing grant, a fixed check), and let it finish without "
+    "error; this hook reads the brief for those words. Send the claim only if it finds no such "
+    "route, and then say what it checked. That day's false claims were \"no other way to commit\" (the GitHub API tools "
     "could) and \"waiting on your approval\" (the thread was not stuck). This holds for a thread and "
     "for the coordinator relaying it. See shared/workflow/lab-operating-rules.md."
 )
@@ -323,7 +335,9 @@ def input_claim(text: str, tool: str) -> str:
     """The first sentence claiming the user's input is needed, or ""; a card is one by construction."""
     for sentence in SPLIT.split(own_words(text)):
         match = NEEDS_INPUT.search(sentence)
-        if match and not NOT_NEEDED.search(sentence[max(match.start() - 30, 0):match.end()]):
+        # A negation anywhere in the clause before the claim cancels it.
+        clause = re.split(r"[,;:]", sentence[:match.start()])[-1] if match else ""
+        if match and not NOT_NEEDED.search(clause + match.group(0)):
             return " ".join(sentence.split())
     if tool.endswith("request_decision"):
         return " ".join(text.split())
@@ -348,9 +362,9 @@ def handoff_reason(text: str) -> str:
 def claim_sentence(text: str) -> str:
     """The first sentence, in the agent's own words, claiming a step cannot be done."""
     for sentence in SPLIT.split(own_words(text)):
-        if EXEMPT.search(sentence) or PERMISSION.search(sentence):
+        if EXEMPT.search(sentence) or PERMISSION.search(sentence) or CLAIM_CANCEL.search(sentence):
             continue
-        if IMPOSSIBLE.search(sentence) and CLAIM_STEP.search(sentence):
+        if IMPOSSIBLE.search(sentence):
             return " ".join(sentence.split())
     return ""
 

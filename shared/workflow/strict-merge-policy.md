@@ -93,13 +93,15 @@ An id change adds, renames or deduplicates an anchor or cross-reference id (`{#d
 together with the references that follow it.
 That includes renaming an id that other sites link to, though their links break:
 Ezra declined that carve-out (2026-11-21).
+A LaTeX change that leaves the rendered math the same counts as infrastructure too (Ezra, 2026-11-22),
+such as swapping a semantic macro in for the raw LaTeX it expands to.
 A PR qualifies only when every changed line is one of these or other infrastructure;
-a changed word of prose, math, code or a caption makes it content.
+a changed word of prose, code or a caption, or any change to the math a reader sees, makes it content.
 
 - **Classify before asking.**
   Before telling the user a PR waits on `mwc`, list its changed paths.
   If every path matches `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py` (`.github/`, `.claude/`, `CLAUDE.md`/`AGENTS.md`, lint, spell and link-check configuration) or the repo is gha, macros or ai-config, report it as merging under the infra grant, not as waiting on the user (Ezra, 2026-11-07, about lds#2009: "it's infra and shouldn't need my word").
-  A PR in a content file whose every changed line is a hyperlink or id change, as defined above, is infra too;
+  A PR in a content file whose every changed line is a hyperlink, id or render-identical LaTeX change, as defined above, is infra too;
   the path list and the hooks cannot see that, so read the diff to classify it.
   `hooks/no-mwc-ask-for-infra-pr.py` denies a reply that asks otherwise (ai-config#5097), including a reply that asks the user to type a merge line such as `merge gha 2152 <sha>` for one (ai-config#6021).
   It also denies a decision card or a coordinator relay that asks to merge infra PRs, such as "Merge the six caller PRs?",
@@ -113,8 +115,10 @@ a changed word of prose, math, code or a caption makes it content.
   In a project with no runner thread, the thread that owns the infra PR merges it itself once it is fully clean, and never asks (Ezra, 2026-11-20: "always handle infra PRs yourself;
   never ask me").
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
-- **Don't:** treat a link-only or id-only PR as content because its files are chapters,
-  or treat a PR as link-only when it also rewords the link text.
+- **Don't:** treat a link-only, id-only or render-identical LaTeX PR as content because its files are chapters,
+  or treat a PR as link-only when it also rewords the link text,
+  or as render-identical when a macro swap changes what the math looks like.
+  Render the page, or read the macro's definition, to confirm the math is unchanged.
 - **Do:** after an infra PR merges, slide the repo's floating tag (gha's `v3`) yourself once [`slide-tag`](../../skills/slide-tag/SKILL.md)'s gates pass, whichever thread you are.
   Never ask the user first, and never leave the slide to a runner thread or the coordinator (Ezra, 2026-11-20: "never ask me before sliding an infra tag;
   always just do it").

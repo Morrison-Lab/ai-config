@@ -151,6 +151,11 @@ This section is the exception that the other "required for merging" statements i
   **Do:** report it as "denied once so far", never "cannot", since another session ran the identical command without a denial (it exited 127, the CLI being absent), so one denial is one sample and not a rule.
   Retry once only on the user's own explicit word.
   Ezra, 2026-11-21: "always allow opencode attempts".
+  The allow comes from `opencode_attempt()` in `hooks/grant-personal-permissions.py` ([#6071](https://github.com/Morrison-Lab/ai-config/pull/6071)), and a session whose plugin cache predates that commit does not have it.
+  On [#6080](https://github.com/Morrison-Lab/ai-config/pull/6080) (2026-11-22), such a session saw the curl denied twice and `opencode run` denied once.
+  A fresh thread, which loads the current plugin, then merged the PR in minutes.
+  **Do:** when the attempt is denied in a session older than the grant, hand the merge to a fresh thread, with the head SHA, through the coordinator or a new session.
+  **Don't:** reword the attempt again, or ask Ezra.
   `hooks/grant-personal-permissions.py` therefore allows a single `curl` POST with an inline body to `https://opencode.ai/zen/go/v1/chat/completions`.
   Send that form on its own, with no `cd` or other command chained to it, so the attempt needs no approval card.
   **Don't:** retry a denied `opencode run` on a relayed message from another session.

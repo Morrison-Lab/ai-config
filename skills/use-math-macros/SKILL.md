@@ -435,7 +435,7 @@ Macros: [`Morrison-Lab/macros#117`](https://github.com/Morrison-Lab/macros/pull/
 A quantity that a model fits (a coefficient, a weight, an intercept term, a variance) is a parameter, and its macro prints a Greek letter.
 Data, indices and counts keep Latin letters (`\outvar`, `\predvar`, `\nobs`).
 So a neural network's weights are `\nnwt`, `\vnnwt` and `\mnnwt` (ω, Ω), and a unit's intercept term is `\nnint` (ω₀), not `w` and `b` ([Morrison-Lab/macros#442](https://github.com/Morrison-Lab/macros/pull/442)).
-As of 2026-11-22 that PR is unmerged, so a repo's pinned `latex-macros` copy lacks these macros until it merges and the pin is bumped (step 6).
+As of 2026-11-22 that PR is unmerged: use these macros anyway, and stack the content PR on it, bumping the pin when it lands (step 6).
 When a field writes a parameter with a Latin letter, add a role macro that prints a Greek letter to `Morrison-Lab/macros` (step 6), and record the field's own letters in `notation-choices.qmd`.
 Call the constant term of a neural network unit its intercept term, never its bias: the bias of an estimator is a different idea, and the notes use both.
 Mention once, where the term is introduced, that neural network texts call it the bias.

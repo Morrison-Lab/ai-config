@@ -442,7 +442,9 @@ Mention once, where the term is introduced, that neural network texts call it th
 - **Do:** write a unit as `\sigmoid(\nnint + \dprod{\vnnwt}{\vx})` and call `\nnint` its intercept term.
 - **Don't:** write `\sigmoid(b + \dprod{\vw}{\vx})` or call `b` the bias.
 
-No check enforces the Greek-letter half: whether a letter is a parameter depends on its role in the model, which no pattern over the source can tell, so that half is prose.
+No check enforces either half, so both are prose.
+Whether a letter is a parameter depends on its role in the model, which no pattern over the source can tell.
+The word "bias" is right for an estimator, and a neural network page discusses estimator bias too, so no pattern can tell a misnamed intercept term from a correct use.
 (Directive from Ezra, 2026-11-21 23:57 PST: "all parameters should be greek", and 23:58 PST: "don't call it bias".)
 
 ### Write a named quantity by its macro, not its definition

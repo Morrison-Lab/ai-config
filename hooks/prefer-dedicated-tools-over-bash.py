@@ -11,16 +11,19 @@ Read, Grep, Glob, Edit and Write never do. DENIES, in every session:
     `find` using only -name, -iname, -path, -ipath, -type f and -print;
     later stages may be head, tail, grep, egrep, fgrep, rg or cat;
   - `sed -i`/`--in-place` and `perl -i`, at any stage (use Edit);
-  - `cat`, `echo` or `printf` redirected into a file, or `tee FILE` fed by a
-    heredoc, echo or printf (use Write). `/dev/...` targets pass.
+  - `cat`, `echo` or `printf` overwriting a file with `>`, or `tee FILE` fed
+    by a heredoc, echo or printf (use Write). `/dev/...` targets pass.
 
 Passes: a pipeline with any other program in it (`git log | head`), output
-redirected into a file from a reader, operands holding `$` or a backtick,
-commands under `if`/`do`/`then`/... (shell control flow), `sudo`, quoted
-mentions and heredoc bodies, and `ls`/`wc`, which have no exact tool.
-`ALLOW_BASH_OVER_TOOL=1` before the command covers a real need (a bulk edit
-over many files, a byte count) and the reply says why. Fails open on a parse
-error or a missing `scripts/lib/shellcmd.py`.
+redirected into a file from a reader, an append (`>>`, `tee -a`), which Write
+cannot do, a search whose exit status is used (`-q`, `-s`, output to
+/dev/null, or `&&`/`||` after it), operands or redirect targets holding `$`
+or a backtick, commands under `if`/`do`/`then`/... and any `case` statement,
+`sudo`, quoted mentions and heredoc bodies, and `ls`/`wc`, which have no
+exact tool. `ALLOW_BASH_OVER_TOOL=1` written as a prefix of the command
+itself (not an `export`) covers a real need, such as one edit across many
+files or a byte count, and the reply says why. Fails open on a parse error
+or a missing `scripts/lib/shellcmd.py`.
 """
 import json
 import os
@@ -46,7 +49,8 @@ CONTROL_WORDS = {"if", "then", "else", "elif", "do", "while", "until", "for", "c
 FIND_VALUE_PREDICATES = {"-name", "-iname", "-path", "-ipath"}
 HEAD_VALUE_FLAGS = {"-n", "--lines"}
 SED_PRINT_RANGE = re.compile(r"^(?:\d{1,9}|\$)(?:,(?:\d{1,9}|\$))?p$")
-REDIRECT_TOKEN = re.compile(r"^[<>&]{1,3}-?$")
+REDIRECT_TOKEN = re.compile(r"^(?=.*[<>])[<>&|]{1,3}-?$")
+QUIET_FLAGS = {"-q", "--quiet", "-s", "--silent", "--no-messages"}
 
 TOOLS = {
     "read": "the Read tool (offset and limit select lines)",
@@ -65,6 +69,12 @@ def _split_args(args):
         if REDIRECT_TOKEN.match(tok):
             if operands and operands[-1].isdigit():
                 operands.pop()  # `2>`: the digit is a file descriptor
+            if tok in ("<<", "<<-"):
+                # The tokenizer drops a heredoc's delimiter word with its body,
+                # so nothing follows `<<` to consume (`cat <<EOF > f`).
+                redirects.append((tok, ""))
+                i += 1
+                continue
             target = args[i + 1] if i + 1 < len(args) else ""
             redirects.append((tok, target))
             i += 2
@@ -80,6 +90,17 @@ def _writes_file(redirects):
         if ">" in op and not op.endswith("&") and not target.startswith("/dev/"):
             return True
     return False
+
+
+def _overwrites_literal(redirects):
+    """True when a redirect overwrites (not appends to) a literally named file.
+
+    Write replaces a whole file, so an append (`>>`) has no exact tool, and a
+    `$`-expanded target names a file the tool call cannot spell.
+    """
+    writes = [(op, t) for op, t in redirects
+              if ">" in op and not op.endswith("&") and not t.startswith("/dev/")]
+    return bool(writes) and all(">>" not in op and not _dynamic([t]) for op, t in writes)
 
 
 def _stdin_is_data(redirects):
@@ -195,8 +216,12 @@ def _stage(argv):
     return os.path.basename(rest[0]), words, redirects, env
 
 
-def _pipeline_kind(stages):
-    """The tool kind a pipeline should have used, or None."""
+def _pipeline_kind(stages, status_used=False):
+    """The tool kind a pipeline should have used, or None.
+
+    `status_used` is True when `&&` or `||` follows the pipeline, so its exit
+    status steers the shell; no tool returns one, so a search there passes.
+    """
     parsed = [_stage(argv) for argv in stages]
     if any(p is None for p in parsed):
         return None
@@ -209,36 +234,48 @@ def _pipeline_kind(stages):
             return "edit"
     prog, words, redirects, _env = parsed[0]
     if prog in ("cat", "echo", "printf") and len(parsed) == 1 and _writes_file(redirects):
-        if _dynamic(words):
+        if _dynamic(words) or not _overwrites_literal(redirects):
             return None
         if prog != "cat" or not words or _stdin_is_data(redirects):
             return "write"
         return None
     if prog in ("cat", "echo", "printf", "tee") and parsed[-1][0] == "tee":
-        tee_files = [w for w in parsed[-1][1] if not w.startswith("-")]
+        tee_args = parsed[-1][1]
+        tee_files = [w for w in tee_args if not w.startswith("-")]
+        appends = any(w in ("-a", "--append") for w in tee_args)
         fed = prog in ("echo", "printf") or _stdin_is_data(redirects)
-        if fed and tee_files and not any(f.startswith("/dev/") for f in tee_files) \
-                and len(parsed) <= 2 and not _dynamic(tee_files):
+        if fed and tee_files and not appends and len(parsed) <= 2 \
+                and not any(f.startswith("/dev/") for f in tee_files) \
+                and not _dynamic(tee_files) and not _dynamic(words):
             return "write"
-    if _dynamic(words):
+    literal = [w for w in words if not (prog == "sed" and SED_PRINT_RANGE.match(w))]
+    if _dynamic(literal) or _dynamic([t for _op, t in redirects]):
         return None
     kind = _reader_kind(prog, words, redirects)
     if kind is None:
         return None
-    for later, _w, later_redirects, _e in parsed[1:]:
+    to_null = any(">" in op and t == "/dev/null" for op, t in redirects)
+    if kind == "search" and (status_used or to_null or QUIET_FLAGS & set(words)):
+        return None
+    for later, later_words, later_redirects, _e in parsed[1:]:
         if later not in FILTERS or _writes_file(later_redirects):
+            return None
+        if later == "cat" and later_words:
             return None
     return kind
 
 
 def pipelines(command):
-    """Each top-level pipeline as a list of argv stages; None on a parse error.
+    """Each top-level pipeline as `(stages, status_used)`; None on a parse error.
 
-    A pipeline that opens inside `$(...)` is dropped: its output feeds another
-    command, which no tool call replaces.
+    `stages` is a list of argv lists, and `status_used` is True when `&&` or
+    `||` follows the pipeline. A pipeline that opens inside `$(...)` is
+    dropped: its output feeds another command, which no tool call replaces.
+    A command holding a `case` statement is skipped whole, since its `)`
+    pattern ends look like subshell closes to the tokenizer.
     """
     toks = shell_tokens(command)
-    if toks is None:
+    if toks is None or "case" in toks:
         return None
     out, stages, cur, skip, prev = [], [], [], False, ""
     for tok in toks:
@@ -250,7 +287,7 @@ def pipelines(command):
                 prev = tok
                 continue
             if stages and not skip:
-                out.append(stages)
+                out.append((stages, tok.lstrip(")").startswith(("&&", "||"))))
             stages = []
             skip = "(" in tok and prev.endswith("$")
             prev = tok
@@ -260,14 +297,14 @@ def pipelines(command):
     if cur:
         stages.append(cur)
     if stages and not skip:
-        out.append(stages)
+        out.append((stages, False))
     return out
 
 
 def offending(command):
     """The tool kind for the first pipeline a dedicated tool covers, or None."""
-    for stages in pipelines(command) or []:
-        kind = _pipeline_kind(stages)
+    for stages, status_used in pipelines(command) or []:
+        kind = _pipeline_kind(stages, status_used)
         if kind:
             return kind, " | ".join(" ".join(s) for s in stages)
     return None
@@ -301,8 +338,8 @@ def main() -> int:
         f"[hook: prefer-dedicated-tools-over-bash] `{what}` is file work that {TOOLS[kind]} "
         "does without an approval prompt (Ezra, 2026-11-21: \"can you use tools instead of "
         "bash\"; ai-config#6065). Use the tool. Keep Bash for what no tool does: git, "
-        f"checks, renders, running scripts. Only if the tool cannot do this, prefix `{OVERRIDE}=1` "
-        "and say why."
+        f"checks, renders, running scripts. Only if the tool cannot do this, start the command "
+        f"itself with `{OVERRIDE}=1 ` and say why."
     )
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",

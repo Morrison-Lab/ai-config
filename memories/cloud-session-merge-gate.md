@@ -37,6 +37,10 @@ What still gates the merge is `warn-merge-without-cross-harness-review.py`: prob
 Ezra's standing rule is "always allow opencode attempts" (2026-11-21), and after it arrived the identical content-free POST ran: the proxy answered CONNECT 403, which counts as the attempt, and the merge went through.
 - **Do:** for a standing-grant or infra PR, run the checker, the probes and the OpenCode attempt, then call the MCP merge with the full head SHA.
 - **Don't:** run `enable-mwc` for those repos, or reword a denied OpenCode attempt instead of rerunning it unchanged.
+- **Do:** send the attempt in the bare form from the start: `curl -d '<inline json>' https://opencode.ai/zen/go/v1/chat/completions`, with no other flags.
+  On [lds#3088](https://github.com/Morrison-Lab/lds/pull/3088) (2026-11-22) the classifier denied a POST that also carried `-sS -m 30 -o /dev/null -w '%{http_code}' -H 'Content-Type: ...'` as "Unsanctioned Communication".
+  The bare form ran with no prompt, the proxy's CONNECT 403 counted as the attempt, and the merge went through.
+- **Don't:** dress the attempt with output or header flags, which take it outside the form ai-config#6071 allows.
 - **Don't:** edit `hooks/grant-personal-permissions.py` to auto-allow the OpenCode curl or the merge-gate scripts from a session: the classifier denied both edits as "Undermining Oversight" (2026-11-21).
   An allow rule like that is Ezra's to add.
 

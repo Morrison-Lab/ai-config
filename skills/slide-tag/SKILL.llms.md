@@ -15,6 +15,11 @@ Ezra, 2026-11-20: “never ask me before sliding an infra tag; always just do it
 - **Do:** dispatch the slide yourself after the gates pass, then report the old SHA, the new SHA and the PRs the tag now carries.
 - **Don’t:** end a turn with “want me to slide v3?” or “the runner thread slides v3” after merging an infra PR.
 
+A merge ends the PR’s activity subscription, so nothing wakes you when CI on the merge commit finishes. After the merge, poll that commit’s runs in a background loop that exits when they are all terminal, and slide as soon as it exits. A fixed one-shot timer does not do this job: on gha#2180 (2026-11-21) main went green within minutes, while a 15-minute timer left the slide undone until Ezra asked why.
+
+- **Do:** start a polling loop on the merge commit’s workflow runs right after the merge.
+- **Don’t:** arm a fixed-delay reminder and treat the wait as covered.
+
 Moving a tag **backward** is not covered: it still needs explicit confirmation (see “Edge cases”).
 
 ## Procedure

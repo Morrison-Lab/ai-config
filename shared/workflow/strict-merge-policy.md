@@ -91,6 +91,8 @@ Hyperlink changes and id changes count as infrastructure too, in any repo and in
 A hyperlink change adds, fixes, repoints or removes a link while the words a reader sees stay the same.
 An id change adds, renames or deduplicates an anchor or cross-reference id (`{#def-...}`, `{#sec-...}`, `{#eq-...}`),
 together with the references that follow it.
+That includes renaming an id that other sites link to, though their links break:
+Ezra declined that carve-out (2026-11-21).
 A PR qualifies only when every changed line is one of these or other infrastructure;
 a changed word of prose, math, code or a caption makes it content.
 

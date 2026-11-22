@@ -91,4 +91,5 @@ never ask me".)
 
 (User directives, 2026-11-21 17:47 and 17:48 PST, via `cai` in the lds project:
 "hyperlink changes count as infra";
-"and id changes count as infra too".)
+"and id changes count as infra too".
+Asked at 18:29 PST whether renaming an id that outside sites link to should be left out, he answered "no".)

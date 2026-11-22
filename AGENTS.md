@@ -259,7 +259,8 @@ Beyond GitHub no hook can tell which Bash steps an MCP tool covers, so check the
 The reviewer's checklist item is in [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md#bash-where-a-cloud-mcp-tool-exists).
 
 The same holds beyond MCP and beyond cloud sessions: before a step that would ask the user for approval, take any idiomatic path that reaches the same result without a prompt (Ezra, 2026-11-15: "avoid asking for approvals when there's another idiomatic path forward", [#5687](https://github.com/Morrison-Lab/ai-config/issues/5687)).
-Edit a file with the Edit or Write tool rather than `sed -i` or a heredoc, and run each step as its own short command rather than chaining edits, commits and checks into one long command.
+Do file work with Read, Grep, Glob, Edit and Write, not `cat`, `grep`, `sed` or heredocs, keeping Bash for git and scripts (a hook denies the rest, [#6065](https://github.com/Morrison-Lab/ai-config/issues/6065)).
+Run each step as its own short command, not one chain of edits, commits and checks.
 Make this choice before the first attempt.
 After a classifier denial, [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md) and [`difm`](skills/do-it-for-me/SKILL.md) still govern: retry the identical command, never a rephrasing that gets around the denial.
 In a cloud session `hooks/no-chained-edit-and-commit-in-cloud.py` denies a command that chains an in-place edit (`sed -i`, `perl -i`, or a redirect into a file outside `/tmp/` and a scratchpad) with `git commit` ([#5688](https://github.com/Morrison-Lab/ai-config/issues/5688)).

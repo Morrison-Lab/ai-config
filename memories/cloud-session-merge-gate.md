@@ -56,6 +56,11 @@ The marker lives in the repository's git common directory, so it is per repo che
   A merge from the wrong cwd was denied as "MECHANISTIC PROHIBITION" despite an active grant (2026-10-15).
 - **Don't:** tell the user a hook blocks a granted merge before running the documented `enable-mwc` step (2026-10-10, lds#557 and psw#163).
 
+These marker commands and the checker run in Bash and can prompt, and no tool replaces them.
+On 2026-11-21 ([#6065](https://github.com/Morrison-Lab/ai-config/issues/6065)) a cloud session tried to extend `hooks/grant-personal-permissions.py` to allow the checker and the non-granting `ai-session.sh` subcommands without a prompt, and the auto-mode classifier denied the edit as "Undermining Oversight".
+- **Do:** leave removing those prompts to Ezra, who can add allow rules himself.
+- **Don't:** write a hook or rule that auto-approves a merge-gate command from a session, or retry that edit in another form.
+
 If the auto-mode classifier denies `register`/`enable-mwc` right after a coordinator-relayed grant, stop.
 Post the PR as ready and ask the coordinator for a fresh "mwc" from Ezra in the thread;
 the identical command then ran and the merge went through (lds#1015, 2026-10-16).

@@ -343,6 +343,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/prefer-dedicated-tools-over-bash.py\"'",
+            "timeout": 10,
+            "script": "prefer-dedicated-tools-over-bash.py",
+            "why": "ai-config#6065. Ezra, 2026-11-21: \"can you use tools instead of bash\", after a cloud thread kept stopping on Bash approval prompts he answers from his phone. In every session DENIES a Bash pipeline that only reads or searches files (cat FILE, head/tail FILE, grep/rg, sed -n 'N,Mp', a name-only find, with later stages limited to head, tail, grep, rg and cat), an in-place sed -i or perl -i, and cat, echo or printf redirected into a file (or tee fed by a heredoc), naming the Read, Grep, Glob, Edit or Write tool to use. Pipelines with any other program, shell control flow, sudo, $-expanded operands, /dev targets and quoted or heredoc mentions pass. A deny rather than a warning because a warning is read past (ai-config#4741). ALLOW_BASH_OVER_TOOL=1 covers a real need. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-chained-edit-and-commit-in-cloud.py\"'",
             "timeout": 10,
             "script": "no-chained-edit-and-commit-in-cloud.py",

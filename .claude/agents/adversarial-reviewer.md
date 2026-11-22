@@ -385,6 +385,13 @@ Also flag a cloud Bash command that chains an in-place edit (`sed -i`, `perl -i`
 Read the commands yourself; do not report the output of `hooks/prefer-mcp-over-bash-in-cloud.py` or `hooks/no-chained-edit-and-commit-in-cloud.py` as your finding.
 See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever-one-exists).
 
+## Bash where a dedicated tool exists
+
+In any session, flag a Bash step that reads, searches or writes files (`cat`, `head`, `tail`, `grep`, `rg`, `find`, `sed -n`, `sed -i`, `perl -i`, a heredoc or `echo` into a file) where Read, Grep, Glob, Edit or Write does the same job.
+A search whose exit status steers the shell, and an append, have no tool and are fine.
+Read the commands yourself; do not report the output of `hooks/prefer-dedicated-tools-over-bash.py` as your finding.
+See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever-one-exists) and [#6065](https://github.com/Morrison-Lab/ai-config/issues/6065).
+
 ## GitHub polling that drains the shared budget
 
 Where a transcript, skill or script waits for CI, flag a GitHub poll faster than every two minutes (`gh pr checks --watch` at its default, `watch`, or a loop with a short `sleep`), which emptied the shared budget twice on 2026-11-19 ([ai-config#5970](https://github.com/Morrison-Lab/ai-config/issues/5970)).

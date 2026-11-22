@@ -61,13 +61,13 @@ SCOPE_HOLDER = (rf"(?:{PLACE}|I|we|(?:my|our|its|the|{PLACE}{APOS}s)\s+(?:github
                 r"|github\s+access)")
 ONLY = re.compile(
     rf"\b{SCOPE_HOLDER}\s+(?:(?:can|could)\s+only|(?:can|could)\s+(?:reach|access|see|clone)\s+only|only\s+(?:has|have|had)\s+(?:access\s+to)?"
-    rf"|(?:is|are|was|were)\s+(?:only\s+)?(?:limited|scoped|restricted|confined)\s+to|(?:is|are)\s+(?:for\s+)?)\s+"
-    rf"(?:(?:reach|access|see|clone|touch|push\s+to|write\s+to|work\s+(?:in|on))\s+)?{DET}{TOK}", re.I)
+    rf"|(?:is|are|was|were)\s+(?:only\s+)?(?:limited|scoped|restricted|confined)\s+to)\s+"
+    rf"(?:(?:reach|access|see|clone|work\s+(?:in|on))\s+)?{DET}{TOK}", re.I)  # push and write blockers stay allowed
 
 
 def only_scope(sentence: str) -> bool:
-    """A sentence that limits this thread or its access to one named repo."""
-    return any(REPO_NAME.search(m.group(1)) for m in ONLY.finditer(sentence))
+    """A sentence that limits this thread or its access to one named repo ("the repo" alone names none)."""
+    return any(NAMED.fullmatch(m.group(1)) for m in ONLY.finditer(sentence))
 OUTAGE = re.compile(r"\b(?:down|outage|offline|proxy|network|disk|quota|rate.limit\w*|timed?\s*out|DNS|SSL|TLS|[45]\d\d|[45]\d\ds)\b", re.I)
 OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to|until|while)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo)\b"
                          rf"|\b{PLACE}\b))", re.I)  # "because it isn't in this thread's repos" is the excuse again

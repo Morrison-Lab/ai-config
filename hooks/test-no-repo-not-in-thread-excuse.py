@@ -52,6 +52,8 @@ CASES = [
     # Passes.
     ("only-scope with attach", POST, "This thread could only reach lds, so I attached ai-config and pushed the hook.", False),
     ("only non-repo", POST, "This thread can only reach the preview site. I can only see the latest run.", False),
+    ("only generic repo", POST, "I can only see the repo history from here. We only have access to the repo via gh. I can only push to the repo with a token.", False),
+    ("only push blocker", POST, "I can only push to lds with a token. This session can only write to lds-site through the deploy job.", False),
     ("attach and other repo", POST, "I attached mlg to this thread, since it wasn't in this thread's repos, and fixed the lds link. mlg wasn't in this thread's repos, so I attached it and pushed the fix for the lds link. I attached ai-config and mlg, since mlg wasn't in this thread's repos. ai-config isn't in this thread's repos yet, so I'm attaching it now.", False),
     ("not a repo", POST, "The merge-ready PR isn't in this thread yet. That file isn't in this thread. scripts/check.py isn't in this thread. `pytest` is not available in this session. mlr is not available in this session yet, so I used tidymodels. mlr isn't attached in this session, so library(mlr) failed. I don't have the SDs in this thread yet. ai-config isn't in this session, so the plugin hooks don't fire.", False),
     ("repo word as place", POST, "The bug is not in this thread's repo, it is in lds-site. Tests aren't in this session's repos folder. The issue is not in this thread's scope, so I left it.", False),

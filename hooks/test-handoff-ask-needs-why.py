@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import uuid
 
 HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(os.path.realpath(__file__)), "handoff-ask-needs-why.py")
@@ -29,7 +30,34 @@ CASES = [
     ("can you push", POST, {"text": "Can you push the branch from your laptop?"}, True),
     ("once you merge", POST, {"text": "I'll carry on once you merge #12."}, True),
     ("imperative press", POST, {"text": "Press the green Merge button on lds#3070."}, True),
-    ("imperative merge it", POST, {"text": "CI passed.\nMerge it when you can."}, True),
+    ("over to you", POST, {"text": "Over to you to merge #12."}, True),
+    ("needs you to press", POST, {"text": "This needs you to press merge."}, True),
+    ("it's on you", POST, {"text": "I can't merge it, so it's on you."}, True),
+    ("your click", POST, {"text": "Needs your click on Merge."}, True),
+    ("yourself", POST, {"text": "Go ahead and merge #12 yourself."}, True),
+    ("would you mind", POST, {"text": "Would you mind merging #12?"}, True),
+    ("kindly", POST, {"text": "Kindly merge #12."}, True),
+    ("I'd like you to", POST, {"text": "I'd like you to merge #12."}, True),
+    ("go ahead and", POST, {"text": "Please go ahead and merge it."}, True),
+    ("approve and merge", POST, {"text": "Please approve and merge #12."}, True),
+    ("force-push", POST, {"text": "Please force-push the branch."}, True),
+    ("squash and merge", POST, {"text": "Please squash and merge."}, True),
+    ("you can merge", POST, {"text": "You can merge #12 now."}, True),
+    ("when you've merged", POST, {"text": "Let me know when you've merged #12."}, True),
+    ("negation earlier in the sentence", POST, {"text": "I never saw this block before, so please merge #12."}, True),
+    ("card option is the agent's own step", DECIDE, {"question": "Land #12 now?",
+                                                     "options": [{"label": "Merge it", "consequence": "I merge #12 under your mwc."},
+                                                                 {"label": "Push it", "consequence": "I push the fix first."}]}, False),
+    ("plan line", POST, {"text": "Plan: merge #12 after CI."}, False),
+    ("next line", POST, {"text": "Done. Next up:\nPush it to the branch."}, False),
+    ("update me", POST, {"text": "Please update me when CI finishes."}, False),
+    ("stop by", POST, {"text": "Can you stop by the thread later?"}, False),
+    ("start with", POST, {"text": "Please start with option A."}, False),
+    ("apply by Friday", POST, {"text": "You must apply by Friday."}, False),
+    ("press coverage", POST, {"text": "Press coverage: the merge button was added."}, False),
+    ("quoted request", POST, {"text": "The reviewer wrote \"please merge this\" on the PR."}, False),
+    ("blockquote", POST, {"text": "> Please re-run the job\nThat was the bot's comment; I re-ran it."}, False),
+    ("fenced code", POST, {"text": "The bot posted:\n```\nPlease merge #12\n```\nI merged it."}, False),
     ("why only, no tried", POST, {"text": "Please press merge on #6066. There is no other way past the classifier."}, True),
     ("tried only, no why", POST, {"text": "Please press merge on #6066. I tried the merge call twice."}, True),
     ("both parts", POST, {"text": "Please press merge on #6066." + EXPLAINED}, False),
@@ -112,14 +140,14 @@ def main() -> int:
         print("FAIL override: still denied")
 
     with tempfile.TemporaryDirectory() as tmp:
-        stop = {"hook_event_name": "Stop", "session_id": "test-handoff", "cwd": tmp,
+        stop = {"hook_event_name": "Stop", "session_id": "test-handoff-" + uuid.uuid4().hex, "cwd": tmp,
                 "last_assistant_message": "Please press merge on #6066."}
         out = run(stop)
         data = json.loads(out) if out.strip() else {}
         if data.get("decision") != "block" or "handoff-ask-needs-why" not in str(data.get("reason")):
             failures += 1
             print(f"FAIL stop hand-off: {out!r}")
-        clean = dict(stop, session_id="test-handoff-2",
+        clean = dict(stop, session_id="test-handoff-" + uuid.uuid4().hex,
                      last_assistant_message="Please press merge on #6066." + EXPLAINED)
         out = run(clean)
         if out.strip() and json.loads(out).get("decision") == "block":

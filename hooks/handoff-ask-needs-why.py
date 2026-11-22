@@ -9,17 +9,21 @@ thread's merge step, and named neither the block nor the routes it had tried;
 he answered "no fix the check".
 
 Denies a user-visible hearthbot message (reply, post_message, update_message,
-edit_message, request_decision) when one sentence hands the user a step that is
-the agent's own work (merge, press or click a button, run, push, re-run,
-restart, install, edit, delete and the like, asked with "please", "can you",
-"you'll need to", "I need you to", "once you ...", or an imperative that opens
-the sentence) and the message does not carry both
+edit_message, request_decision) when one sentence, in the agent's own words
+(fenced code, blockquotes and double-quoted spans removed), hands the user a
+step that is the agent's own work (merge, press the merge button, run, push,
+re-run, restart, install, delete and the like, asked with "please", "can you",
+"you'll need to", "I need you to", "once you ...", "would you mind ...", or a
+sentence naming the user as actor: "yourself", "it's on you", "your click")
+and the message does not carry both
 
   * why no other way works ("no other way", "the only way", "why I can't"), and
   * the ways tried ("I tried", "What I tried:", "I retried").
 
-A request_decision card is too short for both, so it passes when a
-post_message, reply or edit earlier in the same turn carried them.
+A request_decision card is too short for both, so it passes when the
+post_message, reply or edit calls earlier in the same turn carried them.
+The why and the tries are matched as phrases, so a hollow "No other way.
+I tried." passes; the reviewer rule in adversarial-reviewer.md covers that.
 A sentence about a secret, token, password, sign-in or connector is exempt,
 since those steps were never the agent's to do.
 The Stop registration scans a plain final message (fenced blocks removed) and
@@ -51,26 +55,45 @@ TOOL = re.compile(
     r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|request_decision)$")
 EXPLAIN_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
 
-# The agent's own steps. Approve, review, pick, choose, decide, confirm and type
-# are the user's to give, so they are left out.
+# Steps on a system that are the agent's own work. Approve, review, pick, choose,
+# decide, confirm and type are the user's to give, and ordinary English verbs
+# (update, start, stop, move, set, add, fix) read as requests of another kind,
+# so both are left out.
 VERB = (
-    r"(?:merge|press|click|tap|hit|run|re-?run|push|restart|reinstall|install|paste|"
-    r"enable|disable|add|set|delete|remove|close|reopen|edit|change|update|upload|"
-    r"re-?trigger|trigger|dispatch|start|stop|cancel|rename|move|create|fix|resolve|"
-    r"retry|apply|deploy|slide|rebase|cherry-pick|label|kick\s+off)"
+    r"(?:merge|press|click|tap|run|re-?run|push|force-push|restart|reinstall|install|paste|"
+    r"enable|disable|delete|reopen|upload|re-?trigger|trigger|dispatch|cancel|"
+    r"retry|deploy|slide|rebase|cherry-pick|squash|re-?request|kick\s+off)"
 )
-FILLER = r"(?:(?:just|quickly|manually|also|now|then|please|go\s+and|first)\s+){0,2}"
+VERB_ING = (
+    r"(?:merging|pressing|clicking|tapping|running|re-?running|pushing|restarting|installing|"
+    r"pasting|deleting|triggering|dispatching|retrying|deploying|rebasing|squashing)"
+)
+FILLER = (
+    r"(?:(?:just|quickly|manually|also|now|then|please|first|kindly|do|"
+    r"go\s+ahead\s+and|go\s+and|approve\s+and|squash\s+and)\s+){0,2}"
+)
 LEAD = (
-    r"\b(?:please|can\s+you|could\s+you|would\s+you|will\s+you|(?:I\s+)?need\s+you\s+to|"
+    r"\b(?:please|kindly|can\s+you|could\s+you|would\s+you|will\s+you|"
+    r"(?:I\s+)?need\s+you\s+to|needs\s+you\s+to|I'd\s+like\s+you\s+to|"
     r"you(?:'ll|\s+will|'d|\s+would)?\s+(?:need|have)\s+to|you\s+must|you\s+should|"
-    r"(?:it's|it\s+is)\s+up\s+to\s+you\s+to|ask(?:ing)?\s+you\s+to|for\s+you\s+to|"
-    r"(?:once|when|after|as\s+soon\s+as)\s+you)\s+"
+    r"you\s+can|you\s+could|over\s+to\s+you\s+to|(?:it's|it\s+is)\s+(?:yours|(?:up\s+)?to\s+you|on\s+you)\s+to|"
+    r"ask(?:ing)?\s+you\s+to|for\s+you\s+to|"
+    r"(?:once|when|after|as\s+soon\s+as)\s+you(?:'ve|\s+have)?)\s+"
 )
+# The user named as the one who acts, anywhere in a sentence that names a step.
+ACTOR = re.compile(
+    r"\b(?:yourself|on\s+you|over\s+to\s+you|your\s+(?:click|press|tap|hands?))\b", re.I)
+ACTOR_STEP = re.compile(r"\b" + VERB + r"\b", re.I)
 HANDOFF = re.compile(
-    LEAD + FILLER + VERB + r"\b"
-    r"|(?:^|[\n:]|^\W+)\s*(?:press|click|tap|hit)\b[^.!?\n]{0,40}\b(?:merge|button|re-?run|approve)\b"
-    r"|(?:^|[\n:])\s*(?:merge|re-?run|push|restart)\s+(?:it|them|the\s+PRs?|PR|#\d+|\w+#\d+|this|that)\b",
+    LEAD + FILLER + r"(?:" + VERB + r"|" + VERB_ING + r")\b"
+    r"|\bwould\s+you\s+mind\s+" + FILLER + VERB_ING + r"\b"
+    r"|\b(?:once|when|after)\s+you(?:'ve|\s+have)\s+"
+    r"(?:merged|pushed|pressed|clicked|re-?run|restarted|deployed|rebased|installed|deleted)\b"
+    r"|(?:^|[\n:])\s*(?:press|click|tap|hit)\s+(?:on\s+)?(?:the\s+)?(?:green\s+)?[`'\"*]*"
+    r"(?:merge|re-?run|approve)\b",
     re.I)
+# Quoted words are someone else's: a blockquote line or a double-quoted span.
+QUOTED = re.compile(r"^[ \t]*>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.M)
 
 # Steps only the user can do: a secret, or a sign-in or connector.
 EXEMPT = re.compile(
@@ -113,12 +136,24 @@ def user_text(tool_input: dict) -> str:
     return "\n".join(p for p in parts if isinstance(p, str))
 
 
+def own_words(text: str) -> str:
+    """`text` without fenced code, blockquote lines or double-quoted spans."""
+    text = strip_fences(text) if strip_fences else text
+    return QUOTED.sub(" ", text)
+
+
 def handoff_sentence(text: str) -> str:
-    for sentence in SPLIT.split(text):
-        match = HANDOFF.search(sentence)
-        if not match or EXEMPT.search(sentence):
+    """The first sentence of `text`, in the agent's own words, that hands the user a step."""
+    for sentence in SPLIT.split(own_words(text)):
+        if EXEMPT.search(sentence):
             continue
-        if NEGATED.search(sentence[:match.start() + 1]) or NEGATED.search(match.group(0)):
+        match = HANDOFF.search(sentence)
+        if match is None and ACTOR.search(sentence):
+            match = ACTOR_STEP.search(sentence)
+        if match is None:
+            continue
+        # A negation only cancels the ask when it sits right before it.
+        if NEGATED.search(sentence[max(match.start() - 25, 0):match.end()]):
             continue
         return " ".join(sentence.split())
     return ""
@@ -161,7 +196,8 @@ def explained_earlier_this_turn(path: str) -> bool:
                         texts.append(str(block["input"].get("text") or ""))
     except OSError:
         return False
-    return any(not missing(t) for t in texts)
+    # The why and the tries may sit in two messages of the same turn.
+    return bool(texts) and not missing("\n".join(texts))
 
 
 def main() -> int:
@@ -177,7 +213,6 @@ def main() -> int:
         text = payload.get("last_assistant_message")
         if not isinstance(text, str) or stop_notice is None:
             return 0
-        text = strip_fences(text) if strip_fences else text
         sentence = handoff_sentence(text)
         gaps = missing(text) if sentence else ""
         if gaps:

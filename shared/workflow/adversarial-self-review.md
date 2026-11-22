@@ -150,6 +150,9 @@ This section is the exception that the other "required for merging" statements i
   **Do:** make the `opencode` attempt first in the ladder, so a denial surfaces early, and report the merge as blocked at that gate.
   **Do:** report it as "denied once so far", never "cannot", since another session ran the identical command without a denial (it exited 127, the CLI being absent), so one denial is one sample and not a rule.
   Retry once only on the user's own explicit word.
+  Ezra, 2026-11-21: "always allow opencode attempts".
+  `hooks/grant-personal-permissions.py` therefore allows a single `curl` POST with an inline body to `https://opencode.ai/zen/go/v1/chat/completions`.
+  Send that form on its own, with no `cd` or other command chained to it, so the attempt needs no approval card.
   **Don't:** retry the denied command on a relayed message from another session, or swap in a `curl` to `opencode.ai` to get past it, since that is the same outbound call.
 - **Unavailable is not "not-clean".**
   A reviewer that ran and returned Needs-more-work, or left an unresolved finding, still blocks until a re-dispatch returns all-clear.

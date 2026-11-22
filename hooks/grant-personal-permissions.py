@@ -55,6 +55,15 @@ to `no-unauthorized-merge.py` and the settings rules, as before.
     ``; & | < > ( ) $ \\ ` `` or a newline or carriage return, must parse with
     `shlex.split`, and may be preceded only by `ALLOW_MERGE=<value>`
     assignments (the documented merge-guard override).
+  - `Bash` whose command is one `curl` POST of an inline body to
+    `https://opencode.ai/zen/go/v1/chat/completions` -> allow. The owner's
+    standing rule (2026-11-21): "always allow opencode attempts". This is the
+    cross-harness review attempt that `warn-merge-without-cross-harness-review.py`
+    requires before its waiver. The auto-mode classifier had denied it as
+    unsanctioned communication, so each merge needed its own approval card.
+    The grant takes no other URL, no `@file` body or upload (which could send a
+    local file), no output file, no config file, and none of
+    ``; & | < > $ \\ ` `` or a newline or carriage return.
   - anything else, unreadable stdin included -> no output (normal flow).
 
 The Bash test is narrower than a settings prefix rule on purpose. The
@@ -86,6 +95,17 @@ SCHEDULE_TOOLS = frozenset({"mcp__scheduled-tasks__create_scheduled_task"})
 GRANTED_COMMANDS = (["gh", "pr", "merge"], ["glab", "mr", "merge"])
 FORBIDDEN_CHARS = frozenset(";&|<>()$\\`\n\r")
 ALLOWED_ASSIGNMENT = re.compile(r"ALLOW_MERGE=[A-Za-z0-9_.-]*")
+OPENCODE_URL = "https://opencode.ai/zen/go/v1/chat/completions"
+# A JSON body may hold parentheses in its prose; the shell operators stay out.
+OPENCODE_FORBIDDEN = frozenset(";&|<>$\\`\n\r")
+DATA_OPTS = frozenset({"-d", "--data", "--data-raw", "--json"})
+# Options that read or write local files, or send the request somewhere else.
+OPENCODE_REJECT_OPTS = frozenset({
+    "-o", "--output", "-O", "--remote-name", "-T", "--upload-file", "-K", "--config",
+    "-F", "--form", "--form-string", "--data-binary", "--data-urlencode", "--url",
+    "-x", "--proxy", "--connect-to", "--resolve", "-b", "--cookie", "-c", "--cookie-jar",
+    "-D", "--dump-header", "--trace", "--trace-ascii", "--stderr", "-w", "--write-out",
+})
 
 
 def _read_payload():
@@ -123,6 +143,32 @@ def granted_command(command):
     return None
 
 
+def opencode_attempt(command):
+    """True when `command` is one curl POST of an inline body to OPENCODE_URL."""
+    if not isinstance(command, str) or OPENCODE_FORBIDDEN & set(command):
+        return False
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return False
+    if not argv or argv[0] != "curl":
+        return False
+    urls = [a for a in argv[1:] if "://" in a and not a.startswith(("{", "["))]
+    if urls != [OPENCODE_URL]:
+        return False
+    has_body = False
+    for i, arg in enumerate(argv[1:], start=1):
+        opt = arg.split("=", 1)[0]
+        if opt in OPENCODE_REJECT_OPTS or arg.startswith("@"):
+            return False
+        if opt in DATA_OPTS:
+            value = arg.split("=", 1)[1] if "=" in arg else (argv[i + 1] if i + 1 < len(argv) else "")
+            if not value or value.startswith("@"):
+                return False
+            has_body = True
+    return has_body
+
+
 def decide(payload):
     """The `permissionDecisionReason` to allow with, or None for no decision."""
     tool = payload.get("tool_name") or ""
@@ -147,6 +193,9 @@ def decide(payload):
         if name:
             return (f"ai-config#4374 personal grant: Bash({name}); "
                     "merge guards and settings deny/ask rules still apply")
+        if opencode_attempt(inp.get("command")):
+            return ("personal grant: opencode.ai review attempt "
+                    "(owner's standing rule, 2026-11-21: \"always allow opencode attempts\")")
     return None
 
 

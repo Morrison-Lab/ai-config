@@ -305,6 +305,8 @@ Read a request for everything it plainly asks, do every safe step it covers, and
 - **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean (Ezra, 2026-11-21: "infra has permanent mwc in all repos");
   never ask about one, on a card or otherwise.
   Handle it yourself through the merge, and never ask the user about it (Ezra, 2026-11-20).
+  Hyperlink-only and id-only changes count as infrastructure, even in content files (Ezra, 2026-11-21);
+  the test is in [`strict-merge-policy`](shared/workflow/strict-merge-policy.md#infrastructure-prs-standing-mwc-grant).
 - **Slide an infra repo's floating tag yourself** once [`slide-tag`](skills/slide-tag/SKILL.md)'s gates pass;
   never ask first or leave it to another thread (Ezra, 2026-11-20).
 

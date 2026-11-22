@@ -87,9 +87,18 @@ Because it is scoped to the target, a merge run from an ai-config checkout into 
 In any other repo, where `hooks/no-unauthorized-merge.py` is active, clear it with `ALLOW_MERGE=1` on that one merge command, and state in the reply why the PR qualified.
 Do not enable session-wide `/mwc` for it.
 
+Hyperlink changes and id changes count as infrastructure too, in any repo and in content files (Ezra, 2026-11-21).
+A hyperlink change adds, fixes, repoints or removes a link while the words a reader sees stay the same.
+An id change adds, renames or deduplicates an anchor or cross-reference id (`{#def-...}`, `{#sec-...}`, `{#eq-...}`),
+together with the references that follow it.
+A PR qualifies only when every changed line is one of these or other infrastructure;
+a changed word of prose, math, code or a caption makes it content.
+
 - **Classify before asking.**
   Before telling the user a PR waits on `mwc`, list its changed paths.
   If every path matches `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py` (`.github/`, `.claude/`, `CLAUDE.md`/`AGENTS.md`, lint, spell and link-check configuration) or the repo is gha, macros or ai-config, report it as merging under the infra grant, not as waiting on the user (Ezra, 2026-11-07, about lds#2009: "it's infra and shouldn't need my word").
+  A PR in a content file whose every changed line is a hyperlink or id change, as defined above, is infra too;
+  the path list and the hooks cannot see that, so read the diff to classify it.
   `hooks/no-mwc-ask-for-infra-pr.py` denies a reply that asks otherwise (ai-config#5097), including a reply that asks the user to type a merge line such as `merge gha 2152 <sha>` for one (ai-config#6021).
   It also denies a decision card or a coordinator relay that asks to merge infra PRs, such as "Merge the six caller PRs?",
   because Ezra answered that card with "infra has permanent mwc in all repos" (2026-11-21, ai-config#6054).
@@ -102,6 +111,8 @@ Do not enable session-wide `/mwc` for it.
   In a project with no runner thread, the thread that owns the infra PR merges it itself once it is fully clean, and never asks (Ezra, 2026-11-20: "always handle infra PRs yourself;
   never ask me").
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
+- **Don't:** treat a link-only or id-only PR as content because its files are chapters,
+  or treat a PR as link-only when it also rewords the link text.
 - **Do:** after an infra PR merges, slide the repo's floating tag (gha's `v3`) yourself once [`slide-tag`](../../skills/slide-tag/SKILL.md)'s gates pass, whichever thread you are.
   Never ask the user first, and never leave the slide to a runner thread or the coordinator (Ezra, 2026-11-20: "never ask me before sliding an infra tag;
   always just do it").

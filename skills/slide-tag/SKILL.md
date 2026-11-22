@@ -28,6 +28,10 @@ Whichever agent finishes an infra PR, by merging it or by hearing that it merged
 That agent does not hand the slide to a runner thread, the coordinator or the user, and does not wait for a typed "slide v3".
 A gate that fails is a hold, not a question: say which gate failed, fix or wait on it, and slide when it clears.
 Two agents sliding at once are safe, because gha's `slide-major-tag.yml` takes `expected_sha` and refuses a commit nobody checked.
+The workflow tags main's head, so it also refuses when main moved past `expected_sha` before it ran.
+That refusal is a hold too.
+Wait for CI on the new main head to finish, then dispatch again with that head as `expected_sha`
+(gha#2181, 2026-11-22: main gained gha#2185 and gha#2184 while CI ran on the first merge commit).
 `hooks/no-ask-to-slide-tag.py` denies a message that asks leave to slide a tag or hands the slide to someone else.
 
 - **Do:** dispatch the slide yourself after the gates pass, then report the old SHA, the new SHA and the PRs the tag now carries.

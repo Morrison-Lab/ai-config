@@ -603,6 +603,12 @@ So are the other `tools/` files: figure, data and content generators, and build 
 `scripts/merge-infra-pr` reads this same list from a fresh clone of ai-config's `main`, adding only `changelog.d/`.
 A change to the list therefore takes effect for the wrapper once it merges, not on its own PR.
 
+The path list cannot see a hyperlink-only or id-only PR, which counts as infrastructure under
+[`strict-merge-policy`](../../shared/workflow/strict-merge-policy.md#infrastructure-prs-standing-mwc-grant) (Ezra, 2026-11-21)
+although its files are content.
+Read the diff, confirm that every changed line only adds, fixes, repoints or removes a link, or adds, renames or deduplicates an id,
+and clear the guard with `ALLOW_MERGE=1` on that one pinned merge command, as that section says.
+
 The grant is decided by what the PR changes,
 so the guard reads the PR's file list from GitHub (`gh api .../pulls/N/files`,
 or direct REST via `urllib` when `gh` is not on `PATH`).

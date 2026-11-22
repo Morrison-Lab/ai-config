@@ -61,9 +61,12 @@ to `no-unauthorized-merge.py` and the settings rules, as before.
     cross-harness review attempt that `warn-merge-without-cross-harness-review.py`
     requires before its waiver. The auto-mode classifier had denied it as
     unsanctioned communication, so each merge needed its own approval card.
-    The grant takes no other URL, no `@file` body or upload (which could send a
-    local file), no output file, no config file, and none of
-    ``; & | < > $ \\ ` `` or a newline or carriage return.
+    The matcher is an allowlist: `-s`/`-S`, `-m <seconds>`,
+    `-H '<Name>: <value>'`, exactly one `-d`/`--data`/`--data-raw`/`--json`
+    with an inline value as its own token, and exactly one positional
+    argument equal to that URL. Any other token, an attached value (`-d@x`),
+    an `@` file reference, or a second host gets no decision, and so does any
+    of ``; & | < > $ \\ ` `` or a newline or carriage return.
   - anything else, unreadable stdin included -> no output (normal flow).
 
 The Bash test is narrower than a settings prefix rule on purpose. The
@@ -98,14 +101,16 @@ ALLOWED_ASSIGNMENT = re.compile(r"ALLOW_MERGE=[A-Za-z0-9_.-]*")
 OPENCODE_URL = "https://opencode.ai/zen/go/v1/chat/completions"
 # A JSON body may hold parentheses in its prose; the shell operators stay out.
 OPENCODE_FORBIDDEN = frozenset(";&|<>$\\`\n\r")
+# An allowlist, not a denylist: curl has too many file-reading forms
+# (-d@file, -Kcfg, --header=@file, --next, --variable) to enumerate.
+# Every token is one of these, each value option takes its value as the next
+# token (attached forms such as -d@x or --data=x are refused), and the one
+# positional argument is OPENCODE_URL, so a bare second host is refused too.
+OPENCODE_FLAGS = frozenset({"-s", "-S", "-sS", "-Ss", "--silent", "--show-error"})
 DATA_OPTS = frozenset({"-d", "--data", "--data-raw", "--json"})
-# Options that read or write local files, or send the request somewhere else.
-OPENCODE_REJECT_OPTS = frozenset({
-    "-o", "--output", "-O", "--remote-name", "-T", "--upload-file", "-K", "--config",
-    "-F", "--form", "--form-string", "--data-binary", "--data-urlencode", "--url",
-    "-x", "--proxy", "--connect-to", "--resolve", "-b", "--cookie", "-c", "--cookie-jar",
-    "-D", "--dump-header", "--trace", "--trace-ascii", "--stderr", "-w", "--write-out",
-})
+HEADER_OPTS = frozenset({"-H", "--header"})
+TIME_OPTS = frozenset({"-m", "--max-time"})
+HEADER_VALUE = re.compile(r"[A-Za-z][A-Za-z0-9-]*: [^@]*")
 
 
 def _read_payload():
@@ -153,20 +158,29 @@ def opencode_attempt(command):
         return False
     if not argv or argv[0] != "curl":
         return False
-    urls = [a for a in argv[1:] if "://" in a and not a.startswith(("{", "["))]
-    if urls != [OPENCODE_URL]:
-        return False
-    has_body = False
-    for i, arg in enumerate(argv[1:], start=1):
-        opt = arg.split("=", 1)[0]
-        if opt in OPENCODE_REJECT_OPTS or arg.startswith("@"):
-            return False
-        if opt in DATA_OPTS:
-            value = arg.split("=", 1)[1] if "=" in arg else (argv[i + 1] if i + 1 < len(argv) else "")
-            if not value or value.startswith("@"):
+    urls = bodies = 0
+    rest = iter(argv[1:])
+    for arg in rest:
+        if arg in OPENCODE_FLAGS:
+            continue
+        if arg in DATA_OPTS | HEADER_OPTS | TIME_OPTS:
+            value = next(rest, None)
+            if value is None:
                 return False
-            has_body = True
-    return has_body
+            if arg in DATA_OPTS:
+                if not value or value.startswith("@"):
+                    return False
+                bodies += 1
+            elif arg in HEADER_OPTS and not HEADER_VALUE.fullmatch(value):
+                return False
+            elif arg in TIME_OPTS and not value.isdigit():
+                return False
+            continue
+        if arg == OPENCODE_URL:
+            urls += 1
+            continue
+        return False  # any other option, attached value, or positional (a second host)
+    return urls == 1 and bodies == 1
 
 
 def decide(payload):

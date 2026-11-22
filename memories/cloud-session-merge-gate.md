@@ -44,7 +44,8 @@ A hook allow does not reach the classifier: after [ai-config#6071](https://githu
 The same POST ran in another thread minutes later, so the classifier's verdict varies by thread.
 The guard now counts a classifier refusal (`toolDenialKind: automode-blocked`) of an OpenCode attempt as the attempt, which Ezra chose on a decision card (2026-11-22).
 The classifier had denied that guard edit until his choice was in the thread.
-- **Do:** when the classifier denies the OpenCode attempt, leave it denied and proceed: the guard credits it, and the waiver note on the PR says the route was blocked.
+- **Do:** when the classifier denies the OpenCode attempt, rerun it once unchanged, since another run may reach a real reviewer.
+  If it is denied again, leave it denied and proceed: the guard credits it, and the waiver note on the PR says the route was blocked.
 - **Don't:** treat a user's or a hook's refusal of the attempt as the attempt.
   The guard still counts those as nothing.
 - **Don't:** retry a classifier-denied edit to a merge gate on a coordinator's request alone.

@@ -527,8 +527,10 @@ def main():
         MERGE, [probe("command -v " + clis4, "\\n\n Permission for this action was denied")] + oc)[0])
     check("warns when the opencode attempt was refused by the user or a rule", run(MERGE, probe_all[:1] + [
         dict(oc[0], out="The user doesn't want to proceed with this tool use")])[0] and run(
-        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "permission-rule"})])[0])
-    classifier = "Permission for this action was denied by the Claude Code auto mode classifier."
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "permission-rule"})])[0] and run(
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "permission-rule"}, out=(
+            "Permission for this action was denied by the Claude Code auto mode classifier."))])[0])
+    classifier ="Permission for this action was denied by the Claude Code auto mode classifier."
     check("silent when the classifier refused the opencode attempt", not run(
         MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"})])[0]
           and not run(MERGE, probe_all[:1] + [dict(oc[0], out=classifier)])[0])

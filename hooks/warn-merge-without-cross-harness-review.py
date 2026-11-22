@@ -36,14 +36,6 @@ before the gap was noticed.
              unredirected `command -v` / `which` that exited 1; `opencode` attempted,
              or its attempt refused by the auto-mode classifier.
 
-A classifier refusal (`toolDenialKind: automode-blocked`) of an `opencode`
-attempt counts as that attempt: the route cannot run from this session, which
-is the waiver's "host blocked" case. Cloud threads hit it after ai-config#6071,
-whose hook allow does not reach the classifier, and every content merge was
-refused (lds#3089, 2026-11-22). Ezra chose this fix on a decision card,
-2026-11-22. A user's or a hook's refusal still counts as nothing, since either
-can be answered by running the call.
-
     AND NOT  the user typed an `mwr` or `mwrs` grant covering the PR, and
              the transcript holds the checker's `--mwr` MERGE-READY line for
              the merge's pinned head (`mwr_cleared`; ai-config#3946: Ezra,
@@ -54,6 +46,15 @@ runs nothing. Its reviewer CLI call, which is a Bash call, is what counts.
 On a cloud session where `opencode` CLI is unavailable, a `curl` invocation
 targeting `https://opencode.ai/zen/go/v1/chat/completions` counts toward
 `opencode` as an explicit policy grant.
+
+A classifier refusal of an `opencode` attempt counts as that attempt: the
+record says `toolDenialKind: automode-blocked`, or, with no `toolDenialKind`,
+the result opens with the classifier's refusal text. The route cannot run
+from this session, which is the waiver's "host blocked" case. Cloud threads
+hit it after ai-config#6071, whose hook allow does not reach the classifier,
+and every content merge was refused (lds#3089, 2026-11-22). Ezra chose this
+fix on a decision card, 2026-11-22. A user's or a hook's refusal still counts
+as nothing, since either can be answered by running the call.
 
 Merge recognition reuses `_gh_merge` and push recognition reuses `_events`,
 `_push_before_merge` and `MCP_PUSH_TOOLS` from
@@ -230,7 +231,7 @@ NOTE = (
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
     "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone, unredirected (exit 1); "
-    "opencode needs an attempt (its CLI or the OpenCode Go curl; a refusal by the auto-mode classifier counts).An Ollama Cloud chat curl is no attempt: it is itself a qualifying review. Then the "
+    "opencode needs an attempt (its CLI or the OpenCode Go curl; a refusal by the auto-mode classifier counts). An Ollama Cloud chat curl is no attempt: it is itself a qualifying review. Then the "
     "gate is waived and this hook lets the merge through "
     "(Ezra, 2026-10-16; adversarial-self-review.md "
     "'Waiver when no cross-model reviewer can run'). The waiver grants no "
@@ -525,8 +526,10 @@ def _route_calls(sib, command, clis):
 
 def _classifier_blocked(rec, text):
     """True when the auto-mode classifier, not a user, hook or rule, refused the call."""
-    return (rec.get("toolDenialKind") == "automode-blocked"
-            or bool(RX_CLASSIFIER_DENIAL.match(text or "")))
+    kind = rec.get("toolDenialKind")
+    if kind:
+        return kind == "automode-blocked"
+    return bool(RX_CLASSIFIER_DENIAL.match(text or ""))
 
 
 def all_routes_probed(clis, cleared, last_push):

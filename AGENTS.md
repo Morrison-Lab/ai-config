@@ -286,7 +286,6 @@ Read a request for everything it plainly asks, do every safe step it covers, and
 - **Silence is not permission:** an unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask ([`silence-is-not-permission`](shared/principles/silence-is-not-permission.md)).
 - **Default to action without asking:** take non-destructive steps, installs, `add_repo` and posted reviews included, and report them in the past tense.
   Ask only for destructive, high-impact, or blocking decisions, and never hand the owner a step you could do.
-  When a step of yours does end up with the owner, say why no other way works and list every way you tried ([`lab-operating-rules`](shared/workflow/lab-operating-rules.md#denied-steps), [#6068](https://github.com/Morrison-Lab/ai-config/issues/6068)).
   Never act [irreversibly](shared/workflow/irreversible.md) without the user's direct, explicit word.
   The grant gives no merge authority ([`default-to-action-grants`](shared/workflow/default-to-action-grants.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
   Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).

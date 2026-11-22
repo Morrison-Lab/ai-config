@@ -168,6 +168,7 @@ def missing(text: str) -> str:
     return " or ".join(gaps)
 
 
+# transcript-shapes-skip: antigravity -- only a Claude Code request_decision call reads the transcript, and Antigravity has no hearthbot tools.
 def explained_earlier_this_turn(path: str) -> bool:
     """True when a reply tool call since the person's last turn carried both parts."""
     if not path or is_real_user_turn is None:

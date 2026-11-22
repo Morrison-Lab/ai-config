@@ -1,0 +1,71 @@
+# Content rules for lecture notes
+
+Rules from Ezra, starting 2026-10-16.
+Each has a canonical prose rule in [`psw`](https://github.com/Morrison-Lab/psw/), possibly still in review.
+This fragment only points agents to it.
+
+## State the estimand
+
+- **Do:** name what is being estimated or predicted.
+  A prediction's estimand is the new observation's outcome, not its mean.
+- **Don't:** leave the target implicit or swap the mean for the outcome.
+
+Canonical rule: [psw#219](https://github.com/Morrison-Lab/psw/pull/219).
+Tracked in [ai-config#4556](https://github.com/Morrison-Lab/ai-config/issues/4556).
+
+## Link prerequisite definitions
+
+- **Do:** link a prerequisite definition from its home site: math in mds, probability in pds, statistics in sds.
+- **Don't:** restate a definition the prerequisite course already gives.
+
+Canonical rule: [psw#214](https://github.com/Morrison-Lab/psw/pull/214).
+Tracked in [ai-config#4563](https://github.com/Morrison-Lab/ai-config/issues/4563).
+
+## Talk about the ideas, not the notes
+
+- **Do:** write about the concepts themselves.
+- **Don't:** refer to "the notes" or "this document" as the subject of a sentence.
+
+Canonical rule: [psw#216](https://github.com/Morrison-Lab/psw/pull/216).
+Tracked in [ai-config#4564](https://github.com/Morrison-Lab/ai-config/issues/4564).
+
+## Qualify "mean" and "average" as population or sample
+
+- **Do:** write "population mean" or "sample mean" (likewise "average"),
+  and pMSE vs sMSE, pRMSE vs sRMSE, pMAE vs sMAE.
+- **Don't:** write a bare "mean", "average", MSE, RMSE or MAE,
+  unless it is completely clear from context.
+
+Canonical rule: [psw#235](https://github.com/Morrison-Lab/psw/pull/235).
+Tracked in [ai-config#4584](https://github.com/Morrison-Lab/ai-config/issues/4584).
+
+## Include graphical methods in exploratory data analysis
+
+- **Do:** pair the numerical summaries of an exploratory data analysis exercise or lab with plots:
+  a histogram or boxplot for a distribution, a scatterplot or time plot for a trend or relationship.
+- **Don't:** limit an exploratory data analysis to counts, means and correlations.
+
+Ezra, 2026-11-04, on the logistic regression lab in lds.
+No check for it exists yet, so this is a prose rule for now.
+Canonical rule: [psw#478](https://github.com/Morrison-Lab/psw/pull/478).
+Tracked in [ai-config#4938](https://github.com/Morrison-Lab/ai-config/issues/4938).
+
+## Keep expository content out of labs
+
+- **Do:** put every definition, theorem, lemma, proposition, corollary, remark,
+  and explanation of a concept on the exposition page for its topic,
+  and link to it from the lab step that uses it.
+  When a lab needs a concept no exposition page covers,
+  add it to an exposition page first.
+- **Don't:** introduce a definition, a result, or an explanation in a lab page,
+  or in a subfile a lab page includes.
+
+Ezra, 2026-11-19, on psw:
+labs should not introduce new expository content, such as definitions or theoretical results,
+and all expository content belongs on the exposition pages.
+In lds a lab page is `chapters/*-lab.qmd` or `chapters/linear-regression-auto.qmd`.
+The gha check `check-lab-exposition`, proposed in [gha#2136](https://github.com/Morrison-Lab/gha/pull/2136),
+fails a PR that adds a definition, result, or remark div to a lab page in a repository that runs it.
+Until a repository runs it, a reviewer enforces the whole rule there.
+A reviewer always enforces the rest, since no check can tell an explanation from an instruction.
+Canonical rule: [psw#677](https://github.com/Morrison-Lab/psw/pull/677).

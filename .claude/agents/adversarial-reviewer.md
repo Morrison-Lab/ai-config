@@ -501,3 +501,10 @@ On a transcript or report where an infra PR merged in a repo with a floating tag
 Report a message that asked the user's leave to slide, or left the slide to a runner thread or the coordinator.
 `hooks/no-ask-to-slide-tag.py` catches the common wordings; report the ones it missed.
 See [`slide-tag`](../../skills/slide-tag/SKILL.md#never-ask-before-sliding-an-infra-tag) ([ai-config#6052](https://github.com/Morrison-Lab/ai-config/issues/6052)).
+
+## Hand-off asks without the why and the tries
+
+On a transcript or report where the agent asked the user to do one of the agent's own steps (merge, press a button, run, push, re-run), check that the same message said why no other way works and listed every way the agent tried, each with its result.
+Report an ask that lacks either, and an ask made before the other routes were tried (a single retry, another tool or API, a fresh session, fixing the blocking check).
+`hooks/handoff-ask-needs-why.py` catches the common wordings; report the ones it missed.
+See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#denied-steps) ([ai-config#6068](https://github.com/Morrison-Lab/ai-config/issues/6068)).

@@ -119,6 +119,12 @@ The rest are prose because no condition in the transcript can decide them.
   other sessions follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
   Device consent cards are a security boundary, so use environments already approved.
   Not hookable: a denial is not visible to a hook after the fact.
+- When you ask Ezra to do a step that was yours to do, such as pressing merge after a classifier blocked yours, the ask says why no other way works and lists every way you tried, each with its result
+  (Ezra, 2026-11-21: "when you ask me to do something you were supposed to do yourself, you must tell me why no other way would work", then "and tell me all the ways you tried").
+  Try the other routes first: retry the denied step once unchanged, use another tool or API, start a fresh session, or fix the check that blocked you.
+  A decision card is too short for both, so post them in a message in the same turn.
+  This holds for a thread and for the coordinator.
+  Enforced by `hooks/handoff-ask-needs-why.py` ([ai-config#6068](https://github.com/Morrison-Lab/ai-config/issues/6068)).
 
 ## Questions and decisions
 

@@ -2050,6 +2050,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/handoff-ask-needs-why.py\"'",
+            "timeout": 10,
+            "script": "handoff-ask-needs-why.py",
+            "why": "ai-config#6068. Ezra, 2026-11-21: \"when you ask me to do something you were supposed to do yourself, you must tell me why no other way would work\", then \"and tell me all the ways you tried\". The coordinator had asked him to press merge on ai-config#6066 after a classifier blocked a thread's merge, naming neither the block nor the routes tried. Blocks (deny) a user-visible hearthbot reply or decision card whose sentence hands the user one of the agent's own steps (merge, press a button, run, push, re-run, restart, edit and the like) unless the message says why no other way works and every way tried. A card passes when a message earlier in the same turn carried both. Secret, sign-in and connector asks are exempt. ALLOW_HANDOFF_WITHOUT_WHY=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-leftover-cleanup-ask.py\"'",
             "timeout": 10,
             "script": "no-leftover-cleanup-ask.py",
@@ -2506,6 +2513,13 @@
               "_comment and README): the plugin loads it on enable, and",
               "install-hooks.py --fix registers it for a non-plugin install."
             ]
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/handoff-ask-needs-why.py\"'",
+            "timeout": 10,
+            "script": "handoff-ask-needs-why.py",
+            "why": "ai-config#6068. The Stop half of handoff-ask-needs-why: a plain final message is no tool call, so the PreToolUse registration never sees it. Scans the final assistant message (fenced blocks removed) for the same hand-off asks and blocks the stop once per turn through stop_notice when the message does not say why no other way works and every way tried."
           },
           {
             "type": "command",

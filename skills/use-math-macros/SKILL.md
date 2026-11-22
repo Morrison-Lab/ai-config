@@ -430,6 +430,24 @@ a repo whose `latex-macros` pin predates that PR gets the pin bumped in the PR t
 (Directive from the user, 2026-10-09: "let's use a semantic macro rather than a bare `e`. even `y` should be a macro for outcome variable, and `x` should be a macro for predictor variable(s)".
 Macros: [`Morrison-Lab/macros#117`](https://github.com/Morrison-Lab/macros/pull/117); sweep: [`Morrison-Lab/ai-config#4440`](https://github.com/Morrison-Lab/ai-config/issues/4440).)
 
+### Every model parameter prints a Greek letter
+
+A quantity that a model fits (a coefficient, a weight, an intercept term, a variance) is a parameter, and its macro prints a Greek letter.
+Data, indices and counts keep Latin letters (`\outvar`, `\predvar`, `\nobs`).
+So a neural network's weights are `\nnwt`, `\vnnwt` and `\mnnwt` (ω, Ω), and a unit's intercept term is `\nnint` (ω₀), not `w` and `b` ([Morrison-Lab/macros#442](https://github.com/Morrison-Lab/macros/pull/442)).
+As of 2026-11-22 that PR is unmerged: use these macros anyway, and stack the content PR on it, bumping the pin when it lands (step 6).
+When a field writes a parameter with a Latin letter, add a role macro that prints a Greek letter to `Morrison-Lab/macros` (step 6), and record the field's own letters in `notation-choices.qmd`.
+Call the constant term of a neural network unit its intercept term, never its bias: the bias of an estimator is a different idea, and the notes use both.
+Mention once, where the term is introduced, that neural network texts call it the bias.
+
+- **Do:** write a unit as `\sigmoid(\nnint + \dprod{\vnnwt}{\vx})` and call `\nnint` its intercept term.
+- **Don't:** write `\sigmoid(b + \dprod{\vw}{\vx})` or call `b` the bias.
+
+No check enforces either half, so both are prose.
+Whether a letter is a parameter depends on its role in the model, which no pattern over the source can tell.
+The word "bias" is right for an estimator, and a neural network page discusses estimator bias too, so no pattern can tell a misnamed intercept term from a correct use.
+(Directive from Ezra, 2026-11-21 23:57 PST: "all parameters should be greek", and 23:58 PST: "don't call it bias".)
+
 ### Write a named quantity by its macro, not its definition
 
 Once a quantity has a name and a macro, write the macro rather than re-expanding the expression that defines it.

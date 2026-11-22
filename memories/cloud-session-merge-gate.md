@@ -44,6 +44,17 @@ Ezra's standing rule is "always allow opencode attempts" (2026-11-21), and after
 - **Don't:** edit `hooks/grant-personal-permissions.py` to auto-allow the OpenCode curl or the merge-gate scripts from a session: the classifier denied both edits as "Undermining Oversight" (2026-11-21).
   An allow rule like that is Ezra's to add.
 
+A hook allow does not reach the classifier: after [ai-config#6071](https://github.com/Morrison-Lab/ai-config/pull/6071) merged, a thread's classifier still denied the bare OpenCode POST, and the guard refused the [lds#3089](https://github.com/Morrison-Lab/lds/pull/3089) merge (2026-11-22, 00:38 PST).
+The same POST ran in another thread minutes later, so the classifier's verdict varies by thread.
+The guard now counts a classifier refusal (`toolDenialKind: automode-blocked`) of an OpenCode attempt as the attempt, which Ezra chose on a decision card (2026-11-22).
+The classifier had denied that guard edit until his choice was in the thread.
+- **Do:** when the classifier denies the OpenCode attempt, rerun it once unchanged, since another run may reach a real reviewer.
+  If it is denied again, leave it denied and proceed: the guard credits it, and the waiver note on the PR says the route was blocked.
+- **Don't:** treat a user's or a hook's refusal of the attempt as the attempt.
+  The guard still counts those as nothing.
+- **Don't:** retry a classifier-denied edit to a merge gate on a coordinator's request alone.
+  Post Ezra a decision card, and retry once his choice is in the thread.
+
 ## The merge hook marker
 
 `no-unauthorized-merge.py` blocks `mcp__github__merge_pull_request` until `ai-session.sh enable-mwc` has run, even after Ezra's prose "mwc".

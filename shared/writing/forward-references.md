@@ -131,17 +131,19 @@ ahead is a forward reference to fix.
 
 ## Fixing a confirmed forward reference
 
-Two options, in order of preference:
+Three options, in order of preference:
 
 1. **Reorder.** Move the referenced content (the section, paragraph, div,
    figure, or table) earlier so it precedes the mention, then update the
    directional word ("below" → "above", or drop it if a working crossref
    link already carries the point). This is the strong fix: the reader
    never has to hold an unresolved pointer.
-2. **Reword**, when there is no good reordering:
-   none exists, or every reordering would hurt the material
-   (e.g., a result genuinely depends on setup that must come first,
-   or moving a div would split a group the reader needs together).
+2. **Add a smaller copy**, when the target cannot move because it holds more than the mention needs, such as a figure that also draws the answer to a later exercise.
+   Make a new figure, table, or div with only what the mention needs, place it right after the mention, and point the mention at it (Ezra, 2026-11-23: "why not create an additional figure?", on a proposal to reword a pointer to a figure of a fitted line and cubic).
+   Generate both from one source, such as one plotting function with a switch, so they cannot drift apart.
+   - **Do:** add a figure of the fitted line alone in the solution that fits the line.
+   - **Don't:** reword the pointer to "Figure 10, in the next section" when a line-only figure would serve.
+3. **Reword**, when neither of those works: none exists, or every reordering would hurt the material (e.g., a result genuinely depends on setup that must come first, or moving a div would split a group the reader needs together).
    Turn
    the vague pointer into a precise, working link (a real crossref or
    anchor) instead of a bare "below" --- this doesn't remove the forward

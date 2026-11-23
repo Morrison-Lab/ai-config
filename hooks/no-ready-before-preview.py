@@ -86,7 +86,7 @@ NO_PREVIEW_RX = re.compile(
     r"|\b(doesn'?t|does not|don'?t|do not) (have|publish|build|deploy) (a |any )?(PR )?previews?\b",
     re.I,
 )
-QUOTED_RX = re.compile(r'"[^"\n]*"|“[^”\n]*”|^[ \t]*>.*$', re.M)
+QUOTED_RX = re.compile(r'"[^"\n]*"|\u201c[^\u201d\n]*\u201d|^[ \t]*>.*$', re.M)
 
 PREVIEW_URL_RX = re.compile(r"\bpr-?previews?/pr-?(\d+)\b|\bpreviews?/pr-?(\d+)\b", re.I)
 PUSH_CMD_RX = re.compile(r"\bgit\b[^|;&\n]*\bpush\b")

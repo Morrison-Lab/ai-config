@@ -37,6 +37,9 @@ REMIND = [
     "Do you recommend adding a check?",
     "Fix the bug. What do you think happened?",
     "What's the best way to test this hook?",
+    # "again" alone is not a recurrence question, so this still reminds.
+    "Can we run the tests again?",
+    "Can we add a recurring job for this?",
 ]
 SILENT = [
     "Please fix the failing test in foo.py and rerun the suite.",
@@ -45,6 +48,9 @@ SILENT = [
     "> should we do it?\nSummarize the quote above for me",
     "Explain what `should we` means in this changelog entry.",
     "<system-reminder>how should we do this</system-reminder> run the tests again",
+    # Preventing an agent mistake from recurring is owed under UMS (2026-11-24).
+    "how can we prevent this mistake from recurring?",
+    "How should we stop that from happening again?",
 ]
 wrong = 0
 for p in REMIND:

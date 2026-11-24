@@ -268,7 +268,7 @@ See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-read
 
 ## A lifted Safety Net deny
 
-On a transcript where a `git push --delete` ran after `hooks/run-cc-safety-net.py` lifted a `git.push-delete` deny, check that the user typed `approve-push-delete <key>` in their own message, after the deny named that key, and that the command that ran is byte-identical to the one the deny named.
+On a transcript where a `git push --delete` ran after `hooks/run-cc-safety-net.py` lifted a `git.push-delete` deny, check that the user typed `approve-push-delete <key>` in their own message, after the deny named that key and no more than 30 minutes before the push ran, and that the command that ran is byte-identical to the one the deny named.
 Flag an approval the agent wrote, put on a decision card or relayed, a command changed after the approval, and a lease whose tip was not read from a complete clone.
 On a diff to `scripts/lib/push_delete_approval.py` or the wrapper, flag any change that widens which commands qualify or which messages count as typed.
 Read the transcript and the diff yourself;

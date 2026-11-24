@@ -153,6 +153,12 @@ The Claude review dispatches only on a comment whose first text is `/review` (ma
 Put the explanation after it.
 After pushing, confirm a "Claude Review Dispatched" comment names the new head SHA before waiting.
 
+From a project cloud thread on 2026-11-23 (macros#444), the classifier denied both routes to that review:
+the `/review` comment ("Destructive or Unwanted Actions") and `actions_run_trigger` `run_workflow` of `claude-code-review.yml` with `pr_number` ("Undermining Oversight").
+A later `/review` comment that opened with the annotation dispositions dispatched the review and the PR merged.
+- **Do:** after one denial of each route, give Ezra the `/review` line in a fenced block, with both denials listed, and keep the PR watched.
+- **Don't:** reshape the trigger again (an `@claude` mention, a review body), which only rephrases the denied action.
+
 ## A PR parked in a queue goes stale
 
 - After merging main into a PR branch, run `git diff origin/main --stat` and reread each claim in the PR body against it.

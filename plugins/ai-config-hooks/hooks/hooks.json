@@ -2103,6 +2103,13 @@
             "timeout": 10,
             "script": "no-ready-before-preview.py",
             "why": "Refuses a reply calling a named PR ready for review or merge when no tool result since the last user turn and the last push shows that PR's deployed preview (Ezra, 2026-11-23: don't call a PR ready before its preview finishes deploying)."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-macro-claim-without-definition.py\"'",
+            "timeout": 10,
+            "script": "no-macro-claim-without-definition.py",
+            "why": "ai-config#6109, lds#3144, 2026-11-24. An agent told Ezra that a macro called vx \"prints a bold x\" (it prints x with an underset tilde) and that swapping Sigma for covmat would change a chapter's notation (covmat is defined as Sigma); both came from recall, not from reading macros.qmd. Denies a hearthbot reply tool call (reply, post_message, update_message, edit_message) whose sentence names a backslash macro and says what it prints, renders as, displays, typesets, looks like, is defined as or expands to, unless a Read, Grep, Bash or GitHub file-read result in the session shows that macro's definition (def, newcommand, renewcommand, providecommand). Backticks do not exempt it; built-in LaTeX commands and fenced code do. Fails open."
           }
         ]
       },

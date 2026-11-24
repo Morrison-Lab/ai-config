@@ -29,7 +29,7 @@ TOOL = re.compile(
 
 FENCE = re.compile(r"```.*?```", re.S)
 QUOTED = re.compile(
-    r"```.*?```|`[^`\n]*`|^[ \t]*>.*$|\"[^\"\n]*\"|“[^”\n]*”", re.S | re.M)
+    r"```.*?```|`[^`\n]*`|^[ \t]*>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.S | re.M)
 
 _PR = r"(?:PR|pull request|change|diff|branch)"
 CLAIM = re.compile(

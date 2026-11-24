@@ -334,6 +334,21 @@ The only acceptable form reports that `add_repo` was tried and gives its refusal
 Read the text; do not report the output of `hooks/no-repo-not-in-thread-excuse.py` as your finding.
 See [`no-cant-from-session-excuses`](../../shared/workflow/no-cant-from-session-excuses.md).
 
+## Work skipped for a missing or old tool
+
+On a reply, PR body or comment, check that no sentence gives a missing, unavailable or too-old tool, package or toolchain as the reason work was skipped (a render, a PDF build, a test, a spell check).
+The agent should have installed or upgraded it and run the work, or listed every install route it tried and how each failed.
+"LaTeX is too old for the exam template" was false: TinyTeX installed through R's `tinytex` package after `quarto install tinytex` was refused (Ezra, 2026-11-24).
+Read the text; do not report the output of `hooks/no-tool-gap-excuse.py` or `hooks/flag-tool-gap-handling.py` as your finding.
+See [`growth-mindset`](../../shared/workflow/growth-mindset.md).
+
+## A `cai:` request answered without naming its routing
+
+On a transcript, check that the first reply after a user message with a line starting `cai:` says which ai-config mechanism the rule is going into (hook, skill, memory, shared fragment, check) and that its PR comes in that turn.
+A reply that does only the immediate fix leaves the user unable to tell whether the rule was heard (Ezra, 2026-11-24: "then why didn't you say you were going to do it in your original response to my original `cai: ` comment?").
+Read the transcript; do not report the output of `hooks/no-cai-reply-without-routing.py` as your finding.
+See [`config-ai`](../../skills/config-ai/SKILL.md).
+
 ## Thread-model claims
 
 On a reply, PR or memory entry that says which model a project thread runs, or that threads were switched, check that a `get_session` read of each thread named backs it, and flag a claim made from the list of switches sent.

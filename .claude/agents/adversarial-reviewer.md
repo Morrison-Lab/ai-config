@@ -529,5 +529,6 @@ See [`check-the-renders`](../../shared/workflow/check-the-renders.md).
 
 On a diff that adds or edits a hook or script, check that a message or prompt longer than a few lines lives in a `.md` or `.txt` file the code reads, not in a triple-quoted string or a run of concatenated literals.
 Report the inline block and the file it belongs in.
-`scripts/check-hook-prose-literals.py` catches long literals in hooks; read the diff yourself rather than report its verdict.
+`scripts/check-hook-prose-literals.py` catches long literals in hooks.
+Read the diff yourself rather than report its verdict.
 See [`prose-in-files`](../../shared/coding/prose-in-files.md).

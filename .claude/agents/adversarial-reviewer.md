@@ -517,3 +517,10 @@ Check main and sibling repos for an existing fix before accepting a filed issue 
 Report a note that stops at the diagnosis, and a recurrence question answered with start-or-file instead of the fix.
 `hooks/no-unfixed-preexisting-failure.py` catches the common wordings; report the ones it missed.
 See [`persistent-pr-loop`](../../shared/workflow/persistent-pr-loop.md) (psw#703, psw#707).
+
+## Ready claims before the preview deploys
+
+On a transcript or report where the agent told the user a PR was ready for review or merge, check that the PR's repo publishes no preview, or that the preview had finished deploying for the PR's current head before the message went out, and that the message linked it.
+Report a ready claim made while the preview deploy was queued or running, or made from a preview read older than the last push.
+`hooks/no-ready-before-preview.py` catches the common wordings; report the ones it missed.
+See [`check-the-renders`](../../shared/workflow/check-the-renders.md).

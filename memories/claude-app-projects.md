@@ -148,3 +148,25 @@ Review it on your computer."), and the service rejected the call twice that nigh
 - **Do:** fix a delivery problem in a hook or PR;
   when a one-time human step is unavoidable, name it exactly, such as "press Sync on the ai-config plugin card".
 - **Don't:** make an environment change the fix, or retry a rejected `update_environment` call.
+
+## Claude Projects: the merge guard cannot see a merge grant given in a thread
+
+Measured 2026-11-23 on [mds#865](https://github.com/Morrison-Lab/mds/pull/865).
+Ezra tapped "Merge it" on a decision card in the thread and then typed "mwr mds#865" there.
+`hooks/no-unauthorized-merge.py` refused the merge three times.
+It reads a grant only from a typed user record, or from a record with `promptSource=sdk` and `origin.kind=human`, and a project-thread wake is neither.
+The auto-mode classifier also denied `enable-mwc`, and it denied filing an issue about the gap, so the gap is untracked as of this entry.
+Ezra merged the PR himself with GitHub's Merge button.
+
+A link-only `.qmd` PR, [mds#882](https://github.com/Morrison-Lab/mds/pull/882), merged from the same thread under the standing "hyperlink changes count as infra" grant.
+The steps were:
+
+1. Run `check-pr-fully-clean.py` on a `build-pr-payload.py` payload.
+2. Post a PR comment that starts `Annotation dispositions for head <sha7>:`, and rerun the checker with `--annotations-read` set to the ids that `batch-read-annotations.py` printed.
+3. Run five `command -v` probes, each as its own command.
+4. Make one opencode curl attempt (the classifier denied it, which counts as the attempt), and post a waiver note on the PR.
+5. Merge through MCP with `allow_merge` and `expectedHeadSha`.
+
+- **Do:** when a content PR's merge grant arrives as a card tap or a typed "mwr" in a project thread, tell Ezra in one line that the guard cannot read thread grants, and ask him to press Merge on the PR.
+- **Do:** merge a link-only or id-only PR from a thread through the steps above, after reading the diff to confirm that it changes only links or ids.
+- **Don't:** retry the guarded merge, or route around it with `enable-mwc`, once the guard has refused a thread grant.

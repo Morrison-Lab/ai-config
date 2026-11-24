@@ -155,7 +155,7 @@ After pushing, confirm a "Claude Review Dispatched" comment names the new head S
 
 From a project cloud thread on 2026-11-23 (macros#444), the classifier denied both routes to that review:
 the `/review` comment ("Destructive or Unwanted Actions") and `actions_run_trigger` `run_workflow` of `claude-code-review.yml` with `pr_number` ("Undermining Oversight").
-A later `/review` comment that opened with the annotation dispositions dispatched the review and the PR merged.
+A later comment beginning with `/review`, with the annotation dispositions after it, dispatched the review and the PR merged.
 - **Do:** after one denial of each route, give Ezra the `/review` line in a fenced block, with both denials listed, and keep the PR watched.
 - **Don't:** reshape the trigger again (an `@claude` mention, a review body), which only rephrases the denied action.
 

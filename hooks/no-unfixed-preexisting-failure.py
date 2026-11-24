@@ -25,7 +25,8 @@ import sys
 TOOL = re.compile(
     r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|message_thread|message_coordinator)$"
     r"|^mcp__github__(?:add_issue_comment|update_issue_comment|add_reply_to_pull_request_comment"
-    r"|add_comment_to_pending_review|pull_request_review_write|create_pull_request|update_pull_request)$")
+    r"|add_comment_to_pending_review|pull_request_review_write|create_pull_request|update_pull_request"
+    r"|issue_write)$")
 
 FENCE = re.compile(r"```.*?```", re.S)
 QUOTED = re.compile(

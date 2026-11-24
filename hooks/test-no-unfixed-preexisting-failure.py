@@ -37,6 +37,7 @@ CASES = [
     ("blockquote", POST, "text", "> lint fails on main too\nThat was the old note.", False),
     ("fix in another paragraph does not count", POST, "text",
      "The lint failure is pre-existing.\n\nUnrelated: #5 merged.", True),
+    ("issue body", "mcp__github__issue_write", "body", "The lint check fails; it is pre-existing.", True),
     ("unrelated tool", "mcp__github__get_file_contents", "path", "pre-existing failure", False),
 ]
 

@@ -37,6 +37,9 @@ REMIND = [
     "Do you recommend adding a check?",
     "Fix the bug. What do you think happened?",
     "What's the best way to test this hook?",
+    # "again" alone is not a recurrence question, so this still reminds.
+    "Can we run the tests again?",
+    "Can we add a recurring job for this?",
 ]
 SILENT = [
     "Please fix the failing test in foo.py and rerun the suite.",
@@ -49,7 +52,6 @@ SILENT = [
     "how can we prevent this mistake from recurring?",
     "How should we stop that from happening again?",
 ]
-REMIND.append("Can we run the tests again?")
 wrong = 0
 for p in REMIND:
     v = run(p)

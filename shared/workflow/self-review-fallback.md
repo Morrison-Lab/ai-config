@@ -22,6 +22,16 @@ Waiting days for a reset, with a PR held on its review, is the worse default.
 I can usually do that if you ask.
 reviews should work now".)
 
+The reset date a 429 notice states can be wrong, or the quota can come back early, so re-run the review within hours rather than scheduling the re-run for that date.
+
+- **Do:** re-try the review after a short delay, and again before any long wait, alongside asking for a token switch.
+- **Don't:** set a check-in for the stated reset day and hold the PR until then.
+
+(2nd occurrence, 2026-11-24, Morrison-Lab/lds#3140:
+a thread scheduled the re-review for the stated Nov 27 reset;
+the user answered "why waiting so long?" and "claude's quota reset already",
+and the re-run passed the same morning.)
+
 **Provider quotas reset independently, and each has to be checked on its own, not inferred from another provider's state.**
 [`memories/copilot-reviews.md`](../../memories/copilot-reviews.md) already records that Copilot and `claude-review` **fail** independently (one quota-dead does not mean the other is);
 the same independence applies to **resetting**.

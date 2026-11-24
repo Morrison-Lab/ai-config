@@ -244,6 +244,17 @@ Unlike the rule above, this excuse names the pin, so it has a lexical shape a ho
 `hooks/no-stale-pin-macro-excuse.py` is that backstop, not a proof: it denies a reply, a forge post, a PR body or a commit message where one sentence or two adjacent ones name a macro and the pin, say the pin lacks it, and say the macro was kept out;
 a sentence that moves the pin with no "not", "later" or "will", or one that quotes the rule, passes.
 
+**Consistency with neighbouring raw LaTeX is not a reason to skip a macro that renders the same.**
+A macro defined as the raw symbol (`\covmat` is `\Sigma`) prints exactly what the surrounding text prints, so using it in the lines you edit mixes nothing a reader can see.
+Read the macro's definition before citing consistency.
+
+- **Do:** before declining a macro because neighbouring text uses the raw symbol, read the macro's definition;
+  if it renders identically, use the macro in the lines you edit.
+- **Don't:** cite consistency with surrounding raw LaTeX as a reason to skip a render-identical macro.
+  ([Morrison-Lab/lds#3144](https://github.com/Morrison-Lab/lds/pull/3144), 2026-11-24: an agent declined `\covmat` for `\Sigma` in one subfile, saying it "would need the whole chapter changed" for consistency;
+  `\covmat` is defined as `\Sigma`, so a per-file swap renders identically.)
+- A macro that changes the rendering is a real consistency concern: `\detf` prints $\det(\cdot)$ where neighbouring text may print $|\cdot|$.
+
 ### 7. Verify the render and spellcheck, then ship
 
 Run the raw-notation lint over what you changed, from the repository root:

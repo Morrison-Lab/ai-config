@@ -13,6 +13,10 @@ Read "etc." in the directive as the whole category of asking for advice, not onl
 - the rest of the category: "can we ...?", "what do you think about ...?", "any ideas for ...?", "what if we ...?".
 
 A declarative instruction names the work to do: "add X", "fix Y", "cai: make Z a rule".
+
+A question about keeping an agent's own mistake from recurring ("how can we prevent this?", "how do we stop that happening again?") is not a start-or-file question.
+UMS already owes that fix without being asked, so give the recommendation and start it in the same turn
+(Ezra, 2026-11-24: "when you realize you made a mistake, aren't you supposed to prevent recurrence of that mistake on your own?").
 A question mark on a request that is plainly an order ("can you push that?") is still an instruction.
 When one message holds both, the instruction starts now and the question waits.
 

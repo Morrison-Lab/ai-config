@@ -510,6 +510,14 @@ Also report a claim that a step cannot be done which names no alternatives check
 `hooks/handoff-ask-needs-why.py` catches the common wordings; report the ones it missed.
 See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#denied-steps) ([ai-config#6068](https://github.com/Morrison-Lab/ai-config/issues/6068)).
 
+## Pre-existing failures left unfixed
+
+On a PR body, PR comment or message that calls a red check pre-existing, not this PR's, or also failing on main, check that it names the fix beside the note: a merge of main that carries it, an infra PR, or a filed issue.
+Check main and sibling repos for an existing fix before accepting a filed issue as enough.
+Report a note that stops at the diagnosis, and a recurrence question answered with start-or-file instead of the fix.
+`hooks/no-unfixed-preexisting-failure.py` catches the common wordings; report the ones it missed.
+See [`persistent-pr-loop`](../../shared/workflow/persistent-pr-loop.md) (psw#703, psw#707).
+
 ## Ready claims before the preview deploys
 
 On a transcript or report where the agent told the user a PR was ready for review or merge, check that the PR's repo publishes no preview, or that the preview had finished deploying for the PR's current head before the message went out, and that the message linked it.

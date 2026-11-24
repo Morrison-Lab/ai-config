@@ -201,6 +201,22 @@ Other notes from that day:
   Its header already pages by hand around one proxy 403 (gha#1432), and which call still gets the 403 was not read.
   Until that issue is fixed, read `repos/<owner>/<repo>/commits/<sha>/check-runs` and each `repos/<owner>/<repo>/check-runs/<id>/annotations` with `gh api`, which took under a minute.
 
+## Wording the annotation disposition comment
+
+Learned on [ai-config#6103](https://github.com/Morrison-Lab/ai-config/pull/6103) (2026-11-24).
+`no-unfixed-preexisting-failure` denies a comment that calls a failure "pre-existing" or "not this PR's" unless the same paragraph names its fix.
+Selftest negative controls and runner notices have no fix to name, because nothing is broken.
+- **Do:** call each one a false positive and give the reason, for example "a negative control whose fixture is built to fail".
+- **Don't:** describe them as another PR's failures.
+
+## A card tap for a new repo, from a session older than the guard fix
+
+`no-unnamed-repo-pr` read only top-level user records, so a decision-card tap that arrived mid-turn, as a `queued_command` attachment, never named the repo for it.
+[ai-config#6103](https://github.com/Morrison-Lab/ai-config/pull/6103) (merged 2026-11-24) reads those taps too.
+A session started before that merge keeps the old hook until it restarts.
+- **Do:** in such a session, ask the coordinator to relay a note naming each repo as `Morrison-Lab/<repo>`, citing the tap.
+  The guard's `named()` matches a bare repo name too (`mds`), so the card's own wording was enough once the hook can read the tap.
+
 ## The merge hook needs literal ids in the checker command
 
 - The merge hook reads the checker's result line from this transcript, and a run whose `--annotations-read` value is a shell variable (`"$IDS"`) did not satisfy it on mds#671 (2026-11-06).

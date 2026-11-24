@@ -558,6 +558,15 @@ window.Quarto = {
 <li><strong>Don’t:</strong> keep <code>\tp{X} X</code> or another hand-written form because the repo’s pinned copy lacks the macro, or promise to switch once someone else bumps the pin.</li>
 </ul>
 <p>Unlike the rule above, this excuse names the pin, so it has a lexical shape a hook can catch in its common wordings. <code>hooks/no-stale-pin-macro-excuse.py</code> is that backstop, not a proof: it denies a reply, a forge post, a PR body or a commit message where one sentence or two adjacent ones name a macro and the pin, say the pin lacks it, and say the macro was kept out; a sentence that moves the pin with no “not”, “later” or “will”, or one that quotes the rule, passes.</p>
+<p><strong>Read a macro’s definition before saying what it prints or whether it renders the same.</strong> A macro defined as the raw symbol (<code>\covmat</code> is <code>\Sigma</code>) prints exactly what the surrounding text prints, so using it in the lines you edit mixes nothing a reader can see. A macro’s name does not say what it prints either.</p>
+<ul>
+<li><strong>Do:</strong> grep <code>macros.qmd</code> for the definition and quote it, before declining a macro for consistency or describing its output; if it renders identically, use the macro in the lines you edit.</li>
+<li><strong>Don’t:</strong> cite consistency with surrounding raw LaTeX as a reason to skip a render-identical macro.</li>
+<li><strong>Don’t:</strong> describe a macro’s output from its name or from another repository’s convention.</li>
+<li>Example 1 (<a href="https://github.com/Morrison-Lab/lds/pull/3144">Morrison-Lab/lds#3144</a>, 2026-11-24): an agent declined <code>\covmat</code> for <code>\Sigma</code> in one subfile, saying it “would need the whole chapter changed” for consistency. <code>\covmat</code> is defined as <code>\Sigma</code>, so a per-file swap renders identically.</li>
+<li>Example 2 (same session): an agent told Ezra that <code>\vx</code> “prints a bold x”. <code>\def\vx{\vecf{x}}</code> and <code>\vecf</code> is an underset <code>\sim</code>, so <code>\vx</code> prints x with a tilde underneath (<code>latex-macros/macros.qmd</code>, lines 522 and 528).</li>
+<li>A macro that changes the rendering is a real consistency concern: <code>\detf</code> prints <span class="math inline">\(\det(\cdot)\)</span> where neighbouring text may print <span class="math inline">\(|\cdot|\)</span>.</li>
+</ul>
 </section>
 <section id="verify-the-render-and-spellcheck-then-ship" class="level3">
 <h3 class="anchored" data-anchor-id="verify-the-render-and-spellcheck-then-ship">7. Verify the render and spellcheck, then ship</h3>

@@ -532,3 +532,11 @@ Report the inline block and the file it belongs in.
 `scripts/check-hook-prose-literals.py` catches long literals in hooks.
 Read the diff yourself rather than report its verdict.
 See [`prose-in-files`](../../shared/coding/prose-in-files.md).
+
+## Macro output described from recall
+
+On a transcript, reply or PR body that says what a LaTeX macro prints, renders as, displays, typesets or is defined as, check that the same session read the macro's definition (a `\def`, `\newcommand`, `\renewcommand` or `\providecommand` in macros.qmd or the macros submodule) and that the claim matches it.
+Flag a claim made from the macro's name, another repository's convention or a neighbouring macro, and a swap declined for consistency when the two forms render identically.
+A name in backticks is still a claim.
+Read the definition yourself; do not report the output of `hooks/no-macro-claim-without-definition.py` as your finding.
+See [`use-math-macros`](../../skills/use-math-macros/SKILL.md) step 6 ([ai-config#6109](https://github.com/Morrison-Lab/ai-config/pull/6109), lds#3144).

@@ -73,6 +73,7 @@ no-placeholder-reply.py 1
 no-pr-work-without-claim.py 3
 no-push-without-self-review.py 2
 no-rc-outside-runner.py 1
+no-ready-before-preview.py 1
 no-reauth-without-host-check.py 2
 no-redundant-push-pr-authorization.py 1
 no-rm-live-render-intermediate.py 1
@@ -85,6 +86,7 @@ no-underived-required-check.py 2
 no-unexplained-analysis-choice.py 1
 no-unfetched-pr-state-claim.py 2
 no-unfiled-finding.py 1
+no-unfixed-preexisting-failure.py 1
 no-unlinked-session-mention.py 3
 no-unlinked-thread-pointer.py 1
 no-unread-issue-claim.py 1

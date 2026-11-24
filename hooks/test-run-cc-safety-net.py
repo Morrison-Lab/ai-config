@@ -348,6 +348,11 @@ class WhichCommandsQualify(unittest.TestCase):
             "not git push": "git fetch origin",
             "a duplicate delete": LEASED + " claude/x",
             "a branch named like an option": LEASED.replace(" claude/x", " -x"),
+            "a full ref under a doubled lease": (
+                "git push origin --force-with-lease=refs/heads/refs/heads/main:"
+                f"{SHA_A} --delete refs/heads/main"),
+            "HEAD": f"git push origin --force-with-lease=refs/heads/HEAD:{SHA_A} --delete HEAD",
+            "a dot-dot name": f"git push origin --force-with-lease=refs/heads/a..b:{SHA_A} --delete a..b",
         }
         for why, command in cases.items():
             with self.subTest(why=why):
@@ -448,6 +453,22 @@ class TypedApprovalLiftsOnePushDelete(unittest.TestCase):
         proc = self.run_with([self.user(f"approve-push-delete {key}")], command=command)
         self.assertEqual(self.decision(proc), "deny")
         self.assertNotIn("approve-push-delete", proc.stdout)
+
+    def test_a_crash_in_the_check_keeps_the_deny(self):
+        scripts = self.box.root / "scripts"
+        scripts.unlink()
+        lib = scripts / "lib"
+        lib.mkdir(parents=True)
+        for item in (HOOK.parent.parent / "scripts" / "lib").iterdir():
+            if item.name != "push_delete_approval.py":
+                (lib / item.name).symlink_to(item)
+        (lib / "push_delete_approval.py").write_text(
+            "PREFIX = 'approve-push-delete'\nWINDOW = 1800\n"
+            "def leased_delete_push(command):\n    raise RuntimeError('boom')\n",
+            encoding="utf-8")
+        proc = self.run_with([self.user(f"approve-push-delete {self.key}")])
+        self.assertEqual(self.decision(proc), "deny")
+        self.assertIn("answer stands", proc.stderr)
 
     def test_another_deny_is_never_lifted(self):
         proc = self.run_with([self.user(f"approve-push-delete {self.key}")],

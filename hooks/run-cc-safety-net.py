@@ -380,7 +380,14 @@ def main() -> int:
         data = json.loads(payload or b"{}")
     except ValueError:
         data = {}
-    verdict = push_delete_override(data, proc) if isinstance(data, dict) else None
+    verdict = None
+    try:
+        if isinstance(data, dict):
+            verdict = push_delete_override(data, proc)
+    except Exception as exc:
+        print(f"run-cc-safety-net: typed-approval check failed ({exc}); "
+              "CC Safety Net's answer stands", file=sys.stderr)
+        verdict = None
     if verdict and verdict[0]:
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse", "additionalContext": verdict[1]}}))

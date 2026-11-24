@@ -81,9 +81,24 @@ def leased_delete_push(command: str) -> bool:
     deletes = tokens[i + 1:]
     if len(deletes) != len(set(deletes)):
         return False
-    if not all(RX_BRANCH.match(b) and not b.startswith("-") for b in deletes):
+    if not all(plain_branch(b) for b in deletes):
         return False
     return set(deletes) == set(leases)
+
+
+def plain_branch(name: str) -> bool:
+    """Whether `name` can only mean `refs/heads/<name>` on the remote.
+
+    A delete of `refs/heads/main` under a lease on
+    `refs/heads/refs/heads/main` would pass a plain set comparison while
+    the lease pins a different ref, so a name that git could read as a full
+    ref (`refs/...`, `HEAD`) is refused, as is one git refuses anyway.
+    """
+    if not RX_BRANCH.match(name) or name.startswith(("-", "/", "refs/")):
+        return False
+    if name == "HEAD" or name.endswith(("/", ".lock", ".")):
+        return False
+    return ".." not in name and "//" not in name
 
 
 def _when(rec) -> float | None:

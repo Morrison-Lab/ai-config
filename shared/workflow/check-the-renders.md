@@ -101,6 +101,9 @@ A `tippy` exclusion for the hover popups was tried and removed: that markup is i
 - **Do:** check the DEPLOYED preview, not only a local render, when the repo caches renders --- they can disagree.
 - **Do:** grep the render for the exact text your diff added and removed, since that, and not the pattern scan, is what detects a stale build.
 - **Don't:** treat a correct source diff as evidence the published page is correct.
+- **Do:** wait for a PR's preview to finish deploying before calling the PR ready for review or merge, and link the preview in that message.
+  When the deploy is still running, say so and that the PR is ready once it lands (Ezra, 2026-11-23: "don't tell me a PR is ready for review when its preview isn't finished deploying").
+  `hooks/no-ready-before-preview.py` refuses a reply that calls a named PR ready with no `pr-preview/pr-N` URL read since the last user turn and the last push.
 - **Don't:** read a clean run of the pattern checker as evidence the page is current;
   it answers a different question.
 - **Don't:** decide what a detector should match from the source you expect;

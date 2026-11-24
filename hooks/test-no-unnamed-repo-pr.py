@@ -253,6 +253,18 @@ CASES = [
             {"type": "text", "text": relayed_tap("Open it", "Open the PR in epi204?")["message"]["content"]}]}]}}), "deny"),
     ("a relay citing a tap names the repo", MCP, "epi204", transcript(
         "go", relayed_tap("Open it", "Open the PR in Morrison-Lab/epi204?")), "pass"),
+    # A tap made while the agent is working arrives as a queued_command attachment (2026-11-24).
+    ("a mid-turn tap (queued_command) names the repo", MCP, "epi204", transcript("go", {
+        "type": "attachment", "attachment": {"type": "queued_command", "origin": {"kind": "human"},
+                                             "prompt": tap("Open it", "Open the PR in epi204?")["message"]["content"]}}),
+     "pass"),
+    ("a peer-origin queued tap does not name the repo", MCP, "epi204", transcript("go", {
+        "type": "attachment", "attachment": {"type": "queued_command", "origin": {"kind": "peer"},
+                                             "prompt": tap("Open it", "Open the PR in epi204?")["message"]["content"]}}),
+     "deny"),
+    ("an unverified queued tap does not name the repo", MCP, "epi204", transcript("go", {
+        "type": "attachment", "attachment": {"type": "queued_command", "prompt": tap(
+            "Open it", "Open the PR in epi204?", verified=False)["message"]["content"]}}), "deny"),
 ]
 for name, tool, inp, tpath, want, *cwd in CASES + [("the hook-environment grant", MCP, "mlg", GO, "pass")]:
     CASE_ENV = {"ALLOW_UNNAMED_REPO_PR": "1"} if name == "the hook-environment grant" else (

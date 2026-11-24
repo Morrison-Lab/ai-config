@@ -41,3 +41,5 @@ a ratchet whose counts may only fall.
 They are not swept;
 move a hook's prose out when you next edit that hook,
 and lower its count in the same commit.
+The [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#long-prose-built-inline-in-code) checklist looks for the same defect in any code,
+so a long block the check cannot see still gets read.

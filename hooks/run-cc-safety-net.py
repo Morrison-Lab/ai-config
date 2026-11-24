@@ -46,6 +46,16 @@ hook off. It must be set where the agent starts, since a variable set on a
 command line never reaches the hook. `AI_CONFIG_CC_SAFETY_NET_CACHE`
 overrides the cache directory (the self-test uses it).
 
+ONE DENY CAN BE LIFTED, BY THE USER'S TYPED WORDS ONLY (ai-config#6117).
+A `git.push-delete` deny of a push that deletes only lease-pinned branches
+(`git push <remote> --force-with-lease=refs/heads/<b>:<sha> ... --delete
+<b> ...`) is lifted when the user typed `approve-push-delete <key>` in this
+session within the last 30 minutes, where `<key>` is the first 16 hex
+digits of that exact command's sha256. The deny names the key, so the agent
+can quote it to the user. A decision-card tap, a relayed note and the
+agent's own words do not count. `scripts/lib/push_delete_approval.py` has
+the rules. No other deny is ever lifted.
+
 The child runs with `CC_SAFETY_NET_NO_UPDATE_CHECK=1`. CC Safety Net keeps
 its own audit log of each decision, with secrets redacted, in
 `~/.cc-safety-net/logs/` (mode 0600).
@@ -278,6 +288,76 @@ def fill_empty_cwd(payload: bytes) -> bytes:
     return json.dumps(data).encode("utf-8")
 
 
+def _approval_module():
+    """scripts/lib/push_delete_approval.py, or None when it cannot load."""
+    lib = str(HERE.parent / "scripts" / "lib")
+    if lib not in sys.path:
+        sys.path.insert(0, lib)
+    try:
+        import push_delete_approval
+        return push_delete_approval
+    except Exception as exc:
+        print(f"run-cc-safety-net: cannot load push_delete_approval ({exc}); "
+              "no typed approval is read", file=sys.stderr)
+        return None
+
+
+def _typed_readers():
+    """The merge hooks' transcript readers, the one copy of the typed rule."""
+    from sibling import load_sibling
+    module = load_sibling(__file__, "block-merge-without-clean-checker.py",
+                          "_sib_bmwcc_csn", required=True)
+    return module._records, module._blocks, module._typed_text
+
+
+def _bash_command(data: dict) -> str:
+    if data.get("tool_name") != "Bash":
+        return ""
+    command = (data.get("tool_input") or {}).get("command")
+    return command if isinstance(command, str) else ""
+
+
+def push_delete_override(data: dict, proc: subprocess.CompletedProcess):
+    """The note to print when a typed approval lifts this push-delete deny.
+
+    Returns `(allow, text)`, or None to keep the deny unchanged. Lifts only
+    a deny that names `git.push-delete`, on a lease-pinned delete push,
+    that the user typed `approve-push-delete <key>` for (ai-config#6117):
+    then `allow` is True and `text` is the note. When the command
+    qualifies but no approval was typed, `allow` is False and `text` is
+    the hint to add to the deny, naming the key the user would type. Any
+    error keeps the deny unchanged.
+    """
+    said = (proc.stdout + proc.stderr).decode("utf-8", "replace")
+    if "git.push-delete" not in said:
+        return None
+    command = _bash_command(data)
+    approval = _approval_module() if command else None
+    if approval is None or not approval.leased_delete_push(command):
+        return None
+    key = approval.approval_key(command)
+    path = data.get("transcript_path")
+    try:
+        records, blocks, typed_text = _typed_readers()
+        approved = bool(path) and approval.typed_approval(
+            records(path), blocks, typed_text, key, time.time())
+    except Exception as exc:
+        print(f"run-cc-safety-net: typed approval unreadable ({exc}); "
+              "the deny stands", file=sys.stderr)
+        return None
+    if approved:
+        return True, (
+            f"run-cc-safety-net: the user typed `{approval.PREFIX} {key}` "
+            "for this exact lease-pinned delete push, so CC Safety Net's "
+            "git.push-delete deny was lifted for it (ai-config#6117).")
+    return False, (
+        "This is a lease-pinned delete push. The user can approve exactly "
+        f"this command by typing `{approval.PREFIX} {key}` in this session; "
+        f"it is then allowed for {approval.WINDOW // 60} minutes "
+        "(ai-config#6117). Ask them, quoting the command. Do not type the "
+        "approval yourself or change the command.")
+
+
 def main() -> int:
     payload = sys.stdin.buffer.read()
     if os.environ.get(OFF_VAR, "").lower() == "off":
@@ -296,9 +376,33 @@ def main() -> int:
     except (Unavailable, OSError, ValueError, tarfile.TarError) as exc:
         warn_once(session_id, str(exc))
         return 0
-    sys.stdout.buffer.write(proc.stdout)
+    try:
+        data = json.loads(payload or b"{}")
+    except ValueError:
+        data = {}
+    verdict = push_delete_override(data, proc) if isinstance(data, dict) else None
+    if verdict and verdict[0]:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "additionalContext": verdict[1]}}))
+        return 0
+    stdout = add_hint(proc.stdout, verdict[1]) if verdict else proc.stdout
+    sys.stdout.buffer.write(stdout)
     sys.stderr.buffer.write(proc.stderr)
+    if verdict and proc.returncode == 2:
+        sys.stderr.write(os.linesep + verdict[1] + os.linesep)
     return proc.returncode
+
+
+def add_hint(stdout: bytes, hint: str) -> bytes:
+    """`stdout` with `hint` appended to its JSON deny reason, if it has one."""
+    try:
+        out = json.loads(stdout)
+        spec = out["hookSpecificOutput"]
+        reason = str(spec.get("permissionDecisionReason") or "")
+        spec["permissionDecisionReason"] = reason + " " + hint
+    except (ValueError, KeyError, TypeError):
+        return stdout
+    return json.dumps(out).encode("utf-8")
 
 
 if __name__ == "__main__":

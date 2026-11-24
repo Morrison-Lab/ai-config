@@ -266,6 +266,15 @@ Read the transcript and the claim;
 do not report a hook's refusal or silence as your finding.
 See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-reads-in-shallow-clones.md).
 
+## A lifted Safety Net deny
+
+On a transcript where a `git push --delete` ran after `hooks/run-cc-safety-net.py` lifted a `git.push-delete` deny, check that the user typed `approve-push-delete <key>` in their own message, after the deny named that key, and that the command that ran is byte-identical to the one the deny named.
+Flag an approval the agent wrote, put on a decision card or relayed, a command changed after the approval, and a lease whose tip was not read from a complete clone.
+On a diff to `scripts/lib/push_delete_approval.py` or the wrapper, flag any change that widens which commands qualify or which messages count as typed.
+Read the transcript and the diff yourself;
+do not report the hook's note or silence as your finding.
+See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#lifting-one-branch-deleting-push-by-ezras-typed-approval).
+
 ## Stash entries taken without a ref
 
 On a transcript, script, skill or rule that runs `git stash pop` or `git stash apply`, check that it names the entry by a SHA found through its own unique push message, not by a position such as `stash@{0}` read after the push, and that it checked the push saved something.

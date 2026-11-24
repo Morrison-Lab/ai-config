@@ -57,6 +57,20 @@ It runs at the standard level, not strict, because replaying the 797 distinct Ba
   Ask Ezra instead, naming the rule.
 - **Do:** before moving the pin, run `CC_SAFETY_NET_LIVE=1 python3 hooks/test-run-cc-safety-net.py` and feed the new release the incident commands in the failure-pattern table above.
 
+### Lifting one branch-deleting push by Ezra's typed approval
+
+The `git.push-delete` rule refuses every agent `git push --delete`, so on 2026-11-20 twelve merged `lds` branches that Ezra had approved for deletion stayed undeletable for four days ([ai-config#6117](https://github.com/Morrison-Lab/ai-config/issues/6117)).
+The wrapper now lifts that one rule for one command, and only when Ezra types the approval himself.
+The command must delete only branches that each carry a `--force-with-lease=refs/heads/<branch>:<40-hex tip>`.
+The deny then names a key, and Ezra types `approve-push-delete <key>` in the session within 30 minutes.
+The key is the start of the command's sha256, so it covers that exact command and no other.
+
+- **Do:** compose the one-line, lease-pinned push from tips read in a complete clone, quote it to Ezra with the key the deny names, and run the identical command again once he has typed the approval.
+- **Don't:** type the approval yourself, put it on a decision card, relay it through another session, or change a byte of the command after he approves it.
+  A card tap, a relayed note and your own words never count, and a changed command needs a new key.
+
+[`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#a-lifted-safety-net-deny) checks for these.
+
 ## Rules for the patterns no hook decides yet
 
 - **Do:** run `git stash push --include-untracked` before any command that discards working-tree state in a worktree only you use, and say so.

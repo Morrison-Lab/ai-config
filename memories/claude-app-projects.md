@@ -159,6 +159,15 @@ The auto-mode classifier also denied `enable-mwc`.
 The gap is tracked in [ai-config#6096](https://github.com/Morrison-Lab/ai-config/issues/6096), filed 2026-11-24 once a retry was accepted.
 `hooks/no-unnamed-repo-pr.py` has the same gap: it denied this entry's PR after Ezra said "daytb" to opening it, because his words reached the thread only as a coordinator relay citing them.
 Ezra merged the PR himself with GitHub's Merge button.
+A decision-card tap does satisfy `hooks/no-unnamed-repo-pr.py`.
+On 2026-11-24 a thread configured only for lds ran UMS for its quota-retry lesson,
+and the hook denied the resulting ai-config PR twice.
+The PR, [ai-config#6111](https://github.com/Morrison-Lab/ai-config/pull/6111) (the `self-review-fallback.md` quota-retry rule), opened once Ezra tapped a card naming ai-config.
+The hook denied the PR even though the coordinator's note said ai-config was configured and other threads were opening PRs there.
+
+- **Do:** when a thread's configured repo is not ai-config, post a decision card naming ai-config before opening a UMS PR there.
+- **Don't:** take "other threads open PRs there" as evidence that this thread can.
+  Read the hook's denial instead.
 
 A link-only `.qmd` PR, [mds#882](https://github.com/Morrison-Lab/mds/pull/882), merged from the same thread under the standing "hyperlink changes count as infra" grant.
 The steps were:

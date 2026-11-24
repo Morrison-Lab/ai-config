@@ -72,6 +72,9 @@ CASES = [
      "tool is missing", "an outdated version warns"),
     ([say("I couldn't update the page because its text is out of date.")], None,
      "out-of-date prose is not a tool"),
+    ([say("One hook refuses any post that excuses skipped work because a tool "
+          "is missing or too old.")], None,
+     "describing the rule is not an excuse (2026-11-24 false positive)"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

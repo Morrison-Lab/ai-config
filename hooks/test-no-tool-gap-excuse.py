@@ -36,6 +36,9 @@ CASES = [
     ("an install in the next sentence passes", POST,
      {"text": "I couldn't build the PDFs because LaTeX was too old. I installed TinyTeX and rebuilt both."},
      False, {}),
+    ("describing the hook passes", POST,
+     {"text": "It refuses any post, comment or PR body that excuses skipped work because a tool is "
+              "missing or too old."}, False, {}),
     ("a plain result passes", POST, {"text": "Both PDFs build and every page has room to write."}, False, {}),
     ("a missing config key passes", POST,
      {"text": "I couldn't finish the migration because a config key was missing from the YAML file."},

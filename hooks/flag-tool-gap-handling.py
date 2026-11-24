@@ -62,6 +62,8 @@ EXCUSE = re.compile(
     rf"(?:{SKIPPED}[^.\n]{{0,120}}{MISSING}|{MISSING}[^.\n]{{0,120}}{SKIPPED})",
     re.I)
 
+RULE_TALK = re.compile(r"\bexcus(?:e|es|ed|ing)\b", re.I)
+
 NONTOOL = re.compile(
     r"\b(?:certificates?|certs?|licen[sc]es?|api[- ]?keys?|keys?|tokens?|secrets?"
     r"|credentials?|cron|crontab|systemd|units?|entr(?:y|ies)|configs?|configuration"
@@ -116,6 +118,10 @@ def excuse(text):
     if FIXED.search(text):
         return None
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+        # A sentence that names the excuse as such describes the rule or a hook
+        # for it ("refuses a post that excuses skipped work because ..."), not a skip.
+        if RULE_TALK.search(sentence):
+            continue
         if EXCUSE.search(sentence) and not nontool_subject(sentence):
             return sentence.strip()[:160]
     return None

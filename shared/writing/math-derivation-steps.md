@@ -77,6 +77,18 @@ The canonical copy is PSW's
 [One equals sign per line](https://morrison-lab.github.io/psw/chapters/notation.html#one-equals-sign-per-line)
 (Ezra, 2026-10-08).
 
+### Label a step in words; cite an equation in the prose
+
+Quarto resolves an `@id` crossref only in prose, never inside math.
+A crossref written inside `\text{}` in a display, such as `\text{(@eq-lda-mahalanobis-sq and the definition of $\deviationv_k$)}`, renders as the literal text "@eq-...".
+Write the justification of each step in words,
+such as `\text{(definitions of $\mahal_k$ and $\deviationv_k$)}`,
+and cite the equation with `@eq-...` in the sentence around the display.
+
+- **Do:** label a derivation step in words inside `\text{}`, and cite the equation with `@eq-...` in the surrounding prose.
+- **Don't:** put `@id` inside math, even when a reviewer suggests it.
+  On [lds#3144](https://github.com/Morrison-Lab/lds/pull/3144) (2026-11-24) an automated reviewer suggested exactly that label, and a local render showed the literal "@eq-..." text.
+
 ## Reviewing: name the gap, don't just flag it
 
 [`fact-check-prose.md`](fact-check-prose.md)'s document-internal-reasoning

@@ -45,7 +45,11 @@ SILENT = [
     "> should we do it?\nSummarize the quote above for me",
     "Explain what `should we` means in this changelog entry.",
     "<system-reminder>how should we do this</system-reminder> run the tests again",
+    # Preventing an agent mistake from recurring is owed under UMS (2026-11-24).
+    "how can we prevent this mistake from recurring?",
+    "How should we stop that from happening again?",
 ]
+REMIND.append("Can we run the tests again?")
 wrong = 0
 for p in REMIND:
     v = run(p)

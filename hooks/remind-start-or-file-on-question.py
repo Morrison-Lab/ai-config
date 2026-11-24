@@ -44,8 +44,19 @@ TICKED = re.compile(r"`[^`\n]*`")
 REMINDER_BLOCK = re.compile(r"<system-reminder>.*?</system-reminder>", re.S | re.I)
 
 
+# Preventing an agent mistake from recurring is owed under UMS without asking
+# (Ezra, 2026-11-24), so such a question gets no start-or-file reminder.
+RECURRENCE_RE = re.compile(
+    r"\b(prevent|stop|avoid)\b[^.?!\n]{0,60}\b(happen\w* again|repeat\w*)\b"
+    r"|\brecurr\w*\b",
+    re.I,
+)
+
+
 def question(text):
     prose = TICKED.sub(" ", QUOTED.sub(" ", FENCE.sub(" ", REMINDER_BLOCK.sub(" ", text))))
+    if RECURRENCE_RE.search(prose):
+        return None
     m = QUESTION_RE.search(prose)
     return " ".join(m.group(0).split()) if m else None
 

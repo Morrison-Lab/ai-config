@@ -2092,6 +2092,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfixed-preexisting-failure.py\"",
+            "timeout": 10,
+            "script": "no-unfixed-preexisting-failure.py",
+            "why": "Ezra, 2026-11-24, psw#703: \"why didn't you fix the missing curl package?\" An agent noted a lint failure as pre-existing and stopped while psw#707 had already fixed it on main. Blocks (deny) a reply, relay, PR body or forge comment whose paragraph calls a failure pre-existing, not this PR's, or also failing on main, unless the same paragraph names the fix (a PR or issue reference, or a merge of main). See shared/workflow/persistent-pr-loop.md. Fails open."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfetched-pr-state-claim.py\"",
             "timeout": 10,
             "script": "no-unfetched-pr-state-claim.py",
@@ -2168,6 +2175,13 @@
             "timeout": 10,
             "script": "no-ask-to-start-rc.py",
             "why": "Same rule as the hearthbot entry (Ezra, 2026-10-29: \"you can run remote control yourself\"): a forge comment, PR body or issue body that asks the user to start Remote Control is denied, and the denial points at start_remote_control."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfixed-preexisting-failure.py\"",
+            "timeout": 10,
+            "script": "no-unfixed-preexisting-failure.py",
+            "why": "Ezra, 2026-11-24, psw#703: \"why didn't you fix the missing curl package?\" An agent noted a lint failure as pre-existing and stopped while psw#707 had already fixed it on main. Blocks (deny) a reply, relay, PR body or forge comment whose paragraph calls a failure pre-existing, not this PR's, or also failing on main, unless the same paragraph names the fix (a PR or issue reference, or a merge of main). See shared/workflow/persistent-pr-loop.md. Fails open."
           }
         ]
       },

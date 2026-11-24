@@ -605,3 +605,7 @@ Measured 2026-11-19 in a claude.ai cloud session.
 - **Don't:** pass `pr_number`, which is not the parameter name.
 - **Do:** call `mcp__claude-code-remote__add_repo` with `owner` and `repo` as separate bare names, and `access: "push"` to file issues or open PRs there.
 - **Don't:** pass `repo: "<owner>/<repo>"` alone, which the tool refuses with nothing attached.
+- **Do:** when `mcp__github__create_pull_request` times out with "timed out after 60s",
+  look for the PR before retrying, with `gh api -X GET search/issues -f q='repo:<owner>/<repo> is:pr head:<branch>'`.
+  On 2026-11-24 the call timed out but had opened [ai-config#6098](https://github.com/Morrison-Lab/ai-config/pull/6098).
+- **Don't:** resend the create call after a timeout, which can open a duplicate PR.

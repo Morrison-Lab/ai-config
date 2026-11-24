@@ -39,6 +39,7 @@ indented code, `>` quotes, inline code and double-quoted spans, and
 prompt rather than once per session: each correction is its own rule.
 """
 import json
+import os
 import re
 import sys
 
@@ -114,31 +115,24 @@ NOT_TYPED = [
     re.compile(r'`[^`\n]*`|"[^"\n]*"|' + LEFT_DQ + "[^" + RIGHT_DQ + r"\n]*" + RIGHT_DQ),
 ]
 
-REMINDER = """\
-[hook: remind-encode-user-correction] The user's message reads as a \
-correction, or says they have had to repeat themselves ("{quote}").
-The user should never have to say this twice, in this session or any other \
-project. Fix the instance they pointed at, then, in this same turn:
-1. Name the general rule behind the correction, read broadly: an example \
-stands for its category, and "etc." is open-ended.
-2. Check for a similar rule first and strengthen it rather than duplicating. \
-Commit that rule to the repo that owns it and open the PR: \
-Morrison-Lab/ai-config for anything that applies beyond one repo (AGENTS.md \
-for a cross-agent rule; CLAUDE.md or a shared/ fragment for detail; a skill \
-for a procedure), the current repo's own agent docs for a rule about that \
-repo only. If ai-config is not in this session, attach or clone it first. \
-Do this even when the rule is "obvious" -- that it had to be said is the \
-evidence it was not encoded.
-3. If the miss is mechanically detectable, add a hook for it in the same PR.
-4. Project or host memory may get a copy too, but never instead: no other \
-project reads it.
-A correction phrased as a question ("why didn't you ...?") still needs an \
-answer; give it and record the rule. The same holds in a project thread and \
-in a PR review comment.
-If the matched words are not a correction of you (quoted text, a remark \
-about someone else), ignore this reminder. See AGENTS.md "Treat user \
-profanity and frustration as urgent defect signals" and CLAUDE.md \
-"Encoding reusable feedback into ai-config"."""
+# The reminder is prose, so it lives in a Markdown file with semantic line
+# breaks rather than in a string literal here (shared/coding/prose-in-files.md).
+# realpath, not abspath: the plugin registers hooks through a symlinked path
+# (scripts/check-hook-file-resolution.py).
+MESSAGE = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                       "messages", "remind-encode-user-correction.md")
+FALLBACK = ("[hook: remind-encode-user-correction] The user's message reads as a "
+            "correction (\"{quote}\"); its full reminder file is missing: "
+            "encode the general rule in its repo this turn.")
+
+
+def reminder(quote: str) -> str:
+    try:
+        with open(MESSAGE, encoding="utf-8") as handle:
+            text = handle.read().rstrip("\n")
+    except OSError:
+        text = FALLBACK
+    return text.replace("{quote}", quote)
 
 
 EVENT = re.compile(r"<event\b[^>]*\bsource=\"github\"[^>]*>(.*?)</event>", re.DOTALL)
@@ -202,7 +196,7 @@ def main() -> int:
     if match is None:
         return 0
     quote = " ".join(match.group(0).split())[:80]
-    print(REMINDER.format(quote=quote))
+    print(reminder(quote))
     return 0
 
 

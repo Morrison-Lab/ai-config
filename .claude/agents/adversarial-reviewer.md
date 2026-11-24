@@ -524,3 +524,11 @@ On a transcript or report where the agent told the user a PR was ready for revie
 Report a ready claim made while the preview deploy was queued or running, or made from a preview read older than the last push.
 `hooks/no-ready-before-preview.py` catches the common wordings; report the ones it missed.
 See [`check-the-renders`](../../shared/workflow/check-the-renders.md).
+
+## Long prose built inline in code
+
+On a diff that adds or edits a hook or script, check that a message or prompt longer than a few lines lives in a `.md` or `.txt` file the code reads, not in a triple-quoted string or a run of concatenated literals.
+Report the inline block and the file it belongs in.
+`scripts/check-hook-prose-literals.py` catches long literals in hooks.
+Read the diff yourself rather than report its verdict.
+See [`prose-in-files`](../../shared/coding/prose-in-files.md).

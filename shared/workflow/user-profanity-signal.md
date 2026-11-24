@@ -84,6 +84,21 @@ When a user uses profanity or displays intense frustration:
    per [`no-empty-promises.md`](no-empty-promises.md)
    and [`fixing-mistakes-is-top-priority.md`](fixing-mistakes-is-top-priority.md).
 
+## "Why didn't you" questions get a forensic analysis
+
+When the user asks why you did or did not do something that turned out wrong, do a forensic analysis before answering (Ezra, 2026-11-24: "when I ask you 'why didn't you...' questions, you should do a forensic analysis, and if you made a mistake, take action to prevent recurrence").
+
+1. Reconstruct what happened from evidence: the transcript, the tool calls and their results, the files you read or skipped, and the rules and hooks in force at the time.
+   A plausible story is not an analysis.
+2. Name the cause: the rule you followed or missed, the page you did not read, the check that did not exist or did not run.
+3. If it was your mistake, fix the instance, then prevent recurrence in the same turn: the general rule in its owning repo, and a hook or check when the miss is decidable.
+   Do not ask whether to start; preventing your own mistake is owed ([`start-or-file`](start-or-file.md)).
+4. Answer with the cause and what you did about it, in the past tense.
+
+The questions that led here were "why didn't you fix the missing curl package?"
+(a pre-existing failure noted instead of fixed, psw#703) and "why did you write a double inequality?"
+(a math edit in pds not checked against psw's notation pages, pds#492).
+
 ## Summary
 
 - **Do:** treat user profanity, frustration, a correction, or a repeat request as a critical defect alert.

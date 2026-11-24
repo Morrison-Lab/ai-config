@@ -244,6 +244,22 @@ Unlike the rule above, this excuse names the pin, so it has a lexical shape a ho
 `hooks/no-stale-pin-macro-excuse.py` is that backstop, not a proof: it denies a reply, a forge post, a PR body or a commit message where one sentence or two adjacent ones name a macro and the pin, say the pin lacks it, and say the macro was kept out;
 a sentence that moves the pin with no "not", "later" or "will", or one that quotes the rule, passes.
 
+**Read a macro's definition before saying what it prints or whether it renders the same.**
+A macro defined as the raw symbol (`\covmat` is `\Sigma`) prints exactly what the surrounding text prints, so using it in the lines you edit mixes nothing a reader can see.
+A macro's name does not say what it prints either.
+
+- **Do:** grep `macros.qmd` for the definition and quote it, before declining a macro for consistency or describing its output;
+  if it renders identically, use the macro in the lines you edit.
+- **Don't:** cite consistency with surrounding raw LaTeX as a reason to skip a render-identical macro.
+- **Don't:** describe a macro's output from its name or from another repository's convention.
+- Example 1 ([Morrison-Lab/lds#3144](https://github.com/Morrison-Lab/lds/pull/3144), 2026-11-24):
+  an agent declined `\covmat` for `\Sigma` in one subfile, saying it "would need the whole chapter changed" for consistency.
+  `\covmat` is defined as `\Sigma`, so a per-file swap renders identically.
+- Example 2 (same session):
+  an agent told Ezra that `\vx` "prints a bold x".
+  `\def\vx{\vecf{x}}` and `\vecf` is an underset `\sim`, so `\vx` prints x with a tilde underneath (`latex-macros/macros.qmd`, lines 522 and 528).
+- A macro that changes the rendering is a real consistency concern: `\detf` prints $\det(\cdot)$ where neighbouring text may print $|\cdot|$.
+
 ### 7. Verify the render and spellcheck, then ship
 
 Run the raw-notation lint over what you changed, from the repository root:

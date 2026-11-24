@@ -155,7 +155,9 @@ Measured 2026-11-23 on [mds#865](https://github.com/Morrison-Lab/mds/pull/865).
 Ezra tapped "Merge it" on a decision card in the thread and then typed "mwr mds#865" there.
 `hooks/no-unauthorized-merge.py` refused the merge three times.
 It reads a grant only from a typed user record, or from a record with `promptSource=sdk` and `origin.kind=human`, and a project-thread wake is neither.
-The auto-mode classifier also denied `enable-mwc`, and it denied filing an issue about the gap, so the gap is untracked as of this entry.
+The auto-mode classifier also denied `enable-mwc`.
+The gap is tracked in [ai-config#6096](https://github.com/Morrison-Lab/ai-config/issues/6096), filed 2026-11-24 once a retry was accepted.
+`hooks/no-unnamed-repo-pr.py` has the same gap: it denied this entry's PR after Ezra said "daytb" to opening it, because his words reached the thread only as a coordinator relay citing them.
 Ezra merged the PR himself with GitHub's Merge button.
 
 A link-only `.qmd` PR, [mds#882](https://github.com/Morrison-Lab/mds/pull/882), merged from the same thread under the standing "hyperlink changes count as infra" grant.

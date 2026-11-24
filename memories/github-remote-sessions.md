@@ -593,9 +593,9 @@ and on the user's Mac it failed at once with `cd: no such file or directory: /ho
 - **Don't:** paste a command containing `/home/user/`, `/tmp/claude-0/`
   or another container path as something for the user to run.
 
-## Three call forms that fail on first try (2026-11-19)
+## Call forms that fail on first try
 
-Measured 2026-11-19 in a claude.ai cloud session.
+Measured in claude.ai cloud sessions on the dates each entry gives (2026-11-19 unless stated).
 
 - **Do:** search issues over REST with `gh api -X GET search/issues -f q='repo:<owner>/<repo> is:issue <terms>'`.
   In a cloud session the query must include `is:issue` or `is:pull-request`.
@@ -607,5 +607,6 @@ Measured 2026-11-19 in a claude.ai cloud session.
 - **Don't:** pass `repo: "<owner>/<repo>"` alone, which the tool refuses with nothing attached.
 - **Do:** when `mcp__github__create_pull_request` times out with "timed out after 60s",
   look for the PR before retrying, with `gh api -X GET search/issues -f q='repo:<owner>/<repo> is:pr head:<branch>'`.
+  The short qualifier `is:pr` satisfies the cloud session's type check: that query returned the PR on 2026-11-24.
   On 2026-11-24 the call timed out but had opened [ai-config#6098](https://github.com/Morrison-Lab/ai-config/pull/6098).
 - **Don't:** resend the create call after a timeout, which can open a duplicate PR.

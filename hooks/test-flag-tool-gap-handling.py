@@ -65,6 +65,13 @@ CASES = [
      "tool is missing", "'haven't been able to render' warns"),
     ([say("I haven't tested it, because pytest isn't installed.")],
      "tool is missing", "'haven't tested' warns"),
+    ([say("I couldn't build the PDFs here because this container's LaTeX is too "
+          "old for the exam template.")], "tool is missing",
+     "a too-old toolchain warns (mlg thread, 2026-11-24)"),
+    ([say("I couldn't render it, since the Quarto version here is outdated.")],
+     "tool is missing", "an outdated version warns"),
+    ([say("I couldn't update the page because its text is out of date.")], None,
+     "out-of-date prose is not a tool"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

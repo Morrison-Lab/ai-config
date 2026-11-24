@@ -46,11 +46,16 @@ SKIPPED = (r"(?:skipp(?:ed|ing)|couldn['\u2019]?t|could not|can['\u2019]?t|canno
 TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
         r"|dependenc(?:y|ies)|modules?|binary|binaries|cli|extensions?"
         r"|compilers?|runtimes?)\b")
+# Ezra, 2026-11-24, on "LaTeX is too old for the exam template":
+# "cai: never make excuses like this; install the software you need".
+_STALE = r"(?:\S+\s+){0,3}?(?:outdated|out of date)\b"
+OLD = rf"\btoo old\b|\b(?:version|release)\s+{_STALE}|{TOOL}\s+{_STALE}"
 MISSING = (r"(?:(?:isn['\u2019]?t|is not|aren['\u2019]?t|are not|wasn['\u2019]?t|not) installed"
            rf"|{TOOL}\s+(?:\S+\s+){{0,3}}?(?:lacks|lacked|missing)\b"
            rf"|(?:lacks|lacked|missing)\s+(?:\S+\s+){{0,3}}?{TOOL}"
            r"|(?:isn['\u2019]?t|is not|not) (?:available|present)"
-           r"|(?:no|without) (?:\S+ ){0,3}(?:installed|interpreter))")
+           r"|(?:no|without) (?:\S+ ){0,3}(?:installed|interpreter)"
+           rf"|{OLD})")
 FIXED = re.compile(r"\b(?:i|we) (?:installed|have installed|then installed)\b"
                    r"|\binstalled (?:it|them|that)\b", re.I)
 EXCUSE = re.compile(

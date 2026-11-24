@@ -441,6 +441,12 @@ Working set for a typical
   libfontconfig1-dev libfreetype6-dev libharfbuzz-dev libfribidi-dev libpng-dev
   libtiff5-dev libjpeg-dev` (gha's `preview` reusable workflow's default
   `apt-packages` list is the fuller reference).
+  2nd occurrence, 2026-11-24, without renv: psw's `lint-changed-files` ran a bare
+  `install.packages(c("lintr", "gh", ...))` on ubuntu-latest (26.04, resolute).
+  Posit Package Manager had no resolute binary of curl 8.2.0, so curl built from
+  source, failed on `curl/curl.h`, and `gh` would not load.
+  Fixed by an apt step for `libcurl4-openssl-dev` before the install (psw#707).
+  Any workflow that installs R packages, renv or not, needs the apt step.
 - Diagnostic order matters: the TinyTeX 403 masks the renv gap — fixing the first
   failure surfaces the second on the next run, so read each new failed run's log
   fresh instead of assuming the prior diagnosis still applies.

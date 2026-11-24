@@ -132,9 +132,12 @@ evidence it was not encoded.
 3. If the miss is mechanically detectable, add a hook for it in the same PR.
 4. Project or host memory may get a copy too, but never instead: no other \
 project reads it.
-A correction phrased as a question ("why didn't you ...?") still needs an \
-answer; give it and record the rule. The same holds in a project thread and \
-in a PR review comment.
+A "why didn't you ...?" question gets a forensic analysis, not a guess: \
+trace from the transcript, tool results, files and standing rules what you \
+did and which rule, reading or missing check led there, and answer with that \
+cause. If it was your mistake, fix the instance and prevent recurrence (rule \
+plus hook or check) in the same turn, without asking whether to start. The \
+same holds in a project thread and in a PR review comment (Ezra, 2026-11-24).
 If the matched words are not a correction of you (quoted text, a remark \
 about someone else), ignore this reminder. See AGENTS.md "Treat user \
 profanity and frustration as urgent defect signals" and CLAUDE.md \

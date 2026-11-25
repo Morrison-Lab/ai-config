@@ -1231,6 +1231,21 @@
         ]
       },
       {
+        "matcher": "mcp__claude-code-remote__create_session|mcp__Claude_Code_Remote__create_session|mcp__claude-code-remote__send_message|mcp__Claude_Code_Remote__send_message",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-handoff-of-denied-action.py\"'",
+            "timeout": 10,
+            "script": "no-handoff-of-denied-action.py",
+            "why": "ai-config#5914, 2026-11-18: a parent session saw the classifier deny a child session's `opencode run` and two merge calls in a list_events result, then started a second session whose opening prompt told it to make the same attempt. Denies a create_session prompt or send_message message that carries, verbatim, a command or tool input recorded as denied (a `permission_denials` entry, or the auto-mode classifier marker) in a read of another session, unless a later typed user message names the action and the session.",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only on a verbatim match with no later typed user release; fails open on unreadable input. Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {

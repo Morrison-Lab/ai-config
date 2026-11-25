@@ -50,8 +50,9 @@ TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
 # "cai: never make excuses like this; install the software you need".
 _STALE = (r"(?:(?!not\b|never\b|\w+n['’]?t\b)\S+\s+){0,3}?"
           r"(?:outdated|out of date)\b")
-OLD = (rf"\btoo old\b|\b(?:version|release)\s+{_STALE}|{TOOL}\s+{_STALE}"
-       rf"|\b(?:outdated|out[- ]of[- ]date)\s+(?:version|release|copy|{TOOL})")
+_NEG = r"(?<!not )(?<!n't )(?<!n’t )(?<!not an )(?<!not a )"
+OLD = (rf"{_NEG}\btoo old\b|\b(?:version|release)\s+{_STALE}|{TOOL}\s+{_STALE}"
+       rf"|{_NEG}\b(?:outdated|out[- ]of[- ]date)\s+(?:version|release|copy|{TOOL})")
 MISSING = (r"(?:(?:isn['\u2019]?t|is not|aren['\u2019]?t|are not|wasn['\u2019]?t|not) installed"
            rf"|{TOOL}\s+(?:\S+\s+){{0,3}}?(?:lacks|lacked|missing)\b"
            rf"|(?:lacks|lacked|missing)\s+(?:\S+\s+){{0,3}}?{TOOL}"
@@ -61,7 +62,9 @@ MISSING = (r"(?:(?:isn['\u2019]?t|is not|aren['\u2019]?t|are not|wasn['\u2019]?t
 FIXED = re.compile(r"\b(?:i|we) (?:installed|have installed|then installed)\b"
                    r"|\binstalled (?:it|them|that)\b", re.I)
 EXCUSE = re.compile(
-    rf"(?:{SKIPPED}[^.\n]{{0,120}}{MISSING}|{MISSING}[^.\n]{{0,120}}{SKIPPED})",
+    # A dot inside a version number ("Python 3.8") does not end the span.
+    rf"(?:{SKIPPED}(?:[^.\n]|\.(?=\d)){{0,120}}{MISSING}"
+    rf"|{MISSING}(?:[^.\n]|\.(?=\d)){{0,120}}{SKIPPED})",
     re.I)
 
 # "excuse" alone is not enough: "No excuse, I skipped the tests because pytest is

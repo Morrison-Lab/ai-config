@@ -108,6 +108,12 @@ CASES = [
      None, "a contracted 'isn't outdated' is no excuse"),
     ([say("I skipped the migration because the schema is too old.")], None,
      "an old schema is not an old tool"),
+    ([say("I couldn't render it even though LaTeX is not too old.")], None,
+     "'not too old' is no excuse"),
+    ([say("I couldn't render it because this is not an outdated version of "
+          "LaTeX.")], None, "'not an outdated version' is no excuse"),
+    ([say("I couldn't build the docs because Python 3.8 is too old for this "
+          "package.")], "tool is missing", "a dotted version number does not end the span"),
     ([say("I couldn't render it because this container has an out of date "
           "version of LaTeX.")],
      "tool is missing", "an unhyphenated out of date version warns"),

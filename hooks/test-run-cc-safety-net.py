@@ -43,6 +43,10 @@ if (cwd === '') {
   process.stdout.write(JSON.stringify({hookSpecificOutput: {
     hookEventName: 'PreToolUse', permissionDecision: 'deny',
     permissionDecisionReason: 'fake deny'}}));
+} else if (d.includes('--delete') && d.includes('NONDICTSPEC')) {
+  process.stdout.write(JSON.stringify({hookSpecificOutput: 'not a dict'}));
+  process.stderr.write('BLOCKED by CC Safety Net Rule: git.push-delete');
+  process.exit(2);
 } else if (d.includes('--delete') && d.includes('ASKDELETE')) {
   process.stdout.write(JSON.stringify({hookSpecificOutput: {
     hookEventName: 'PreToolUse', permissionDecision: 'ask',
@@ -509,21 +513,34 @@ class TypedApprovalLiftsOnePushDelete(unittest.TestCase):
         self.assertEqual(self.decision(proc), "deny")
         self.assertNotIn("approve-push-delete", proc.stdout)
 
-    def test_a_crash_in_the_check_keeps_the_deny(self):
+    def test_any_error_in_the_check_passes_the_deny_through(self):
         scripts = self.box.root / "scripts"
         scripts.unlink()
         lib = scripts / "lib"
         lib.mkdir(parents=True)
-        for item in (HOOK.parent.parent / "scripts" / "lib").iterdir():
+        source = HOOK.parent.parent / "scripts" / "lib"
+        for item in source.iterdir():
             if item.name != "push_delete_approval.py":
                 (lib / item.name).symlink_to(item)
-        (lib / "push_delete_approval.py").write_text(
-            "PREFIX = 'approve-push-delete'\nWINDOW = 1800\n"
-            "def leased_delete_push(command):\n    raise RuntimeError('boom')\n",
-            encoding="utf-8")
-        proc = self.run_with([self.user(f"approve-push-delete {self.key}")])
-        self.assertEqual(self.decision(proc), "deny")
-        self.assertIn("answer stands", proc.stderr)
+        real = (source / "push_delete_approval.py").read_text(encoding="utf-8")
+        for name, error in (("leased_delete_push", "RuntimeError"),
+                            ("approval_key", "AttributeError")):
+            with self.subTest(name=name):
+                (lib / "push_delete_approval.py").write_text(
+                    f"{real}\ndef {name}(command):\n    raise {error}('boom')\n",
+                    encoding="utf-8")
+                proc = self.run_with([self.user(f"approve-push-delete {self.key}")])
+                self.assertEqual((self.decision(proc), proc.returncode), ("deny", 0))
+                self.assertNotIn("Traceback", proc.stderr)
+                self.assertIn("answer stands", proc.stderr)
+
+    def test_a_non_dict_hook_output_keeps_the_deny_without_crashing(self):
+        for records in ([], [self.user("go")]):
+            with self.subTest(records=len(records)):
+                proc = self.run_with(records, cwd=str(self.box.root / "NONDICTSPEC"))
+                self.assertEqual(proc.returncode, 2, proc.stderr)
+                self.assertNotIn("Traceback", proc.stderr)
+                self.assertIn(f"approve-push-delete {self.key}", proc.stderr)
 
     def test_an_ask_is_not_a_deny_and_is_left_alone(self):
         proc = self.run_with([self.user(f"approve-push-delete {self.key}")],

@@ -1,39 +1,24 @@
 """A typed approval for one exact lease-pinned branch-deleting push.
 
-CC Safety Net's `git.push-delete` rule refuses every `git push --delete`
-from an agent, and nothing the user can say in chat lifts it: the only
-routes were the user running the push in their own terminal, or relaxing
-the rule for every command (ai-config#6117, after the 12 merged `lds`
-branches Ezra approved on 2026-11-20 stayed undeletable for four days).
+CC Safety Net's `git.push-delete` rule refuses every agent
+`git push --delete`, and nothing said in chat lifted it (ai-config#6117).
+`hooks/run-cc-safety-net.py` passes one such push only when all hold:
 
-This module lets `hooks/run-cc-safety-net.py` pass exactly one such push
-when, and only when, all of these hold:
+- The deny names `git.push-delete` as its only rule (`sole_push_delete_deny`).
+- The command is `git push https://github.com/<o>/<r>
+  --force-with-lease=refs/heads/<b>:<sha> ... --delete <b> ...` and nothing
+  else: every deleted branch is leased to its 40-hex tip and every lease is
+  deleted, so GitHub refuses a branch that moved (`leased_delete_push`).
+- The user TYPED a line reading only `approve-push-delete <key>` within
+  `WINDOW` seconds; `<key>` is the first `KEY_HEX` hex digits of the raw
+  command's sha256 (`approval_key`), so one changed byte is another key.
+  "Typed" is the merge hooks' `_typed_text`: reminders, coordinator notes,
+  non-principal messages and card taps (whose label the agent wrote) are
+  removed.
 
-- CC Safety Net's deny names `git.push-delete` as its only rule
-  (`sole_push_delete_deny`), so no other reason is dropped with it.
-- The command is `git push <github-url> --force-with-lease=refs/heads/<b>:<sha>
-  ... --delete <b> ...` and nothing else: every deleted branch carries a
-  lease naming its 40-character tip, and every lease names a deleted
-  branch. A branch that moved since it was checked is then refused by
-  GitHub itself. No other option, no shell operator, no expansion
-  (`leased_delete_push`).
-- The user TYPED a line reading only `approve-push-delete <key>` in this
-  session within the last `WINDOW` seconds, where `<key>` is the first 32
-  hex digits of the command's sha256 (`approval_key`), hashed exactly as
-  the command arrives. One changed byte, whitespace included, is a
-  different key. A line that only mentions the approval ("do not
-  approve-push-delete <key>") does not count.
-  "Typed" is the merge hooks' rule (`_typed_text` in
-  `block-merge-without-clean-checker.py`): a user-role text block, with
-  system reminders, coordinator notes, non-principal messages and
-  decision-card taps removed. A card tap is refused because the agent
-  wrote its label.
-
-The approval never covers another command, so it cannot be widened. It is
-not consumed: within the window the same command is allowed again, so a
-push that failed on the network can be retried. Repeating it after it ran
-is harmless: its leases then name branches that no longer exist, and
-GitHub refuses the push.
+The approval is not consumed: a push that failed on the network can be
+retried within the window, and one that ran fails at GitHub, its leased
+branches gone.
 
 LIMIT, shared with every typed-words gate in ai-config: an agent that can
 write to its own transcript file could forge a user record. The window

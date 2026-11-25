@@ -57,8 +57,10 @@ Ezra, 2026-11-20 09:16 PST: "i shouldn't need to approve opening PRs".
 On the same day's follow-up (2026-11-25), the classifier denied turning `no-unrequested-sweep-pr.py`'s 10-PR cap from a deny into a warning as "Undermining Oversight".
 
 - **Do:** after one such denial, stop, stash the half-applied edit (`git stash push -- <paths>`), and give Ezra the exact line to type in the thread, in a fenced block.
-- **Don't:** reword the denied edit or split it across tools; each new shape is the same action.
+- **Don't:** reword the denied edit or split it across tools.
+  Each new shape is the same action.
 - **Do:** in a cloud ai-config checkout, read and search files with Read, Grep and Edit (`replace_all` for a bulk rename);
   `prefer-dedicated-tools-over-bash` denies `sed`, `grep`, `tail` and `cat` on files, and `prefer-mcp-over-bash-in-cloud` denies `gh api repos/...` (only `gh api search/...` passes).
 - **Don't:** retry a refused GitHub read unchanged: the refused attempt still counts for `no-tight-github-polling`, so the retry needs `ALLOW_REPEAT_GITHUB_READ=1`.
-- **Do:** make a second branch with `git worktree add`; switching the main checkout's branch is refused.
+- **Do:** make a second branch with `git worktree add`.
+  Switching the main checkout's branch is refused.

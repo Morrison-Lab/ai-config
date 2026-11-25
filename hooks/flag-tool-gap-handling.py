@@ -129,21 +129,20 @@ def excuse(text):
     if FIXED.search(text):
         return None
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
-        if nontool_subject(sentence):
-            continue
         for m in EXCUSE.finditer(sentence):
-            # A clause that names the excuse as such describes the rule or a hook
-            # for it ("refuses a post that excuses skipped work because ..."), not
-            # a skip. Only the clauses this match spans count, so "The hook says
-            # no excuses; I skipped the tests because pytest is not installed"
-            # still warns, and so does a second, real excuse after an exempt one.
-            if not RULE_TALK.search(_clauses_around(sentence, m.start(), m.end())):
+            # A match is exempt when the clauses it spans describe the rule
+            # ("refuses a post that excuses skipped work because ...") or name a
+            # non-tool subject ("the template is too old"). Only those clauses
+            # count, so "The hook says no excuses; I skipped the tests because
+            # pytest is not installed" still warns.
+            window = _clauses_around(sentence, m.start(), m.end())
+            if not (RULE_TALK.search(window) or nontool_subject(window)):
                 return sentence.strip()[:160]
             # The match can run across a clause break into a real excuse, so
-            # drop the rule-talk clauses and test what is left as one text,
-            # which keeps an excuse whose halves sit in two clauses.
+            # drop the exempt clauses and test what is left as one text, which
+            # keeps an excuse whose halves sit in two clauses.
             rest = " ".join(c for c in CLAUSE_BREAK.split(sentence)
-                            if not RULE_TALK.search(c))
+                            if not (RULE_TALK.search(c) or nontool_subject(c)))
             if EXCUSE.search(rest):
                 return sentence.strip()[:160]
     return None

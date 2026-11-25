@@ -86,9 +86,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -387,6 +387,7 @@ cookieconsent.run({
   <li><a href="#slide-tag" id="toc-slide-tag" class="nav-link active" data-scroll-target="#slide-tag">Slide Tag</a>
   <ul class="collapse">
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
+  <li><a href="#never-ask-before-sliding-an-infra-tag" id="toc-never-ask-before-sliding-an-infra-tag" class="nav-link" data-scroll-target="#never-ask-before-sliding-an-infra-tag">Never ask before sliding an infra tag</a></li>
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
   <li><a href="#determine-tag-and-target" id="toc-determine-tag-and-target" class="nav-link" data-scroll-target="#determine-tag-and-target">1. Determine tag and target</a></li>
@@ -421,6 +422,20 @@ cookieconsent.run({
 <li>After merging work to main when the repo uses floating version tags</li>
 </ul>
 </section>
+<section id="never-ask-before-sliding-an-infra-tag" class="level2">
+<h2 class="anchored" data-anchor-id="never-ask-before-sliding-an-infra-tag">Never ask before sliding an infra tag</h2>
+<p>Ezra, 2026-11-20: “never ask me before sliding an infra tag; always just do it” (<a href="https://github.com/Morrison-Lab/ai-config/issues/6052">ai-config#6052</a>). A floating tag in an infrastructure repo (gha’s <code>v3</code>, any lab repo whose consumers pin a major tag) moves forward without anyone’s leave. Whichever agent finishes an infra PR, by merging it or by hearing that it merged, slides the tag once the gates in step 3 pass. That agent does not hand the slide to a runner thread, the coordinator or the user, and does not wait for a typed “slide v3”. A gate that fails is a hold, not a question: say which gate failed, fix or wait on it, and slide when it clears. Two agents sliding at once are safe, because gha’s <code>slide-major-tag.yml</code> takes <code>expected_sha</code> and refuses a commit nobody checked. The workflow tags main’s head, so it also refuses when main moved past <code>expected_sha</code> before it ran. That refusal is a hold too. Wait for CI on the new main head to finish, then dispatch again with that head as <code>expected_sha</code> (gha#2181, 2026-11-22: main gained gha#2185 and gha#2184 while CI ran on the first merge commit). <code>hooks/no-ask-to-slide-tag.py</code> denies a message that asks leave to slide a tag or hands the slide to someone else.</p>
+<ul>
+<li><strong>Do:</strong> dispatch the slide yourself after the gates pass, then report the old SHA, the new SHA and the PRs the tag now carries.</li>
+<li><strong>Don’t:</strong> end a turn with “want me to slide v3?” or “the runner thread slides v3” after merging an infra PR.</li>
+</ul>
+<p>A merge ends the PR’s activity subscription, so nothing wakes you when CI on the merge commit finishes. After the merge, poll that commit’s runs in a background loop that exits when they are all terminal, and slide as soon as it exits. A fixed one-shot timer does not do this job: on gha#2180 (2026-11-21) main went green within minutes, while a 15-minute timer left the slide undone until Ezra asked why.</p>
+<ul>
+<li><strong>Do:</strong> start a polling loop on the merge commit’s workflow runs right after the merge.</li>
+<li><strong>Don’t:</strong> arm a fixed-delay reminder and treat the wait as covered.</li>
+</ul>
+<p>Moving a tag <strong>backward</strong> is not covered: it still needs explicit confirmation (see “Edge cases”).</p>
+</section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
 <section id="determine-tag-and-target" class="level3">
@@ -441,7 +456,7 @@ cookieconsent.run({
 </section>
 <section id="show-whats-moving" class="level3">
 <h3 class="anchored" data-anchor-id="show-whats-moving">3. Show what’s moving</h3>
-<p>Display the before/after so the user can sanity-check:</p>
+<p>Display the before/after, so the report can name what moved (this is a record, not a request for approval):</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">"Current: </span><span class="va">$(</span><span class="fu">git</span> log <span class="at">--oneline</span> <span class="at">-1</span> <span class="op">&lt;</span>tag<span class="op">&gt;</span><span class="va">)</span><span class="st">"</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">"Target:  </span><span class="va">$(</span><span class="fu">git</span> log <span class="at">--oneline</span> <span class="at">-1</span> <span class="op">&lt;</span>target<span class="op">&gt;</span><span class="va">)</span><span class="st">"</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">"Commits being added:"</span></span>
@@ -487,7 +502,8 @@ User: "slide v3 to the release branch"
 <ul>
 <li>❌ Using <code>git push --force origin &lt;tag&gt;</code> without trying delete first</li>
 <li>❌ Sliding without fetching first (tag might already be at target)</li>
-<li>❌ Sliding without showing the user what commits are being added</li>
+<li>❌ Sliding without reporting what commits were added</li>
+<li>❌ Asking anyone’s leave for a forward slide, or leaving it to a runner thread</li>
 <li>❌ Moving a tag backward without explicit confirmation</li>
 </ul>
 </section>

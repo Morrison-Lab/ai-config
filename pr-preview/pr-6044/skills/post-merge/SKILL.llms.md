@@ -338,7 +338,7 @@ In most repos the merge *is* the delivery, and this step is a no-op. In a repo w
 
 `Morrison-Lab/gha` is the case to recognize. A capability ships with `examples/<name>.yml` and `website/reference/<name>.qmd` stubs pinning `@v2`, but `@v2` moves only when someone dispatches `slide-major-tag.yml` — so a consumer who copies a stub literally between merge and slide gets `workflow-not-found`, per that repo’s own README. The same holds for any tag-, registry-, or release-gated artifact: a version bump merged but unpublished, a submodule pin not yet bumped in its consumer.
 
-Two things make this the step that gets skipped rather than deferred. Nothing turns red — CI passed, the PR is green and merged, and the failure lands on a consumer who is not in the room. And the slide is destructive (it force-moves a tag), so it needs explicit human authorization and cannot simply be folded into the tidy, which is exactly why it evaporates instead: a step you are not allowed to perform is easy to stop tracking.
+Two things make this the step that gets skipped rather than deferred. Nothing turns red — CI passed, the PR is green and merged, and the failure lands on a consumer who is not in the room. And the slide force-moves a tag, which once read as needing a human’s word, so it was left out of the tidy and evaporated. It needs no word: for an infra repo’s forward slide, Ezra’s standing rule is “never ask me before sliding an infra tag; always just do it” (2026-11-20, [ai-config#6052](https://github.com/Morrison-Lab/ai-config/issues/6052)). So when a slide is owed, run [`slide-tag`](../../skills/slide-tag/SKILL.llms.md) yourself once its gates pass, as part of this step.
 
 Decide it mechanically rather than from memory of what the PR touched — two lookups settle it, so this is an [`algorithmatize-checks`](../../shared/workflow/algorithmatize-checks.md) case:
 
@@ -349,11 +349,12 @@ git rev-parse 'v2^{}' origin/main   # equal means current; different means a sli
 
 Keep the `^{}`. It peels a tag to the commit it names, and without it an **annotated** tag resolves to its own tag-object SHA instead — which never equals a commit SHA, so the check would report a slide owed on every run and become noise rather than an instrument. A lightweight tag resolves the same either way, so the peeled form is correct for both and there is no case where dropping it helps. (`slide-tag` reads a tag with `git log --oneline -1 <tag>`, which peels for the same reason.)
 
-Then raise it as a `⚠️ **FLAG** ---` in step 5’s report, naming the tag and what is unreachable until it moves. An offer is not a flag: say plainly that the slide is owed and that it needs the human, the same way [`report-mistakes-proactively`](../../shared/workflow/report-mistakes-proactively.md) rules out offering to file an issue instead of filing it.
+Then slide it, and report the old and new SHAs in step 5. If a gate holds the slide, raise a `⚠️ **FLAG** ---` naming the tag, the gate, and what is unreachable until it moves. An offer is not a slide: never close with “want me to slide it?”, the same way [`report-mistakes-proactively`](../../shared/workflow/report-mistakes-proactively.md) rules out offering to file an issue instead of filing it.
 
 - **Do:** compare the release ref against `main` after the merge, and flag the gap with the specific tag and the affected consumer-facing paths.
 - **Do:** run the comparison on every merge rather than first judging whether the repo looks release-gated — it costs two commands and prints nothing to act on when the SHAs match, so the comparison *is* the classifier.
-- **Don’t:** run the release step yourself when it force-moves a ref or publishes — that is the human-gated action `ardi` reserves for explicit authorization.
+- **Do:** slide an infra repo’s floating tag forward yourself once `slide-tag`’s gates pass, without asking.
+- **Don’t:** run a release step that publishes a versioned release, or moves a tag backward, without explicit authorization.
 - **Don’t:** report a merged PR wrapped up while the artifact it documents is still unreachable at the version its own docs name.
 
 (gha#357, 2026-07-30: three new reusable workflows merged as `159dbf4` while `v2` still pointed at `c50e847`, so every `@v2` line in the new capabilities’ own stubs named a workflow that did not exist yet. Found only by an ad-hoc `rev-parse` at the end of the tidy, after steps 1 through 3 had already reported clean.)
@@ -435,7 +436,7 @@ Then a linked summary: the merged PR, the auto-closed issue, any deferred follow
 - **`wrap-up`** — session-level bookend; also embeds UMS. `post-merge` is the per-PR version: run it each time a PR lands; run `wrap-up` once at session end. They share the verify-then-UMS shape.
 - **`ums`** — step 4 invokes it.
 - **`spot-skill-opportunities`** — step 4’s “multi-step pattern that emerged” bullet routes here to judge recurrence before handing off to `skill-builder`.
-- **`slide-tag`** – what step 3.5’s flag asks the human to authorize; it does the force-move, this skill only detects that one is owed.
+- **`slide-tag`** – what step 3.5 runs when a slide is owed; it does the force-move, and this skill decides when one is owed.
 - **`cb` / `clean-branches`** — for stacked or stale sibling branches.
 - **`clean-worktrees` / `cw`** — if the PR was built in a git worktree, remove it during the tidy (step 2); a leftover worktree pins its branch and blocks `git branch -d`.
 - **`st` / `gi`** — the front of the lifecycle that `post-merge` closes.
@@ -451,7 +452,7 @@ Then a linked summary: the merged PR, the auto-closed issue, any deferred follow
 - ❌ Recursing UMS on a UMS PR — running UMS again when the just-merged PR was itself the learnings PR, restating lessons it already banked (see step 4’s guard). The chain has to terminate somewhere.
 - ❌ Leaving deferred/acknowledged items without follow-up issues.
 - ❌ Reporting an ai-config merge wrapped up without step 3.75’s `--fix` run – whatever hooks are owed stay merged, documented, and inert, which is the deferred-step-with-no-owner shape this skill’s own step 3.75 exists to close, arriving one level up in the checklist meant to catch it.
-- ❌ Calling a merge wrapped up in a release-gated repo without comparing the release ref against `main` (step 3.5) – the merged docs pin a version consumers cannot resolve until a human slides the tag.
+- ❌ Calling a merge wrapped up in a release-gated repo without comparing the release ref against `main` (step 3.5) – the merged docs pin a version consumers cannot resolve until the tag slides.
 - ❌ Reporting “all cleaned up” while a stacked sibling branch dangles unmentioned.
 - ❌ Treating the whole cascade-scan hit list as work caused by this merge, without intersecting it against the merge’s own deleted and renamed paths (step 1.5’s own step 2) — on an old backlog that claims other people’s stale PRs for no reason.
 - ❌ Pushing to, or commenting on, a PR that fails the scope test — it gets a report to the user — or pushing to a release branch carrying an out-of-band process even when it passes, where a report is the safe form.

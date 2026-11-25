@@ -51,9 +51,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -380,6 +380,10 @@ cookieconsent.run({
 <li>A request names a desired behavior without naming a mechanism – that’s the tell that this skill, not a specific builder skill, is the right entry point.</li>
 </ul>
 <p>Every message that starts with <code>cai:</code> or <code>ca:</code> runs this skill, in whichever session receives it. A coordinator session has no repository clone, so repo skills never load for it. A coordinator must therefore send every <code>cai:</code> message to a thread that has the clone and invokes this skill, and must not answer it itself. Step 2’s reuse check is the part that gets skipped when the skill is not invoked (<a href="https://github.com/Morrison-Lab/ai-config/issues/5219">ai-config#5219</a>).</p>
+<ul>
+<li><strong>Do:</strong> say in the first reply to a <code>cai:</code> message which mechanism the rule is going into and that its PR comes this turn, alongside any immediate fix.</li>
+<li><strong>Don’t:</strong> answer only the immediate fix and route the rule silently. Ezra, 2026-11-24, after a reply that only said TeX was being installed: “then why didn’t you say you were going to do it in your original response to my original <code>cai:</code> comment?” The user cannot tell a rule was heard from a reply that never names it. <code>hooks/no-cai-reply-without-routing.py</code> denies such a thread reply, and the <a href="../../.claude/agents/adversarial-reviewer.md"><code>adversarial-reviewer</code></a> checklist looks for it.</li>
+</ul>
 </section>
 <section id="step-0-restate-the-capability-not-the-mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="step-0-restate-the-capability-not-the-mechanism">Step 0 – Restate the capability, not the mechanism</h2>

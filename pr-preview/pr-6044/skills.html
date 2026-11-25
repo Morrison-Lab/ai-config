@@ -50,9 +50,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark-32280d01ff3a7ff5cbe701a37ed6ca11.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="site_libs/bootstrap/bootstrap-8d3ad9c781c51ccd60b292c95058b2c2.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-dark-b348d5b559a602027a1f18095d1d555f.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="site_libs/bootstrap/bootstrap-cb61c712ca1a7fe70a83faed8e4da2d7.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -560,26 +560,31 @@ cookieconsent.run({
 <td>Grant session-scoped permission to merge fully-clean PRs without asking per PR</td>
 </tr>
 <tr class="even">
+<td><a href="./skills/mwr/SKILL.html"><code>mwr</code></a></td>
+<td><code>mwrs</code>, <code>amwr</code></td>
+<td>Merge without a clean review while CI stays green, for named PRs, the session, or a repository marked in its <code>AGENTS.md</code></td>
+</tr>
+<tr class="odd">
 <td><a href="./skills/post-merge/SKILL.html"><code>post-merge</code></a></td>
 <td></td>
 <td>After a merge: checkout main, pull, delete branch, run UMS</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="./skills/clean-branches/SKILL.html"><code>clean-branches</code></a></td>
 <td><code>cb</code>, <code>prune</code></td>
 <td>Delete local branches already merged or closed</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="./skills/clean-worktrees/SKILL.html"><code>clean-worktrees</code></a></td>
 <td><code>cw</code></td>
 <td>Remove dead git worktrees left behind by merged PRs and ended sessions</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><a href="./skills/clean-git/SKILL.html"><code>clean-git</code></a></td>
 <td></td>
 <td>Sweep dead worktrees then dead branches in one pass, in the order that works</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><a href="./skills/resolve-conflicts/SKILL.html"><code>resolve-conflicts</code></a></td>
 <td><code>rmc</code></td>
 <td>Resolve merge/rebase/cherry-pick conflicts by consolidating the best of both branches</td>

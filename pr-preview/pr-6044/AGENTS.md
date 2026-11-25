@@ -43,6 +43,12 @@ Never send email for the user; draft it ([`never-send-email`](shared/workflow/ne
 Follow [`graph-and-equation-defaults`](shared/writing/graph-and-equation-defaults.md) for figures, visuals and display math.
 It sets the plotting library, axis titles and ticks, where to add a visual, equation layout and labels, and the macros all LaTeX math uses.
 
+## Define technical terms; never dodge them
+
+Never replace a technical term with a plain word to avoid defining it: use the term and define it, or link its definition ([`plain-prose`](shared/writing/plain-prose.md)).
+[`hooks/no-delete-flagged-term.py`](hooks/no-delete-flagged-term.py) blocks the case a check can see.
+A term no notes define yet is in no term list, so that case rests on this rule.
+
 ## Check external repository guidelines and PR template before filing
 
 Before filing a PR in an external repository, read and follow its `CONTRIBUTING.md` and `.github/pull_request_template.md`, never an internal template or memory.
@@ -125,7 +131,7 @@ See [`improve-your-subagents`](shared/workflow/improve-your-subagents.md).
 
 ## Treat user profanity and frustration as urgent defect signals
 
-Treat profanity, frustration, a correction, or a repeat request as an urgent defect: diagnose, fix it now, and in that turn commit the general rule to the repo that owns it (ai-config if it spans repos), never in project memory (`hooks/remind-encode-user-correction.py`).
+Treat profanity, frustration, a correction, a repeat request, or a "why didn't you" as an urgent defect: diagnose it forensically, fix it now, and that turn commit the rule to its repo (ai-config if it spans repos), not project memory (`hooks/remind-encode-user-correction.py`).
 See [`user-profanity-signal`](shared/workflow/user-profanity-signal.md).
 
 ## Status and diagnostic requests do not make issues report-only
@@ -190,6 +196,7 @@ Worktrees still share the stash stack and other repository state: see [`shared-g
 Fix a new rule's violations in passages you edit anyway.
 Sweep only if Ezra explicitly says "sweep" (`Sweep authorized:` in the PR body);
 checks default to changed lines.
+A brief never widens the ask: brief the asked step and offer the rest.
 See [`no-sweeps-by-default`](shared/workflow/no-sweeps-by-default.md).
 
 ## Timestamp recaps in local time
@@ -252,7 +259,8 @@ Beyond GitHub no hook can tell which Bash steps an MCP tool covers, so check the
 The reviewer's checklist item is in [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md#bash-where-a-cloud-mcp-tool-exists).
 
 The same holds beyond MCP and beyond cloud sessions: before a step that would ask the user for approval, take any idiomatic path that reaches the same result without a prompt (Ezra, 2026-11-15: "avoid asking for approvals when there's another idiomatic path forward", [#5687](https://github.com/Morrison-Lab/ai-config/issues/5687)).
-Edit a file with the Edit or Write tool rather than `sed -i` or a heredoc, and run each step as its own short command rather than chaining edits, commits and checks into one long command.
+Do file work with Read, Grep, Glob, Edit and Write, not `cat`, `grep`, `sed` or heredocs, keeping Bash for git and scripts (a hook denies these, [#6065](https://github.com/Morrison-Lab/ai-config/issues/6065)).
+Run each step as its own short command, not one chain of edits, commits and checks.
 Make this choice before the first attempt.
 After a classifier denial, [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md) and [`difm`](skills/do-it-for-me/SKILL.md) still govern: retry the identical command, never a rephrasing that gets around the denial.
 In a cloud session `hooks/no-chained-edit-and-commit-in-cloud.py` denies a command that chains an in-place edit (`sed -i`, `perl -i`, or a redirect into a file outside `/tmp/` and a scratchpad) with `git commit` ([#5688](https://github.com/Morrison-Lab/ai-config/issues/5688)).
@@ -295,11 +303,16 @@ Read a request for everything it plainly asks, do every safe step it covers, and
   `mergeStateStatus: CLEAN` is not a review verdict.
 - **View every page of a document render before calling its PR ready** ([`review-rendered-documents`](shared/workflow/review-rendered-documents.md)).
 - **Revert a premature or defective merge at once**, and reopen the issues it closed.
-- **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean.
+- **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean (Ezra, 2026-11-21: "infra has permanent mwc in all repos");
+  never ask about one, on a card or otherwise.
   Handle it yourself through the merge, and never ask the user about it (Ezra, 2026-11-20).
-  Sliding a floating tag of an infrastructure repo to `main` (for example gha's `v3`) is infrastructure too, and needs no typed approval.
+  Link-only, id-only and render-identical LaTeX changes count as infrastructure, even in content files;
+  the test is in [`strict-merge-policy`](shared/workflow/strict-merge-policy.md#infrastructure-prs-standing-mwc-grant).
+- **Slide an infra repo's floating tag yourself** once [`slide-tag`](skills/slide-tag/SKILL.md)'s gates pass;
+  never ask first or leave it to another thread (Ezra, 2026-11-20).
+  Sliding a floating tag of an infrastructure repo to `main` (for example gha's `v3`) needs no typed approval.
   Ezra, 2026-11-20 8:31 AM PST: "sliding the gha tag shouldn't require my approval", "it's infra".
-  It still waits for every check on `main` to finish and for the permissions audit to pass ([`slide-tag`](skills/slide-tag/SKILL.md)).
+  It still waits for every check on `main` to finish and for the permissions audit to pass.
 
 Detail, cases, cross-model waiver: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
 

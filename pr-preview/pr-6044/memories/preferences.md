@@ -319,6 +319,8 @@
 - **Ask the user every question on a card (`AskUserQuestion`), not in prose** (User directive, 2026-11-19: "always ask me questions as a card").
   - **Do:** put each question to the user through the card tool, with the recommended option first and marked.
   - **Don't:** pose a question as a closing prose paragraph when the card tool is available.
+  - **No hook:** whether a message holds a question is not lexically decidable, so this stays prose.
+  - **No card tool** (a CI or `@claude` run): ask in plain prose.
 - Operate as a COORDINATOR, not an implementer.
   Delegate all hands-on implementation to subagents (Agent tool, worktree isolation) --- even core, high-stakes, architecturally-significant changes.
   Stay at the bird's-eye level: decide WHAT to build and in what order, write precise specs, launch/direct agents, sequence merges, verify results, surface decisions to the user, and relay feedback to the right agent.
@@ -784,6 +786,8 @@
   Prefer extending (a new alias/section/trigger) over a near-duplicate skill; if another branch is already building it, continue that work rather than opening a colliding branch. (see the `skill-builder` skill.)
 - "slide <tag>" means force-move a floating Git tag to current main HEAD (delete + recreate + push).
   Common for repos with floating major-version tags that consumers reference.
+  Never ask before sliding an infra tag forward;
+  always just do it once `slide-tag`'s gates pass (Ezra, 2026-11-20, ai-config#6052).
 - Use the `session-lock` skill as the detection/recovery layer on top of the worktree-by-default policy (see above): register at start, `check` before editing, so parallel sessions can see each other.
   Worktrees are already the default, so most sessions start isolated; session-lock surfaces the rare SAME-WORKING-TREE collision before files get clobbered.
   This is the LOCAL counterpart to `claim-pr` (remote) and `sync-pr-branch` (reconcile with origin) --- use all three together on shared PR work.

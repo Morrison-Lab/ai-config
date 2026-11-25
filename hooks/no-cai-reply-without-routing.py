@@ -12,8 +12,10 @@ Stop. It does not make the reply tell the user so. This hook covers that half.
 
 DENIES an `mcp__hearthbot__post_message` when all three hold:
 - the user's latest message has a line starting `cai:` (or `ca:`);
-- no reply since that message has named the routing;
+- no post_message reply since that message has named the routing;
 - this reply does not name it either.
+Only post_message counts as a reply: in a hearthbot thread, plain assistant
+text never reaches the user, so a routing named there was never said.
 A reply names the routing when it mentions ai-config, a hook, a skill, a
 memory or rule file, a check, or a `Mechanism:` line.
 A message whose `cai:` is quoted, fenced or inside a code span does not count,

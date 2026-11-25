@@ -18,6 +18,16 @@ Enforced by `hooks/no-answer-from-recall.py`, which denies a reply that says it 
 Those two rest on this rule alone (#4959).
 Related: [`live-state-over-notes`](live-state-over-notes.md) (a note's claim about a changing condition), `hooks/flag-book-unavailable-without-library-search.py`, [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
 
+## Look up a public fact before calling it unknown
+
+Ezra, 2026-11-24, after a thread left his office room, mail stop, phone and department web address off a WWU letterhead and told him it "didn't know" them: "why didn't you look them up online?" and "don't make this mistake again".
+His faculty page, one search away, listed every one of them.
+
+- **Do:** before leaving a field blank, writing a placeholder, or saying a fact is unknown, search the web (`WebSearch`, then the `web-fetch` agent for the page) and the attached sources.
+  Fill the field from what you read, and cite the page.
+- **Don't:** treat a single blocked request (such as a proxy 403 from `curl`) as proof the fact is unreachable, or report "I didn't know" without naming what you searched.
+- If the search finds nothing, say what you searched and leave the field for the user.
+
 ## Hyperlink the evidence for every factual claim
 
 Ezra, 2026-11-12, after a coordinator post hedged a claim with "I may be out of date on that":

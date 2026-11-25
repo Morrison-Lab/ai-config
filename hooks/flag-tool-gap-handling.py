@@ -134,9 +134,11 @@ def excuse(text):
             if not RULE_TALK.search(_clauses_around(sentence, m.start(), m.end())):
                 return sentence.strip()[:160]
             # The match can run across a clause break into a real excuse, so
-            # also test each clause that holds no rule talk on its own.
-            if any(EXCUSE.search(c) and not RULE_TALK.search(c)
-                   for c in CLAUSE_BREAK.split(sentence)):
+            # drop the rule-talk clauses and test what is left as one text,
+            # which keeps an excuse whose halves sit in two clauses.
+            rest = " ".join(c for c in CLAUSE_BREAK.split(sentence)
+                            if not RULE_TALK.search(c))
+            if EXCUSE.search(rest):
                 return sentence.strip()[:160]
     return None
 

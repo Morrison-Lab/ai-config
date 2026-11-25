@@ -86,6 +86,9 @@ CASES = [
     ([say("The hook refuses a post that excuses skipped work; I couldn't render "
           "it because pdflatex is not installed.")],
      "tool is missing", "a match spanning a rule clause and a real one still warns"),
+    ([say("This hook refuses posts that excuse skipped work because a tool is "
+          "missing; I couldn't render it: pdflatex is not installed.")],
+     "tool is missing", "a real excuse split over two clauses after rule talk warns"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

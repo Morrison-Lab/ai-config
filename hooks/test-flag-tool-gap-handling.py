@@ -132,6 +132,13 @@ CASES = [
      None, "'no longer outdated' is no excuse"),
     ([say("I didn't run the upgrade because the release is outdated.")],
      "tool is missing", "control: an outdated release is an excuse"),
+    # The hook's patterns spell the curly apostrophe and em dash as \u escapes,
+    # which re decodes; these two cases pin that on the real glyphs.
+    ([say("I didn\u2019t run the upgrade because it isn\u2019t an outdated version.")],
+     None, "a curly 'isn't an outdated version' is no excuse"),
+    ([say("The hook flags excuses \u2014 I skipped the tests because pytest is not "
+          "installed.")],
+     "tool is missing", "an em dash ends the rule-talk clause"),
     ([say("No excuse, I skipped the checks because pytest is not installed.")],
      "tool is missing", "skipped checks are skipped work, not rule talk"),
     ([say("I couldn't build the PDFs here because this container's LaTeX is too "

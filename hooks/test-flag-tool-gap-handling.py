@@ -77,6 +77,9 @@ CASES = [
      "describing the rule is not an excuse (2026-11-24 false positive)"),
     ([say("No excuse, I skipped the tests because pytest is not installed.")],
      "tool is missing", "the word excuse alone does not exempt a real skip"),
+    ([say("The hook says no excuses; I skipped the tests because pytest is "
+          "not installed.")],
+     "tool is missing", "a rule clause does not exempt the next clause's skip"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

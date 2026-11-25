@@ -62,7 +62,12 @@ EXCUSE = re.compile(
     rf"(?:{SKIPPED}[^.\n]{{0,120}}{MISSING}|{MISSING}[^.\n]{{0,120}}{SKIPPED})",
     re.I)
 
-RULE_TALK = re.compile(r"\bexcus(?:e|es|ed|ing)\b", re.I)
+# "excuse" alone is not enough: "No excuse, I skipped the tests because pytest is
+# not installed" is still a skip. The sentence must also name a rule or check.
+RULE_TALK = re.compile(
+    r"\bexcus(?:e|es|ed|ing)\b(?=.*\b(?:hooks?|rules?|checks?|checkers?|refus\w*|den(?:y|ies)|flags?)\b)"
+    r"|\b(?:hooks?|rules?|checks?|checkers?|refus\w*|den(?:y|ies)|flags?)\b(?=.*\bexcus(?:e|es|ed|ing)\b)",
+    re.I)
 
 NONTOOL = re.compile(
     r"\b(?:certificates?|certs?|licen[sc]es?|api[- ]?keys?|keys?|tokens?|secrets?"

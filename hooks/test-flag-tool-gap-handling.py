@@ -102,6 +102,11 @@ CASES = [
      "old data is not an old tool"),
     ([say("I couldn't render it even though LaTeX is not outdated.")], None,
      "a tool that is not outdated is no excuse"),
+    ([say("I couldn't render it even though the Quarto version is not outdated.")],
+     None, "a version that is not outdated is no excuse"),
+    ([say("I couldn't render it because this container has an out of date "
+          "version of LaTeX.")],
+     "tool is missing", "an unhyphenated out of date version warns"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

@@ -48,7 +48,8 @@ TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
         r"|compilers?|runtimes?)\b")
 # Ezra, 2026-11-24, on "LaTeX is too old for the exam template":
 # "cai: never make excuses like this; install the software you need".
-_STALE = r"(?:(?!not\b|never\b)\S+\s+){0,3}?(?:outdated|out of date)\b"
+_STALE = (r"(?:(?!not\b|never\b|\w+n['’]?t\b)\S+\s+){0,3}?"
+          r"(?:outdated|out of date)\b")
 OLD = (rf"\btoo old\b|\b(?:version|release)\s+{_STALE}|{TOOL}\s+{_STALE}"
        rf"|\b(?:outdated|out[- ]of[- ]date)\s+(?:version|release|copy|{TOOL})")
 MISSING = (r"(?:(?:isn['\u2019]?t|is not|aren['\u2019]?t|are not|wasn['\u2019]?t|not) installed"
@@ -73,7 +74,8 @@ RULE_TALK = re.compile(
 NONTOOL = re.compile(
     r"\b(?:certificates?|certs?|licen[sc]es?|api[- ]?keys?|keys?|tokens?|secrets?"
     r"|credentials?|cron|crontab|systemd|units?|entr(?:y|ies)|configs?|configuration"
-    r"|services?|daemons?|hooks?|webhooks?|data|datasets?|snapshots?|caches?)\b", re.I)
+    r"|services?|daemons?|hooks?|webhooks?|data|datasets?|snapshots?|caches?"
+    r"|schemas?|models?|formats?|templates?)\b", re.I)
 
 INSTALL = re.compile(
     r"\b(?:pip3?|uv pip|uv tool|pipx|conda|mamba|npm|pnpm|yarn|cargo|gem|tlmgr"

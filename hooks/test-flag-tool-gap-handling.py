@@ -104,6 +104,10 @@ CASES = [
      "a tool that is not outdated is no excuse"),
     ([say("I couldn't render it even though the Quarto version is not outdated.")],
      None, "a version that is not outdated is no excuse"),
+    ([say("I haven't upgraded the compiler because it isn't outdated.")],
+     None, "a contracted 'isn't outdated' is no excuse"),
+    ([say("I skipped the migration because the schema is too old.")], None,
+     "an old schema is not an old tool"),
     ([say("I couldn't render it because this container has an out of date "
           "version of LaTeX.")],
      "tool is missing", "an unhyphenated out of date version warns"),

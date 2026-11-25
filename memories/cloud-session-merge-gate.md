@@ -258,3 +258,18 @@ Learned over about 90 merges through `merge-infra-pr` and pinned `gh pr merge` i
 - `gh api rate_limit` costs nothing.
   A gha PR needs about 800 calls for the annotation read and 100 to 300 for the checker.
   The 5,000 per hour budget therefore supports about four gha merges plus a few content checks, so pace by the reset time.
+
+## A 5xx from the merge call can still have merged
+
+On 2026-11-25, `mcp__github__merge_pull_request` on mcs#199 returned HTTP 500, then 502 on a retry, and the PR had merged anyway (`bc02af9` on main).
+
+- **Do:** after a 5xx from a merge call, read the base branch's tip (`git fetch origin main`, then `git log origin/main -1`) or the PR's `merged` field before trying again.
+- **Don't:** report a 5xx merge as failed, or retry it more than once, before reading that state.
+
+A review run that fails on a 5xx while posting is the same kind of failure.
+On 2026-11-25, `post-review` on ai-config#6139 classified the review `ready-for-merge`, then failed on a 502 from `gh pr comment`.
+After that, `rerun-failed-jobs` (twice) and `rerun` on the run each returned HTTP 500 and left `run_attempt` at 1.
+
+- **Do:** read the `post-review` log for the classifier's verdict, and read the run's `run_attempt` after a 5xx rerun call.
+  When the rerun endpoints keep failing, push the next commit or post an `@claude review` comment that also says why the checks are red.
+- **Don't:** treat the red review gates as a finding on the diff before reading that log.

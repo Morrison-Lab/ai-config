@@ -2371,6 +2371,13 @@
             "timeout": 10,
             "script": "no-cai-reply-without-routing.py",
             "why": "Ezra, 2026-11-24, mlg thread: after a reply to his \"cai: never make excuses like this; install the software you need\" said only that TeX was being installed, \"did you not recognize `cai:`\" and \"then why didn't you say you were going to do it in your original response to my original `cai: ` comment?\". no-user-correction-without-mechanism.py makes the turn build a mechanism before Stop but not tell the user so. DENIES an mcp__hearthbot__post_message when the user's latest message has a line starting cai: (or ca:), no post since then named the routing, and this one does not (ai-config, hook, skill, memory, AGENTS.md/CLAUDE.md, shared/*.md, check, or a Mechanism: line). Quoted, fenced and code-span cai: does not count (remind-encode-user-correction.py typed_text). ALLOW_CAI_REPLY_WITHOUT_ROUTING=1 overrides. See skills/config-ai/SKILL.md. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-status-line-answer-to-question.py\"",
+            "timeout": 10,
+            "script": "no-status-line-answer-to-question.py",
+            "why": "Ezra, 2026-11-25 00:46 PST, after he asked \"why haven't you merged 2196?\" and the first reply was \"Running the clean check on gha#2196 now, then merging it\": \"cai: always answer my questions directly and immediately\" (ai-config#6129). DENIES the first mcp__hearthbot__post_message after a user question (a sentence ending in ?, or a line starting with why/what/did/have/has/is/are/can/how and similar) when the reply's first sentence is only a status or plan line (a gerund, I'll, I will, I'm going to, Let me) with no answer word (because, yes, no, not, never, hadn't, didn't, already...). Polite requests (can/could/would/will you, please) and later replies pass. ALLOW_STATUS_FIRST_REPLY=1 overrides. See shared/workflow/answer-questions-directly.md. Fails open on parse trouble."
           }
         ]
       },

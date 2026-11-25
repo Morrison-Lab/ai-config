@@ -309,6 +309,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/algorithmatize-checks.md` | Never spend LLM reasoning on a check a deterministic algorithm can decide. Whenever a verification, measurement, or classification step is decidable by compu... |  |
 | `shared/workflow/always-reply.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/answer-briefly-link-the-record.md` | Ezra, 2026-11-12 (#5591): "when I ask you a question that we have a recorded answer for, give me a brief direct answer and refer me to our recorded answer fo... |  |
+| `shared/workflow/answer-questions-directly.md` | Ezra, 2026-11-25 00:46 PST (#6129): "cai: always answer my questions directly and immediately". |  |
 | `shared/workflow/ardi.md` | Whenever you are working a PR/MR, run the full **ARDI** loop by default, without being asked: **A**ddress every flagged item, **R**ebut findings that are wro... |  |
 | `shared/workflow/ask-for-manual-approval.md` | Applies to every agent that runs under a permission classifier or approval mode. The measured case is Claude Code's auto mode. Codex approval modes, Gemini,... |  |
 | `shared/workflow/ask-when-instruction-contradicts-rule.md` | When the maintainer gives an instruction that seems to contradict a recorded rule or guideline, ask which of these it is, quoting the rule and linking where... |  |

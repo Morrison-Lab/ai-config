@@ -49,3 +49,18 @@ The fix chosen was to retarget the child, [ai-config#5976](https://github.com/Mo
   `hooks/block-project-memory-write.py` denies it, and the lesson belongs in a tracked file such as this one.
 - **Don't:** chain a `>>` append with `git commit` in one cloud Bash call;
   `hooks/no-chained-edit-and-commit-in-cloud.py` denies it, so edit with the Edit tool and commit separately.
+
+## Opening a PR never needs Ezra's words, but weakening a PR gate does
+
+Ezra, 2026-11-20 09:16 PST: "i shouldn't need to approve opening PRs".
+[ai-config#6142](https://github.com/Morrison-Lab/ai-config/pull/6142) exempts every Morrison-Lab GitHub repo from `no-unnamed-repo-pr.py`, and the auto-mode permission classifier allowed that edit.
+On a later follow-up (2026-11-25), the same classifier denied turning `no-unrequested-sweep-pr.py`'s 10-PR cap from a deny into a warning as "Undermining Oversight".
+
+- **Do:** after one such denial, stop, stash the half-applied edit (`git stash push -- <paths>`), and give Ezra the exact line to type in the thread, in a fenced block.
+- **Don't:** reword the denied edit or split it across tools.
+  Each new shape is the same action.
+- **Do:** in a cloud ai-config checkout, read and search files with Read, Grep and Edit (`replace_all` for a bulk rename);
+  `prefer-dedicated-tools-over-bash` denies `sed`, `grep`, `tail` and `cat` on files, and `prefer-mcp-over-bash-in-cloud` denies `gh api repos/...` (only `gh api search/...` passes).
+- **Don't:** retry a refused GitHub read unchanged: the refused attempt still counts for `no-tight-github-polling`, so the retry needs `ALLOW_REPEAT_GITHUB_READ=1`.
+- **Do:** make a second branch with `git worktree add`.
+  Switching the main checkout's branch is refused.

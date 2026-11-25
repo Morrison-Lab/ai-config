@@ -16,6 +16,10 @@ HOOK = os.path.join(HOOKS_DIR, "warn-merge-without-cross-harness-review.py")
 sys.path.insert(0, os.path.join(os.path.dirname(HOOKS_DIR), "scripts", "lib"))
 from mwr_checker_fixture import trusted_checker_root  # noqa: E402
 
+# Stay offline: no amwr marker read (ai-config#3946, step 3). The off
+# switch only takes an amwr grant away; the amwr tests patch repo_amwr.
+os.environ["AI_CONFIG_AMWR_OFF"] = "1"
+
 # The plugin root the clean-checker hook trusts for an mwr merge (round 4,
 # finding 2): a fixture checkout whose checker blob is origin/main's.
 _MWR_ROOT_DIR = tempfile.TemporaryDirectory()
@@ -521,9 +525,22 @@ def main():
     check("warns when the probe was refused and never ran", run(MERGE, [dict(
         probe("command -v " + clis4), rec={"toolDenialKind": "permission-rule"})] + oc)[0] and run(
         MERGE, [probe("command -v " + clis4, "\\n\n Permission for this action was denied")] + oc)[0])
-    check("warns when the opencode attempt was refused", run(MERGE, probe_all[:1] + [
+    check("warns when the opencode attempt was refused by the user or a rule", run(MERGE, probe_all[:1] + [
         dict(oc[0], out="The user doesn't want to proceed with this tool use")])[0] and run(
-        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"})])[0])
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "permission-rule"})])[0] and run(
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "permission-rule"}, out=(
+            "Permission for this action was denied by the Claude Code auto mode classifier."))])[0])
+    classifier = "Permission for this action was denied by the Claude Code auto mode classifier."
+    check("silent when the classifier refused the opencode attempt", not run(
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"})])[0]
+          and not run(MERGE, probe_all[:1] + [dict(oc[0], out=classifier)])[0])
+    check("warns when the classifier-refused opencode attempt predates the last push", run(
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"}),
+                                step("git push origin HEAD")])[0])
+    check("warns when the classifier refused a probe or another CLI's attempt", run(MERGE, [dict(
+        probe("command -v " + clis4), rec={"toolDenialKind": "automode-blocked"})] + oc)[0] and run(
+        MERGE, [probe("command -v agy gemini cursor-agent"), dict(probe(
+            "codex exec 'review the diff'"), rec={"toolDenialKind": "automode-blocked"})] + oc)[0])
     check("warns when the probe shares its call or exits other than 1", run(MERGE, [probe(
         "cd /nope && command -v " + clis4)] + oc)[0] and run(MERGE, [probe("command -v " + clis4, "Exit code 2")] + oc)[0]
           and all(run(MERGE, [probe(p + clis4)] + oc)[0] for p in ("which -s ", "command -V ")) and run(MERGE, [probe("which %s 2 > f" % clis4)] + oc)[0])

@@ -55,6 +55,19 @@ ATTACH_VERB = re.compile(rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!reposit
     rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\b(?:added|cloned|(?:(?<=[Ii'\u2019]m\s)|(?<=[a'\u2019]re\s)|(?<=\bam\s))(?:adding|cloning))\s+(?:it|them|the\s+repo(?:sitory)?|{NAMED.pattern})\b(?!\s+(?:to|in)\s+(?!{PLACE}|/))"
     r"|\b(?:ran|called|used|invoked|tried|(?:(?<=[Ii'\u2019]m\s)|(?<=[a'\u2019]re\s)|(?<=\bam\s))(?:running|calling))\s+(?:the\s+)?add_repo\b|(?:^[-*+>\s]*|(?<=[,;:(-]\s)|(?<=\())(?:running|calling)\s+add_repo\s+now\b|\badd_repo\s+(?:(?!(?:would|could|might|may|will|should|not|never)\b)\S+\s+){0,3}?(?:attached|added|cloned|fixed|succeeded|worked)\b"
     r"|\b(?:fixed|attached|added|(?:(?<=[Ii'\u2019]m\s)|(?<=[a'\u2019]re\s)|(?<=\bam\s))adding)\s+(?:\w+\s+){0,3}?(?:with|via|using)\s+add_repo\b", re.I)
+# "This thread can only reach lds" and "GitHub access is scoped to lds" call every other repo out of reach (Ezra, 2026-11-21:
+# "that's still wrong; you can clone any repo", "never forget that again").
+SCOPE_HOLDER = (rf"(?:{PLACE}|I|we|(?:my|our|its|the|{PLACE}{APOS}s)\s+(?:github\s+|git\s+|repo\s+|repository\s+)?(?:access|scope|token|permissions?)"
+                r"|github\s+access)")
+ONLY = re.compile(
+    rf"\b{SCOPE_HOLDER}\s+(?:(?:can|could)\s+only|(?:can|could)\s+(?:reach|access|see|clone)\s+only|only\s+(?:has|have|had)\s+(?:access\s+to)?"
+    rf"|(?:is|are|was|were)\s+(?:only\s+)?(?:limited|scoped|restricted|confined)\s+to)\s+"
+    rf"(?:(?:reach|access|see|clone|work\s+(?:in|on))\s+)?{DET}{TOK}", re.I)  # push and write blockers stay allowed
+
+
+def only_scope(sentence: str) -> bool:
+    """A sentence that limits this thread or its access to one named repo ("the repo" alone names none)."""
+    return any(NAMED.fullmatch(m.group(1)) for m in ONLY.finditer(sentence))
 OUTAGE = re.compile(r"\b(?:down|outage|offline|proxy|network|disk|quota|rate.limit\w*|timed?\s*out|DNS|SSL|TLS|[45]\d\d|[45]\d\ds)\b", re.I)
 OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to|until|while)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo)\b"
                          rf"|\b{PLACE}\b))", re.I)  # "because it isn't in this thread's repos" is the excuse again
@@ -113,7 +126,7 @@ def attaches(sentence: str) -> bool:
 
 
 def is_excuse(sentence: str) -> bool:
-    return (bool(LOC.search(sentence)) and not attaches(sentence) and names_repo(sentence)  # R's attached package, ai-config's plugin
+    return (not attaches(sentence) and (only_scope(sentence) or (bool(LOC.search(sentence)) and names_repo(sentence)))  # R's attached package, ai-config's plugin
             and not re.search(r"\b(?:library|require)\(|\bR\s+session\b|\b(?:chunk|render\w*|knit\w*|package|plugin|marketplace)\b",
                               sentence, re.I))
 

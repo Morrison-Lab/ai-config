@@ -6,10 +6,17 @@ A reviewed, revised reference copy of an **environment Setup script** for
 research project; this copy lives here as a worked example to crib from when
 setting up a new repo's cloud environment.
 
-> **The lab's environment Setup script is pasted from this file** (Ezra, 2026-11-02).
-> It includes the `# [lds]` additions that give the notes repos' sessions their
+> **The lab's environment Setup script is [`setup-stub.sh`](./setup-stub.sh)**,
+> which fetches and runs `cloud-setup.sh` from `main` at each container build
+> ([ai-config#6004](https://github.com/Morrison-Lab/ai-config/issues/6004)).
+> `cloud-setup.sh` includes the `# [lds]` additions that give the notes repos' sessions their
 > render toolchain at build time.
-> Edit it here, then paste it into the environment.
+> Edit it here.
+> An environment running the stub picks the change up at its next build.
+> Pasting `cloud-setup.sh` itself (Ezra, 2026-11-02) let the field drift:
+> on 2026-11-21 the stored copy predated the plugin step, so project threads ran
+> only the stale claude.ai-synced plugin.
+> The field also takes at most 100 lines, and `cloud-setup.sh` has 486.
 >
 > **Otherwise this is reference material, not active config.**
 > It is **not** wired into

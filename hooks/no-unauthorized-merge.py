@@ -2415,6 +2415,119 @@ def _mwr_spec(ref_repo) -> str | None:
     return ref_repo if "/" in ref_repo else f"{MWR_DEFAULT_OWNER}/{ref_repo}"
 
 
+# The repo-wide `amwr` grant (ai-config#3946, step 3): a line that is exactly
+# AMWR_MARKER, outside any fenced code block, in the root AGENTS.md of the
+# repository's DEFAULT branch. It is read from the default branch only
+# (Ezra's card, 2026-11-20: "read from main only"), so a PR cannot grant
+# itself, and the mwr gates refuse a PR that changes the root AGENTS.md, so
+# an mwr merge cannot switch it on either.
+AMWR_FILE = "AGENTS.md"
+AMWR_MARKER = "<!-- amwr: on -->"
+AMWR_FETCH_BUDGET_S = 6.0
+AMWR_TARGET_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+AMWR_FENCE_RE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})")
+
+
+def amwr_marked(text) -> bool:
+    """Whether `text` (an AGENTS.md) holds the amwr marker as a line of its own.
+
+    A line inside a fenced code block does not count, so a document that
+    shows the marker as an example does not switch the grant on, and neither
+    does an indented code block (four spaces or a tab). Up to three leading
+    spaces and any trailing whitespace are ignored; anything else on the line
+    is not.
+    """
+    if not isinstance(text, str):
+        return False
+    fence = None
+    for line in text.splitlines():
+        match = AMWR_FENCE_RE.match(line)
+        if match:
+            mark = match.group(1)
+            if fence is None:
+                fence = mark[0] * len(mark)
+            elif mark[0] == fence[0] and len(mark) >= len(fence):
+                fence = None
+            continue
+        # Up to three leading spaces, as for a fence; four or a tab make an
+        # indented code block, which only shows the marker.
+        bare = line.rstrip()
+        indent = len(bare) - len(bare.lstrip(" "))
+        if fence is None and indent <= 3 and bare.lstrip(" ") == AMWR_MARKER:
+            return True
+    return False
+
+
+def fetch_default_branch_agents_md(target: str) -> str | None:
+    """The root AGENTS.md of `target`'s default branch, or None.
+
+    The contents route with no `ref` reads the default branch. Uses `gh api`
+    when it runs, else direct REST. Any failure, a missing file included,
+    is None.
+    """
+    if not isinstance(target, str) or not AMWR_TARGET_RE.match(target.strip()):
+        return None
+    target = target.strip()
+    if any(part.strip(".") == "" for part in target.split("/")):
+        return None  # "." or ".." is a path step, not a name
+    route = f"repos/{target}/contents/{AMWR_FILE}"
+    deadline = time.monotonic() + AMWR_FETCH_BUDGET_S
+    if shutil.which("gh"):
+        try:
+            out = subprocess.run(
+                ["gh", "api", "-H", "Accept: application/vnd.github.raw", route],
+                capture_output=True, text=True, timeout=AMWR_FETCH_BUDGET_S, check=False,
+            )
+        except subprocess.SubprocessError:
+            return None
+        except OSError:
+            out = None
+        if out is not None:
+            return out.stdout if out.returncode == 0 else None
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return None
+    headers = {"User-Agent": INFRA_FETCH_USER_AGENT,
+               "Accept": "application/vnd.github.raw"}
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        req = urllib.request.Request(f"https://api.github.com/{route}", headers=headers)
+        with urllib.request.urlopen(req, timeout=remaining) as resp:
+            return resp.read().decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+# Setting this to "1" turns the amwr read off: no network read, and no amwr
+# grant. It can only take a grant away, never give one, so the test suites
+# set it to stay offline.
+AMWR_OFF_ENV = "AI_CONFIG_AMWR_OFF"
+_AMWR_CACHE: dict = {}
+
+
+def repo_amwr(target) -> bool:
+    """Whether `target` ("owner/name") carries the amwr marker on its default
+    branch. Fails closed: a read failure is False, and the failure is
+    reported on stderr, so a grant that never applies is visible. Each
+    repository is read at most once per hook process."""
+    if os.environ.get(AMWR_OFF_ENV) == "1":
+        return False
+    key = str(target or "").strip().lower()
+    if key in _AMWR_CACHE:
+        return _AMWR_CACHE[key]
+    text = fetch_default_branch_agents_md(target)
+    if text is None:
+        print(f"no-unauthorized-merge: could not read {AMWR_FILE} on the default "
+              f"branch of {target}; no amwr grant", file=sys.stderr)
+        result = False
+    else:
+        result = amwr_marked(text)
+    _AMWR_CACHE[key] = result
+    return result
+
+
 def _queued_prompt(rec) -> str | None:
     """The text of a message the user typed while the agent was working, or None.
 
@@ -2465,6 +2578,11 @@ def transcript_mwr_grant(payload: dict | None = None, target: str | None = None,
     trigger="true"). Every other record can only revoke, and
     `<cited author="user">` never grants.
 
+    The repo-wide `amwr` marker (`repo_amwr`, step 3) also covers every PR
+    of a repository whose default-branch root AGENTS.md holds it, unless
+    the user revoked mwr earlier in the session. It still needs a readable
+    transcript, like every other grant here.
+
     This is PERMISSION only. block-merge-without-clean-checker.py still
     needs the checker's MERGE-READY line for the merge's own head, and only
     under this grant does that line stand in for FULLY CLEAN. Fails closed:
@@ -2481,19 +2599,20 @@ def transcript_mwr_grant(payload: dict | None = None, target: str | None = None,
         return False
     blanket = False
     named = set()   # ("owner/name", number)
+    revoked = False
     try:
         for rec in _transcript_records(path.strip()):
             queued = _queued_prompt(rec)
             if queued is not None:
                 # Typed mid-turn: it can only revoke (round 4, finding 1).
                 if detector.revokes_mwr(queued):
-                    blanket, named = False, set()
+                    blanket, named, revoked = False, set(), True
                 continue
             prompt = _prompt_text(rec)
             if prompt is None:
                 continue
             if detector.revokes_mwr(prompt):
-                blanket, named = False, set()
+                blanket, named, revoked = False, set(), True
                 continue
             # Only an allowlisted record can START a grant (round 7): a typed
             # CLI prompt, or an SDK principal wake with a human origin. Any
@@ -2516,9 +2635,14 @@ def transcript_mwr_grant(payload: dict | None = None, target: str | None = None,
     except Exception as exc:
         print(f"no-unauthorized-merge: mwr-grant read failed ({exc})", file=sys.stderr)
         return False
-    if blanket:
+    if blanket or (target.strip().lower(), number) in named:
         return True
-    return (target.strip().lower(), number) in named
+    # The repo-wide amwr marker (step 3) covers every PR of its repository,
+    # until the user revokes mwr in this session: after any revocation only
+    # a later typed grant counts.
+    if revoked:
+        return False
+    return repo_amwr(target)
 
 
 def check_mwc_active(payload: dict | None = None) -> bool:

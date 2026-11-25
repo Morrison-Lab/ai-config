@@ -279,8 +279,16 @@ after a split: group the new pages into topical dropdowns where that fits
 the site's structure, and avoid reducing the navbar to a single catch-all
 dropdown the way the test above rules out.
 Where another site links to the page as a submodule, its `#id` anchors move
-with the content that carries them, so every cross-page and cross-repo link
-into the split page needs updating, not just the navbar entry.
+with the content that carries them.
+On a site that ships qwt's moved-anchor redirect (`anchor-index.py` and
+`anchor-landing.html`), an old `page.html#id` link still reaches whichever
+page now holds the id, so cross-repo links need no rewrite as long as every
+id keeps its name and lands on exactly one page.
+Prove that on the PR preview rather than assuming it: map each id to its page
+before and after the split (none lost, none on two pages), and open a few old
+links to confirm where they land (pds#502, 2026-11-24).
+On a site without the redirect, every cross-page and cross-repo link into the
+split page needs updating, not just the navbar entry.
 
 - **Do:** split a page whose title joins two independent nouns with "and",
   or whose title is a vague catch-all, or whose sections do not build on
@@ -290,8 +298,11 @@ into the split page needs updating, not just the navbar entry.
 - **Don't:** split a page merely because its title or table of contents is
   long --- check for independence, vagueness, or non-building sections
   first.
-- **Don't:** rename or move a page's `#id` anchors during a split without
-  updating every link, cross-repo included, that points at them.
+- **Do:** on a site with the moved-anchor redirect, keep every id's name,
+  check that no id is lost or duplicated, and open old links on the preview.
+- **Don't:** rename a page's `#id` anchors during a split, or move them on a
+  site without the redirect, without updating every link, cross-repo
+  included, that points at them.
 
 (User question, 2026-09-28: "are long titles an indication that a page
 might be better split into two topics?"

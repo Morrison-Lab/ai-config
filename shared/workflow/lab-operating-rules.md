@@ -119,6 +119,24 @@ The rest are prose because no condition in the transcript can decide them.
   other sessions follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
   Device consent cards are a security boundary, so use environments already approved.
   Not hookable: a denial is not visible to a hook after the fact.
+- When you ask Ezra to do a step that was yours to do, such as pressing merge after a classifier blocked yours, the ask says why no other way works and lists every way you tried, each with its result
+  (Ezra, 2026-11-21: "when you ask me to do something you were supposed to do yourself, you must tell me why no other way would work", then "and tell me all the ways you tried").
+  Try the other routes first: retry the denied step once unchanged, use another tool or API, start a fresh session, or fix the check that blocked you.
+  A decision card is too short for both, so post them in a message in the same turn.
+  This holds for a thread and for the coordinator.
+  Enforced by `hooks/handoff-ask-needs-why.py` ([ai-config#6068](https://github.com/Morrison-Lab/ai-config/issues/6068)).
+- A claim that a step cannot be done ("no other way to commit", "can't push") names every alternative you checked, each with its result, in a reply and in a relay to the coordinator or a thread.
+  A claim about committing or pushing names the GitHub API tools (`mcp__github__push_files`, `create_or_update_file`) among them, since they commit without local git
+  (Ezra, 2026-11-22: "why not use tools to commit", then "dont bs me", after the coordinator relayed that a thread had "no other way to commit").
+  If a checked route works, use it instead of making the claim.
+- Before any claim reaches Ezra that his input is needed (a decision card, a hand-off, "waiting on your approval"), launch a separate subagent briefed to refute it adversarially by finding a route that does not need him.
+  Send the claim only if it finds none, and say what it checked.
+  The coordinator runs its own check before relaying a thread's claim
+  (Ezra, 2026-11-22: "you must adversarially check every claim that my input is needed").
+  The same night's false claims were "no other way to commit", when the GitHub API tools could commit, and "waiting on your approval", when the thread was not stuck.
+  Enforced by `hooks/handoff-ask-needs-why.py`, which reads the turn for a subagent whose brief asks for that refutation ([ai-config#6075](https://github.com/Morrison-Lab/ai-config/issues/6075)).
+  The hook also fires on a status line such as "which needs your merge once its preview renders", even for a content PR whose merge is Ezra's by standing rule.
+  In a status list, give the PR's own state ("preview still rendering"), and make the ask only once the work is ready and the refutation has run (Morrison-Lab/lds#3188, 2026-11-25).
 
 ## Questions and decisions
 

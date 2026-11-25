@@ -104,11 +104,29 @@ def card_text(option, question, consequence=""):
     return " ".join(p for p in (option + ".", question, consequence) if p).strip()
 
 
+def record_prompt(rec):
+    """The prompt text a record carries: a user record's content, or a mid-turn `queued_command`.
+
+    A tap that lands while the agent is working arrives as an `attachment` record of type
+    `queued_command` (origin `human`), not as a user record; reading only user records
+    dropped it (measured 2026-11-24 in a lds project thread: the PR guard denied the repos
+    the tap had just named). A peer-origin or task-notification queued command is not the
+    member's, so it yields "".
+    """
+    att = rec.get("attachment") if isinstance(rec.get("attachment"), dict) else None
+    if att is not None:
+        if att.get("type") != "queued_command" or att.get("commandMode") == "task-notification" \
+                or (att.get("origin") or {}).get("kind") == "peer":
+            return ""
+        return _prompt(att.get("prompt"))
+    msg = rec.get("message") if isinstance(rec.get("message"), dict) else {}
+    return _prompt(msg.get("content"))
+
+
 def answers_in_record(rec, cards):
     """Card-answer texts in one transcript record; `cards` maps a card's message_id to its input."""
-    msg = rec.get("message") if isinstance(rec.get("message"), dict) else {}
     out = []
-    for option, question, did, idx in answers_in_prompt(_prompt(msg.get("content"))):
+    for option, question, did, idx in answers_in_prompt(record_prompt(rec)):
         consequence = ""
         opts = (cards.get(did) or {}).get("options") if did else None
         if isinstance(opts, list) and idx is not None and idx < len(opts) and isinstance(opts[idx], dict):

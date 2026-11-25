@@ -539,6 +539,10 @@ jobs:
         run: python3 scripts/check-hook-file-resolution.py
       - name: Run hook-file-resolution check tests
         run: python3 scripts/test_check_hook_file_resolution.py
+      - name: Check hooks read long prose from files (ratchet)
+        run: python3 scripts/check-hook-prose-literals.py
+      - name: Run hook-prose-literals check tests
+        run: python3 scripts/test_check_hook_prose_literals.py
       - name: Run pre-push-review tool tests
         # pre-push-review.py executes local adversarial AI code reviews using
         # workstation subscription CLIs. Unit tests mock the CLI/subprocess boundaries

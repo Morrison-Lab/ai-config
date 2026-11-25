@@ -89,3 +89,15 @@
   The tag was lightweight so `--refs` happened to give the right answer --- the
   trap only bites on annotated tags, which is exactly why it is worth checking
   every time rather than when something looks off.)
+- A gha `slide-major-tag.yml` run can fail its readiness audit
+  (`audit_slide_readiness.py`) on a check run whose `status` is stuck at
+  `in_progress` even though its `conclusion` already reads `success`.
+  The audit counts it as pending, so every redispatch fails the same way.
+  - **Do:** rerun that one job (`POST /repos/Morrison-Lab/gha/actions/jobs/<id>/rerun`),
+    confirm the check run now reads `completed`, then redispatch with the same
+    `expected_sha`.
+  - **Don't:** redispatch the slide again unchanged, or read the failure as a
+    red commit.
+  (Morrison-Lab/gha, 2026-11-24: runs 45504530331 and 45504862972 failed on
+  `preview-workflow-tests`; after the job rerun, run 45514088405 slid v3 from
+  4a9fd33 to d015e49.)

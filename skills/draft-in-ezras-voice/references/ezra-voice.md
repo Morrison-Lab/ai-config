@@ -30,6 +30,13 @@ Keep it free of FERPA data and of agent-written text.
 - **Serial comma.**
   A comma before the final "and" or "or" of three or more items.
 
+## Contact details on letters and forms
+
+- **Do:** use `ezra.morrison@wwu.edu` wherever a letter, letterhead, signature block or form drafted for Ezra needs his email.
+  Ezra, 2026-11-24: "always use ezra.morrison@wwu.edu".
+- **Don't:** use `morri313@wwu.edu` (his account login) or `demorrison@ucdavis.edu`, even when a source draft or his account profile shows one of them.
+- Take his office, phone and other WWU details from his faculty page, https://cs.wwu.edu/morri313, read live.
+
 ## Canvas announcements to students
 
 Learned from nine of his own announcements (2026-10-19 to 2026-11-05), plus his edit of one draft (2026-11-11).

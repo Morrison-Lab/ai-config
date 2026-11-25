@@ -70,6 +70,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      - a definition of a term that a site earlier in the course sequence (mcs, mds, pds, sds) already defines, where the page should link that definition instead, so the same term has two statements that can drift apart ([ai-config#5242](https://github.com/Morrison-Lab/ai-config/issues/5242)).
    - In the same pages, read the diff for these defects in the families the gha checks leave uncovered or unwired ([ai-config#5181](https://github.com/Morrison-Lab/ai-config/issues/5181)):
      - math written with raw LaTeX where a shared macro names the concept, or a bare `\exp` where the macros redefine it;
+       a repo's `latex-macros` pin that lacks the macro is not an excuse, since the PR can bump the pin;
      - a figure with no real `fig-alt`, a matplotlib call without a trailing `;`, or `code-fold: false` on a chunk whose output is the point;
      - a bracketed citation that should be bare, or the reverse, where the author is not the sentence's subject;
      - three or more parallel items in running prose instead of a bullet list, or `---` where `{{< slidebreak >}}` belongs;
@@ -220,6 +221,20 @@ Flag a coordinator or thread reply that lists options in prose, including one ph
 Read the message; do not report `hooks/no-plain-text-choice.py`'s verdict as your finding.
 See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
 
+## A denied action handed to another session
+
+On a transcript where a session read another session's events or summary and saw a classifier denial, check that no later `create_session` prompt or `send_message` message asks a session to make the same attempt, quoted or paraphrased, without a typed user message that names the action and the session.
+Flag a paraphrase the verbatim-matching hook cannot see.
+Read the prompt; do not report `hooks/no-handoff-of-denied-action.py`'s verdict as your finding.
+See [`ask-for-manual-approval`](../../shared/workflow/ask-for-manual-approval.md).
+
+## Replies that open with a status line
+
+On a transcript or message draft that answers a user's question ("why", "did you", "have you"), check that the reply's first sentence answers that question.
+Flag a reply whose first sentence is only a plan or status line ("Running X now, then Y"), including one the hook let through because it does not open with a gerund.
+Read the message; do not report `hooks/no-status-line-answer-to-question.py`'s verdict as your finding.
+See [`answer-questions-directly`](../../shared/workflow/answer-questions-directly.md).
+
 ## Posts under an unanswered decision card
 
 On a transcript addressed to the user, check that nothing visible in the thread (a reply, an edit, a checklist update, a widget or a second card) was posted after a decision card that was still waiting for an answer.
@@ -264,6 +279,15 @@ A shallow clone gives a wrong answer with a real SHA and exit 0, so a plausible-
 Read the transcript and the claim;
 do not report a hook's refusal or silence as your finding.
 See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-reads-in-shallow-clones.md).
+
+## A lifted Safety Net deny
+
+On a transcript where a `git push --delete` ran after `hooks/run-cc-safety-net.py` lifted a `git.push-delete` deny, check that the user typed `approve-push-delete <key>` in their own message, after the deny named that key and no more than 30 minutes before the push ran, and that the command that ran is byte-identical to the one the deny named.
+Flag an approval the agent wrote, put on a decision card or relayed, a command changed after the approval, and a lease whose tip was not read from a complete clone.
+On a diff to `scripts/lib/push_delete_approval.py` or the wrapper, flag any change that widens which commands qualify, which messages count as typed, or which denies can be lifted: only a deny whose one rule is `git.push-delete` may be.
+Read the transcript and the diff yourself;
+do not report the hook's note or silence as your finding.
+See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#lifting-one-branch-deleting-push-by-ezras-typed-approval).
 
 ## Stash entries taken without a ref
 
@@ -333,6 +357,21 @@ The only acceptable form reports that `add_repo` was tried and gives its refusal
 Read the text; do not report the output of `hooks/no-repo-not-in-thread-excuse.py` as your finding.
 See [`no-cant-from-session-excuses`](../../shared/workflow/no-cant-from-session-excuses.md).
 
+## Work skipped for a missing or old tool
+
+On a reply, PR body or comment, check that no sentence gives a missing, unavailable or too-old tool, package or toolchain as the reason work was skipped (a render, a PDF build, a test, a spell check).
+The agent should have installed or upgraded it and run the work, or listed every install route it tried and how each failed.
+"LaTeX is too old for the exam template" was false: TinyTeX installed through R's `tinytex` package after `quarto install tinytex` was refused (Ezra, 2026-11-24).
+Read the text; do not report the output of `hooks/no-tool-gap-excuse.py` or `hooks/flag-tool-gap-handling.py` as your finding.
+See [`growth-mindset`](../../shared/workflow/growth-mindset.md).
+
+## A `cai:` request answered without naming its routing
+
+On a transcript, check that the first reply after a user message with a line starting `cai:` says which ai-config mechanism the rule is going into (hook, skill, memory, shared fragment, check) and that its PR comes in that turn.
+A reply that does only the immediate fix leaves the user unable to tell whether the rule was heard (Ezra, 2026-11-24: "then why didn't you say you were going to do it in your original response to my original `cai: ` comment?").
+Read the transcript; do not report the output of `hooks/no-cai-reply-without-routing.py` as your finding.
+See [`config-ai`](../../skills/config-ai/SKILL.md).
+
 ## Thread-model claims
 
 On a reply, PR or memory entry that says which model a project thread runs, or that threads were switched, check that a `get_session` read of each thread named backs it, and flag a claim made from the list of switches sent.
@@ -384,6 +423,13 @@ Also flag a cloud Bash command that chains an in-place edit (`sed -i`, `perl -i`
 Read the commands yourself; do not report the output of `hooks/prefer-mcp-over-bash-in-cloud.py` or `hooks/no-chained-edit-and-commit-in-cloud.py` as your finding.
 See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever-one-exists).
 
+## Bash where a dedicated tool exists
+
+In any session, flag a Bash step that reads, searches or writes files (`cat`, `head`, `tail`, `grep`, `rg`, `find`, `sed -n`, `sed -i`, `perl -i`, a heredoc or `echo` into a file) where Read, Grep, Glob, Edit or Write does the same job.
+A search whose exit status steers the shell, and an append, have no tool and are fine.
+Read the commands yourself; do not report the output of `hooks/prefer-dedicated-tools-over-bash.py` as your finding.
+See [`AGENTS.md`](../../AGENTS.md#cloud-sessions-use-mcp-tools-not-bash-wherever-one-exists) and [#6065](https://github.com/Morrison-Lab/ai-config/issues/6065).
+
 ## GitHub polling that drains the shared budget
 
 Where a transcript, skill or script waits for CI, flag a GitHub poll faster than every two minutes (`gh pr checks --watch` at its default, `watch`, or a loop with a short `sleep`), which emptied the shared budget twice on 2026-11-19 ([ai-config#5970](https://github.com/Morrison-Lab/ai-config/issues/5970)).
@@ -432,6 +478,8 @@ See [`merge-queue`](../../shared/workflow/merge-queue.md#reporting-a-prs-state-t
 On a transcript or a set of PRs from one session, check that each PR answers something the user asked for in their own words.
 Flag a run of PRs that brings existing content into line with a new rule or check when no message the user wrote asked for a sweep.
 A coordinator's note, a relayed "the scope is confirmed" or the agent's expectation that a new check would flag old text is not that ask.
+Check each brief the session wrote (a subagent prompt, a thread start or message) against the user message it answers too:
+flag a brief that adds a sweep, an all-repos rollout or edits to existing content the user did not ask for, instead of offering them as a follow-up.
 Read the transcript and the PR list yourself;
 do not report the output of `hooks/no-unrequested-sweep-pr.py` as your finding.
 See [`no-sweeps-by-default`](../../shared/workflow/no-sweeps-by-default.md#approving-a-check-is-not-approving-a-sweep).
@@ -484,3 +532,49 @@ Moving the head re-runs the PR's CI and voids its review, so "main moved" or "fr
 Read the merge's parents yourself (`git merge-tree --write-tree` for a conflict, `git diff --name-only <base> <main> -- .github/workflows` for staleness);
 do not report the output of `hooks/no-routine-main-merge.py` as your finding.
 See [`sync-with-main`](../../shared/workflow/sync-with-main.md) ([ai-config#5988](https://github.com/Morrison-Lab/ai-config/issues/5988)).
+
+## Tag slides asked about or handed off
+
+On a transcript or report where an infra PR merged in a repo with a floating tag (gha's `v3`), check that the agent slid the tag once the gates passed, or named the gate holding it.
+Report a message that asked the user's leave to slide, or left the slide to a runner thread or the coordinator.
+`hooks/no-ask-to-slide-tag.py` catches the common wordings; report the ones it missed.
+See [`slide-tag`](../../skills/slide-tag/SKILL.md#never-ask-before-sliding-an-infra-tag) ([ai-config#6052](https://github.com/Morrison-Lab/ai-config/issues/6052)).
+
+## Hand-off asks without the why and the tries
+
+On a transcript or report where the agent asked the user to do one of the agent's own steps (merge, press a button, run, push, re-run), check that the same message said why no other way works and listed every way the agent tried, each with its result.
+Report an ask that lacks either, and an ask made before the other routes were tried (a single retry, another tool or API, a fresh session, fixing the blocking check).
+Also report a claim that a step cannot be done which names no alternatives checked, a commit or push claim that leaves out the GitHub API tools, and any claim that the user's input is needed that went out with no adversarial subagent check behind it, or with a check whose brief did not ask for a route without the user (ai-config#6075).
+`hooks/handoff-ask-needs-why.py` catches the common wordings; report the ones it missed.
+See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#denied-steps) ([ai-config#6068](https://github.com/Morrison-Lab/ai-config/issues/6068)).
+
+## Pre-existing failures left unfixed
+
+On a PR body, PR comment or message that calls a red check pre-existing, not this PR's, or also failing on main, check that it names the fix beside the note: a merge of main that carries it, an infra PR, or a filed issue.
+Check main and sibling repos for an existing fix before accepting a filed issue as enough.
+Report a note that stops at the diagnosis, and a recurrence question answered with start-or-file instead of the fix.
+`hooks/no-unfixed-preexisting-failure.py` catches the common wordings; report the ones it missed.
+See [`persistent-pr-loop`](../../shared/workflow/persistent-pr-loop.md) (psw#703, psw#707).
+
+## Ready claims before the preview deploys
+
+On a transcript or report where the agent told the user a PR was ready for review or merge, check that the PR's repo publishes no preview, or that the preview had finished deploying for the PR's current head before the message went out, and that the message linked it.
+Report a ready claim made while the preview deploy was queued or running, or made from a preview read older than the last push.
+`hooks/no-ready-before-preview.py` catches the common wordings; report the ones it missed.
+See [`check-the-renders`](../../shared/workflow/check-the-renders.md).
+
+## Long prose built inline in code
+
+On a diff that adds or edits a hook or script, check that a message or prompt longer than a few lines lives in a `.md` or `.txt` file the code reads, not in a triple-quoted string or a run of concatenated literals.
+Report the inline block and the file it belongs in.
+`scripts/check-hook-prose-literals.py` catches long literals in hooks.
+Read the diff yourself rather than report its verdict.
+See [`prose-in-files`](../../shared/coding/prose-in-files.md).
+
+## Macro output described from recall
+
+On a transcript, reply or PR body that says what a LaTeX macro prints, renders as, displays, typesets or is defined as, check that the same session read the macro's definition (a `\def`, `\newcommand`, `\renewcommand` or `\providecommand` in macros.qmd or the macros submodule) and that the claim matches it.
+Flag a claim made from the macro's name, another repository's convention or a neighbouring macro, and a swap declined for consistency when the two forms render identically.
+A name in backticks is still a claim.
+Read the definition yourself; do not report the output of `hooks/no-macro-claim-without-definition.py` as your finding.
+See [`use-math-macros`](../../skills/use-math-macros/SKILL.md) step 6 ([ai-config#6109](https://github.com/Morrison-Lab/ai-config/pull/6109), lds#3144).

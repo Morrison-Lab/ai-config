@@ -447,3 +447,18 @@ Copying the file's dependencies alongside it (`cp -rL hooks scripts`) is what ma
 (Morrison-Lab/ai-config#3707, 2026-09-17.
 The same path sensitivity had already produced a spurious "6 pre-existing failures on `origin/main`" earlier in the same branch's work, and was written up then.
 It recurred anyway, in a session that had read the write-up, which is the argument for the control rather than for the knowledge: the control is a step you run, and the knowledge is something you have to remember to apply at a moment that does not announce itself.)
+
+## A text-fragment link resolved by grepping the source, which found the neighbour
+
+Ezra linked a rendered page with a text fragment, `...#linear-discriminant-analysis:~:text=LDA%20logistic%20...0.0046%20...0.0055`, and asked whether that output should get a table caption.
+The thread grepped the chapter's source for "LDA" and "logistic", found an example in that section printing LDA and logistic coefficients side by side, and fixed it, through two renders and a PR.
+The linked output was a different example two subsections down, the `Default` data's `signif(dflt_coef, 3)` print.
+The fragment named its values (`0.0046`, `0.0055`), and the fixed example printed `0.0322` and `-0.0545`, so one look at the rendered numbers would have shown the mismatch.
+The source grep could not, because the printed values exist only in the render.
+
+- **Do:** resolve a `:~:text=` link against the live page: fetch it, strip the tags, find the decoded fragment text, and only then map it to its source chunk.
+- **Do:** confirm the output you changed prints the fragment's own values before calling it the linked target.
+- **Don't:** take the first source match for the words in a fragment as its target, when the fragment's distinguishing part is rendered output.
+
+(Morrison-Lab/lds#3146, 2026-11-24.
+The neighbour was the same defect, so the PR kept both fixes and said so.)

@@ -34,7 +34,13 @@ without asking confirmation before every merge.
   Every required check must still pass, and a formal CHANGES_REQUESTED or REJECTED review still blocks.
   A dismissed review blocks too, since dismissing a CHANGES_REQUESTED review removes it from the formal decision.
   `mwr` never merges a PR that changes any file under `.github/`, since such a PR could edit the very CI that `mwr` relies on.
+  Nor does it merge a PR that changes the root `AGENTS.md`, which holds the `amwr` marker.
   Merge that PR under `mwc`.
+  The `amwr` marker is the repository-wide form, step 3 of ai-config#3946.
+  A line that is exactly `<!-- amwr: on -->`, outside code blocks, in the root `AGENTS.md` of the repository's default branch, grants `mwr` for every PR of that repository (Ezra's card, 2026-11-20: "read from main only").
+  It is read from the default branch only, so a PR cannot grant itself, and a read that fails grants nothing.
+  A revocation in the session suspends it, after which only a later typed grant counts.
+  The [`mwr`](../mwr/SKILL.md) skill is the short form.
   The checker fails closed when it cannot read the PR's file list.
   Under `mwr` a human's answered "not clean" review body that is not a formal review no longer blocks, since only a formal CHANGES_REQUESTED does.
   `mwr` covers the PRs its message names ("mwr owner/repo#N", "mwr repo#N", or the PR's URL), and `mwrs` covers the session.
@@ -75,7 +81,7 @@ without asking confirmation before every merge.
   The checker runs before the merge, and the PR can change in between, so `hooks/enforce-mwc-review-gate.py` checks again at merge time, on live data it reads in the same hook call.
   `hooks/block-merge-without-clean-checker.py` runs the same checks whenever the MERGE-READY line, not FULLY CLEAN, is what credits the merge, and so does the review gate even when its ordinary path would allow.
   It denies when any review on the PR, not only each reviewer's latest, is DISMISSED, CHANGES_REQUESTED or REJECTED.
-  It denies when the files changed between the PR's live base sha and the pinned head (`compare/<base>...<head>`, renames' old names included) include anything under `.github/`, so retargeting the base after the checker run does not help.
+  It denies when the files changed between the PR's live base sha and the pinned head (`compare/<base>...<head>`, renames' old names included) include anything under `.github/` or the root `AGENTS.md`, so retargeting the base after the checker run does not help.
   It denies when the live head sha is not the pinned sha.
   Any of this data that cannot be read denies too.
   The checker's own `.github/` and dismissed-review checks stay as a second layer.
@@ -597,6 +603,13 @@ So are the other `tools/` files: figure, data and content generators, and build 
 `scripts/merge-infra-pr` reads this same list from a fresh clone of ai-config's `main`, adding only `changelog.d/`.
 A change to the list therefore takes effect for the wrapper once it merges, not on its own PR.
 
+The path list cannot see a hyperlink-only, id-only or render-identical LaTeX PR, which counts as infrastructure under
+[`strict-merge-policy`](../../shared/workflow/strict-merge-policy.md#infrastructure-prs-standing-mwc-grant) (Ezra, 2026-11-21 and 2026-11-22)
+although its files are content.
+Read the diff, confirm that every changed line only adds, fixes, repoints or removes a link, adds, renames or deduplicates an id,
+or changes LaTeX without changing the rendered math (such as a macro swapped in for the raw LaTeX it expands to),
+and clear the guard with `ALLOW_MERGE=1` on that one pinned merge command, as that section says.
+
 The grant is decided by what the PR changes,
 so the guard reads the PR's file list from GitHub (`gh api .../pulls/N/files`,
 or direct REST via `urllib` when `gh` is not on `PATH`).
@@ -854,6 +867,7 @@ which is correct and easy to misread as the guard malfunctioning.
 It also requires `AI_SESSION_ID` or `CLAUDE_SESSION_ID` to be set; with neither
 set the function returns `False` and the guard denies even with a valid marker.
 Run `enable-mwc` and `check-mwc` from the repository of the session's working directory (where the merge command runs), not merely once per session or from the `-R` target repository.
+A scratchpad clone of the target repository is the same mistake: on psw#701 (2026-11-22) a marker written in a scratchpad psw clone left the guard reporting "found no ai-sessions directory", and the same command run in the project thread's primary checkout (`/home/user/lds`) let the merge through.
 
 **The grant does not expire, but its LIVENESS PROOF does, and a long session loses merge authority mid-session because of it.**
 This is the property most likely to bite, because the two facts that produce it are individually reassuring.

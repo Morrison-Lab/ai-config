@@ -62,9 +62,8 @@ read it before running this skill; the steps below are the short version.
      earlier so it precedes the mention. Update the directional word
      ("below" → "above") or drop it once a working crossref link carries
      the point.
-   - **Reword** --- only when there is no good reordering:
-     none exists, or every one would hurt the material
-     (break the argument's order, split a group the reader needs together).
+   - **Add a smaller copy** --- when the target holds more than the mention needs (a figure that also shows a later exercise's answer), add a new figure, table or div with just that part right after the mention, generated from the same source (see the fragment's fix list).
+   - **Reword** --- only when there is no good reordering or smaller copy: none exists, or every one would hurt the material (break the argument's order, split a group the reader needs together).
      A linked forward reference is then better than no link at all
      (Ezra, 2026-11-19).
      Replace the vague pointer with a precise, working

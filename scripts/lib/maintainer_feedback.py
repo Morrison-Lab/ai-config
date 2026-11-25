@@ -14,10 +14,16 @@ import sys
 import re
 from typing import Any, Dict, List, Set
 
+# The cloud harness ends every comment it posts with this footer, and an agent
+# that follows the harness and not the disclosure rule writes only it, so it
+# marks agent authorship as well (ai-config#4785).
+HARNESS_FOOTER = (r"_generated (?:by|with) \[claude code\]"
+                  r"\(https://claude\.(?:ai/code|com/claude-code)\)_")
+
 # The agent-disclosure marker an agent appends to a comment it posts under the
 # maintainer's login.
 AGENT_AUTHORSHIP_RE = re.compile(
-    r"posted by\b[^\n]*\(ai agent\)|\*\*claude finished|\U0001f916",
+    r"posted by\b[^\n]*\(ai agent\)|\*\*claude finished|\U0001f916|" + HARNESS_FOOTER,
     re.IGNORECASE,
 )
 
@@ -25,7 +31,8 @@ AGENT_AUTHORSHIP_RE = re.compile(
 # Such a reply answers the maintainer items before it (ai-config#5577).
 # Narrower than AGENT_AUTHORSHIP_RE: the robot emoji and "Claude finished" also
 # mark automated review output, which answers nothing.
-AGENT_REPLY_RE = re.compile(r"posted by\b[^\n]*\(ai agent\)", re.IGNORECASE)
+AGENT_REPLY_RE = re.compile(r"posted by\b[^\n]*\(ai agent\)|" + HARNESS_FOOTER,
+                            re.IGNORECASE)
 
 # A bare merge grant or approval, not a request for change. One optional
 # token, so no two quantifiers can match the same text.

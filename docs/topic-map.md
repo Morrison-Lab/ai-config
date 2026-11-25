@@ -147,6 +147,7 @@ its description does not use (ai-config#949).
 | `skills/mma/SKILL.md` | Merge main into open PR branches. |  |
 | `skills/model-fit/SKILL.md` | -> assess-model-fit. |  |
 | `skills/mwc/SKILL.md` | Session merge grant with confidence gate. Aliases: maw, merge-at-will, merge-when-confident. |  |
+| `skills/mwr/SKILL.md` | Merge-when-ready grant: skip review, keep green CI. Covers mwr, mwrs and the amwr marker. |  |
 | `skills/next/SKILL.md` | Insert after in-flight task. |  |
 | `skills/oppo/SKILL.md` | -> opposition-research. |  |
 | `skills/opposition-research/SKILL.md` | Mine competitor community demand. Aliases: oppo. |  |
@@ -270,6 +271,7 @@ its description does not use (ai-config#949).
 | `shared/coding/per-operation-grouping.md` | When reviewing or writing `dplyr` code, prefer **per-operation grouping** (the `.by` argument) over persistent `group_by()` / `ungroup()` pairs. Apply it whe... |  |
 | `shared/coding/powershell-cli-safety.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/coding/prefer-packaged-functions.md` | Before writing a function, **perform a research step to look for an existing packaged one that already does the job** --- and prefer it over rolling your own: |  |
+| `shared/coding/prose-in-files.md` | A message of more than a few lines that a program prints, such as a hook's reminder or deny text, lives in a Markdown or text file that the program reads, no... |  |
 | `shared/coding/regex-backtracking-pitfalls.md` | When authoring regular expressions that handle variable user or reviewer text, ensure that repeated groups and quantifiers cannot backtrack catastrophically... |  |
 | `shared/coding/restore-global-state.md` | When a function has to change global state, restore it on the way out --- on every exit path, including the ones that throw. State a function changes and doe... |  |
 | `shared/coding/reuse-docs-and-args.md` | When writing or reviewing a function that wraps or closely relates to another function, prefer **reusing** that other function's documentation and argument l... |  |
@@ -307,6 +309,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/algorithmatize-checks.md` | Never spend LLM reasoning on a check a deterministic algorithm can decide. Whenever a verification, measurement, or classification step is decidable by compu... |  |
 | `shared/workflow/always-reply.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/answer-briefly-link-the-record.md` | Ezra, 2026-11-12 (#5591): "when I ask you a question that we have a recorded answer for, give me a brief direct answer and refer me to our recorded answer fo... |  |
+| `shared/workflow/answer-questions-directly.md` | Ezra, 2026-11-25 00:46 PST (#6129): "cai: always answer my questions directly and immediately". |  |
 | `shared/workflow/ardi.md` | Whenever you are working a PR/MR, run the full **ARDI** loop by default, without being asked: **A**ddress every flagged item, **R**ebut findings that are wro... |  |
 | `shared/workflow/ask-for-manual-approval.md` | Applies to every agent that runs under a permission classifier or approval mode. The measured case is Claude Code's auto mode. Codex approval modes, Gemini,... |  |
 | `shared/workflow/ask-when-instruction-contradicts-rule.md` | When the maintainer gives an instruction that seems to contradict a recorded rule or guideline, ask which of these it is, quoting the rule and linking where... |  |

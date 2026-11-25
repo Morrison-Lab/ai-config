@@ -305,6 +305,7 @@ def read_session(path, prompt_text, user_bodies):
             if att.get("type") == "queued_command" and att.get("commandMode") != "task-notification" \
                     and (att.get("origin") or {}).get("kind") != "peer":
                 prompts.append(str(att.get("prompt") or ""))
+                card_texts += card_answer.answers_in_record(rec, cards)  # a tap that arrived mid-turn
             msg = rec.get("message")
             if not rec.get("isSidechain"):
                 card_answer.track_cards(rec, cards_pending, cards)

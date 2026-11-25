@@ -105,6 +105,9 @@ one of:
   "never remove technical terms that get flagged as unlinked;
   always link to them to a definition instead, writing one if necessary").
   Deleting "finite" from an exercise in lds#3017 passed the check and lost the precision the word carried.
+  The same holds when no check flagged anything:
+  never replace a technical term with a plain word to avoid defining it
+  ([`plain-prose`](plain-prose.md), "Never swap a technical term for a plain word").
   `hooks/no-delete-flagged-term.py` denies an edit that rewords a flagged line and drops the term.
   - **Do:** keep the term and write `[finite](sets.qmd#def-finite-set)`.
   - **Don't:** reword "a finite set" to "a set" because the check flagged "finite".

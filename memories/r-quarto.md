@@ -1057,6 +1057,22 @@ The class is Quarto's own (its `landscape.lua` filter), so it needs no extension
 User directive, 2026-10-05, on [Morrison-Lab/lds#412](https://github.com/Morrison-Lab/lds/pull/412);
 lds's `.github/copilot-instructions.md` already states it.
 
+## A table whose R and Python tabs both print it: one `#tbl-` float, console output inside
+
+A table printed in a language tabset gets one caption and label by wrapping the tabset in a `::: {#tbl-x}` div with the caption as the div's last paragraph.
+The chunks in the tabs take no `tbl-` labels, since subtables make each tab show a lone "(a)" or "(b)" (gha `check-lone-subfloats`).
+Two PDF limits apply, measured with Quarto 1.11.9 on [Morrison-Lab/lds#3146](https://github.com/Morrison-Lab/lds/pull/3146) (2026-11-24):
+
+- If each tab prints a formatted table (`knitr::kable`, `DataFrame.to_markdown`), the LaTeX writer puts the float's caption and `\label` into **every** longtable in the float, so the handout shows "Table 1" and "Table 2" with one label.
+  Have the tabs print a tibble and a DataFrame instead: those are not pandoc tables, and `df-print: paged` still shows the tibble as a formatted table on the website.
+- A table float cannot break across pages, so long fitting code inside it runs off the bottom of the page.
+  Keep that code in a tabset outside the float, and put only short display chunks in a second tabset inside it.
+
+The HTML render shows neither problem, so check the PDF: `pdftotext` the handout and `grep -o "Table [0-9]*:"` for duplicate numbers, and look at the float's page.
+
+- **Do:** render the PDF and count the table captions whenever a `#tbl-` float wraps a tabset.
+- **Don't:** call a tabset table done from a clean HTML render.
+
 ## Inline R: avoid scientific notation with `formatC(..., format="d", big.mark=",")`
 
 `format(200000, big.mark=",")` renders as `2e+05` under default `scipen`.

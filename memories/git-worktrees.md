@@ -29,6 +29,14 @@ there.
   is enough; the submodule warning is the only blocker.)
   If the dir somehow lingers,
   `rm -rf <path> && git worktree prune` finishes the cleanup.
+- Where CC Safety Net is installed (cloud sessions), both forms are denied:
+  `git worktree remove --force` (rule `git.worktree-remove-force`) and
+  `rm -rf` on a path outside the current directory, even from its parent
+  (rule `rm.recursive-force-outside-cwd`).
+  `git submodule deinit --all` first does not help; git still refuses.
+  Measured 2026-11-25 on a clean, merged lds worktree.
+  - **Do:** leave the worktree in place in an ephemeral container, and say so.
+  - **Don't:** retry the blocked forms, or route around the guard.
 - The branch can't be deleted while the worktree still references it
   (`error: cannot delete branch '…' used by worktree at '…'`), so remove the
   worktree **first**, then `git branch -D <branch>`.

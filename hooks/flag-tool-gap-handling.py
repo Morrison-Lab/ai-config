@@ -73,7 +73,7 @@ RULE_TALK = re.compile(
 NONTOOL = re.compile(
     r"\b(?:certificates?|certs?|licen[sc]es?|api[- ]?keys?|keys?|tokens?|secrets?"
     r"|credentials?|cron|crontab|systemd|units?|entr(?:y|ies)|configs?|configuration"
-    r"|services?|daemons?|hooks?|webhooks?)\b", re.I)
+    r"|services?|daemons?|hooks?|webhooks?|data|datasets?|snapshots?|caches?)\b", re.I)
 
 INSTALL = re.compile(
     r"\b(?:pip3?|uv pip|uv tool|pipx|conda|mamba|npm|pnpm|yarn|cargo|gem|tlmgr"
@@ -146,7 +146,7 @@ def excuse(text):
 
 # Commas are not clause breaks: a rule description lists its targets with them
 # ("refuses any post, comment or PR body that excuses ...").
-CLAUSE_BREAK = re.compile(r"[;:]\s+|\s+(?:--|---|—|but|yet|so)\s+")
+CLAUSE_BREAK = re.compile(r"[;:]\s+|,?\s+(?:--|---|—|but|yet|so)\s+|,\s+and\s+")
 
 
 def _clauses_around(sentence, start, end):

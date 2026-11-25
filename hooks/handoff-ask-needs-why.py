@@ -164,6 +164,9 @@ LEAD = (
     r"you(?:'ll|\s+will|'d|\s+would)?\s+(?:need|have)\s+to|you\s+must|you\s+should|"
     r"you\s+can|you\s+could|over\s+to\s+you\s+to|(?:it's|it\s+is)\s+(?:yours|(?:up\s+)?to\s+you|on\s+you)\s+to|"
     r"ask(?:ing)?\s+you\s+to|for\s+you\s+to|"
+    # "If you paste the links, I'll add them" hands the step back as a condition
+    # (2026-11-25: a thread asked Ezra to paste video links his own machine could find).
+    r"if\s+you(?:'d|\s+would|\s+can|\s+could)?|"
     r"(?:once|when|after|as\s+soon\s+as)\s+you(?:'ve|\s+have)?)\s+"
 )
 # The user named as the one who acts, anywhere in a sentence that names a step.

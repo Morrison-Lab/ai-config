@@ -44,6 +44,8 @@ CASES = [
     ("squash and merge", POST, {"text": "Please squash and merge."}, True),
     ("you can merge", POST, {"text": "You can merge #12 now."}, True),
     ("when you've merged", POST, {"text": "Let me know when you've merged #12."}, True),
+    ("if you paste", POST, {"text": "If you paste the titles or links, I'll add them to M6."}, True),
+    ("if you can run", POST, {"text": "If you can run the job, I'll read its log."}, True),
     ("negation earlier in the sentence", POST, {"text": "I never saw this block before, so please merge #12."}, True),
     ("card option is the agent's own step", DECIDE, {"question": "Land #12 now?",
                                                      "options": [{"label": "Merge it", "consequence": "I merge #12 under your mwc."},

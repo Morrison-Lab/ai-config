@@ -181,3 +181,22 @@ The steps were:
 - **Do:** when a content PR's merge grant arrives as a card tap or a typed "mwr" in a project thread, tell Ezra in one line that the guard cannot read thread grants, and ask him to press Merge on the PR.
 - **Do:** merge a link-only or id-only PR from a thread through the steps above, after reading the diff to confirm that it changes only links or ids.
 - **Don't:** retry the guarded merge, or route around it with `enable-mwc`, once the guard has refused a thread grant.
+
+## Claude Projects: stacking a generator PR into a link-only PR makes the base a content PR
+
+Measured 2026-11-25 on [lds#3179](https://github.com/Morrison-Lab/lds/pull/3179).
+That PR changed only links, so the "hyperlink changes count as infra" grant covered it.
+[lds#3180](https://github.com/Morrison-Lab/lds/pull/3180) was stacked on it and merged into its branch.
+That PR changed `tools/make_lab_stubs.py`, a `pre-render` step whose output students download.
+The base PR then carried a content generator, which `shared/workflow/strict-merge-policy.md` keeps out of infra, so its merge needed Ezra's word.
+An adversarial subagent found no route around that.
+
+- **Do:** merge a link-only or id-only PR on its own before a content PR stacked on it merges into its branch.
+- **Don't:** merge a stacked content PR into an infra-grant PR's branch and then report the base as covered by the grant.
+
+A project thread's hooks refused two other moves in the same pass:
+
+- `git switch -c` in the main checkout of a repository that has other worktrees.
+  The form that worked was `git worktree add -b <branch> <dir> origin/main`.
+- A `post_message` that wrote `lds#3179` as plain text in its Stopping Point line.
+  Every artifact mention needs its own link, that line included.

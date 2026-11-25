@@ -1062,12 +1062,6 @@ Its "agy on Windows" section carries the 2026-09-02 install-and-mechanics writeu
 - Commits by `dem-extra1` to repos owned by `the repository owner`, `ucd-serg`, or `ucdavis` → the true author is `the repository owner` (demorrison@ucdavis.edu); set `--author="Douglas Morrison <demorrison@ucdavis.edu>"` (or amend) when the committing identity is `dem-extra1`.
 - Commits to `sparta` by `the repository owner` → the true author is `dem-extra1` (dougmor@gmail.com); set `--author="dem-extra1 <dougmor@gmail.com>"` when the committing identity is `the repository owner`.
 
-## Ezra's contact email on documents
-- **Do:** put `ezra.morrison@wwu.edu` wherever a letter, letterhead, signature block or form drafted for Ezra needs his email (Ezra, 2026-11-24: "always use ezra.morrison@wwu.edu").
-- **Don't:** use `morri313@wwu.edu` (his account login) or the old `demorrison@ucdavis.edu`, even when a source draft or his account profile shows one of them.
-- His other WWU details come from his faculty page, https://cs.wwu.edu/morri313.
-  Read that page live rather than copying them from here.
-
 ## Access to paywalled academic sources
 - The user has university journal-subscription access and can fetch most academic articles and many books on request. When a task would genuinely benefit from a peer-reviewed or otherwise paywalled source (grounding a design decision, fact-checking a claim, replacing a weak general-audience citation) rather than whatever's freely indexable, ask for the specific title/article rather than settling for a lower-quality open-access source or skipping the citation. Don't request sources speculatively -- ask when a concrete, identified gap would benefit from one. (Learned on Lacaedemon/sparta, 2026-07-24: offered mid-session while grounding a combat-mechanics design discussion in a general-audience website; a peer-reviewed alternative would have been stronger.)
 

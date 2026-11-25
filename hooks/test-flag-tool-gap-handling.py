@@ -65,6 +65,88 @@ CASES = [
      "tool is missing", "'haven't been able to render' warns"),
     ([say("I haven't tested it, because pytest isn't installed.")],
      "tool is missing", "'haven't tested' warns"),
+    ([say("I couldn't build the PDFs here because this container's LaTeX is too "
+          "old for the exam template.")], "tool is missing",
+     "a too-old toolchain warns (mlg thread, 2026-11-24)"),
+    ([say("I couldn't render it, since the Quarto version here is outdated.")],
+     "tool is missing", "an outdated version warns"),
+    ([say("I couldn't update the page because its text is out of date.")], None,
+     "out-of-date prose is not a tool"),
+    ([say("One hook refuses any post that excuses skipped work because a tool "
+          "is missing or too old.")], None,
+     "describing the rule is not an excuse (2026-11-24 false positive)"),
+    ([say("No excuse, I skipped the tests because pytest is not installed.")],
+     "tool is missing", "the word excuse alone does not exempt a real skip"),
+    ([say("The hook says no excuses; I skipped the tests because pytest is "
+          "not installed.")],
+     "tool is missing", "a rule clause does not exempt the next clause's skip"),
+    ([say("This hook excuses when I skipped work because a tool is missing; "
+          "I skipped tests because pytest is not installed.")],
+     "tool is missing", "a real excuse after an exempt one still warns"),
+    ([say("The hook refuses a post that excuses skipped work; I couldn't render "
+          "it because pdflatex is not installed.")],
+     "tool is missing", "a match spanning a rule clause and a real one still warns"),
+    ([say("This hook refuses posts that excuse skipped work because a tool is "
+          "missing; I couldn't render it: pdflatex is not installed.")],
+     "tool is missing", "a real excuse split over two clauses after rule talk warns"),
+    ([say("The hook says no excuses but I skipped the tests because pytest is "
+          "not installed.")],
+     "tool is missing", "rule talk joined by 'but' does not exempt the skip"),
+    ([say("I couldn't render it because this container has an outdated version "
+          "of LaTeX.")],
+     "tool is missing", "an outdated version before the tool name warns"),
+    ([say("A hook refuses posts that excuse skipped work because a tool is "
+          "missing, and I skipped the tests because pytest is not installed.")],
+     "tool is missing", "rule talk joined by ', and' does not exempt the skip"),
+    ([say("I skipped the refit because the data is too old.")], None,
+     "old data is not an old tool"),
+    ([say("I couldn't render it even though LaTeX is not outdated.")], None,
+     "a tool that is not outdated is no excuse"),
+    ([say("I couldn't render it even though the Quarto version is not outdated.")],
+     None, "a version that is not outdated is no excuse"),
+    # Each negation case below uses a skip verb SKIPPED matches, and is paired
+    # with its un-negated sentence, so the case fails if the negation guard goes.
+    ([say("I didn't run the upgrade because the compiler isn't outdated.")],
+     None, "a contracted 'isn't outdated' is no excuse"),
+    ([say("I didn't run the upgrade because the compiler is outdated.")],
+     "tool is missing", "control: an outdated compiler is an excuse"),
+    ([say("I skipped the migration because the schema is too old.")], None,
+     "an old schema is not an old tool"),
+    ([say("I couldn't render it even though LaTeX is not too old.")], None,
+     "'not too old' is no excuse"),
+    ([say("I couldn't render it because this is not an outdated version of "
+          "LaTeX.")], None, "'not an outdated version' is no excuse"),
+    ([say("I couldn't build the docs because Python 3.8 is too old for this "
+          "package.")], "tool is missing", "a dotted version number does not end the span"),
+    ([say("I couldn't render the slides because the template is too old; I "
+          "couldn't compile them because texlive is not installed.")],
+     "tool is missing", "a non-tool clause does not hide a real excuse beside it"),
+    ([say("I installed pandoc. Then I wrote the summary. I couldn't render the "
+          "PDF because LaTeX is too old.")],
+     "tool is missing", "an unrelated earlier install does not excuse a later skip"),
+    ([say("I didn't run the upgrade because it isn't an outdated version.")],
+     None, "'isn't an outdated version' is no excuse"),
+    ([say("I didn't run the upgrade because it is an outdated version.")],
+     "tool is missing", "control: 'an outdated version' is an excuse"),
+    ([say("I didn't run the upgrade because the release is no longer outdated.")],
+     None, "'no longer outdated' is no excuse"),
+    ([say("I didn't run the upgrade because the release is outdated.")],
+     "tool is missing", "control: an outdated release is an excuse"),
+    # The hook's patterns spell the curly apostrophe and em dash as \u escapes,
+    # which re decodes; these two cases pin that on the real glyphs.
+    ([say("I didn\u2019t run the upgrade because it isn\u2019t an outdated version.")],
+     None, "a curly 'isn't an outdated version' is no excuse"),
+    ([say("The hook flags excuses \u2014 I skipped the tests because pytest is not "
+          "installed.")],
+     "tool is missing", "an em dash ends the rule-talk clause"),
+    ([say("No excuse, I skipped the checks because pytest is not installed.")],
+     "tool is missing", "skipped checks are skipped work, not rule talk"),
+    ([say("I couldn't build the PDFs here because this container's LaTeX is too "
+          "old for the exam template.")],
+     "tool is missing", "the founding sentence, template and all, warns"),
+    ([say("I couldn't render it because this container has an out of date "
+          "version of LaTeX.")],
+     "tool is missing", "an unhyphenated out of date version warns"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

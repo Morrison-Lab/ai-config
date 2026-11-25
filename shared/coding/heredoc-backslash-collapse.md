@@ -287,3 +287,15 @@ Prescribing a portability-dependent flag inside a section about checks that retu
   it answers only the direction that happens to be broken.
 
 This is the same displacement this file's own "treat having read this file as the check" records, one level in: having a check is not the check either, when the check is blind to the half you hit.
+
+## The Edit tool can decode a typed `\u` escape into the glyph
+
+The default above says the Write tool passes bytes through unchanged.
+A `\u` escape is the exception measured so far.
+Measured 2026-11-24, in a Linux remote Claude Code container, on [ai-config#6121](https://github.com/Morrison-Lab/ai-config/pull/6121): Edit calls whose new text held a regex with a typed backslash-u escape for a right single quotation mark (U+2019) and an em dash (U+2014) wrote the glyphs themselves into `hooks/flag-tool-gap-handling.py`.
+The `re` module reads the escape and the glyph the same way, so every test passed.
+Only `scripts/check-ascii-punctuation.py`, run by `validate` and `new-line-breaks` in CI, caught the five glyphs.
+
+- **Do:** after an Edit that types a `\u` escape, run `python3 scripts/check-ascii-punctuation.py` before pushing.
+- **Do:** write such an escape with a script that builds it from `chr(92)`, as above, when the file must hold the escape and not the glyph.
+- **Don't:** read a green test suite as proof that a typed escape landed as an escape.

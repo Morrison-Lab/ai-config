@@ -46,21 +46,41 @@ SKIPPED = (r"(?:skipp(?:ed|ing)|couldn['\u2019]?t|could not|can['\u2019]?t|canno
 TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
         r"|dependenc(?:y|ies)|modules?|binary|binaries|cli|extensions?"
         r"|compilers?|runtimes?)\b")
+# Ezra, 2026-11-24, on "LaTeX is too old for the exam template":
+# "cai: never make excuses like this; install the software you need".
+_STALE = (r"(?:(?!not\b|never\b|no\b|longer\b|\w+n['\u2019]?t\b)\S+\s+){0,3}?"
+          r"(?:outdated|out of date)\b")
+_NEG = (r"(?<!not )(?<!n't )(?<!n\u2019t )(?<!not an )(?<!not a )"
+        r"(?<!n't an )(?<!n\u2019t an )(?<!n't a )(?<!n\u2019t a )(?<!no longer )")
+OLD = (rf"{_NEG}\btoo old\b|\b(?:version|release)\s+{_STALE}|{TOOL}\s+{_STALE}"
+       rf"|{_NEG}\b(?:outdated|out[- ]of[- ]date)\s+(?:version|release|copy|{TOOL})")
 MISSING = (r"(?:(?:isn['\u2019]?t|is not|aren['\u2019]?t|are not|wasn['\u2019]?t|not) installed"
            rf"|{TOOL}\s+(?:\S+\s+){{0,3}}?(?:lacks|lacked|missing)\b"
            rf"|(?:lacks|lacked|missing)\s+(?:\S+\s+){{0,3}}?{TOOL}"
            r"|(?:isn['\u2019]?t|is not|not) (?:available|present)"
-           r"|(?:no|without) (?:\S+ ){0,3}(?:installed|interpreter))")
+           r"|(?:no|without) (?:\S+ ){0,3}(?:installed|interpreter)"
+           rf"|{OLD})")
 FIXED = re.compile(r"\b(?:i|we) (?:installed|have installed|then installed)\b"
                    r"|\binstalled (?:it|them|that)\b", re.I)
 EXCUSE = re.compile(
-    rf"(?:{SKIPPED}[^.\n]{{0,120}}{MISSING}|{MISSING}[^.\n]{{0,120}}{SKIPPED})",
+    # A dot inside a version number ("Python 3.8") does not end the span.
+    rf"(?:{SKIPPED}(?:[^.\n]|\.(?=\d)){{0,120}}{MISSING}"
+    rf"|{MISSING}(?:[^.\n]|\.(?=\d)){{0,120}}{SKIPPED})",
+    re.I)
+
+# "excuse" alone is not enough: "No excuse, I skipped the tests because pytest is
+# not installed" is still a skip. The sentence must also name a rule or check.
+# A bare "check" is not a rule word: "I skipped the checks" is skipped work.
+RULE_TALK = re.compile(
+    r"\bexcus(?:e|es|ed|ing)\b(?=.*\b(?:hooks?|rules?|checkers?|refus\w*|den(?:y|ies)|flags?)\b)"
+    r"|\b(?:hooks?|rules?|checkers?|refus\w*|den(?:y|ies)|flags?)\b(?=.*\bexcus(?:e|es|ed|ing)\b)",
     re.I)
 
 NONTOOL = re.compile(
     r"\b(?:certificates?|certs?|licen[sc]es?|api[- ]?keys?|keys?|tokens?|secrets?"
     r"|credentials?|cron|crontab|systemd|units?|entr(?:y|ies)|configs?|configuration"
-    r"|services?|daemons?|hooks?|webhooks?)\b", re.I)
+    r"|services?|daemons?|hooks?|webhooks?|data|datasets?|snapshots?|caches?"
+    r"|schemas?|models?|formats?|templates?)\b", re.I)
 
 INSTALL = re.compile(
     r"\b(?:pip3?|uv pip|uv tool|pipx|conda|mamba|npm|pnpm|yarn|cargo|gem|tlmgr"
@@ -105,15 +125,48 @@ def turn_installs(path):
 def excuse(text):
     """The excusing sentence, unless the reply also says it installed the tool.
 
-    The fix is usually the next sentence ("X was missing. I installed it and
-    reran."), so FIXED is checked against the whole reply.
+    The fix is usually the same or the next sentence ("X was missing. I
+    installed it and reran."), so FIXED is checked against those two only:
+    "I installed pandoc." earlier in a reply does not excuse a later sentence.
     """
-    if FIXED.search(text):
-        return None
-    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
-        if EXCUSE.search(sentence) and not nontool_subject(sentence):
-            return sentence.strip()[:160]
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", text)
+    for i, sentence in enumerate(sentences):
+        if FIXED.search(" ".join(sentences[i:i + 2])):
+            continue
+        for m in EXCUSE.finditer(sentence):
+            # A match is exempt when the clauses it spans describe the rule
+            # ("refuses a post that excuses skipped work because ...") or name a
+            # non-tool subject ("the template is too old"). Only those clauses
+            # count, so "The hook says no excuses; I skipped the tests because
+            # pytest is not installed" still warns.
+            window = _clauses_around(sentence, m.start(), m.end())
+            if not (RULE_TALK.search(window) or nontool_subject(window)):
+                return sentence.strip()[:160]
+            # The match can run across a clause break into a real excuse, so
+            # drop the exempt clauses and test what is left as one text, which
+            # keeps an excuse whose halves sit in two clauses.
+            rest = " ".join(c for c in CLAUSE_BREAK.split(sentence)
+                            if not (RULE_TALK.search(c) or nontool_subject(c)))
+            if EXCUSE.search(rest):
+                return sentence.strip()[:160]
     return None
+
+
+# Commas are not clause breaks: a rule description lists its targets with them
+# ("refuses any post, comment or PR body that excuses ...").
+CLAUSE_BREAK = re.compile(r"[;:]\s+|,?\s+(?:--|---|\u2014|but|yet|so)\s+|,\s+and\s+")
+
+
+def _clauses_around(sentence, start, end):
+    """The part of `sentence` from the clause holding `start` to the one holding `end`."""
+    lo, hi = 0, len(sentence)
+    for b in CLAUSE_BREAK.finditer(sentence):
+        if b.end() <= start:
+            lo = b.end()
+        elif b.start() >= end:
+            hi = b.start()
+            break
+    return sentence[lo:hi]
 
 
 def nontool_subject(sentence):

@@ -2357,6 +2357,20 @@
             "timeout": 10,
             "script": "no-stale-pin-macro-excuse.py",
             "why": "Ezra, 2026-11-20 23:22 PST: never skip a semantic macro (\\ccprod, \\stprod, \\soprod, \\oprod) because a repo's pinned latex-macros copy lacks it; bump the pin in the same PR and use the macro. \"Inconvenience is never a valid excuse.\" A backstop for common wordings: DENIES a user-visible post, forge comment, issue or PR body, gh issue/pr --body/--title/--body-file, or git commit -m/-am/-F message where one sentence or two adjacent ones name a macro and the pin, say the pin lacks it, and say the macro was kept out (kept, used, left, raw, until, for now). A window that moves the pin (bumped, synced, updated the submodule, stacked) with no negation or deferral, or quotes the rule, passes; a heredoc -F - message is not read. ALLOW_STALE_PIN_MACRO=1 overrides for a quote. See skills/use-math-macros/SKILL.md. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-tool-gap-excuse.py\"",
+            "timeout": 10,
+            "script": "no-tool-gap-excuse.py",
+            "why": "Ezra, 2026-11-24, quoting an mlg thread reply \"LaTeX is too old for the exam template\": \"cai: never make excuses like this; install the software you need\" (and 2026-11-02: \"no excuses; always install what you need\"). flag-tool-gap-handling.py only warns at Stop, after the excuse reached the user, and never sees thread posts or forge text. DENIES a user-visible post, forge comment, issue or PR body, or gh issue/pr --body/--title where one sentence says work was skipped because a tool is missing or too old, unless the text says it was installed; sentence matching is flag-tool-gap-handling.py's excuse(). ALLOW_TOOL_GAP_EXCUSE=1 overrides for a quote or a tool that truly cannot be installed. See shared/workflow/growth-mindset.md. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-cai-reply-without-routing.py\"",
+            "timeout": 10,
+            "script": "no-cai-reply-without-routing.py",
+            "why": "Ezra, 2026-11-24, mlg thread: after a reply to his \"cai: never make excuses like this; install the software you need\" said only that TeX was being installed, \"did you not recognize `cai:`\" and \"then why didn't you say you were going to do it in your original response to my original `cai: ` comment?\". no-user-correction-without-mechanism.py makes the turn build a mechanism before Stop but not tell the user so. DENIES an mcp__hearthbot__post_message when the user's latest message has a line starting cai: (or ca:), no post since then named the routing, and this one does not (ai-config, hook, skill, memory, AGENTS.md/CLAUDE.md, shared/*.md, check, or a Mechanism: line). Quoted, fenced and code-span cai: does not count (remind-encode-user-correction.py typed_text). ALLOW_CAI_REPLY_WITHOUT_ROUTING=1 overrides. See skills/config-ai/SKILL.md. Fails open on parse trouble."
           }
         ]
       },

@@ -104,8 +104,12 @@ CASES = [
      "a tool that is not outdated is no excuse"),
     ([say("I couldn't render it even though the Quarto version is not outdated.")],
      None, "a version that is not outdated is no excuse"),
-    ([say("I haven't upgraded the compiler because it isn't outdated.")],
+    # Each negation case below uses a skip verb SKIPPED matches, and is paired
+    # with its un-negated sentence, so the case fails if the negation guard goes.
+    ([say("I didn't run the upgrade because the compiler isn't outdated.")],
      None, "a contracted 'isn't outdated' is no excuse"),
+    ([say("I didn't run the upgrade because the compiler is outdated.")],
+     "tool is missing", "control: an outdated compiler is an excuse"),
     ([say("I skipped the migration because the schema is too old.")], None,
      "an old schema is not an old tool"),
     ([say("I couldn't render it even though LaTeX is not too old.")], None,
@@ -120,10 +124,14 @@ CASES = [
     ([say("I installed pandoc. Then I wrote the summary. I couldn't render the "
           "PDF because LaTeX is too old.")],
      "tool is missing", "an unrelated earlier install does not excuse a later skip"),
-    ([say("I haven't upgraded the compiler because it isn't an outdated version.")],
+    ([say("I didn't run the upgrade because it isn't an outdated version.")],
      None, "'isn't an outdated version' is no excuse"),
-    ([say("I haven't upgraded LaTeX because the release is no longer outdated.")],
+    ([say("I didn't run the upgrade because it is an outdated version.")],
+     "tool is missing", "control: 'an outdated version' is an excuse"),
+    ([say("I didn't run the upgrade because the release is no longer outdated.")],
      None, "'no longer outdated' is no excuse"),
+    ([say("I didn't run the upgrade because the release is outdated.")],
+     "tool is missing", "control: an outdated release is an excuse"),
     ([say("No excuse, I skipped the checks because pytest is not installed.")],
      "tool is missing", "skipped checks are skipped work, not rule talk"),
     ([say("I couldn't build the PDFs here because this container's LaTeX is too "

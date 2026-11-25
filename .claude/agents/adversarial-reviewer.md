@@ -221,6 +221,13 @@ Flag a coordinator or thread reply that lists options in prose, including one ph
 Read the message; do not report `hooks/no-plain-text-choice.py`'s verdict as your finding.
 See [`lab-operating-rules`](../../shared/workflow/lab-operating-rules.md#deliverables-and-approvals).
 
+## Replies that open with a status line
+
+On a transcript or message draft that answers a user's question ("why", "did you", "have you"), check that the reply's first sentence answers that question.
+Flag a reply whose first sentence is only a plan or status line ("Running X now, then Y"), including one the hook let through because it does not open with a gerund.
+Read the message; do not report `hooks/no-status-line-answer-to-question.py`'s verdict as your finding.
+See [`answer-questions-directly`](../../shared/workflow/answer-questions-directly.md).
+
 ## Posts under an unanswered decision card
 
 On a transcript addressed to the user, check that nothing visible in the thread (a reply, an edit, a checklist update, a widget or a second card) was posted after a decision card that was still waiting for an answer.

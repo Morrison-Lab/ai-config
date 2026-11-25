@@ -49,7 +49,8 @@ TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
 # Ezra, 2026-11-24, on "LaTeX is too old for the exam template":
 # "cai: never make excuses like this; install the software you need".
 _STALE = r"(?:\S+\s+){0,3}?(?:outdated|out of date)\b"
-OLD = rf"\btoo old\b|\b(?:version|release)\s+{_STALE}|{TOOL}\s+{_STALE}"
+OLD = (rf"\btoo old\b|\b(?:version|release)\s+{_STALE}|{TOOL}\s+{_STALE}"
+       rf"|\b(?:outdated|out-of-date)\s+(?:version|release|copy|{TOOL})")
 MISSING = (r"(?:(?:isn['\u2019]?t|is not|aren['\u2019]?t|are not|wasn['\u2019]?t|not) installed"
            rf"|{TOOL}\s+(?:\S+\s+){{0,3}}?(?:lacks|lacked|missing)\b"
            rf"|(?:lacks|lacked|missing)\s+(?:\S+\s+){{0,3}}?{TOOL}"
@@ -143,7 +144,9 @@ def excuse(text):
     return None
 
 
-CLAUSE_BREAK = re.compile(r"[;:]\s+|\s+(?:--|---|—)\s+")
+# Commas are not clause breaks: a rule description lists its targets with them
+# ("refuses any post, comment or PR body that excuses ...").
+CLAUSE_BREAK = re.compile(r"[;:]\s+|\s+(?:--|---|—|but|yet|so)\s+")
 
 
 def _clauses_around(sentence, start, end):

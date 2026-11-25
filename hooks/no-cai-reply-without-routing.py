@@ -38,7 +38,8 @@ POST = "mcp__hearthbot__post_message"
 CAI = re.compile(r"^\s*cai?\s*:", re.I | re.M)
 ROUTED = re.compile(
     r"\bai-config\b|\bhooks?\b|\bskills?\b|\bmemor(?:y|ies)\b|\bAGENTS\.md\b|\bCLAUDE\.md\b"
-    r"|\bshared/\S+\.md\b|\bchecks?\b|^\s*Mechanism:", re.I | re.M)
+    r"|\bshared/\S+\.md\b|\b(?:gha|CI|deny|failing|new)\s+checks?\b|\bcheckers?\b"
+    r"|^\s*Mechanism:", re.I | re.M)
 
 REASON = (
     "[hook: no-cai-reply-without-routing] The user's latest message starts a line with `cai:`, "

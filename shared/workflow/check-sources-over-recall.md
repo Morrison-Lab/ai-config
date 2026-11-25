@@ -20,8 +20,7 @@ Related: [`live-state-over-notes`](live-state-over-notes.md) (a note's claim abo
 
 ## Look up a public fact before calling it unknown
 
-Ezra, 2026-11-24, after a thread left his office room, mail stop, phone and department web address off a WWU letterhead and told him it "didn't know" them:
-"why didn't you look them up online?" and "don't make this mistake again".
+Ezra, 2026-11-24, after a thread left his office room, mail stop, phone and department web address off a WWU letterhead and told him it "didn't know" them: "why didn't you look them up online?" and "don't make this mistake again".
 His faculty page, one search away, listed every one of them.
 
 - **Do:** before leaving a field blank, writing a placeholder, or saying a fact is unknown, search the web (`WebSearch`, then the `web-fetch` agent for the page) and the attached sources.

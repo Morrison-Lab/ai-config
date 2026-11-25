@@ -53,8 +53,8 @@ The fix chosen was to retarget the child, [ai-config#5976](https://github.com/Mo
 ## Opening a PR never needs Ezra's words, but weakening a PR gate does
 
 Ezra, 2026-11-20 09:16 PST: "i shouldn't need to approve opening PRs".
-[ai-config#6142](https://github.com/Morrison-Lab/ai-config/pull/6142) exempts every Morrison-Lab GitHub repo from `no-unnamed-repo-pr.py`, and the classifier allowed that edit.
-On the same day's follow-up (2026-11-25), the classifier denied turning `no-unrequested-sweep-pr.py`'s 10-PR cap from a deny into a warning as "Undermining Oversight".
+[ai-config#6142](https://github.com/Morrison-Lab/ai-config/pull/6142) exempts every Morrison-Lab GitHub repo from `no-unnamed-repo-pr.py`, and the auto-mode permission classifier allowed that edit.
+On a later follow-up (2026-11-25), the same classifier denied turning `no-unrequested-sweep-pr.py`'s 10-PR cap from a deny into a warning as "Undermining Oversight".
 
 - **Do:** after one such denial, stop, stash the half-applied edit (`git stash push -- <paths>`), and give Ezra the exact line to type in the thread, in a fenced block.
 - **Don't:** reword the denied edit or split it across tools.

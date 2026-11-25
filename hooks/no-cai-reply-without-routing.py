@@ -81,7 +81,7 @@ def owed(path, human_text, typed_text):
                 blocks = (m.get("message") or {}).get("content") or []
                 for b in blocks if isinstance(blocks, list) else []:
                     text = post_text(b) if isinstance(b, dict) else None
-                    if text is not None and ROUTED.search(text):
+                    if text is not None and ROUTED.search(typed_text(text)):
                         pending = False
     return pending
 
@@ -92,12 +92,13 @@ def denial(payload):
     if payload.get("tool_name") != POST:
         return None
     text = str((payload.get("tool_input") or {}).get("text") or "")
-    if ROUTED.search(text):
-        return None
     path = payload.get("transcript_path") or ""
     if not path or not os.path.isfile(path):
         return None
     corr = _load("remind-encode-user-correction.py")
+    # Routing named only inside a quote or code was not said to the user.
+    if ROUTED.search(corr.typed_text(text)):
+        return None
     mech = _load("no-user-correction-without-mechanism.py")
     return REASON if owed(path, mech.human_text, corr.typed_text) else None
 

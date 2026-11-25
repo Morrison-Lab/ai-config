@@ -164,9 +164,10 @@ LEAD = (
     r"you(?:'ll|\s+will|'d|\s+would)?\s+(?:need|have)\s+to|you\s+must|you\s+should|"
     r"you\s+can|you\s+could|over\s+to\s+you\s+to|(?:it's|it\s+is)\s+(?:yours|(?:up\s+)?to\s+you|on\s+you)\s+to|"
     r"ask(?:ing)?\s+you\s+to|for\s+you\s+to|"
-    # "If you paste the links, I'll add them" hands the step back as a condition
-    # (2026-11-25: a thread asked Ezra to paste video links his own machine could find).
-    r"if\s+you(?:'d|\s+would|\s+can|\s+could)?|"
+    # "If you can paste the links" hands the step back as a condition. Only the
+    # modal forms are a lead here; a bare "if you <verb>" is caught below only
+    # when an "I'll" clause follows, so "If you push to main, CI runs." passes.
+    r"if\s+you(?:'d|\s+would|\s+can|\s+could)|"
     r"(?:once|when|after|as\s+soon\s+as)\s+you(?:'ve|\s+have)?)\s+"
 )
 # The user named as the one who acts, anywhere in a sentence that names a step.
@@ -176,6 +177,9 @@ ACTOR_STEP = re.compile(r"\b" + VERB + r"\b", re.I)
 HANDOFF = re.compile(
     LEAD + FILLER + r"(?:" + VERB + r"|" + VERB_ING + r")\b"
     r"|\bwould\s+you\s+mind\s+" + FILLER + VERB_ING + r"\b"
+    # "If you paste the links, I'll add them" (2026-11-25: a thread asked Ezra to
+    # paste video links that his own machine could find).
+    r"|\bif\s+you\s+" + FILLER + VERB + r"\b[^.!?\n]{0,120}?,\s*(?:I'll|I\s+will|I\s+can|I'd|then\s+I)\b"
     r"|\b(?:once|when|after)\s+you(?:'ve|\s+have)\s+"
     r"(?:merged|pushed|pressed|clicked|re-?run|restarted|deployed|rebased|installed|deleted)\b"
     r"|(?:^|[\n:])\s*(?:press|click|tap|hit)\s+(?:on\s+)?(?:the\s+)?(?:green\s+)?[`'\"*]*"

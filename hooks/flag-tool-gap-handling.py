@@ -48,9 +48,10 @@ TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
         r"|compilers?|runtimes?)\b")
 # Ezra, 2026-11-24, on "LaTeX is too old for the exam template":
 # "cai: never make excuses like this; install the software you need".
-_STALE = (r"(?:(?!not\b|never\b|\w+n['’]?t\b)\S+\s+){0,3}?"
+_STALE = (r"(?:(?!not\b|never\b|no\b|longer\b|\w+n['’]?t\b)\S+\s+){0,3}?"
           r"(?:outdated|out of date)\b")
-_NEG = r"(?<!not )(?<!n't )(?<!n’t )(?<!not an )(?<!not a )"
+_NEG = (r"(?<!not )(?<!n't )(?<!n’t )(?<!not an )(?<!not a )"
+        r"(?<!n't an )(?<!n’t an )(?<!n't a )(?<!n’t a )(?<!no longer )")
 OLD = (rf"{_NEG}\btoo old\b|\b(?:version|release)\s+{_STALE}|{TOOL}\s+{_STALE}"
        rf"|{_NEG}\b(?:outdated|out[- ]of[- ]date)\s+(?:version|release|copy|{TOOL})")
 MISSING = (r"(?:(?:isn['\u2019]?t|is not|aren['\u2019]?t|are not|wasn['\u2019]?t|not) installed"
@@ -123,12 +124,14 @@ def turn_installs(path):
 def excuse(text):
     """The excusing sentence, unless the reply also says it installed the tool.
 
-    The fix is usually the next sentence ("X was missing. I installed it and
-    reran."), so FIXED is checked against the whole reply.
+    The fix is usually the same or the next sentence ("X was missing. I
+    installed it and reran."), so FIXED is checked against those two only:
+    "I installed pandoc." earlier in a reply does not excuse a later sentence.
     """
-    if FIXED.search(text):
-        return None
-    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", text)
+    for i, sentence in enumerate(sentences):
+        if FIXED.search(" ".join(sentences[i:i + 2])):
+            continue
         for m in EXCUSE.finditer(sentence):
             # A match is exempt when the clauses it spans describe the rule
             # ("refuses a post that excuses skipped work because ...") or name a

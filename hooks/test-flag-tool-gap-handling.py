@@ -117,6 +117,13 @@ CASES = [
     ([say("I couldn't render the slides because the template is too old; I "
           "couldn't compile them because texlive is not installed.")],
      "tool is missing", "a non-tool clause does not hide a real excuse beside it"),
+    ([say("I installed pandoc. Then I wrote the summary. I couldn't render the "
+          "PDF because LaTeX is too old.")],
+     "tool is missing", "an unrelated earlier install does not excuse a later skip"),
+    ([say("I haven't upgraded the compiler because it isn't an outdated version.")],
+     None, "'isn't an outdated version' is no excuse"),
+    ([say("I haven't upgraded LaTeX because the release is no longer outdated.")],
+     None, "'no longer outdated' is no excuse"),
     ([say("I couldn't render it because this container has an out of date "
           "version of LaTeX.")],
      "tool is missing", "an unhyphenated out of date version warns"),

@@ -47,9 +47,11 @@ command line never reaches the hook. `AI_CONFIG_CC_SAFETY_NET_CACHE`
 overrides the cache directory (the self-test uses it).
 
 ONE DENY CAN BE LIFTED, BY THE USER'S TYPED WORDS ONLY (ai-config#6117).
-A `git.push-delete` deny of a push that deletes only lease-pinned branches
-(`git push <remote> --force-with-lease=refs/heads/<b>:<sha> ... --delete
-<b> ...`) is lifted when the user typed `approve-push-delete <key>` in this
+A deny whose one rule is `git.push-delete`, of a push that deletes only
+lease-pinned branches of a repository named by its full URL
+(`git push https://github.com/<owner>/<repo>
+--force-with-lease=refs/heads/<b>:<sha> ... --delete <b> ...`), is lifted
+when the user typed a line reading only `approve-push-delete <key>` in this
 session within the last 30 minutes, where `<key>` is the first 16 hex
 digits of that exact command's sha256. The deny names the key, so the agent
 can quote it to the user. A decision-card tap, a relayed note and the

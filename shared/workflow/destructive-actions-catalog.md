@@ -63,8 +63,9 @@ The `git.push-delete` rule refuses every agent `git push --delete`, so on 2026-1
 The wrapper now lifts that one rule for one command, and only when Ezra types the approval himself.
 The command must name the repository by its full `https://github.com/<owner>/<repo>` URL, not a remote such as `origin`, and delete only branches that each carry a `--force-with-lease=refs/heads/<branch>:<40-hex tip>`.
 A deny that gives any other reason besides `git.push-delete` is never lifted.
-The deny then names a key, and Ezra types `approve-push-delete <key>` in the session within 30 minutes.
+The deny then names a key, and Ezra types `approve-push-delete <key>` on a line of its own in the session within 30 minutes.
 The key is the start of the command's sha256, so it covers that exact command and no other.
+The approval is not used up: the same command may be retried within the window, and once it has run its leases name branches that are gone, so GitHub refuses it.
 
 - **Do:** compose the one-line, lease-pinned push from tips read in a complete clone, quote it to Ezra with the key the deny names, and run the identical command again once he has typed the approval.
 - **Don't:** type the approval yourself, put it on a decision card, relay it through another session, or change a byte of the command after he approves it.

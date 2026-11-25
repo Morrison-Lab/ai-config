@@ -43,13 +43,24 @@ if (cwd === '') {
   process.stdout.write(JSON.stringify({hookSpecificOutput: {
     hookEventName: 'PreToolUse', permissionDecision: 'deny',
     permissionDecisionReason: 'fake deny'}}));
+} else if (d.includes('--delete') && d.includes('TWORULES')) {
+  process.stdout.write(JSON.stringify({hookSpecificOutput: {
+    hookEventName: 'PreToolUse', permissionDecision: 'deny',
+    permissionDecisionReason: 'Reason: deletes refs.\\n\\nRule: git.push-delete\\n\\n'
+      + 'Reason: something else.\\n\\nRule: rm.home'}}));
+} else if (d.includes('--delete') && d.includes('TWOREASONS')) {
+  process.stdout.write(JSON.stringify({hookSpecificOutput: {
+    hookEventName: 'PreToolUse', permissionDecision: 'deny',
+    permissionDecisionReason: 'Reason: deletes refs.\\n\\nRule: git.push-delete\\n\\n'
+      + 'Reason: an unnamed second reason.'}}));
 } else if (d.includes('--delete') && d.includes('EXIT2DELETE')) {
   process.stderr.write('BLOCKED by CC Safety Net Rule: git.push-delete');
   process.exit(2);
 } else if (d.includes('--delete')) {
   process.stdout.write(JSON.stringify({hookSpecificOutput: {
     hookEventName: 'PreToolUse', permissionDecision: 'deny',
-    permissionDecisionReason: 'git push deletes remote refs. Rule: git.push-delete'}}));
+    permissionDecisionReason: 'BLOCKED by CC Safety Net\\n\\nReason: git push deletes '
+      + 'remote refs.\\n\\nRule: git.push-delete\\n\\nCommand: x'}}));
 } else if (d.includes('DENYME')) {
   process.stdout.write(JSON.stringify({hookSpecificOutput: {
     hookEventName: 'PreToolUse', permissionDecision: 'deny',
@@ -303,6 +314,7 @@ class FailsOpenVisibly(unittest.TestCase):
 
 SHA_A = "a" * 40
 SHA_B = "b" * 40
+URL = "https://github.com/Morrison-Lab/lds"
 LEASED = ("git push https://github.com/Morrison-Lab/lds "
           f"--force-with-lease=refs/heads/claude/x:{SHA_A} "
           f"--force-with-lease=refs/heads/gii/y:{SHA_B} "
@@ -328,10 +340,13 @@ class WhichCommandsQualify(unittest.TestCase):
     def test_the_lease_pinned_delete_qualifies(self):
         self.assertTrue(approval_lib().leased_delete_push(LEASED))
         self.assertTrue(approval_lib().leased_delete_push(
-            f"git push origin --force-with-lease=refs/heads/a:{SHA_A} --delete a"))
+            f"git push {URL}.git --force-with-lease=refs/heads/a:{SHA_A} --delete a"))
 
     def test_these_do_not(self):
         cases = {
+            "a bare remote name": (
+                f"git push origin --force-with-lease=refs/heads/a:{SHA_A} --delete a"),
+            "a vertical tab": LEASED.replace(" --delete", "\v--delete"),
             "no lease": "git push origin --delete claude/x",
             "lease without a sha": "git push origin --force-with-lease=refs/heads/a --delete a",
             "short sha": "git push origin --force-with-lease=refs/heads/a:abc123 --delete a",
@@ -349,14 +364,28 @@ class WhichCommandsQualify(unittest.TestCase):
             "a duplicate delete": LEASED + " claude/x",
             "a branch named like an option": LEASED.replace(" claude/x", " -x"),
             "a full ref under a doubled lease": (
-                "git push origin --force-with-lease=refs/heads/refs/heads/main:"
+                f"git push {URL} --force-with-lease=refs/heads/refs/heads/main:"
                 f"{SHA_A} --delete refs/heads/main"),
-            "HEAD": f"git push origin --force-with-lease=refs/heads/HEAD:{SHA_A} --delete HEAD",
-            "a dot-dot name": f"git push origin --force-with-lease=refs/heads/a..b:{SHA_A} --delete a..b",
+            "HEAD": f"git push {URL} --force-with-lease=refs/heads/HEAD:{SHA_A} --delete HEAD",
+            "a dot-dot name": f"git push {URL} --force-with-lease=refs/heads/a..b:{SHA_A} --delete a..b",
         }
         for why, command in cases.items():
             with self.subTest(why=why):
                 self.assertFalse(approval_lib().leased_delete_push(command))
+
+    def test_only_a_sole_push_delete_rule_is_liftable(self):
+        lib = approval_lib()
+        self.assertTrue(lib.sole_push_delete_deny(
+            "Reason: deletes refs.\n\nRule: git.push-delete\n\nCommand: x"))
+        cases = {
+            "a second rule": "Reason: a\n\nRule: git.push-delete\n\nReason: b\n\nRule: rm.home",
+            "a second reason with no rule": "Reason: a\n\nRule: git.push-delete\n\nReason: b",
+            "the rule only mentioned": "see git.push-delete",
+            "another rule": "Reason: a\n\nRule: git.reset-hard",
+        }
+        for why, said in cases.items():
+            with self.subTest(why=why):
+                self.assertFalse(lib.sole_push_delete_deny(said))
 
     def test_one_changed_byte_changes_the_key(self):
         lib = approval_lib()
@@ -469,6 +498,14 @@ class TypedApprovalLiftsOnePushDelete(unittest.TestCase):
         proc = self.run_with([self.user(f"approve-push-delete {self.key}")])
         self.assertEqual(self.decision(proc), "deny")
         self.assertIn("answer stands", proc.stderr)
+
+    def test_a_deny_with_another_reason_too_is_never_lifted(self):
+        for marker in ("TWORULES", "TWOREASONS"):
+            with self.subTest(marker=marker):
+                proc = self.run_with([self.user(f"approve-push-delete {self.key}")],
+                                     cwd=str(self.box.root / marker))
+                self.assertEqual(self.decision(proc), "deny")
+                self.assertNotIn("approve-push-delete", proc.stdout)
 
     def test_another_deny_is_never_lifted(self):
         proc = self.run_with([self.user(f"approve-push-delete {self.key}")],

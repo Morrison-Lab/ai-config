@@ -61,7 +61,8 @@ It runs at the standard level, not strict, because replaying the 797 distinct Ba
 
 The `git.push-delete` rule refuses every agent `git push --delete`, so on 2026-11-20 twelve merged `lds` branches that Ezra had approved for deletion stayed undeletable for four days ([ai-config#6117](https://github.com/Morrison-Lab/ai-config/issues/6117)).
 The wrapper now lifts that one rule for one command, and only when Ezra types the approval himself.
-The command must delete only branches that each carry a `--force-with-lease=refs/heads/<branch>:<40-hex tip>`.
+The command must name the repository by its full `https://github.com/<owner>/<repo>` URL, not a remote such as `origin`, and delete only branches that each carry a `--force-with-lease=refs/heads/<branch>:<40-hex tip>`.
+A deny that gives any other reason besides `git.push-delete` is never lifted.
 The deny then names a key, and Ezra types `approve-push-delete <key>` in the session within 30 minutes.
 The key is the start of the command's sha256, so it covers that exact command and no other.
 

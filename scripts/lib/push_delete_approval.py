@@ -9,7 +9,9 @@ branches Ezra approved on 2026-11-20 stayed undeletable for four days).
 This module lets `hooks/run-cc-safety-net.py` pass exactly one such push
 when, and only when, all of these hold:
 
-- The command is `git push <remote> --force-with-lease=refs/heads/<b>:<sha>
+- CC Safety Net's deny names `git.push-delete` as its only rule
+  (`sole_push_delete_deny`), so no other reason is dropped with it.
+- The command is `git push <github-url> --force-with-lease=refs/heads/<b>:<sha>
   ... --delete <b> ...` and nothing else: every deleted branch carries a
   lease naming its 40-character tip, and every lease names a deleted
   branch. A branch that moved since it was checked is then refused by
@@ -46,9 +48,26 @@ RX_APPROVAL = re.compile(r"(?<![\w-])approve-push-delete\s+([0-9a-f]{16})(?![\w-
                          re.IGNORECASE)
 RX_LEASE = re.compile(r"\A--force-with-lease=refs/heads/([A-Za-z0-9._/-]+):([0-9a-f]{40})\Z")
 RX_BRANCH = re.compile(r"\A[A-Za-z0-9._/-]+\Z")
+# The full URL, never a remote name: `origin` resolves through local git
+# config, so the key would not bind which repository loses the branches.
 RX_REMOTE = re.compile(
-    r"\A(?:origin|https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+?(?:\.git)?)\Z")
-RX_UNSAFE = re.compile(r"[;&|`$<>(){}\\\n\r'\"*?!~#]")
+    r"\Ahttps://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+?(?:\.git)?\Z")
+RX_UNSAFE = re.compile(r"[;&|`$<>(){}\\\n\r\v\f'\"*?!~#]")
+RX_RULE = re.compile(r"\bRule:\s*([A-Za-z0-9._-]+)")
+RX_REASON = re.compile(r"\bReason:")
+LIFTED_RULE = "git.push-delete"
+
+
+def sole_push_delete_deny(said: str) -> bool:
+    """Whether CC Safety Net's output names git.push-delete and no other rule.
+
+    A decision can carry more than one reason. Lifting it because one of
+    them is git.push-delete would drop the others too, so the lift needs
+    exactly one `Rule:` line, naming git.push-delete, and at most one
+    `Reason:` line.
+    """
+    return (RX_RULE.findall(said) == [LIFTED_RULE]
+            and len(RX_REASON.findall(said)) <= 1)
 
 
 def approval_key(command: str) -> str:

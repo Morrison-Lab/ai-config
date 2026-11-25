@@ -317,23 +317,40 @@ def _bash_command(data: dict) -> str:
     return command if isinstance(command, str) else ""
 
 
+def _deny_text(proc: subprocess.CompletedProcess) -> str:
+    """CC Safety Net's deny as plain text: the JSON reason decoded, and stderr.
+
+    The raw JSON escapes each newline, so `\\n\\nRule:` would hide the
+    `Rule:` line from a word-boundary match; decode the reason first.
+    """
+    out = proc.stdout.decode("utf-8", "replace")
+    try:
+        spec = json.loads(out)["hookSpecificOutput"]
+        out = str(spec.get("permissionDecisionReason") or "")
+    except (ValueError, KeyError, TypeError):
+        pass
+    return out + "\n" + proc.stderr.decode("utf-8", "replace")
+
+
 def push_delete_override(data: dict, proc: subprocess.CompletedProcess):
     """The note to print when a typed approval lifts this push-delete deny.
 
     Returns `(allow, text)`, or None to keep the deny unchanged. Lifts only
-    a deny that names `git.push-delete`, on a lease-pinned delete push,
+    a deny whose one rule is `git.push-delete`, on a lease-pinned delete push,
     that the user typed `approve-push-delete <key>` for (ai-config#6117):
     then `allow` is True and `text` is the note. When the command
     qualifies but no approval was typed, `allow` is False and `text` is
     the hint to add to the deny, naming the key the user would type. Any
     error keeps the deny unchanged.
     """
-    said = (proc.stdout + proc.stderr).decode("utf-8", "replace")
+    said = _deny_text(proc)
     if "git.push-delete" not in said:
         return None
     command = _bash_command(data)
     approval = _approval_module() if command else None
-    if approval is None or not approval.leased_delete_push(command):
+    if approval is None or not approval.sole_push_delete_deny(said):
+        return None
+    if not approval.leased_delete_push(command):
         return None
     key = approval.approval_key(command)
     path = data.get("transcript_path")

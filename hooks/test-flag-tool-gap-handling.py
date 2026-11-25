@@ -124,6 +124,11 @@ CASES = [
      None, "'isn't an outdated version' is no excuse"),
     ([say("I haven't upgraded LaTeX because the release is no longer outdated.")],
      None, "'no longer outdated' is no excuse"),
+    ([say("No excuse, I skipped the checks because pytest is not installed.")],
+     "tool is missing", "skipped checks are skipped work, not rule talk"),
+    ([say("I couldn't build the PDFs here because this container's LaTeX is too "
+          "old for the exam template.")],
+     "tool is missing", "the founding sentence, template and all, warns"),
     ([say("I couldn't render it because this container has an out of date "
           "version of LaTeX.")],
      "tool is missing", "an unhyphenated out of date version warns"),

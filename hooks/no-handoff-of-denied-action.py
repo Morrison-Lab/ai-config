@@ -67,15 +67,21 @@ RX_STRIP = re.compile(
     r"|<message\b[^>]*trust=\"relay\"[^>]*>.*?</message>",
     re.IGNORECASE | re.DOTALL)
 
-REASON = (
-    "The auto-mode classifier denied {what} in session {sid}, and this "
-    "`{tool}` call carries that denied {kind} verbatim. Ezra's standing rule "
-    "is that a denied action is reported, not handed to another session to "
-    "run instead (shared/workflow/ask-for-manual-approval.md, ai-config#5914). "
-    "Report the denial to the user and stop. The one thing that clears this "
-    "is a message the user types after the denial that names both the action "
-    "({action}) and the session ({sid}). A prompt that quotes the user's "
-    "earlier words does not count.")
+# realpath, not abspath: the plugin registers hooks through a symlinked path
+# (scripts/check-hook-file-resolution.py).
+MESSAGE = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                       "messages", "no-handoff-of-denied-action.md")
+FALLBACK = ("[hook: no-handoff-of-denied-action] The classifier denied {what} "
+            "in session {sid}; report it, do not hand it to another session "
+            "(ai-config#5914).")
+
+
+def _reason_template():
+    try:
+        with open(MESSAGE, encoding="utf-8") as fh:
+            return " ".join(fh.read().split())
+    except OSError:
+        return FALLBACK
 
 
 def _ws(text):
@@ -274,7 +280,7 @@ def decide(payload):
                 continue
             sid = sorted(sids)[0] if sids else "another session"
             what = f"`{dtool}`" if dtool else "an action"
-            return deny(REASON.format(
+            return deny(_reason_template().format(
                 what=what, sid=sid, tool=tool, kind=kind,
                 action=action_words(dtool, dinp).replace("\\s+", " ")
                 .replace("[\\s_]+", " ").replace("\\", "")))

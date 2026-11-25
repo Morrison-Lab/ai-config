@@ -44,6 +44,31 @@ The waiver removes only the cross-model requirement;
 authorization, [`fully-clean`](fully-clean.md), and the clean-on-head rules still bind.
 Full procedure: [`adversarial-self-review`](adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run) (Ezra, 2026-10-16).
 
+## The user's waiver of the fully-clean check
+
+Only the user can waive the fully-clean check.
+`hooks/block-merge-without-clean-checker.py` reads the waiver from the transcript in two forms:
+
+- **Typed:** "merge it anyway" or "override the merge check" in the user's own message (Ezra, 2026-11-02).
+- **Tapped:** a decision card in your own thread (Ezra, 2026-11-19, [ai-config#5892](https://github.com/Morrison-Lab/ai-config/issues/5892)).
+
+The agent writes a card's text, so the hook counts a tap only when all of these hold:
+
+- The tapped option's label is "Waive the check", with at most ", merge it" (or "both", "them", "all") after it.
+- Another option on the card is exactly "Hold it" (or "Hold", "Hold both", "No", "Not now"),
+  and its consequence names no merge, waiver or other way of going ahead.
+- The tapped option's consequence is "I merge" followed by each pull request, as `owner/repo#N` or its `github.com` pull URL, and nothing else.
+  Join several with commas or "and": "I merge owner/repo#1 and owner/other#2."
+  The waiver covers the pull requests named there and no other.
+  The hook does not read the card's question.
+- The platform verified the tap, and the session that merges is the session that posted the card.
+
+A waiver in another session's note, or a tap relayed from another thread, does not count.
+The merge still needs the full head sha pinned, and a PR comment recording the waiver and why the check could not pass.
+
+- **Do:** ask for a waiver only when no fix can make the check pass, such as a repository with no workflows and no review bot.
+- **Don't:** ask for one when the checker or its input can be fixed.
+
 ## Infrastructure PRs standing `mwc` grant
 
 Infrastructure PRs carry a standing `mwc` grant in every repo the user can push to.
@@ -62,12 +87,42 @@ Because it is scoped to the target, a merge run from an ai-config checkout into 
 In any other repo, where `hooks/no-unauthorized-merge.py` is active, clear it with `ALLOW_MERGE=1` on that one merge command, and state in the reply why the PR qualified.
 Do not enable session-wide `/mwc` for it.
 
+Hyperlink changes and id changes count as infrastructure too, in any repo and in content files (Ezra, 2026-11-21).
+A hyperlink change adds, fixes, repoints or removes a link while the words a reader sees stay the same.
+An id change adds, renames or deduplicates an anchor or cross-reference id (`{#def-...}`, `{#sec-...}`, `{#eq-...}`),
+together with the references that follow it.
+That includes renaming an id that other sites link to, though their links break:
+Ezra declined that carve-out (2026-11-21).
+A LaTeX change that leaves the rendered math the same counts as infrastructure too (Ezra, 2026-11-22),
+such as swapping a semantic macro in for the raw LaTeX it expands to.
+A PR qualifies only when every changed line is one of these or other infrastructure;
+a changed word of prose, code or a caption, or any change to the math a reader sees, makes it content.
+
 - **Classify before asking.**
   Before telling the user a PR waits on `mwc`, list its changed paths.
   If every path matches `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py` (`.github/`, `.claude/`, `CLAUDE.md`/`AGENTS.md`, lint, spell and link-check configuration) or the repo is gha, macros or ai-config, report it as merging under the infra grant, not as waiting on the user (Ezra, 2026-11-07, about lds#2009: "it's infra and shouldn't need my word").
-  `hooks/no-mwc-ask-for-infra-pr.py` denies a reply that asks otherwise (ai-config#5097).
+  A PR in a content file whose every changed line is a hyperlink, id or render-identical LaTeX change, as defined above, is infra too;
+  the path list and the hooks cannot see that, so read the diff to classify it.
+  `hooks/no-mwc-ask-for-infra-pr.py` denies a reply that asks otherwise (ai-config#5097), including a reply that asks the user to type a merge line such as `merge gha 2152 <sha>` for one (ai-config#6021).
+  It also denies a decision card or a coordinator relay that asks to merge infra PRs, such as "Merge the six caller PRs?",
+  because Ezra answered that card with "infra has permanent mwc in all repos" (2026-11-21, ai-config#6054).
+- **Do:** merge a caller, workflow or other infra PR with its number and head SHA written literally (`pulls/2174/merge -f sha=<40-hex>`, `gh pr merge 2174 --match-head-commit <40-hex>`).
+  The merge guard reads both to fetch the changed paths and pin the head, so a loop over `pulls/$n/merge`, or `sha=$(...)`, fails closed and reads as a missing grant
+  (rme#1510, 2026-11-21: refused with `sha=$(gh api ...)`, merged with the SHA spelled out).
+- **Don't:** post a decision card asking whether to merge an infra PR, or enable session `mwc` to get past a guard refusal you caused by hiding the PR number.
 - **Do:** merge a fully clean infrastructure PR without asking, and say in the same reply that you did and why it qualified.
-  In a project, an owner thread never merges: it sends the PR's final head to the coordinator, and the runner thread merges once the fully-clean checker exits 0 (ai-config#5111).
+  In a project with a runner thread, an owner thread never merges: it sends the PR's final head to the coordinator, and the runner thread merges once the fully-clean checker exits 0 (ai-config#5111).
+  In a project with no runner thread, the thread that owns the infra PR merges it itself once it is fully clean, and never asks (Ezra, 2026-11-20: "always handle infra PRs yourself;
+  never ask me").
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
+- **Don't:** treat a link-only, id-only or render-identical LaTeX PR as content because its files are chapters,
+  or treat a PR as link-only when it also rewords the link text,
+  or as render-identical when a macro swap changes what the math looks like.
+  Render the page, or read the macro's definition, to confirm the math is unchanged.
+- **Do:** after an infra PR merges, slide the repo's floating tag (gha's `v3`) yourself once [`slide-tag`](../../skills/slide-tag/SKILL.md)'s gates pass, whichever thread you are.
+  Never ask the user first, and never leave the slide to a runner thread or the coordinator (Ezra, 2026-11-20: "never ask me before sliding an infra tag;
+  always just do it").
+  `hooks/no-ask-to-slide-tag.py` denies a message that asks or hands the slide off (ai-config#6052).
+- **Don't:** report an infra merge done while its tag slide is owed and no gate holds it.
 
 See [`AGENTS.cases.md`](../../AGENTS.cases.md), "Strict Merge Control Policy" for the authentic user directives.

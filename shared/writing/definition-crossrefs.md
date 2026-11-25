@@ -99,6 +99,22 @@ one of:
   ("defined later in this section (@def-x)"), per
   [keep the crossref](forward-references.md#keep-the-crossref);
   never delete the link or add `<!-- check-term-links: allow -->` to hide the forward reference from a dependency-graph check.
+- **Flagged term** --- `check-term-links` flags a term as unlinked or undefined;
+  link it to its definition, and write the definition first if none exists.
+  Never delete or swap out the term to quiet the check (Ezra, 2026-11-20:
+  "never remove technical terms that get flagged as unlinked;
+  always link to them to a definition instead, writing one if necessary").
+  Deleting "finite" from an exercise in lds#3017 passed the check and lost the precision the word carried.
+  The same holds when no check flagged anything:
+  never replace a technical term with a plain word to avoid defining it
+  ([`plain-prose`](plain-prose.md), "Never swap a technical term for a plain word").
+  `hooks/no-delete-flagged-term.py` denies an edit that rewords a flagged line and drops the term.
+  - **Do:** keep the term and write `[finite](sets.qmd#def-finite-set)`.
+  - **Don't:** reword "a finite set" to "a set" because the check flagged "finite".
+  - **Do:** before reusing the target the check suggests, open that definition and confirm it defines the term you are linking.
+    `check-term-links` learns its targets from links that already exist, so one wrong target spreads to every later link it suggests.
+    In lds, "inputs" had been linked to sds's definition of a data set, and the check went on to suggest that target until 131 links in 121 files pointed there ([lds#3026](https://github.com/Morrison-Lab/lds/issues/3026), found in review of lds#2989).
+  - **Don't:** copy a link target from a neighbouring file, or from the check's suggestion, without reading the definition it points at.
 - **Undefined term** --- the term is mentioned but no div defines it
   anywhere in the document; add the missing definition.
   In a series of related documents, such as course sites, first look for a
@@ -114,6 +130,21 @@ one of:
 - **Missing definition link** --- a `#thm-`, `#lem-`, `#cor-`, or `#prp-` div
   links no definition; link each defined term it uses to its definition,
   or add the `check-result-definition-links: allow: reason` comment when it has none.
+- **Partial link** --- `check-term-links` finds the link text covering only part
+  of its target definition's title, followed immediately by another word of
+  that title, and suggests widening the link over that word.
+  The defined term is the word or phrase the definition bolds, which can be
+  shorter than the title.
+  When the word the check would add is a function word ("of", "a", "the"),
+  reword the sentence so the word immediately after the link is not in the
+  title, and never widen the link over the function word.
+  In [mds#844](https://github.com/Morrison-Lab/mds/pull/844) and
+  [mds#858](https://github.com/Morrison-Lab/mds/pull/858),
+  the definition titled "Limit of a sequence" bolds **limit**, and the check
+  suggested linking "limit of", which an agent did.
+  Rewording to "the sequence's limit", with only "limit" linked, fixes it.
+  The check's own handling is tracked in
+  [gha#2146](https://github.com/Morrison-Lab/gha/issues/2146).
 - **Doubled type word** --- the mention writes the type name in front of a
   crossref that already supplies it; drop the hand-written word.
 

@@ -150,7 +150,16 @@ This section is the exception that the other "required for merging" statements i
   **Do:** make the `opencode` attempt first in the ladder, so a denial surfaces early, and report the merge as blocked at that gate.
   **Do:** report it as "denied once so far", never "cannot", since another session ran the identical command without a denial (it exited 127, the CLI being absent), so one denial is one sample and not a rule.
   Retry once only on the user's own explicit word.
-  **Don't:** retry the denied command on a relayed message from another session, or swap in a `curl` to `opencode.ai` to get past it, since that is the same outbound call.
+  Ezra, 2026-11-21: "always allow opencode attempts".
+  The allow comes from `opencode_attempt()` in `hooks/grant-personal-permissions.py` ([#6071](https://github.com/Morrison-Lab/ai-config/pull/6071)), and a session whose plugin cache predates that commit does not have it.
+  On [#6080](https://github.com/Morrison-Lab/ai-config/pull/6080) (2026-11-22), such a session saw the curl denied twice and `opencode run` denied once.
+  A fresh thread, which loads the current plugin, then merged the PR in minutes.
+  **Do:** when the attempt is denied in a session older than the grant, hand the merge to a fresh thread, with the head SHA, through the coordinator or a new session.
+  **Don't:** reword the attempt again, or ask Ezra.
+  `hooks/grant-personal-permissions.py` therefore allows a single `curl` POST with an inline body to `https://opencode.ai/zen/go/v1/chat/completions`.
+  Send that form on its own, with no `cd` or other command chained to it, so the attempt needs no approval card.
+  **Don't:** retry a denied `opencode run` on a relayed message from another session.
+  The hook-allowed `curl` above is the permitted form of the attempt, so send that one rather than a reworded denied command.
 - **Unavailable is not "not-clean".**
   A reviewer that ran and returned Needs-more-work, or left an unresolved finding, still blocks until a re-dispatch returns all-clear.
   The waiver covers only a reviewer that could not produce any verdict.
@@ -175,6 +184,25 @@ Tried afterward, it returned 401 "OpenCode Go requires an API key", so the waive
 - **Do:** before merging under this waiver, try every route, including the cloud `curl` to the OpenCode Go endpoint, and post the PR note that the review was waived and why.
   Only then merge.
 - **Don't:** read "every CLI is absent" as "no reviewer can run" in a cloud session, where the reviewer route is an HTTP call rather than a CLI.
+
+Case (2026-11-19, a cloud session merging [ai-config#5935](https://github.com/Morrison-Lab/ai-config/pull/5935)):
+two merge hooks refused in turn.
+`hooks/block-merge-without-clean-checker.py` did not credit a `check-pr-fully-clean.py` run that was piped through `tail`
+and followed by an `echo` of `${PIPESTATUS[0]}`.
+The hook's own test is the echo, not the pipe: it refuses any `echo` argument holding `clean` or an expansion other than `$?`, since such an echo could print the evidence line.
+The `tail` pipe also hides the checker's exit status behind `tail`'s, so drop it as well.
+`hooks/warn-merge-without-cross-harness-review.py` then refused until five lone `command -v` probes (`agy`, `codex`, `cursor-agent`, `gemini`, `opencode`) each exited 1
+and an `opencode run "<prompt>"` attempt exited 127.
+That hook reads the transcript for the probes and the attempt only.
+It does not check the PR waiver note, which this file still requires.
+After the probes, the attempt and the note, the merge call with `expectedHeadSha` succeeded.
+The same hook refused the next PR's merge ([ai-config#5997](https://github.com/Morrison-Lab/ai-config/pull/5997)) because that PR had been pushed to (a merge of `main`) after the probes were run:
+the probes count only when they come after the PR's last push, so a merge of `main` into the branch means running them again.
+
+- **Do:** run the checker alone with literal arguments (literal `--annotations-read` ids included) and a plain trailing `echo "exit=$?"`.
+  Run the five probes and the `opencode` attempt in the same stride, after the PR's last push, post the waiver note, and only then call the merge.
+- **Don't:** pipe the checker, or put an expansion other than `$?` in its echo.
+  Don't call the merge before the probes and the attempt are in the transcript.
 
 
 The merge-side rules live with the gate they serve:

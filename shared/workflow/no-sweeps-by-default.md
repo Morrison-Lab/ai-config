@@ -31,7 +31,22 @@ A new check reads changed lines, so existing violations do not trip it, and a re
 - **Don't:** clear a new check's existing violations because you expect it to flag them.
 - **Don't:** read a coordinator's note, or your own reading of the ask, as the user saying "sweep".
 
+## A brief does not widen the ask
+
+On 2026-11-20 Ezra said "do that" to moving the ids equation-label check into gha.
+The coordinator's brief to the new thread also told it to label every unlabeled equation in all the notes repos and roll the check out everywhere.
+His reply: "did I say to sweep?"
+Whoever writes the brief, a coordinator or an agent launching a subagent, is bound by the ask as the user wrote it.
+
+- **Do:** brief the step the user asked for, and name the wider work in the brief as a follow-up to offer the user.
+- **Don't:** add a sweep, a rollout to every repo, or edits to existing content to a brief because they seem to follow from the ask.
+
 ## The mechanisms
+
+- `hooks/no-unrequested-sweep-in-brief.py` denies a brief (a subagent launch, `SendMessage`, a thread start, a thread or coordinator message, remote-control instructions) that says "sweep", pairs "all/every ... repos", "everywhere" or "existing content" with a content-edit verb, or names three or more notes repos beside an edit verb, unless the user's own words since their latest message ask for that breadth.
+  The phrase is read clause by clause (split at commas, semicolons and colons): a clause that is a question, offers the work ("offer it as a follow-up") or negates the phrase passes, and an all-repos or named-repos phrase in a clause about PRs, CI, merges, hooks or branches passes too (the word "sweep" does not).
+  A typed `gia`, `gii`, `gip`, `gmd` or `ardia` grants it, as for the PR guard.
+  It catches the widening when the work is handed over, before `no-unrequested-sweep-pr.py` can see any PR.
 
 - `hooks/no-unrequested-sweep-pr.py` denies a PR creation (`gh pr create` or `mcp__github__create_pull_request`) once ten PRs were opened since the user's latest message, unless a sentence the user wrote asks for a sweep.
   Only the user's words count, never a coordinator's `<note>`, a question ("did I say to sweep?") or a negation ("don't sweep").
@@ -43,7 +58,7 @@ A new check reads changed lines, so existing violations do not trip it, and a re
   It warns rather than blocks because a title containing the word is not always a sweep, and a hook cannot read Ezra's intent.
 - gha's content checks (`check-new-line-breaks`, `check-def-commentary`, `check-exm-figures`, `check-one-div-per-subfile`, `check-tree-lists`, `check-visualization-figures`, `check-typos` and others) are diff-scoped by default (checked 2026-10-29), reflagging nothing already merged.
   Where a whole-tree mode exists (a `whole-tree` input, which most of the checks above carry except `check-new-line-breaks` and `check-typos`), it is opt-in, so keep it off by default.
-- `hooks/no-oversized-pr-push.py` already caps any PR at 10 files and 300 lines ([`small-prs`](small-prs.md)), so an unrequested sweep that slips past the title check still cannot ship as one large PR.
+- `hooks/no-oversized-pr-push.py` already caps any PR at 20 files and 600 lines ([`small-prs`](small-prs.md)), so an unrequested sweep that slips past the title check still cannot ship as one large PR.
 - The part with no mechanism: deciding that a fix is incremental, not a sweep, depends on whether the passage was already being edited.
   A hook cannot know that, so this prose carries it.
 

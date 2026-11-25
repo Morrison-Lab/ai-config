@@ -43,6 +43,12 @@ Never send email for the user; draft it ([`never-send-email`](shared/workflow/ne
 Follow [`graph-and-equation-defaults`](shared/writing/graph-and-equation-defaults.md) for figures, visuals and display math.
 It sets the plotting library, axis titles and ticks, where to add a visual, equation layout and labels, and the macros all LaTeX math uses.
 
+## Define technical terms; never dodge them
+
+Never replace a technical term with a plain word to avoid defining it: use the term and define it, or link its definition ([`plain-prose`](shared/writing/plain-prose.md)).
+[`hooks/no-delete-flagged-term.py`](hooks/no-delete-flagged-term.py) blocks the case a check can see.
+A term no notes define yet is in no term list, so that case rests on this rule.
+
 ## Check external repository guidelines and PR template before filing
 
 Before filing a PR in an external repository, read and follow its `CONTRIBUTING.md` and `.github/pull_request_template.md`, never an internal template or memory.
@@ -57,6 +63,10 @@ What you say about the state you stop in must be true, and any work that remains
 - **Say whether the session is done when reporting stopping point status**, confirming UMS ran (or no new learnings accumulated) and noticed follow-ups are filed;
   never say done with uncommitted, unpushed, or un-PRed changes, or open PRs the session authored ([`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md)).
 - **Run UMS before every pause**, first, before ending a turn to wait on anything (CI, a review round, a subagent, or an answer from the user), if learnings have accumulated ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
+  Every thread runs UMS before it is resolved, whoever resolves it,
+  and ends its last report with a `UMS executed:` line (Ezra, 2026-11-20).
+  `hooks/require-ums-before-resolve.py` denies a thread's own resolve without a UMS run,
+  and a resolve by thread id without that line in the thread's newest reply (ai-config#6027).
 - **Run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn;
   answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
 - **Terminate superseded and abandoned background tasks** (diagnostic commands, monitors, subagents) once their purpose is met, their findings are superseded, or the session moves on,
@@ -121,7 +131,7 @@ See [`improve-your-subagents`](shared/workflow/improve-your-subagents.md).
 
 ## Treat user profanity and frustration as urgent defect signals
 
-Treat profanity, frustration, a correction, or a repeat request as an urgent defect: diagnose, fix it now, and in that turn commit the general rule to the repo that owns it (ai-config if it spans repos), never in project memory (`hooks/remind-encode-user-correction.py`).
+Treat profanity, frustration, a correction, a repeat request, or a "why didn't you" as an urgent defect: diagnose it forensically, fix it now, and that turn commit the rule to its repo (ai-config if it spans repos), not project memory (`hooks/remind-encode-user-correction.py`).
 See [`user-profanity-signal`](shared/workflow/user-profanity-signal.md).
 
 ## Status and diagnostic requests do not make issues report-only
@@ -176,6 +186,9 @@ Limits: [`context-budget`](shared/workflow/context-budget.md).
 
 Isolate work in a dedicated `git worktree` so parallel sessions never clobber working directory or branch state.
 Never work in a primary branch checkout or share a dirty worktree across tasks.
+On Ezra's Mac, put each task's worktree at `~/Documents/GitHub/worktrees/<repo>/<task>`.
+`<repo>` is the repository's name, and `<task>` is a single path component, such as `fix-login-test`, that no other worktree under `~/Documents/GitHub/worktrees/<repo>/` uses.
+This one parent directory per repository replaces the several listed in [#3042](https://github.com/Morrison-Lab/ai-config/issues/3042) (Ezra, 2026-11-20).
 Worktrees still share the stash stack and other repository state: see [`shared-git-state`](shared/workflow/shared-git-state.md).
 
 ## No sweeps for new rules by default
@@ -183,6 +196,7 @@ Worktrees still share the stash stack and other repository state: see [`shared-g
 Fix a new rule's violations in passages you edit anyway.
 Sweep only if Ezra explicitly says "sweep" (`Sweep authorized:` in the PR body);
 checks default to changed lines.
+A brief never widens the ask: brief the asked step and offer the rest.
 See [`no-sweeps-by-default`](shared/workflow/no-sweeps-by-default.md).
 
 ## Timestamp recaps in local time
@@ -245,7 +259,8 @@ Beyond GitHub no hook can tell which Bash steps an MCP tool covers, so check the
 The reviewer's checklist item is in [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md#bash-where-a-cloud-mcp-tool-exists).
 
 The same holds beyond MCP and beyond cloud sessions: before a step that would ask the user for approval, take any idiomatic path that reaches the same result without a prompt (Ezra, 2026-11-15: "avoid asking for approvals when there's another idiomatic path forward", [#5687](https://github.com/Morrison-Lab/ai-config/issues/5687)).
-Edit a file with the Edit or Write tool rather than `sed -i` or a heredoc, and run each step as its own short command rather than chaining edits, commits and checks into one long command.
+Do file work with Read, Grep, Glob, Edit and Write, not `cat`, `grep`, `sed` or heredocs, keeping Bash for git and scripts (a hook denies these, [#6065](https://github.com/Morrison-Lab/ai-config/issues/6065)).
+Run each step as its own short command, not one chain of edits, commits and checks.
 Make this choice before the first attempt.
 After a classifier denial, [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md) and [`difm`](skills/do-it-for-me/SKILL.md) still govern: retry the identical command, never a rephrasing that gets around the denial.
 In a cloud session `hooks/no-chained-edit-and-commit-in-cloud.py` denies a command that chains an in-place edit (`sed -i`, `perl -i`, or a redirect into a file outside `/tmp/` and a scratchpad) with `git commit` ([#5688](https://github.com/Morrison-Lab/ai-config/issues/5688)).
@@ -288,7 +303,13 @@ Read a request for everything it plainly asks, do every safe step it covers, and
   `mergeStateStatus: CLEAN` is not a review verdict.
 - **View every page of a document render before calling its PR ready** ([`review-rendered-documents`](shared/workflow/review-rendered-documents.md)).
 - **Revert a premature or defective merge at once**, and reopen the issues it closed.
-- **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean.
+- **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean (Ezra, 2026-11-21: "infra has permanent mwc in all repos");
+  never ask about one, on a card or otherwise.
+  Handle it yourself through the merge, and never ask the user about it (Ezra, 2026-11-20).
+  Link-only, id-only and render-identical LaTeX changes count as infrastructure, even in content files;
+  the test is in [`strict-merge-policy`](shared/workflow/strict-merge-policy.md#infrastructure-prs-standing-mwc-grant).
+- **Slide an infra repo's floating tag yourself** once [`slide-tag`](skills/slide-tag/SKILL.md)'s gates pass;
+  never ask first or leave it to another thread (Ezra, 2026-11-20).
 
 Detail, cases, cross-model waiver: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
 
@@ -321,7 +342,7 @@ Verify every push first, and carry work worth keeping through to a PR ([#2889](h
 
 - **Commit, push, and PR any potentially-reusable work you produce:** commit work produced incidentally in any medium to an owning repository when reproducing it costs more than a moment **and** something durable cites it, or will ([`commit-reusable-work`](shared/workflow/commit-reusable-work.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
   [Port content by script](shared/workflow/port-by-script.md): when adapting any content, copy it first with a script and modify after;
-  when porting a source, also inventory it item by item, port every item, and report the source-to-target map.
+  when porting a source, also inventory it item by item, port every item, and report a coverage map plus a review of whether the source suggests a better structure for the destination.
 - **Deliver completed implementation work:** when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
   This grants no merge authority: the Strict Merge Control Policy still applies.
 - **Verify changes before pushing:** always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.

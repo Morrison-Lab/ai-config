@@ -69,9 +69,13 @@ A branch already pushed unlinked and with no PR yet: read its head SHA, delete t
 The branch is briefly absent between the two calls, so do this only when no other session pushes to it.
 Leave a branch that already has a PR alone and link the PR instead.
 
-Cloud sessions get HTTP 403 on every GraphQL call, so they cannot create a linked branch themselves;
+Cloud sessions get HTTP 403 on every GraphQL call, so they cannot call `createLinkedBranch` themselves;
 `Closes #N` in a PR body still works there.
-Hand the branch creation (issue, repository, branch name, base or SHA) to a local runner, a Remote Control session on Ezra's machine, before the first push, and push onto the branch once it exists.
-If no local runner is reachable, say in the thread that the branch is unlinked and why, rather than skipping the step silently.
+For an issue in `Morrison-Lab/ai-config`, dispatch [`create-linked-branch.yml`](../../.github/workflows/create-linked-branch.yml) over REST before the first push
+(the GitHub MCP `actions_run_trigger` tool, inputs `issue`, `branch` and `base`),
+wait for the run to succeed, then fetch the branch and push onto it (ai-config#5303).
+The workflow runs the mutation with the repository's own token, so it reaches only this repository.
+For any other repository, hand the branch creation (issue, repository, branch name, base or SHA) to a local runner, a Remote Control session on Ezra's machine, before the first push, and push onto the branch once it exists.
+If neither route is available, say in the thread that the branch is unlinked and why, rather than skipping the step silently.
 
 No hook yet: a hook cannot tell from a push which issue a branch addresses, and a cloud session cannot query the link (ai-config#5303 tracks a mechanism).

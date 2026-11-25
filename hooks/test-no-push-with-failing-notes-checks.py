@@ -42,7 +42,7 @@ jobs:
 """
 STUB = """import json, os, sys
 open(os.path.join(os.environ["STUB_LOG"], os.path.basename(__file__) + ".env"), "w", encoding="utf-8").write(
-    json.dumps({k: v for k, v in os.environ.items() if k.startswith(("TERM_LINKS_", "NLB_", "CTR_"))}))
+    json.dumps({k: v for k, v in os.environ.items() if k.startswith(("TERM_LINKS_", "NLB_", "CTR_", "CAW_", "QL_"))}))
 code = int(open(".stub-exit", encoding="utf-8").read().strip()) if os.path.exists(".stub-exit") else 0
 if code:
     print("::error file=chapters/a.qmd,line=3::unlinked-first-use: model")
@@ -72,7 +72,9 @@ def make_repo(workflows):
 def stub_dir():
     g = tempfile.mkdtemp(prefix="npc-gha-")
     for sub, name in (("check-term-links", "check-term-links.py"), ("check-new-line-breaks", "check-new-line-breaks.py"),
-                      ("check-title-references", "check-title-references.py")):
+                      ("check-title-references", "check-title-references.py"),
+                      ("check-avoided-words", "check-avoided-words.py"),
+                      ("check-quarto-links", "check-quarto-links.py")):
         os.makedirs(os.path.join(g, sub))
         open(os.path.join(g, sub, name), "w", encoding="utf-8").write(STUB)
     return g
@@ -277,6 +279,105 @@ verdict, _ = run("git push origin feat", gated, 0, extra={"CTR_GLOBS": "*.nothin
 env_ctr = json.load(open(os.path.join(LOG, "check-title-references.py.env"), encoding="utf-8"))
 expect("T49 caller CTR_ variables do not leak into a check", env_ctr.get("CTR_GLOBS"), None)
 
+# ai-config#4986: lds's cluster-checks.yml runs its diff-scoped checks as run-check.sh lines.
+BUNDLED = """name: Cluster checks
+on:
+  pull_request:
+jobs:
+  checks:
+    steps:
+      - name: Check out gha
+        uses: actions/checkout@v7
+        with:
+          repository: Morrison-Lab/gha
+          ref: v3
+          path: .gha
+      - name: Run
+        with:
+          steps: |
+            .gha/run-check/run-check.sh check-avoided-words CAW_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}' CAW_WHOLE_TREE='${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}' CAW_GLOBS='*.qmd *.md' CAW_FAIL=false -- python3 -u .gha/check-avoided-words/check-avoided-words.py
+            .gha/run-check/run-check.sh check-new-line-breaks NLB_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}' NLB_GLOBS='*.bundled' NLB_FAIL=true -- python3 -u .gha/check-new-line-breaks/check-new-line-breaks.py
+            .gha/run-check/run-check.sh check-quarto-links QL_GLOBS='*.qmd' QL_FAIL=true -- python3 -u .gha/check-quarto-links/check-quarto-links.py
+"""
+for name in ("check-avoided-words.py.env", "check-quarto-links.py.env", "check-new-line-breaks.py.env"):
+    if os.path.exists(os.path.join(LOG, name)):
+        os.remove(os.path.join(LOG, name))
+bundled = make_repo({"cluster-checks.yml": BUNDLED})
+verdict, _ = run("git push origin feat", bundled, 0, extra={"CAW_PATHS_IGNORE": "stray"})
+env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))
+expect("T50 a bundled line runs with its own assignments",
+       (env_caw.get("CAW_GLOBS"), env_caw.get("CAW_FAIL")), ("*.qmd *.md", "false"))
+expect("T51 the pull-request expression becomes origin/main, the dispatch one false",
+       (env_caw.get("CAW_BASE_REF"), env_caw.get("CAW_WHOLE_TREE")), ("origin/main", "false"))
+expect("T52 a stray variable with the line's prefix does not leak", "CAW_PATHS_IGNORE" in env_caw, False)
+expect("T53 a whole-tree line (no base ref) is not run", os.path.exists(os.path.join(LOG, "check-quarto-links.py.env")), False)
+expect("T54 passing bundled checks stay silent", verdict, "silent")
+verdict, out = run("git push origin feat", bundled, 1)
+expect("T55 a failing bundled check denies, naming it",
+       (verdict, "check-avoided-words failed" in out["hookSpecificOutput"].get("permissionDecisionReason", "")),
+       ("DENY", True))
+both = make_repo({"cluster-checks.yml": BUNDLED, "check-new-line-breaks.yml": NLB})
+run("git push origin feat", both, 0)
+env_nlb = json.load(open(os.path.join(LOG, "check-new-line-breaks.py.env"), encoding="utf-8"))
+expect("T56 a check with its own caller runs from the caller, not the bundled line", env_nlb.get("NLB_GLOBS"), "*.md *.qmd")
+bundled_gated = make_repo({"cluster-checks.yml": BUNDLED, "annotation-gate.yml": GATE})
+run("git push origin feat", bundled_gated, 0)
+env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))
+expect("T57 an annotation gate makes a bundled warn-only check blocking", env_caw.get("CAW_FAIL"), "true")
+expect("T60 the lds line form parses: name, ref, command",
+       [(c["name"], c["ref"], c["command"][-1]) for c in hook.parse_run_check_lines(BUNDLED)],
+       [(n, "v3", f".gha/{n}/{n}.py") for n in ("check-avoided-words", "check-new-line-breaks")])
+for case, before, after in (
+        ("T58 an unknown expression", "CAW_WHOLE_TREE='${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}'",
+         "CAW_WHOLE_TREE='${{ inputs.whole }}'"),
+        ("T61 an unquoted expression", "CAW_BASE_REF='${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}'",
+         "CAW_BASE_REF=${{ github.base_ref }}"),
+        ("T67 an unclosed quote", "CAW_WHOLE_TREE='${{", "CAW_WHOLE_TREE=\"'${{")):
+    verdict, out = run("git push origin feat", make_repo({"cluster-checks.yml": BUNDLED.replace(before, after)}), 0)
+    expect(f"{case} fails open with a note naming the check, never runs or skips silently",
+           (verdict, "check-avoided-words could not run locally" in out.get("systemMessage", "")), ("NOTE", True))
+commented = hook.parse_run_check_lines(BUNDLED.replace(
+    "check-avoided-words.py\n", "check-avoided-words.py # trailing note\n"))
+expect("T62 a trailing shell comment is not passed as arguments",
+       " ".join(commented[0]["command"]), "python3 -u .gha/check-avoided-words/check-avoided-words.py")
+for case, before, after in (("T59 another repository", "repository: Morrison-Lab/gha", "repository: other/gha"),
+                            ("T63 another path", "path: .gha", "path: tools/gha")):
+    expect(f"{case} is not read as the .gha checkout", hook.parse_run_check_lines(BUNDLED.replace(before, after)), [])
+for case, keys in (("T64 keys in another order", ["path: .gha", "ref: v3", "repository: Morrison-Lab/gha"]),
+                   ("T66 comments on keys", ["repository: Morrison-Lab/gha # p", "ref: v3 # f", "path: .gha # h"])):
+    expect(f"{case} still gives the ref", hook.gha_checkout_ref("      with:\n" + "".join(f"        {k}\n" for k in keys)), "v3")
+CMD = "python3 -u .gha/check-avoided-words/check-avoided-words.py"
+FAIL, OWN = "CAW_FAIL=false", "is not python on .gha/check-avoided-words/"
+# (case, text replaced, replacement, expected substring of an `unhandled` entry)
+REFUSED = [
+    ("T69 nothing after --", " -- " + CMD, " --", "(empty)"),
+    ("T70 not python", CMD, "bash -c true", OWN),
+    ("T71 a .. path", CMD, "python3 .gha/../../evil.py", OWN),
+    ("T77 another gha script", CMD, "python3 -u .gha/quarto-publish/render-per-file.py . out html", OWN),
+    ("T73 PYTHONPATH", FAIL, FAIL + " PYTHONPATH=.", "PYTHONPATH"),
+    *[(f"T75 a {p} key", FAIL, FAIL + f" {p}BASE_REF=m {p}LIBRARY=x", f"{p}BASE_REF does not") for p in ("LD_", "TCL_", "TK_")],
+    ("T80 a GITHUB_ key", FAIL, FAIL + " GITHUB_BASE_REF=x GITHUB_STEP_SUMMARY=/tmp/x", "GITHUB_BASE_REF does not"),
+    ("T79 two *_BASE_REF keys", FAIL, FAIL + " OI_BASE_REF=x", "not exactly one"),
+    ("T81 a commit-pinned gha ref", "ref: v3", "ref: " + "a" * 40, "not a named tag"),
+    ("T83 a .. gha ref", "ref: v3", "ref: ..", "not a named tag"),
+    ("T82 a check's key that picks code to run", FAIL, FAIL + " CAW_BIN_DIR=tools", "CAW_BIN_DIR is not"),
+]
+for value in ("CAW_FAIL='${{ github.event_name == 'pull_request' && 'true' || 'false' }}'",
+              "CAW_BASE_REF=--output=/tmp/x", "CAW_MACROS_FILE=/etc/passwd", "CAW_MACROS_FILE=' /etc/passwd'", "CAW_LIBRARY='x /root/.netrc'",
+              "CAW_LIBRARY=~/x", "CAW_GLOBS='*.qmd ../../etc/*'", "CAW_WHOLE_TREE=true", "CAW_FAIL=-x"):
+    REFUSED.append(("T68/T85/T86 " + value, FAIL, FAIL + " " + value, value.split("=")[0] + "="))
+for case, before, after, reason in REFUSED:
+    refused = hook.parse_run_check_lines(BUNDLED.replace(before, after))
+    expect(f"{case} is not run", any(reason in u for u in refused[0]["unhandled"]), True)
+expect("T72 interpreter flags are allowed, and any argument after the script is refused",
+       [hook.gha_script_command(f"python3 -I -u .gha/check-x/check-x.py{a}".split(), "check-x") for a in ("", " -o x")], [True, False])
+expect("T78 a check name not of the form check-<words> runs nothing",
+       hook.gha_script_command("python3 .gha/quarto-publish/quarto-publish.py".split(), "quarto-publish"), False)
+no_fail = make_repo({"cluster-checks.yml": BUNDLED.replace(" CAW_FAIL=false", ""), "annotation-gate.yml": GATE})
+run("git push origin feat", no_fail, 0)
+env_caw = json.load(open(os.path.join(LOG, "check-avoided-words.py.env"), encoding="utf-8"))
+expect("T65 under a gate, a line without its FAIL variable is made blocking", env_caw.get("CAW_FAIL"), "true")
+
 # A moved tag (gha slides v3) must reach the cache on the next push, inside the daily window.
 origin = tempfile.mkdtemp(prefix="npc-gha-origin-")
 git(origin, "init", "-q", "-b", "main")
@@ -295,6 +396,8 @@ expect("T41 a tag moved after a fresh stamp is refetched", git(hook.ensure_gha("
 expect("T42 an unchanged tag reports not moved", hook.remote_moved(first, "v3"), False)
 git(first, "remote", "set-url", "origin", "/nonexistent-origin")
 expect("T43 an unreadable remote falls back to the stamp", hook.remote_moved(first, "v3"), None)
+expect("T84 a .. ref is refused before any clone or cleanup",
+       (hook.ensure_gha(".."), hook.ensure_gha("."), os.path.isdir(first)), (None, None, True))
 
 real = os.environ.get("GHA_REAL_DIR")
 if real:

@@ -97,6 +97,12 @@ The same holds for a skipped check: a render skipped because an interpreter is m
   Ezra, 2026-11-04, on a psw#480 reply that said "I haven't rendered the page, and `typos` isn't installed in this session":
   "never make an excuse like this", and "why not?" to the unrendered page.
   Both were installable in the session, so the push should have waited for the render and the spell check.
+  An old version is the same excuse.
+  Ezra, 2026-11-24, on an mlg reply that said "LaTeX is too old for the exam template":
+  "cai: never make excuses like this; install the software you need".
+  `quarto install tinytex` was refused there, and `tinytex::install_tinytex()` from R with a CTAN mirror worked.
+  So try every install route before reporting one as blocked.
+  `hooks/no-tool-gap-excuse.py` denies such an excuse in a post, comment or PR body before anyone reads it.
 
 - **Do:** when a cloud session's token or sandbox blocks a read or an action, run it from a local session that holds Ezra's credentials: a Remote Control session on his usual Linux work device, or on his Mac.
   The CI runner processes on the lab machines only execute triggered jobs, so they are not this route.

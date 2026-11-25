@@ -9,35 +9,21 @@
 # so selftest negative controls that also appear on the base branch drop out.
 # Last line: the comma-separated run ids to pass to --annotations-read.
 #
-# Pages by hand: `gh api --paginate` follows numeric-ID Link URLs that the
+# lib/annotation_cache.py pages by hand: `gh api --paginate` follows
+# numeric-ID Link URLs that the
 # cloud-session proxy rejects with HTTP 403 (gha#1432, 2026-11-03).
 set -euo pipefail
 
 repo="${1:?usage: $0 OWNER/REPO SHA [BASE_SHA]}"
 sha="${2:?usage: $0 OWNER/REPO SHA [BASE_SHA]}"
 base="${3:-}"
-max_pages=10
+lib="$(dirname "$0")/lib/annotation_cache.py"
 
-annotated_run_ids() {
-  local commit="$1" page got
-  for page in $(seq 1 "$max_pages"); do
-    got=$(gh api "repos/$repo/commits/$commit/check-runs?per_page=100&page=$page" \
-      --jq '.check_runs[] | select(.output.annotations_count > 0) | .id')
-    [ -z "$got" ] && break
-    printf '%s\n' "$got"
-  done
-}
-
+# Completed runs are read through a cache keyed by check-run id
+# (ai-config#6032), so re-reading a head, or main's tip once per PR,
+# spends no annotation calls. A failed or short read exits non-zero.
 annotation_rows() {
-  local commit="$1" id page out
-  for id in $(annotated_run_ids "$commit"); do
-    for page in $(seq 1 "$max_pages"); do
-      out=$(gh api "repos/$repo/check-runs/$id/annotations?per_page=100&page=$page" \
-        --jq ".[] | [\"$id\", .annotation_level, .path, (.message | split(\"\n\")[0] | .[0:140])] | @tsv")
-      [ -z "$out" ] && break
-      printf '%s\n' "$out"
-    done
-  done
+  python3 "$lib" rows "$repo" "$1"
 }
 
 rows=$(annotation_rows "$sha")

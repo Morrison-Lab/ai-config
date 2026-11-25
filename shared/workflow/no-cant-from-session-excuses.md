@@ -20,9 +20,14 @@ An mds thread had asked the coordinator to file in ai-config because "ai-config 
 
 - **Do:** call `mcp__claude-code-remote__add_repo`, clone the repository, do the work, and report it in the past tense.
 - **Don't:** tell the user or another session that a repository is outside this thread's repos or scope.
+- **Don't:** limit the thread to the repositories it started with ("this thread can only reach lds", "GitHub access is scoped to lds").
+  The system prompt's Repository Scope list names where the session began, not what it can reach.
+  Ezra, 2026-11-21: "that's still wrong; you can clone any repo".
+  He then added "never forget that again".
 
 If `add_repo` refuses or is blocked, say so in that sentence or the next and give its reason, quoted where it returned text.
 `hooks/no-repo-not-in-thread-excuse.py` denies a sentence saying a repository is not in, not attached to or outside the thread, the session or its repo list, or that the thread can't reach it.
+It also denies a sentence that limits the thread, the session or its access to a named repository ("can only reach lds", "access is scoped to lds").
 It passes a sentence when it or the sentence before or after it reports an attach or a refused attach, and it leaves push, write-access and edit blockers alone.
 [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#a-repository-called-out-of-the-threads-reach) looks for the same excuse in what it reviews.
 

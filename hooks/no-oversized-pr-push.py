@@ -11,7 +11,15 @@ files changed and added plus deleted lines, not counting generated, lock,
 image and data paths, nor a path `.gitattributes` marks `linguist-generated`
 (a committed generator output, ai-config#5288), and not counting the lines of a newly added `_fig-*`
 subfile (it still counts as a file), and not counting a pure rename (no line
-changed). Over 10 files or 300 lines the push is denied.
+changed). A line deleted in one place and added unchanged in another (a move
+or split between files) does not count, and neither does a file whose every
+changed line is such a move. Over 20 files or 600 lines the push is denied
+(Ezra, 2026-11-19: "we need to raise the pr size limit so you stop bothering
+me"; the cap was 10 files and 300 lines).
+
+A stacked branch is measured against the branch it is stacked on, not only
+the default branch: the open PR's base, or on a first push the nearest
+remote branch in HEAD's history that the default branch lacks.
 
 The hook agrees with CI, so a push CI would pass is not denied
 (ai-config#5749; 2026-11-17, a follow-up fix to gha#2082 needed a typed
@@ -39,7 +47,7 @@ approval from Ezra although CI passed):
   The diffs are compared by `git patch-id --stable`.
 
 Escape hatch for a deliberate exception (a mechanical rename the maintainer
-asked for in one PR, a stacked branch whose base is not the default branch):
+asked for in one PR, a stacked branch whose parent is not on the server):
 prefix the command with `ALLOW_LARGE_PR=1` and say why in the reply.
 
 Fails open on any parse trouble, outside a repo, with no remote default
@@ -51,9 +59,10 @@ import os
 import re
 import subprocess
 import sys
+from collections import Counter
 
-MAX_FILES = 10
-MAX_LINES = 300
+MAX_FILES = 20
+MAX_LINES = 600
 # Keep in step with BUILTIN_IGNORE in gha's check-pr-size/check-pr-size.py.
 IGNORE = [
     r"(?:.*/)?[^/]*\.lock", r"(?:.*/)?package-lock\.json",
@@ -134,6 +143,55 @@ def registration_paths(added):
     return paths
 
 
+def changed_lines(cwd, mb, tip):
+    """{path: (added, deleted)} stripped line texts; headers are read only before
+    a file's first hunk, so a deleted line starting `--` is content."""
+    out = git(cwd, "diff", "-M", "--unified=0", "--no-color", "--no-ext-diff", mb, tip)
+    if out is None:
+        return None
+    files, cur, old, header = {}, None, None, False
+    for line in out.splitlines():
+        if line.startswith("diff --git "):
+            cur, old, header = None, None, True
+        elif header and line.startswith("--- "):
+            old = line[6:] if line.startswith("--- a/") else None
+        elif header and line.startswith("+++ "):
+            cur = line[6:] if line.startswith("+++ b/") else old
+            files.setdefault(cur, ([], []))
+        elif line.startswith("@@"):
+            header = False
+        elif cur is not None and not header and line[:1] in "+-":
+            files[cur][0 if line[0] == "+" else 1].append(line[1:].strip())
+    return files
+
+
+def move_budget(files):
+    """How often each line text is both deleted and added: moved, as in a split
+    (lds#2885, 38 files, needed an override).  Short or punctuation-only lines
+    (braces, fences, blanks) recur in any big edit, so they never count as moved."""
+    added, deleted = Counter(), Counter()
+    for a, d in files.values():
+        added.update(t for t in a if len(t) >= 8 and re.search(r"\w", t))
+        deleted.update(d)
+    return added & deleted
+
+
+def unmoved(lines, budget):
+    """The number of `lines` not paid for by `budget`, which it consumes."""
+    n = 0
+    for text in lines:
+        if budget[text] > 0:
+            budget[text] -= 1
+        else:
+            n += 1
+    return n
+
+
+def skipped(path, gen):
+    """A path the cap never counts: generated, or on the IGNORE list."""
+    return path in gen or any(re.fullmatch(p, path) for p in IGNORE)
+
+
 def measure(cwd, base, tip="HEAD"):
     mb = git(cwd, "merge-base", base, tip)
     if not mb:
@@ -141,27 +199,42 @@ def measure(cwd, base, tip="HEAD"):
     out = git(cwd, "diff", "--numstat", "-M", mb, tip)
     if out is None:
         return None
+    # A failed text diff only turns off move detection: numstat still counts.
+    texts = changed_lines(cwd, mb, tip) or {}
     added = git(cwd, "diff", "--name-only", "--diff-filter=A", "-M", mb, tip)
     added = set((added or "").splitlines())
     registration = registration_paths(added)
     rows = [r.split("\t", 2) for r in out.splitlines()]
     rows = [r for r in rows if len(r) == 3]
     gen = generated(cwd, [new_path(r[2]) for r in rows])
+    # Ignored and generated paths are not counted, so their lines must not
+    # pay for a counted file's lines as moves either.
+    rows = [r for r in rows if not skipped(new_path(r[2]), gen)]
+    counted = {new_path(r[2]) for r in rows}
+    texts = {path: t for path, t in texts.items() if path in counted}
+    plus, minus = move_budget(texts), move_budget(texts)
     files = lines = 0
     for parts in rows:
         path = new_path(parts[2])
-        if path in gen or any(re.fullmatch(p, path) for p in IGNORE):
-            continue
         # A pure rename (no line changed) is content-identical (ai-config#5128).
         if " => " in parts[2] and parts[:2] == ["0", "0"]:
             continue
+        n = None
+        if path in texts:
+            a, d = texts[path]
+            n = unmoved(a, plus) + unmoved(d, minus)
+            # Every changed line was moved here from another file, or away.
+            if n == 0 and (a or d):
+                continue
         # A registration file does not count as a file, but its lines still
         # count, so a new capability cannot carry unrelated prose for free.
         if path not in registration:
             files += 1
         if path in added and re.fullmatch(NEW_FIGURE_LINES_FREE, path):
             continue
-        if parts[0] != "-":
+        if n is not None:
+            lines += n
+        elif parts[0] != "-":
             lines += int(parts[0]) + int(parts[1])
     return files, lines
 
@@ -204,14 +277,23 @@ def live_remote(cwd, branch):
     """`origin/<branch>` when the tracking ref matches the server's tip, else None.
 
     The tracking ref can be stale after a force push elsewhere, so the server's
-    tip must be the commit measured.
+    tip must be the commit measured. A clone that fetches only `main`, as a
+    cloud session's does, has no tracking ref at all, so a missing or stale
+    one is fetched from the server before it is compared (ai-config#5884).
+    The server is asked for `refs/heads/<branch>` in full, since a bare
+    pattern also matches `<other>/<branch>` and could take its sha first.
     """
     remote = f"origin/{branch}"
-    local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
-    if not local:
+    live = git(cwd, "ls-remote", "--heads", "origin", f"refs/heads/{branch}")
+    if not live:
         return None
-    live = git(cwd, "ls-remote", "--heads", "origin", branch)
-    if not live or live.split()[0] != local:
+    tip = live.split()[0]
+    local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
+    if local != tip:
+        git(cwd, "fetch", "-q", "--no-tags", "origin",
+            f"+refs/heads/{branch}:refs/remotes/{remote}")
+        local = git(cwd, "rev-parse", "--verify", "-q", remote + "^{commit}")
+    if local != tip:
         return None
     return remote
 
@@ -269,6 +351,64 @@ def delta_within_cap(cwd, branch):
     return delta is not None and not over_cap(delta)
 
 
+def stacked_parents(cwd, branch, default, pr):
+    """[the open PR's base], else [the nearest remote branch tip in HEAD's history
+    that the default branch lacks], else []. Measuring a stack against main
+    counted its lower layers too (lds#2896, 215 lines, needed an override)."""
+    ref = ((pr or {}).get("base") or {}).get("ref")
+    if ref:
+        # CI measures against the PR's base and nothing else, so an open PR
+        # settles the parent: the default branch means no stack at all.
+        if f"origin/{ref}" == default:
+            return []
+        if git(cwd, "rev-parse", "--verify", "-q", f"origin/{ref}^{{commit}}"):
+            return [f"origin/{ref}"]
+        tip = server_tip(cwd, ref)
+        return [tip] if tip else []
+    out = git(cwd, "for-each-ref", "--merged", "HEAD", "--no-merged", default,
+              "--format=%(refname:short)", "refs/remotes/origin/")
+    skip = {default, "origin/HEAD", "origin", f"origin/{branch}"}
+    refs = [r for r in (out or "").splitlines() if r not in skip]
+    if not refs:
+        refs = server_parents(cwd, branch, default)
+    best = None
+    for r in refs:
+        n = git(cwd, "rev-list", "--count", f"{r}..HEAD")
+        if n and (best is None or int(n) < best[0]):
+            best = (int(n), r)
+    return [best[1]] if best else []
+
+
+def server_tip(cwd, ref):
+    """The server's tip of branch `ref` when that commit is local (a
+    single-branch clone has no origin/<ref>), else None."""
+    line = git(cwd, "ls-remote", "--heads", "origin", f"refs/heads/{ref}")
+    sha = (line or "").split()[0] if (line or "").split() else ""
+    if sha and git(cwd, "rev-parse", "--verify", "-q", f"{sha}^{{commit}}"):
+        return sha
+    return None
+
+
+def server_parents(cwd, branch, default):
+    """Server branch tips in HEAD's history and not the default's, for a
+    single-branch clone: the parent's tip is already local, so no fetch."""
+    live = git(cwd, "ls-remote", "--heads", "origin")
+    tips = {}
+    for line in (live or "").splitlines():
+        sha, _, ref = line.partition("\t")
+        if ref != f"refs/heads/{branch}":
+            tips.setdefault(sha, ref)
+    if not tips:
+        return []
+    p = subprocess.run(["git", "cat-file", "--batch-check=%(objectname) %(objecttype)"],
+                       cwd=cwd, input="\n".join(tips) + "\n",
+                       capture_output=True, text=True, timeout=15)
+    local = [ln.split()[0] for ln in p.stdout.splitlines() if ln.endswith(" commit")]
+    return [s for s in local
+            if git(cwd, "merge-base", "--is-ancestor", s, "HEAD") is not None
+            and git(cwd, "merge-base", "--is-ancestor", s, default) is None]
+
+
 def decide(command, cwd):
     """Return the denial reason, or None to allow."""
     m = PUSH.search(command)
@@ -290,10 +430,19 @@ def decide(command, cwd):
     if delta_within_cap(where, branch) or pr_diff_unchanged(where, branch, base):
         return None
     try:
-        if pr_exempt(open_pr(where, branch)):
-            return None
+        pr = open_pr(where, branch)
     except (OSError, ValueError, subprocess.SubprocessError):
-        pass
+        pr = None
+    if pr_exempt(pr):
+        return None
+    try:
+        parents = stacked_parents(where, branch, base, pr)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        parents = []  # no parent found: the base measurement stands
+    for parent in parents:
+        stacked = measure(where, parent)
+        if stacked is not None and not over_cap(stacked):
+            return None
     return (
         f"This branch changes {files} files and {lines} lines against {base} "
         f"(cap {MAX_FILES} files, {MAX_LINES} lines). Every PR should be as small and "
@@ -304,8 +453,10 @@ def decide(command, cwd):
         "This hook already passes what CI passes: an open PR labelled size-exempt or "
         "saying 'mechanical, content-identical', a new gha capability's registration "
         "files, a within-cap push on top of an already-pushed over-cap tip, and a merge "
-        "from the base or a rebase that leaves the PR diff unchanged. If this "
-        "is a stacked branch whose base is not the default branch, or a mechanical, "
+        "from the base or a rebase that leaves the PR diff unchanged, lines moved "
+        "between files, and a stacked branch measured against the branch it is "
+        "stacked on. If this is a stacked branch whose "
+        "parent is not on the server, or a mechanical, "
         "content-identical PR (a move or split with no wording change; the PR body "
         "must say so), rerun with the prefix ALLOW_LARGE_PR=1 and state why."
     )

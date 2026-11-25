@@ -16,12 +16,35 @@ The rest are prose because no condition in the transcript can decide them.
   instead, ask me for permission to do it for me").
   This replaces the 2026-10-26 fallback of giving him one command that runs an idempotent script.
   Enforced by `hooks/no-manual-step-ask.py`, which denies a reply that tells him to type or run a shell command, unless the reply names a secret, token, password or credential.
+- An `mwc <repo> <pr>` line, with or without a SHA, carries to a later head that only merged main, and `scripts/check-mwc-carry.py` decides that (see [`mwc`](../../skills/mwc/SKILL.md#an-mwc-carries-to-a-new-head-only-for-a-named-pr)).
+  Never ask Ezra for a new line because a main merge moved the SHA.
+  In a copy block, give only `mwc <repo> <pr>`, never the head SHA or title that `scripts/mwc-batch.py` prints beside it.
+- CI-caller PRs land in batches (Ezra, 2026-11-19, a project decision card answered "Both", ai-config#5967).
+  A CI-caller PR is an infra PR that changes a file under `.github/workflows/`, such as a repo's new caller of a gha check.
+  Its merge can make every waiting PR in that repository merge main, because a new check never ran on their heads.
+  So the runner merges clean CI-caller PRs together, once per `scripts/mwc-batch.py` sweep, never one at a time as each turns clean.
+  In that sweep it first merges every content PR in that repository that already holds an mwc line and is fully clean;
+  it never holds the batch for a line not yet given.
+  After the batch, a waiting PR merges main only if the checker now refuses its head as stale or it conflicts, once, in one pass ([`batch-merge-and-resolve`](batch-merge-and-resolve.md)).
+  A PR that is only behind by content merges on its current head: routine main merges are denied in every repository (Ezra, 2026-11-20, [ai-config#5988](https://github.com/Morrison-Lab/ai-config/issues/5988), [`sync-with-main`](sync-with-main.md)).
+  `scripts/mwc-batch.py` lists CI-caller PRs as their own group, so the batch is visible in its report.
+  - **Do:** hold a clean CI-caller PR until the runner's next sweep, and merge the batch after the repository's mwc-approved content PRs.
+  - **Don't:** merge CI-caller PRs one by one, each forcing another main-merge round on every waiting PR.
 
 ## Deliverables and approvals
 
 - Ask every multiple-choice question on a decision card (`request_decision`), never as a plain-text option list: "start now or file?", "which option?", lettered or numbered options (Ezra, 2026-11-18, ai-config#5826: "anytime you ask me a multiple choice question, can you use a multiple choice card?").
   This holds for every agent, coordinator and thread alike.
   Enforced by `hooks/no-plain-text-choice.py`; an open-ended question with no fixed answers stays plain text.
+- Keep an unanswered decision card last in its thread.
+  A card moves when anything is posted after it.
+  Ezra has tapped the wrong option because of that (2026-11-19): "sometimes a card moves while I'm clicking and I click the wrong choice".
+  To post after a card, withdraw it with `close_decision`, make the post, then post the card again as the turn's last thread-visible call.
+  His words: "if you want to post something after a card, delete the card and repost it last".
+  **Do:** send the message and checklist update first, and post the card last.
+  **Don't:** update the checklist or reply under a card still waiting for an answer.
+  Enforced by `hooks/no-post-under-open-card.py` (ai-config#5969);
+  the reviewer layer is "Posts under an unanswered decision card" in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md).
 - An ask for a deliverable (for example "post the key") authorizes its whole follow-through, including re-uploads and replacements of the same item.
   Never ask again for each step.
   Enforced by `hooks/no-stepwise-approval-ask.py` (ai-config#4726).
@@ -40,7 +63,7 @@ The rest are prose because no condition in the transcript can decide them.
 - One approval ask per message.
   A bare "yes" covers only the primary ask, and any use of a credential or key (ssh key, token, secret) is its own single-question ask (Ezra, 2026-11-02, ai-config#4875).
   Enforced by `hooks/no-bundled-approval-ask.py`.
-- Give every line Ezra must type or paste in a fenced code block of its own, never only in inline code, quotes or plain text, in every project and thread, the coordinator's project chat included: merge words (`mwc <repo> <pr> <sha>`, `merge 95 and 96`), classifier-clearing lines (`approve push of ...`, `approve editing ...`), `retry <repo>#<n>`, `merge anyway <pr>` and commands.
+- Give every line Ezra must type or paste in a fenced code block of its own, never only in inline code, quotes or plain text, in every project and thread, the coordinator's project chat included: merge words (`mwc <repo> <pr>` or `mwc <repo> <pr> <sha>`, `merge 95 and 96`), classifier-clearing lines (`approve push of ...`, `approve editing ...`), `retry <repo>#<n>`, `merge anyway <pr>` and commands.
   The Claude app shows a copy button only on a fenced block (Ezra, 2026-11-15: "always give me the line with a copy button", ai-config#5667;
   restated the same day as "always give me lines in copy blocks" after a coordinator post asked for "merge 95 and 96" inline, ai-config#5685).
   Enforced by `hooks/no-unfenced-typed-line-ask.py`, and checked by [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#typed-lines-without-a-copy-button).
@@ -96,6 +119,24 @@ The rest are prose because no condition in the transcript can decide them.
   other sessions follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
   Device consent cards are a security boundary, so use environments already approved.
   Not hookable: a denial is not visible to a hook after the fact.
+- When you ask Ezra to do a step that was yours to do, such as pressing merge after a classifier blocked yours, the ask says why no other way works and lists every way you tried, each with its result
+  (Ezra, 2026-11-21: "when you ask me to do something you were supposed to do yourself, you must tell me why no other way would work", then "and tell me all the ways you tried").
+  Try the other routes first: retry the denied step once unchanged, use another tool or API, start a fresh session, or fix the check that blocked you.
+  A decision card is too short for both, so post them in a message in the same turn.
+  This holds for a thread and for the coordinator.
+  Enforced by `hooks/handoff-ask-needs-why.py` ([ai-config#6068](https://github.com/Morrison-Lab/ai-config/issues/6068)).
+- A claim that a step cannot be done ("no other way to commit", "can't push") names every alternative you checked, each with its result, in a reply and in a relay to the coordinator or a thread.
+  A claim about committing or pushing names the GitHub API tools (`mcp__github__push_files`, `create_or_update_file`) among them, since they commit without local git
+  (Ezra, 2026-11-22: "why not use tools to commit", then "dont bs me", after the coordinator relayed that a thread had "no other way to commit").
+  If a checked route works, use it instead of making the claim.
+- Before any claim reaches Ezra that his input is needed (a decision card, a hand-off, "waiting on your approval"), launch a separate subagent briefed to refute it adversarially by finding a route that does not need him.
+  Send the claim only if it finds none, and say what it checked.
+  The coordinator runs its own check before relaying a thread's claim
+  (Ezra, 2026-11-22: "you must adversarially check every claim that my input is needed").
+  The same night's false claims were "no other way to commit", when the GitHub API tools could commit, and "waiting on your approval", when the thread was not stuck.
+  Enforced by `hooks/handoff-ask-needs-why.py`, which reads the turn for a subagent whose brief asks for that refutation ([ai-config#6075](https://github.com/Morrison-Lab/ai-config/issues/6075)).
+  The hook also fires on a status line such as "which needs your merge once its preview renders", even for a content PR whose merge is Ezra's by standing rule.
+  In a status list, give the PR's own state ("preview still rendering"), and make the ask only once the work is ready and the refutation has run (Morrison-Lab/lds#3188, 2026-11-25).
 
 ## Questions and decisions
 

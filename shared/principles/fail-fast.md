@@ -34,6 +34,14 @@ Worked-example case records for the rules below live in
   system boundary, a retry for a known-transient failure --- make it
   explicit and observable: message the degradation, bound the retries,
   and document why the fallback is safe.
+- A guard that fails closed covers every step it depends on, not only the
+  first one that can fail.
+  - **Do:** wrap the call to an optional helper as well as its import, and
+    refuse with a stderr line on either.
+  - **Don't:** wrap only `from helper import f` and then call `f()` bare.
+    The push guard in ai-config#5953 did that at 933ff17, so an exception
+    inside the scope helper would have crashed the hook instead of
+    refusing the credit (2026-11-19).
 - In CI, a step that can fail should fail the job, not
   `continue-on-error` its way to a green check.
   The exception is a deliberate pattern that re-checks the outcome
@@ -171,6 +179,17 @@ and only the hook suite's per-record fail-open fixture showed it (ai-config#5900
   that one should crash.
 - **Don't:** treat `except ValueError` as "any unreadable JSON",
   or widen it to `except Exception`, which also hides the reader's own bugs.
+
+Text that decodes is not yet the shape the code expects.
+In a deny hook the gap flips the verdict.
+`require-ums-before-resolve.py` iterated `data.get("messages")` from a `read_thread` result.
+A `true` there raised `TypeError`, the hook's top-level `except Exception` swallowed it,
+and the resolve went through, failing open on the one path meant to fail closed (ai-config#6030).
+
+- **Do:** check the type of each decoded value before using it (`isinstance(msgs, list)`),
+  return the deny-side answer when it is wrong, and add a wrong-shape fixture
+  (a number, a boolean) next to the not-JSON one.
+- **Don't:** count on the hook's outer fail-open handler to cover a bad shape inside a check that must fail closed.
 
 ## When exit codes carry meaning, an error path must set its own
 

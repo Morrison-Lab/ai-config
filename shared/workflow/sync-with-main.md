@@ -1,24 +1,49 @@
-Whenever `main` has moved ahead of a PR branch you're working on, **merge
-`main` into the PR branch** before the next push or review trigger. Don't wait
-for a conflict to surface or for someone to ask.
+**Merge `main` into a PR branch only when the branch needs it**, in every repository (Ezra, 2026-11-20, chose "Make it permanent" on "should we stop main merges permanently?", [ai-config#5988](https://github.com/Morrison-Lab/ai-config/issues/5988)).
+Every merge of `main` moves the head, which re-runs the PR's whole CI and voids its review, and routine merges across many open PRs helped queue 499 lds runs on 2026-11-19 ([Morrison-Lab/lds#2992](https://github.com/Morrison-Lab/lds/issues/2992)).
+A PR that is only behind `main` merges on its current head.
+The branch takes `main` in exactly four cases:
 
-Merging `main` into any PR branch is standing-authorized and never needs
-asking (Ezra, 2026-10-22: asked "confirm I may merge main into that branch",
-the answer was "yes, always").
-A repo's own "merge main only when it conflicts" guidance does not make the
-merge a question for the user: do it when `main` has moved, and say so after.
+- **(a) Conflict:** the branch conflicts with `main`.
+- **(b) A named fix:** the branch needs a specific commit or PR on `main`, such as the fix for a check it fails.
+  Name it on the merge command: `MERGE_MAIN_FOR=<sha> git merge origin/main` or `MERGE_MAIN_FOR='#<PR>' git merge origin/main`.
+- **(c) Stale:** `main` changed `.github/workflows/` since the merge base, so a check may never have run on the head.
+  This is `check-pr-fully-clean.py`'s base-drift refusal, and the runner's checker refuses such a head.
+  When base drift is the head's only blocker, the checker prints `CLEAN EXCEPT BASE DRIFT` and still exits 1.
+  Merge `main` into such a PR only when it is next in the merge order, not into every open PR the moment the workflow lands:
+  one new workflow on `main` would otherwise restart every open PR's CI at once (coordinator, 2026-11-20, [ai-config#6028](https://github.com/Morrison-Lab/ai-config/issues/6028)).
+  Report such a PR as clean except drift, with its sha, so the merger knows it needs one main merge first.
+  One merge line covers that merge (Ezra, 2026-11-20, chose "One line covers it" on a decision card):
+  an mwc line on a clean-except-drift sha also covers the just-in-time main merge,
+  provided the full checker passes on the post-merge head and that head's diff against `main` matches the original PR diff.
+  `scripts/check-mwc-carry.py` decides the diff half: it prints CARRIES only when every commit added since the approved head is a clean, unedited merge from `main` and the PR's diff against `main` is unchanged.
+  The checker decides the other half on the new head.
+- **(d) A deleted stacked base:** the PR was stacked, its base merged into `main` and was deleted, and the PR's latest `pull_request` runs still name that base.
+  Re-running those runs replays the old base ref and fails at `git fetch` (lds#2913, lds#2922, [ai-config#6001](https://github.com/Morrison-Lab/ai-config/issues/6001)), so only a new push gives the PR a working run.
+  Read the base from the runs' `pull_requests[].base.ref`, then name it on the merge command: `MERGE_MAIN_FOR=base:<branch> git merge origin/main`.
 
-The one exception is a PR that is already fully clean on its current head and waiting for a merge word.
-Merging `main` into it moves the head and voids the Clean review and the checker pass (ids#47 lost its Clean verdict this way, 2026-11-07, [ai-config#5093](https://github.com/Morrison-Lab/ai-config/issues/5093)).
-`hooks/no-update-branch-on-clean-pr.py` denies `update_pull_request_branch`, `gh api .../update-branch` and `gh pr update-branch` there,
-unless `check-pr-fully-clean.py` has reported that the branch needs the base (base drift adding a CI gate, a conflict, or a required up-to-date branch).
+`hooks/no-routine-main-merge.py` denies any other `git merge` or `git pull` of `main` into a PR branch, and every server-side update-branch call, since those cannot say why.
+It checks (a) with `git merge-tree`, (c) with a diff of `.github/workflows/`, and (b) by finding the named commit or PR on `main` and missing from the branch.
+It checks (d) with `git ls-remote`, which must find no such branch on the remote, and by finding a `Merge pull request #N from <owner>/<branch>` commit on `main` that the branch lacks, or a stale remote-tracking ref for the base whose tip is on `main`, with `main` ahead of the branch.
+A squash-merged base leaves neither trace, so the hook denies it.
+Merge stacked PRs with a merge commit.
+There is no bare override, so `MERGE_MAIN_FOR` cannot be left on: it passes only when it names a real fix.
+Fetch `main` in its own command first: the hook denies a `git pull` of `main`, and a merge of `main` after a fetch in the same command, since it could judge those only on a stale or missing local ref.
+Reviewers flag a routine main merge the hook did not see, per the [adversarial reviewer's section](../../.claude/agents/adversarial-reviewer.md#routine-merges-of-main-into-a-pr-branch).
+When one of the four cases holds, the merge needs no asking (Ezra, 2026-10-22: "yes, always").
+Say so after.
+
+- **Do:** merge `main` when the PR conflicts, when it needs a named fix, when the checker calls the head stale, or when its runs name a stacked base that merged and was deleted.
+- **Don't:** merge `main` because it moved, to freshen a PR before review, or once per sweep.
+
+The rest of this page, which says to fetch and merge before every push, applies only when one of the four cases holds.
+
+A PR that is already fully clean on its current head and waiting for a merge word costs the most when `main` is merged in without need.
+The merge moves the head and voids the Clean review and the checker pass (ids#47 lost its Clean verdict this way, 2026-11-07, [ai-config#5093](https://github.com/Morrison-Lab/ai-config/issues/5093)).
+`hooks/no-update-branch-on-clean-pr.py` also denies `update_pull_request_branch`, `gh api .../update-branch` and `gh pr update-branch` there.
 At merge time the no-update rule covers every repository, not only lds (Ezra, 2026-11-14, [#5675](https://github.com/Morrison-Lab/ai-config/issues/5675)): a PR behind only by other PRs' content merges on its current head, and the branch is updated only on a real conflict, a base-drift failure, or a base that requires an up-to-date branch, per the content-only rule in [`fully-clean`](fully-clean.md).
 
-**Exception for `Morrison-Lab/lds`** (Ezra, 2026-11-09, [ai-config#5210](https://github.com/Morrison-Lab/ai-config/issues/5210)):
-do not merge `main` into an lds PR branch unless the runner's checker reports that PR stale.
-Every main merge resets CI and review, and that was growing the lds backlog.
-While you have two or more open lds PRs, open no new ones:
-drive the existing ones to final, or do non-lds work.
+**lds came first** (Ezra, 2026-11-09, [ai-config#5210](https://github.com/Morrison-Lab/ai-config/issues/5210)): lds stopped routine main merges for the same reason before the rule covered every repository.
+lds keeps one rule of its own: while you have two or more open lds PRs, open no new ones: drive the existing ones to final, or do non-lds work.
 
 **Small lds workflow fixes ride along** (coordinator, 2026-11-10, [ai-config#5245](https://github.com/Morrison-Lab/ai-config/issues/5245)):
 every lds workflow merge re-stales all open lds PRs, so do not open a standalone lds workflow PR for a small workflow fix.
@@ -262,8 +287,10 @@ merges: `git merge-tree "$(git merge-base origin/main origin/<sibling-branch>)" 
 cleanly.
 That check reads the sibling branch and edits nothing, so it runs for every
 sibling PR.
-Then apply `memories/reviewing-prs.md`'s scope test before preparing
-anything: for a sibling PR that fails it, report the conflict to the user and
+Then apply `memories/reviewing-prs.md`'s scope test before preparing anything:
+save `gh pr list --state open --limit 100 --json number,title,author,assignees,headRefName` unfiltered to a file
+and pipe it into `python3 scripts/pr-scope.py` with the `--user`, `--alias`, `--requested` and `--excluded` flags `ardia` step 1 defines.
+For a sibling PR that fails the test, report the conflict to the user and
 leave the PR untouched, since they can assign or name it first.
 For one that passes, re-apply the sibling PR's actual semantic change (not a
 mechanical `--theirs`) to the new location, verify with a direct diff that

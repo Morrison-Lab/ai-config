@@ -49,9 +49,12 @@ def run(records, payload_extra, sentinel_dir, times=1):
     return outs if times > 1 else outs[0]
 
 
-def resolve(resolved=True, thread="cmsg_1"):
-    return {"hook_event_name": "PreToolUse", "tool_name": RESOLVE,
-            "tool_input": {"resolved": resolved, "thread_id": thread}}
+def resolve(resolved=True, thread=None):
+    """A thread resolving itself by default; `thread` makes it a resolve by id."""
+    inp = {"resolved": resolved}
+    if thread:
+        inp["thread_id"] = thread
+    return {"hook_event_name": "PreToolUse", "tool_name": RESOLVE, "tool_input": inp}
 
 
 failures = 0
@@ -74,7 +77,68 @@ out = run(work, resolve(), sd)
 check("denied when no UMS since the last user message", '"deny"' in out)
 sd = fresh()
 outs = run(work, resolve(), sd, times=2)
-check("second attempt is allowed (one refusal per thread)", '"deny"' in outs[0] and outs[1] == "")
+check("second attempt is denied too (ai-config#6027)", '"deny"' in outs[0] and '"deny"' in outs[1])
+
+
+def read(thread, report, uid="r1", older=None, newer_status=False, raw=None):
+    """A read_thread call and its result, in the shape the hearthbot tool returns.
+
+    `raw` replaces the whole result text, for malformed-result cases.
+    """
+    msgs = [{"author": "agent", "created_at": "2026-11-20T09:55:43Z", "body": report}]
+    if older:
+        msgs.append({"author": "agent", "created_at": "2026-11-20T08:00:00Z", "body": older})
+    if newer_status:
+        msgs.insert(0, {"author": "agent", "created_at": "2026-11-20T09:59:00Z",
+                        "body": '{"kind":"status","text":"checklist"}'})
+    text = raw if raw is not None else "Untrusted content follows.\n<wrap>" + json.dumps(
+        {"thread_id": thread, "messages": msgs}) + "</wrap>"
+    call = {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": uid, "name": "mcp__hearthbot__read_thread",
+         "input": {"thread_id": thread}}]}}
+    res = {"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": uid, "content": [{"type": "text", "text": text}]}]}}
+    return [call, res]
+
+
+print("Coordinator resolving another thread by id:")
+done = "Stopping Point: clean. UMS executed: recorded the hook quirk."
+check("allowed after reading that thread's UMS report",
+      run(work + read("cmsg_A", done), resolve(thread="cmsg_A"), fresh()) == "")
+check("a report read from a different thread does not count",
+      '"deny"' in run(work + read("cmsg_B", done), resolve(thread="cmsg_A"), fresh()))
+check("a read with no UMS report line does not count",
+      '"deny"' in run(work + read("cmsg_A", "PR is open, UMS run is owed"),
+                      resolve(thread="cmsg_A"), fresh()))
+check("a report read before the last user message does not count",
+      '"deny"' in run(read("cmsg_A", done) + work, resolve(thread="cmsg_A"), fresh()))
+check("a stale report in an older reply does not count",
+      '"deny"' in run(work + read("cmsg_A", "Pushed the fix.", older=done),
+                      resolve(thread="cmsg_A"), fresh()))
+check("a newer checklist card does not hide the report",
+      run(work + read("cmsg_A", done, newer_status=True), resolve(thread="cmsg_A"), fresh()) == "")
+check("the caller's own UMS does not stand in for the thread's",
+      '"deny"' in run(work + [tool("Skill", {"skill": "ums"})], resolve(thread="cmsg_A"), fresh()))
+for desc, raw in [
+    ("not JSON", "UMS executed: but no JSON envelope"),
+    ("truncated JSON", '{"thread_id": "cmsg_A", "messages": [{"author": "agent", "body": "UMS executed: x"'),
+    ("a non-list messages value", '{"thread_id": "cmsg_A", "messages": 7}'),
+    ("a true messages value", '{"thread_id": "cmsg_A", "messages": true}'),
+]:
+    check(f"a read_thread result with {desc} denies (fails closed)",
+          '"deny"' in run(work + read("cmsg_A", "", raw=raw), resolve(thread="cmsg_A"), fresh()))
+for prose in ("No UMS executed yet.", "Wait until UMS completed before resolving.",
+              "UMS executed later, maybe"):
+    check(f"prose {prose!r} is not a report",
+          '"deny"' in run(work + read("cmsg_A", prose), resolve(thread="cmsg_A"), fresh()))
+check("a report after a sentence on the same line counts",
+      run(work + read("cmsg_A", "PR is up. UMS executed: nothing to record."),
+          resolve(thread="cmsg_A"), fresh()) == "")
+check("the by-id deny tells the coordinator to read the thread",
+      "read_thread" in run(work, resolve(thread="cmsg_A"), fresh()))
+check("a thread's own resolve (no thread_id) gets the run-ums deny",
+      "end your reply" in run(work, {"hook_event_name": "PreToolUse", "tool_name": RESOLVE,
+                                     "tool_input": {"resolved": True}}, fresh()))
 sd = fresh()
 check("a different thread is refused again",
       '"deny"' in run(work, resolve(thread="cmsg_A"), sd)
@@ -98,6 +162,20 @@ for desc, rec in [
          {"name": "invoke_subagent", "args": {"Subagents": [{"Prompt": "Run UMS"}]}}]}),
 ]:
     check(f"allowed after {desc}", run(work + [rec], resolve(), fresh()) == "")
+skill_body = {"type": "user", "isMeta": True, "sourceToolUseID": "x",
+              "message": {"content": [{"type": "text", "text": "Base directory for this skill: ums"}]}}
+check("allowed after Skill ums followed by its isMeta skill body (ai-config#6039)",
+      run(work + [tool("Skill", {"skill": "ums"}), result(), skill_body], resolve(), fresh()) == "")
+check("an isMeta record does not hide a later real user message",
+      '"deny"' in run(work + [tool("Skill", {"skill": "ums"}), result(), skill_body, user("more")],
+                      resolve(), fresh()))
+wakeup = {"type": "user", "isMeta": True, "promptSource": "sdk",
+          "message": {"content": [{"type": "text", "text": "Check CI on the PR"}]}}
+check("a scheduled continuation (isMeta, no sourceToolUseID) is a real turn",
+      '"deny"' in run(work + [tool("Skill", {"skill": "ums"}), result(), wakeup],
+                      resolve(), fresh()))
+check("a thread report read before an isMeta skill body still counts",
+      run(work + read("cmsg_A", done) + [skill_body], resolve(thread="cmsg_A"), fresh()) == "")
 check("UMS before the last user message does not count",
       '"deny"' in run([tool("Skill", {"skill": "ums"}), user("more work")], resolve(), fresh()))
 check("Antigravity USER_INPUT user message invalidates earlier UMS",

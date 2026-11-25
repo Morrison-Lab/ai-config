@@ -34,6 +34,12 @@ A coordinator session has no repository clone, so repo skills never load for it.
 A coordinator must therefore send every `cai:` message to a thread that has the clone and invokes this skill, and must not answer it itself.
 Step 2's reuse check is the part that gets skipped when the skill is not invoked ([ai-config#5219](https://github.com/Morrison-Lab/ai-config/issues/5219)).
 
+- **Do:** say in the first reply to a `cai:` message which mechanism the rule is going into and that its PR comes this turn, alongside any immediate fix.
+- **Don't:** answer only the immediate fix and route the rule silently.
+  Ezra, 2026-11-24, after a reply that only said TeX was being installed: "then why didn't you say you were going to do it in your original response to my original `cai: ` comment?"
+  The user cannot tell a rule was heard from a reply that never names it.
+  `hooks/no-cai-reply-without-routing.py` denies such a thread reply, and the [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md) checklist looks for it.
+
 ## Step 0 -- Restate the capability, not the mechanism
 
 State in one sentence what the requester wants Claude (or Codex, or the

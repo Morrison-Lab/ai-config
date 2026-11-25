@@ -26,26 +26,54 @@ A scripted copy plus targeted edits keeps the diff against the source small, so 
 - **Don't:** write generatively and call it a port.
   Content with nothing to port is new content, and the PR says so.
 
-## Port every item: inventory, map, report
+## Port every item: inventory, map, structure review, report
 
 When Ezra asks to incorporate, port or adapt a source (a lab, a slide deck, a chapter, anything) into a repo, the port covers the whole source, not only its gaps.
+An adaptation answers two questions (Ezra, 2026-11-19):
+is every unit of content in the source covered somewhere in the destination,
+and could the destination's organizational structure be improved, using the source as inspiration?
+The coverage map in steps 2 and 3 answers the first, and the structure review in step 5 answers the second.
 
 1. **Inventory** the source item by item with a script or an explicit list: every item of every kind, such as exercises, examples, figures, definitions, tables and listings.
-2. **Map** each item to its target: an existing equivalent in the target repo (name it), or a new port.
+   First work out how the source marks each kind of unit (Ezra, 2026-11-19):
+   a definition may be a boxed block, a bolded term or an italicized term in running prose,
+   and a result, remark, example, algorithm, figure, table or any other kind of unit may be numbered, captioned, boxed or set off by a heading.
+   List each convention in a marking table with three columns:
+   the kind of unit, how the source marks it, and the decision (adapt each marked item as a named destination type, such as a `#def-` div, or leave that kind unadapted, with the reason).
+   Then inventory every item each convention marks, so an italicized term in a paragraph gets a row as surely as a boxed definition does.
+2. **Map** each item to its target in a coverage map with one row per source item and three columns:
+   the source item (its number and name),
+   its place in the destination (a file and `#id`, or the PR that adds it),
+   and a status of `covered`, `partly covered` (say what differs), `ported`, `banked` (a repeat sent to an exercise bank) or `skipped` (link Ezra's agreement).
+   Write the map as a table or CSV, not prose, so a missing row or an empty cell shows.
 3. **Give every item a row, and port every item that has no equivalent.**
    An item the target already covers is mapped to that equivalent, and the match is reported.
    Nothing is dropped unless Ezra agrees to the skip.
    A kickoff brief that says "leave out what the target already covers" is not that agreement: it still owes the row.
 4. **Copy with a script, then improve.**
    The scripted copy comes first, and the style edits and improvements come after it as separate steps.
-5. **Report the source-to-target map** before calling the work done, one row per source item.
-   A missing row is the defect.
+5. **Review the destination's structure against the source.**
+   Compare how the source organizes the material with how the destination does:
+   the order of topics, which items sit together under one heading, where a concept is introduced relative to its first use, and how finely items are split.
+   Where the source's organization is clearer, propose that change to the destination, naming the source passage that suggests it.
+   A move within the pages the adaptation already touches can go in the same PR, per [`reorganize-prose`](../writing/reorganize-prose.md);
+   a restructure beyond them gets its own issue or PR, so the adaptation stays small.
+   Where the destination's organization is better, keep it and say why.
+6. **Report the marking table, the coverage map and the structure review** before calling the work done:
+   the marking table, the map, and a structure section listing each proposed change and where it went (this PR, an issue, or declined with a reason).
+   Write "none" in the structure section when the review found nothing, so a skipped review shows.
+   A missing row, or a missing structure section, is the defect.
+
+- **Do:** post a marking table naming how the source marks each kind of unit, a coverage map with a row and a status for every source item, and a structure section, even one that says "none".
+- **Don't:** report only the items you ported, or port into the destination's existing layout without asking whether the source's layout is better.
 
 ### Why no hook enforces this
 
 A hook sees tool calls, PR text and diffs.
 An inventory script can list a source's items, but deciding whether a target page already covers an item needs a reader of both, so no hook can decide completeness.
-The check is the map in step 5.
+Whether the source suggests a better structure is a judgment about how readers learn the material, so no hook can decide that either;
+a hook could see that a structure section exists, but not that the review behind it happened.
+The checks are the marking table, the map and the structure section in step 6.
 On 2026-11-18 about 20 of the 32 exercises in the ISLP chapter 7 lab were left unported and unreported, because the brief framed the task as filling gaps ([ai-config#5823](https://github.com/Morrison-Lab/ai-config/issues/5823), lds#2802, lds#2803, lds#2805).
 
 ## Drift: keep improvements, question accidents
@@ -69,6 +97,7 @@ Every difference beyond the required edits is either a deliberate improvement or
 Route the fix for each accidental drift to the PR's own thread, which applies the decision above.
 
 Rule from Ezra, 2026-10-19;
-the copy-first-for-any-content rule and the port-every-item section from Ezra, 2026-11-18.
+the copy-first-for-any-content rule and the port-every-item section from Ezra, 2026-11-18;
+the coverage, structure and marking-convention steps from Ezra, 2026-11-19 ([ai-config#5950](https://github.com/Morrison-Lab/ai-config/issues/5950)).
 See [ai-config#4632](https://github.com/Morrison-Lab/ai-config/issues/4632).
 Related: [`send-notes`](../../skills/send-notes/SKILL.md), [`global-by-default`](global-by-default.md), [`reorganize-prose`](../writing/reorganize-prose.md).

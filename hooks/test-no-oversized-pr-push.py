@@ -58,11 +58,16 @@ def run(command, cwd, raw=None, pr=None):
     return p.returncode, denied
 
 
-def new_path_cases():
+def load_hook():
     import importlib.util
     spec = importlib.util.spec_from_file_location("hook", HOOK)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    return mod
+
+
+def new_path_cases():
+    mod = load_hook()
     return [
         ("rename: plain arrow", mod.new_path("a.qmd => _freeze/b.json"), "_freeze/b.json"),
         ("rename: brace form", mod.new_path("chapters/{old => _freeze}/x.json"), "chapters/_freeze/x.json"),
@@ -79,24 +84,24 @@ def check(label, ok):
 def main():
     fails = 0
     sweep = make_repo({f"chapters/c{i}.qmd": 2 for i in range(25)})  # pds#244 shape
-    big = make_repo({"big.qmd": 500})
+    big = make_repo({"big.qmd": 700})
     small = make_repo({"a.qmd": 20, "b.qmd": 20})
-    edge = make_repo({f"f{i}.qmd": 30 for i in range(10)})
-    over = make_repo({f"f{i}.qmd": 1 for i in range(11)})
+    edge = make_repo({f"f{i}.qmd": 30 for i in range(20)})
+    over = make_repo({f"f{i}.qmd": 1 for i in range(21)})
     ignored = make_repo({**{f"_freeze/p{i}/x.json": 100 for i in range(30)}, "renv.lock": 900, "a.qmd": 5})
 
     figs = make_repo({"c/_fig-a-3d.qmd": 250, "c/_fig-b-3d.qmd": 250, "c/x.qmd": 10})
-    many_figs = make_repo({f"c/_fig-{i}.qmd": 5 for i in range(11)})
+    many_figs = make_repo({f"c/_fig-{i}.qmd": 5 for i in range(21)})
 
     # lds#2355 shape: two committed generator outputs plus a small hand edit.
-    by_module = {"c/_sub/definitions/_by-module.qmd": 270,
-                 "c/_sub/results/_by-module.qmd": 270, "c/x.qmd": 10}
+    by_module = {"c/_sub/definitions/_by-module.qmd": 400,
+                 "c/_sub/results/_by-module.qmd": 400, "c/x.qmd": 10}
     gen_marked = make_repo(by_module, attrs="**/_by-module.qmd linguist-generated\n")
     gen_true = make_repo(by_module, attrs="**/_by-module.qmd linguist-generated=true\n")
     gen_false = make_repo(by_module, attrs="**/_by-module.qmd linguist-generated=false\n")
     gen_unmarked = make_repo(by_module)
 
-    renames = make_repo({f"old/r{i}.qmd": 5 for i in range(12)})
+    renames = make_repo({f"old/r{i}.qmd": 5 for i in range(22)})
     git(renames, "update-ref", "refs/remotes/origin/main", "HEAD")
     git(renames, "mv", "old", "new")
     git(renames, "commit", "-q", "-m", "move")
@@ -107,12 +112,13 @@ def main():
                   ".github/workflows/check-x.yml": 20, "examples/check-x.yml": 10,
                   "website/reference/check-x.qmd": 20, "website/_quarto.yml": 1,
                   "README.md": 3, "CLAUDE.md": 2, "changelog.d/add-check-x.added.md": 2,
-                  ".github/workflows/_selftest.yml": 20, "check-x/README.md": 1}
+                  ".github/workflows/_selftest.yml": 20, "check-x/README.md": 1,
+                  **{f"check-x/p{i}.py": 1 for i in range(10)}}
     new_cap = make_repo(capability)
     no_workflow = make_repo({k: v for k, v in capability.items()
                              if k != ".github/workflows/check-x.yml"})
-    big_cap = make_repo({**capability, "check-x/check-x.py": 400})
-    big_readme = make_repo({**capability, "README.md": 250})
+    big_cap = make_repo({**capability, "check-x/check-x.py": 700})
+    big_readme = make_repo({**capability, "README.md": 500})
     other_fragments = make_repo({**capability, **{f"changelog.d/other-{i}.md": 1
                                                   for i in range(8)}})
 
@@ -142,16 +148,22 @@ def main():
 
     # Pushed over the cap, then main (20 new files) merged in: the PR diff is
     # unchanged, but origin/feature..HEAD holds all of main's files (#5721).
-    synced = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    synced = make_repo({f"f{i}.qmd": 1 for i in range(22)})
     push_tip(synced)
     merge_main(synced, [f"m{i}.qmd" for i in range(20)])
+    # A single-branch clone: `git fetch origin feature` wrote only FETCH_HEAD,
+    # so there is no origin/feature tracking ref (gha#2158).
+    no_tracking = make_repo({f"f{i}.qmd": 1 for i in range(22)})
+    push_tip(no_tracking)
+    git(no_tracking, "update-ref", "-d", "refs/remotes/origin/feature")
+    add_files(no_tracking, ["f0.qmd"], "small fix")
     # The same merge, then a commit that grows the PR diff over the cap.
-    synced_grown = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    synced_grown = make_repo({f"f{i}.qmd": 1 for i in range(22)})
     push_tip(synced_grown)
     merge_main(synced_grown, [f"m{i}.qmd" for i in range(20)])
-    add_files(synced_grown, [f"g{i}.qmd" for i in range(11)], "more")
+    add_files(synced_grown, [f"g{i}.qmd" for i in range(21)], "more")
     # Rebased onto a moved main: the commits are new, the PR diff is not.
-    rebased = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    rebased = make_repo({f"f{i}.qmd": 1 for i in range(22)})
     push_tip(rebased)
     git(rebased, "switch", "-q", "main")
     add_files(rebased, [f"m{i}.qmd" for i in range(20)], "main moves on")
@@ -160,25 +172,115 @@ def main():
     git(rebased, "rebase", "-q", "origin/main")
 
     # A branch pushed over the cap, then a small fix on top of it.
-    pushed = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    pushed = make_repo({f"f{i}.qmd": 1 for i in range(22)})
     push_tip(pushed)
     add_files(pushed, ["f0.qmd"], "fix")
-    pushed_big = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    pushed_big = make_repo({f"f{i}.qmd": 1 for i in range(22)})
     push_tip(pushed_big)
-    add_files(pushed_big, [f"g{i}.qmd" for i in range(11)], "more")
+    add_files(pushed_big, [f"g{i}.qmd" for i in range(21)], "more")
+    # The same small fix in a clone that fetches only main, so it has no
+    # tracking ref for the pushed branch (ai-config#5884).
+    untracked = make_repo({f"f{i}.qmd": 1 for i in range(22)})
+    push_tip(untracked)
+    git(untracked, "update-ref", "-d", "refs/remotes/origin/feature")
+    add_files(untracked, ["f0.qmd"], "fix")
     # Pushed under the cap, then pushed over it by a small commit.
-    crossing = make_repo({f"f{i}.qmd": 1 for i in range(10)})
+    crossing = make_repo({f"f{i}.qmd": 1 for i in range(20)})
     push_tip(crossing)
-    add_files(crossing, ["f10.qmd"], "cross")
+    add_files(crossing, ["f20.qmd"], "cross")
     # The tracking ref says over-cap, but the server's branch is not that tip.
-    stale = make_repo({f"f{i}.qmd": 1 for i in range(12)})
+    stale = make_repo({f"f{i}.qmd": 1 for i in range(22)})
     stale_bare = push_tip(stale)
     git(stale_bare, "update-ref", "refs/heads/feature",
         subprocess.run(["git", "rev-parse", "HEAD~1"], cwd=stale, capture_output=True,
                        text=True, check=True).stdout.strip())
     add_files(stale, ["f0.qmd"], "fix")
 
+    # lds#2885 shape: one 700-line page split into 35 subfiles, no wording change.
+    def split_repo(edit=0):
+        d = make_repo({"page.qmd": 700})
+        text = [f"Sentence {j} of the page.\n" for j in range(700)]
+        with open(os.path.join(d, "page.qmd"), "w", encoding="utf-8") as f:
+            f.write("".join(text))
+        git(d, "commit", "-q", "-a", "--amend", "-m", "page")
+        git(d, "update-ref", "refs/remotes/origin/main", "HEAD")
+        os.remove(os.path.join(d, "page.qmd"))
+        for i in range(35):
+            with open(os.path.join(d, f"_s{i}.qmd"), "w", encoding="utf-8") as f:
+                f.write("".join(text[i * 20:i * 20 + 20]))
+        for i in range(edit):
+            with open(os.path.join(d, f"new{i}.qmd"), "w", encoding="utf-8") as f:
+                f.write("".join(f"new{i}-{j}\n" for j in range(40)))
+        git(d, "add", "-A")
+        git(d, "commit", "-q", "-m", "split")
+        return d
+
+    split = split_repo()
+    split_edited = split_repo(edit=16)
+
+    # An ignored path's deleted lines must not pay for a counted file's added lines.
+    def ignored_source_repo():
+        d = make_repo({"docs/page.md": 700})
+        text = [f"Sentence {j} of the page.\n" for j in range(700)]
+        with open(os.path.join(d, "docs/page.md"), "w", encoding="utf-8") as f:
+            f.write("".join(text))
+        git(d, "commit", "-q", "-a", "--amend", "-m", "page")
+        git(d, "update-ref", "refs/remotes/origin/main", "HEAD")
+        os.remove(os.path.join(d, "docs/page.md"))
+        # Four parts, so no part is detected as a rename of the whole page.
+        for i in range(4):
+            with open(os.path.join(d, f"part{i}.qmd"), "w", encoding="utf-8") as f:
+                f.write("".join(text[i * 175:i * 175 + 175]))
+        git(d, "add", "-A")
+        git(d, "commit", "-q", "-m", "copy out of docs")
+        return d
+
+    ignored_source = ignored_source_repo()
+
+    # lds#2896 shape: a layer of 15 files stacked on a pushed 15-file layer.
+    def stack_repo():
+        d = make_repo({f"a{i}.qmd": 20 for i in range(15)})
+        git(d, "update-ref", "refs/remotes/origin/claude/lower", "HEAD")
+        git(d, "switch", "-q", "-c", "upper")
+        add_files(d, [f"b{i}.qmd" for i in range(15)], "upper layer")
+        return d
+
+    stacked = stack_repo()
+    stacked_pr = stack_repo()
+    git(stacked_pr, "update-ref", "-d", "refs/remotes/origin/claude/lower")
+    git(stacked_pr, "update-ref", "refs/remotes/origin/lower-renamed", "HEAD~1")
+    unstacked = stack_repo()
+    git(unstacked, "update-ref", "-d", "refs/remotes/origin/claude/lower")
+
+    def single_branch_stack():
+        """A cloud clone: the parent is on the server, with no tracking ref here."""
+        d = stack_repo()
+        git(d, "update-ref", "-d", "refs/remotes/origin/claude/lower")
+        bare = tempfile.mkdtemp()
+        git(bare, "init", "-q", "--bare", "-b", "main")
+        git(d, "remote", "add", "origin", bare)
+        git(d, "push", "-q", "origin", "HEAD~1:refs/heads/claude/lower", "main:main")
+        # The push wrote a tracking ref, which a single-branch clone lacks.
+        git(d, "update-ref", "-d", "refs/remotes/origin/claude/lower")
+        return d
+
+    server_stack = single_branch_stack()
+
     cases = [
+        ("a split of one page into 35 subfiles is not counted (lds#2885)",
+         run("git push", split), False),
+        ("a split plus over-cap new files is denied", run("git push", split_edited), True),
+        ("lines moved out of an ignored path still count",
+         run("git push", ignored_source), True),
+        ("a stacked layer is measured against its pushed parent (lds#2896)",
+         run("git push", stacked), False),
+        ("a stacked layer is measured against its open PR's base",
+         run("git push", stacked_pr, pr={"labels": [], "body": "",
+                                          "base": {"ref": "lower-renamed"}}), False),
+        ("a single-branch clone finds its parent on the server",
+         run("git push", server_stack), False),
+        ("a stack whose parent is not on the remote is measured against main",
+         run("git push", unstacked), True),
         ("a new gha capability's registration files are not counted (gha#2082)",
          run("git push", new_cap), False),
         ("registration files count without the new reusable workflow",
@@ -189,6 +291,8 @@ def main():
          run("git push", other_fragments), True),
         ("a merge from main that leaves an over-cap PR diff unchanged passes (#5721)",
          run("git push", synced), False),
+        ("a small fix on an over-cap pushed tip passes with no tracking ref",
+         run("git push", no_tracking), False),
         ("a merge from main plus an over-cap addition is denied",
          run("git push", synced_grown), True),
         ("a rebase that leaves the PR diff unchanged passes",
@@ -204,15 +308,17 @@ def main():
          run("git push", sweep, pr={"labels": [{"name": "P1"}], "body": "A sweep."}), True),
         ("a small fix on top of an already-pushed over-cap tip passes",
          run("git push", pushed), False),
+        ("the same fix passes with no tracking ref, fetched from the server (#5884)",
+         run("git push", untracked), False),
         ("an over-cap addition on top of an over-cap tip is denied",
          run("git push", pushed_big), True),
         ("a small push that takes an under-cap tip over the cap is denied",
          run("git push", crossing), True),
-        ("12 pure renames are not counted", run("git push", renames), False),
+        ("22 pure renames are not counted", run("git push", renames), False),
         ("new figure subfiles' lines are free", run("git push", figs), False),
         ("new figure subfiles still count as files", run("git push", many_figs), True),
         ("sweep of 25 files is denied", run("git push -u origin feature", sweep), True),
-        ("500-line change is denied", run("git push", big), True),
+        ("700-line change is denied", run("git push", big), True),
         ("small branch passes", run("git push", small), False),
         ("exactly at the cap passes", run("git push", edge), False),
         ("one file over the cap is denied", run("git push", over), True),
@@ -239,7 +345,29 @@ def main():
     git(sweep, "switch", "-q", "main")
     rc, denied = run("git push", sweep)
     fails += check("push from the default branch passes", rc == 0 and not denied)
-    total = len(cases) + 1 + len(new_path_cases())
+    # The open PR's base wins over a nearer remote branch in HEAD's history.
+    git(stacked_pr, "update-ref", "refs/remotes/origin/nearer", "HEAD")
+    mod = load_hook()
+    got = mod.stacked_parents(stacked_pr, "upper", "origin/main",
+                              {"base": {"ref": "lower-renamed"}})
+    fails += check("the PR base is preferred to the nearest remote branch",
+                   got == ["origin/lower-renamed"])
+    got = mod.stacked_parents(stacked_pr, "upper", "origin/main",
+                              {"base": {"ref": "main"}})
+    fails += check("a PR based on the default branch has no stacked parent",
+                   got == [])
+    got = mod.stacked_parents(stacked_pr, "upper", "origin/main",
+                              {"base": {"ref": "not-on-server"}})
+    fails += check("a PR base found nowhere is no parent, not the nearest branch",
+                   got == [])
+    got = mod.stacked_parents(stacked_pr, "upper", "origin/main", None)
+    fails += check("with no PR the nearest remote branch is the parent",
+                   got == ["origin/nearer"])
+    budget = mod.move_budget({"a": (["}", ":::", "x = compute(y)"], []),
+                              "b": ([], ["}", ":::", "x = compute(y)"])})
+    fails += check("braces and fences never count as moved",
+                   dict(budget) == {"x = compute(y)": 1})
+    total = len(cases) + 6 + len(new_path_cases())
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

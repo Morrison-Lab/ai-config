@@ -133,7 +133,7 @@ operations:
     cli: gh pr comment "<N>" --body "..."
     github_mcp: mcp__github__add_issue_comment
   - id: REPLY_REVIEW_COMMENT
-    description: Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead. **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
+    description: Reply to an inline pull-request review comment. The path carries the PR number; the id-only route (`PATCH .../pulls/comments/<id>`) EDITS that comment instead. The reply fails with `user_id can only have one pending review per pull request` while the posting account has an unsubmitted review open on the PR, which is usually the human's own draft when agents post under their login; never submit or delete it, and answer the threads in one COMMENT_PR that links each `#discussion_r...` anchor instead (Morrison-Lab/lds#3179, 2026-11-25). **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
     cli: gh api -X POST "repos/<owner>/<repo>/pulls/<N>/comments/<id>/replies" -F "body=@<file>"
     github_mcp: mcp__github__add_reply_to_pull_request_comment
   - id: RESOLVE_REVIEW_THREAD

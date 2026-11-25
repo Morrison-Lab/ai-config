@@ -28,7 +28,15 @@ do not fall back to polling.
 
 An Auto-fix wake is a prompt to check the PR's real state, not an order to push.
 Fix only what your changes caused:
-leave pre-existing failures alone and note them in the PR description,
+don't fix a pre-existing failure on this PR's branch, but don't leave it red either.
+Look for a fix already on main (an open or merged PR) and merge main in,
+or open an infra PR that fixes the cause (infra carries a standing merge grant),
+or file an issue when the fix is not yours to make,
+then check sibling repos for the same failure,
+and name that fix in the PR description next to the note
+(Ezra, 2026-11-24, psw#703: the curl lint failure was noted as pre-existing while psw#707 had already fixed it;
+`hooks/no-unfixed-preexisting-failure.py` denies the note without the fix).
+Beyond that:
 don't weaken a check to get green (a spelling exception, `--allow-skips`, a loosened threshold) unless the flagged item is really correct,
 and hand a failure that turns on content or reasoning back to the reviewer instead of patching it.
 Comments that carry no finding, like a quota refusal or a preview-URL sticky, need no reply or push

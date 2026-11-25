@@ -85,3 +85,14 @@ This widened the grant from repositories the work needs to any repository that w
 "let's say that everything in gha is infra",
 "so is ai-config",
 "that's why we have a standing mwc for ai-config".)
+
+(User directive, 2026-11-20, in a project with no runner thread, after a thread waited on him for seven caller PRs and a hook fix: "always handle infra PRs yourself;
+never ask me".)
+
+(User directives, 2026-11-21 17:47 and 17:48 PST, via `cai` in the lds project:
+"hyperlink changes count as infra";
+"and id changes count as infra too".
+Asked at 18:29 PST whether renaming an id that outside sites link to should be left out of infra, Ezra answered "no", so such renames stay infra.)
+
+(User directive, 2026-11-22 00:04 PST, via `cai` in the lds project:
+"changes to latex that don't change the rendered math (for example swapping in macros in place of raw latex expressions) count as infra".)

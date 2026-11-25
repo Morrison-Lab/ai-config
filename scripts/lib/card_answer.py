@@ -19,8 +19,11 @@ the `message_id` its result returned and the wake's `decision_id`), the chosen o
 consequence line is added, since that line is usually where the card names the act.
 
 An option that declines (No, Not now, Skip, Stop, Later, File it, Wait, Hold, Cancel) yields
-nothing: choosing it is not a request for the act. This module never feeds a merge grant:
-the mwc gates read typed words only, by design.
+nothing: choosing it is not a request for the act. A tap is never a merge grant: the mwc
+gates read typed words only, by design. `hooks/block-merge-without-clean-checker.py` reads
+taps through `answers_in_prompt`, `prompt_text` and `track_cards` for one other purpose, a
+waiver of the fully-clean check, on its own stricter terms (ai-config#5892). That waiver
+stands in for the checker's pass and leaves the merge grant as it was.
 """
 import html
 import re
@@ -91,6 +94,9 @@ def _prompt(content):
     return "\n".join(str(b.get("text") or "") for b in content if isinstance(b, dict) and b.get("type") == "text")
 
 
+prompt_text = _prompt
+
+
 def card_text(option, question, consequence=""):
     """The words a tap stands for, or "" when the option declines."""
     if DECLINE.match(option):
@@ -98,11 +104,29 @@ def card_text(option, question, consequence=""):
     return " ".join(p for p in (option + ".", question, consequence) if p).strip()
 
 
+def record_prompt(rec):
+    """The prompt text a record carries: a user record's content, or a mid-turn `queued_command`.
+
+    A tap that lands while the agent is working arrives as an `attachment` record of type
+    `queued_command` (origin `human`), not as a user record; reading only user records
+    dropped it (measured 2026-11-24 in a lds project thread: the PR guard denied the repos
+    the tap had just named). A peer-origin or task-notification queued command is not the
+    member's, so it yields "".
+    """
+    att = rec.get("attachment") if isinstance(rec.get("attachment"), dict) else None
+    if att is not None:
+        if att.get("type") != "queued_command" or att.get("commandMode") == "task-notification" \
+                or (att.get("origin") or {}).get("kind") == "peer":
+            return ""
+        return _prompt(att.get("prompt"))
+    msg = rec.get("message") if isinstance(rec.get("message"), dict) else {}
+    return _prompt(msg.get("content"))
+
+
 def answers_in_record(rec, cards):
     """Card-answer texts in one transcript record; `cards` maps a card's message_id to its input."""
-    msg = rec.get("message") if isinstance(rec.get("message"), dict) else {}
     out = []
-    for option, question, did, idx in answers_in_prompt(_prompt(msg.get("content"))):
+    for option, question, did, idx in answers_in_prompt(record_prompt(rec)):
         consequence = ""
         opts = (cards.get(did) or {}).get("options") if did else None
         if isinstance(opts, list) and idx is not None and idx < len(opts) and isinstance(opts[idx], dict):

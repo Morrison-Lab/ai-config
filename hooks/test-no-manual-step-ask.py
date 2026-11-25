@@ -97,6 +97,14 @@ CASES = [
     ("scheduled re-check is fine", POST, "I scheduled a re-check for 00:25 UTC; nothing is merged yet.", False),
     ("user tells another person", POST, "Tell the reviewers when the preview is up.", False),
     ("let me know about a decision is fine", POST, "Let me know which option you prefer for the title.", False),
+    ("merge in the GitHub UI (ai-config#5797)", POST, "Both PRs are green, so merge them in the GitHub UI.", True),
+    ("merge them yourself in the UI (ai-config#5797)", POST, "You can merge them yourself in the UI once CI finishes.", True),
+    ("will need to merge on the website", POST, "You will need to merge the PR on the GitHub website.", True),
+    ("have to merge via the UI", POST, "You have to merge it via the GitHub UI.", True),
+    ("type mwc in a local session (ai-config#5797)", POST, "Type `mwc all` in a local session and I will take it from there.", True),
+    ("type mwc locally", POST, "Please type mwc locally to start the merge.", True),
+    ("report a refusal as fact", POST, "The merge was refused by the branch rule on main; I am fixing the failing check.", False),
+    ("cannot merge in the UI is a fact", POST, "I cannot merge in the GitHub UI from this session, so I used the API.", False),
     ("unrelated tool","Bash", "Click the Merge button", False),
     ("no text", POST, None, False),
 ]
@@ -108,8 +116,56 @@ def run(tool, text):
     return p.returncode, p.stdout
 
 
+def run_stop(message, session="s1", extra=None):
+    payload = {"hook_event_name": "Stop", "session_id": session, "last_assistant_message": message}
+    payload.update(extra or {})
+    p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload), capture_output=True, text=True)
+    return p.returncode, p.stdout
+
+
+def stop_blocked(out):
+    try:
+        data = json.loads(out)
+    except ValueError:
+        return False
+    return data.get("decision") == "block" and "no-manual-step-ask" in data.get("reason", "")
+
+
+# (name, message, should_block)
+STOP_CASES = [
+    ("stop: merge in the GitHub UI", "Both PRs are green. Merge them in the GitHub UI.", True),
+    ("stop: type mwc in a local session", "Type `mwc all` in a local session to merge them.", True),
+    ("stop: merge button", "Click the green Merge button.", True),
+    ("stop: refusal reported as fact", "The merge was refused by the branch rule; I am fixing the failing check.", False),
+    ("stop: plain mwc ask", "Both are ready. Type `mwc` to merge them.", False),
+    ("stop: ask only inside a fence", "Quoted from the log:\n```\nMerge them in the GitHub UI.\n```\nI merged them myself.", False),
+]
+
+
 def main():
     fails = 0
+    for i, (name, message, block) in enumerate(STOP_CASES):
+        rc, out = run_stop(message, session=f"case-{os.getpid()}-{i}")
+        ok = rc == 0 and stop_blocked(out) == block
+        print(("  ok      " if ok else "  FAIL    ") + name)
+        fails += 0 if ok else 1
+    # A second Stop in the same turn (stop_hook_active) is never blocked, so no loop.
+    rc, out = run_stop("Merge them in the GitHub UI.", session=f"loop-{os.getpid()}", extra={"stop_hook_active": True})
+    ok = rc == 0 and not stop_blocked(out)
+    print(("  ok      " if ok else "  FAIL    ") + "stop: stop_hook_active never blocks")
+    fails += 0 if ok else 1
+    # The transcript is the fallback when the payload carries no message.
+    transcript = os.path.join(os.environ.get("TMPDIR", "/tmp"), f"nmsa-{os.getpid()}.jsonl")
+    with open(transcript, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps({"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "Merge them yourself in the UI."}]}}) + "\n")
+    try:
+        rc, out = run_stop(None, session=f"tr-{os.getpid()}", extra={"transcript_path": transcript})
+    finally:
+        os.remove(transcript)
+    ok = rc == 0 and stop_blocked(out)
+    print(("  ok      " if ok else "  FAIL    ") + "stop: reads the transcript when no message is given")
+    fails += 0 if ok else 1
     for name, tool, text, deny in CASES:
         rc, out = run(tool, text)
         denied = '"permissionDecision": "deny"' in out
@@ -120,7 +176,7 @@ def main():
     ok = p.returncode == 0 and not p.stdout
     print(("  ok      " if ok else "  FAIL    ") + "fails open on garbage stdin")
     fails += 0 if ok else 1
-    total = len(CASES) + 1
+    total = len(CASES) + len(STOP_CASES) + 3
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

@@ -185,6 +185,7 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
 - `/messages` (`claude-haiku-5-5`, `minimax-m3`) returned 401 `Missing API key` through the proxy on 2026-10-09, so it is not usable there.
 - `/responses` and `/models` also exist; `/models` lists every id.
 - Send a stable `x-opencode-session` UUID header for each conversation, or the request fails with 400 `MissingSessionID`.
+  Make the UUID with `python3 -c 'import uuid; print(uuid.uuid4())'`, as the examples below do: a cloud container has no `uuidgen` (2026-11-19, [ai-config#5979](https://github.com/Morrison-Lab/ai-config/issues/5979)).
 - Models seen on `/models` on 2026-10-15 include `deepseek-v4.1-flash` (the vendor estimates about 87,000 requests per week on Go at 410 input, 71,300 cached and 310 output tokens per request, with input at $0.15 per million tokens off-peak;
   a review that returns a longer answer gets fewer requests, and several smaller models list lower prices) and `gemini-4-argon-contributor` (the Argon model, 2x usage for a limited time).
   Treat `/models` as the authority, since the vendor says the list changes as models are added.
@@ -214,6 +215,16 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   Streaming fixed it for `deepseek-v4.1-flash`: send `"stream": true` with `curl -N`, `"reasoning_effort": "low"` and `"max_tokens": 60000`, and read the answer from the SSE `delta.content` fields.
   With 24000 tokens the model spent the whole budget on reasoning and stopped with `finish_reason: length`.
   Streaming did not fix it for `glm-5.3`, which streams its reasoning under `delta.reasoning`: on one 190-line review it was still reasoning when a 570 s `--max-time` ran out, so prefer `deepseek-v4.1-flash`.
+
+  On 2026-11-19 the Go plan hit its weekly `GoUsageLimitError` mid-afternoon, and `/models` listed the free ids `beam-free`, `iceman-contributor-free`, `longcat-2.5-free` and `hy4-flash-free`.
+  Reviewing a 20-line diff, `beam-free` returned a bare `Verdict: CLEAN` with no reasons.
+  `iceman-contributor-free` returned a reasoned verdict on each of four diffs of 20 to 180 lines ([#5877](https://github.com/Morrison-Lab/ai-config/pull/5877), [#5894](https://github.com/Morrison-Lab/ai-config/pull/5894), [#5898](https://github.com/Morrison-Lab/ai-config/pull/5898), [#5909](https://github.com/Morrison-Lab/ai-config/pull/5909)).
+  Those requests were streamed, with a system message saying the reviewer has no tools, `"reasoning_effort": "low"`, `"max_tokens": 60000`, and a brief asking for one line of reasoning per changed line before the verdict.
+
+  - **Do:** ask a free reviewer for a reason per changed line, so a verdict comes with the lines it checked.
+  - **Don't:** turn on the Go plan's "Extra Usage" when the weekly limit hits: it is pay-as-you-go.
+  - **Do:** post the model, the head sha and the verdict line as a PR comment when another session will merge the PR.
+    The merge gate credits only a read made in the merging session, and the merge runner on [#5898](https://github.com/Morrison-Lab/ai-config/pull/5898) found no read on the PR and ran its own.
 
   Check `/models` for the current free ids and try them before relying on this route.
 - **Make the request with `curl` itself if it is to satisfy the merge gate.**
@@ -370,6 +381,16 @@ Measured in a claude.ai cloud session on 2026-11-12, while merging [ai-config#54
 
 - **Do:** run the OpenCode `curl` directly in Bash, and run `check-pr-fully-clean.py` unpiped, before a merge.
 - **Don't:** wrap the `curl` in a script, or count another session's posted read, as the merge hook's cross-harness review.
+
+Measured in a claude.ai cloud session on 2026-11-19, reviewing [ai-config#5881](https://github.com/Morrison-Lab/ai-config/pull/5881), [#5887](https://github.com/Morrison-Lab/ai-config/pull/5887) and [#5888](https://github.com/Morrison-Lab/ai-config/pull/5888):
+- A request sent without the `x-opencode-session` header that the endpoint list above requires came back as a 206-byte `MissingSessionID` error body with curl exit 0, so the stream parser printed nothing.
+- A `kimi-k3` stream stalled mid-reasoning with no content, and the same patch sent to `deepseek-v4-pro` with "keep reasoning brief" returned a full review.
+- The Go reads found real defects on heads that the Claude CI review had already called CLEAN, among them a command allowlist that still ran arbitrary code.
+- Later that day Go returned the weekly `GoUsageLimitError`.
+  `deepseek-v4.1-flash-free` and `beam-free` both returned `FreeUsageLimitError` on a one-word probe.
+  Neither tier could give a read, so the coordinator's router thread was asked for one instead.
+- **Do:** when the parser prints nothing, read the raw body (`out.sse`) for an `error` object before retrying, and resend a stalled `kimi-k3` read to `deepseek-v4-pro`.
+- **Don't:** read an empty parse, or curl exit 0, as an empty model answer, or skip the Go read because the Claude review is already clean.
 
 Reuse one UUID across the turns of a conversation.
 Prefer Go models for bulk and mechanical work while Claude quota is low.

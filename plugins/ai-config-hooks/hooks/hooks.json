@@ -34,6 +34,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/refresh-synced-plugin-copy.py\"'",
+            "timeout": 180,
+            "script": "refresh-synced-plugin-copy.py",
+            "why": "ai-config#6004. Every claude.ai cloud or project session loads the account-synced copy under ~/.claude/plugins/synced/, which is only as fresh as the last Sync, and a deny from any copy wins. On 2026-11-20 the synced guard-slide-major-tag.py predated #5414 and blocked the gha v3 slides after gha#2174 and gha#2177, so they waited on Ezra. In CLAUDE_CODE_REMOTE sessions, copies the marketplace plugin's files over each synced ai-config copy (keeping files only it has), installing ai-config@Morrison-Lab first when the environment never did, so the synced hooks run current code from the next tool call. Opt out with AI_CONFIG_NO_SYNCED_REFRESH=1, or of the install alone with AI_CONFIG_NO_SYNCED_INSTALL=1."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/sync-auto-mode-approvals.py\"'",
             "timeout": 10,
             "script": "sync-auto-mode-approvals.py",
@@ -336,6 +343,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/prefer-dedicated-tools-over-bash.py\"'",
+            "timeout": 10,
+            "script": "prefer-dedicated-tools-over-bash.py",
+            "why": "ai-config#6065. Ezra, 2026-11-21: \"can you use tools instead of bash\", after a cloud thread kept stopping on Bash approval prompts he answers from his phone. In every session DENIES a Bash pipeline that only reads or searches files (cat FILE, head/tail FILE, grep/rg, sed -n 'N,Mp', a name-only find, with later stages limited to head, tail, grep, rg and cat), an in-place sed -i or perl -i, and cat, echo or printf overwriting a file with > (or tee fed by a heredoc), naming the Read, Grep, Glob, Edit or Write tool to use. Pipelines with any other program, appends (>>, tee -a), searches whose exit status is used (-q, -s, /dev/null, && or || after), if/case/loop bodies, sudo, $-expanded words, /dev targets and quoted or heredoc mentions pass. A deny rather than a warning because a warning is read past (ai-config#4741). ALLOW_BASH_OVER_TOOL=1 covers a real need. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-chained-edit-and-commit-in-cloud.py\"'",
             "timeout": 10,
             "script": "no-chained-edit-and-commit-in-cloud.py",
@@ -611,6 +625,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-switch-in-main-checkout.py\"'",
+            "timeout": 20,
+            "script": "no-switch-in-main-checkout.py",
+            "why": "ai-config#4233, #3204: the main worktree of a repository with linked worktrees is read by other sessions and subagents, and a switch there left it on a fixer's branch with a stale index; denies git switch and a branch-changing git checkout there."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-delete-branch-under-stacked-pr.py\"'",
             "timeout": 25,
             "script": "no-delete-branch-under-stacked-pr.py",
@@ -635,7 +656,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-oversized-pr-push.py\"'",
             "timeout": 20,
             "script": "no-oversized-pr-push.py",
-            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 10 files or 300 lines against the merge base with the remote default branch (generated, lock, image and data paths not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 20 files or 600 lines against the merge base with the remote default branch, or for a stacked branch against the branch it is stacked on (generated, lock, image and data paths, and lines moved between files, not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch whose parent is not on the server or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
           },
           {
             "type": "command",
@@ -656,7 +677,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-push-with-failing-notes-checks.py\"'",
             "timeout": 120,
             "script": "no-push-with-failing-notes-checks.py",
-            "why": "Coordinator, 2026-10-26: lds#1409, lds#1422 and lds#1424 each failed CI's check-term-links or check-new-line-breaks within an hour because the thread skipped the local run that lds .claude/project-memory.md already prescribes. DENIES a `git push` when the repo's own doc checks fail locally. It reads the repo's caller workflows for Morrison-Lab/gha check-term-links and check-new-line-breaks jobs and their literal `with:` inputs (so every notes repo is covered with no per-repo list), runs gha's own scripts at the pinned ref from a daily-refreshed cache in ~/.cache/ai-config/gha against origin/main, and names the findings. Clearable with an AI_CONFIG_SKIP_PUSH_CHECKS='<reason>' prefix (a bare 1 is refused; each bypass is appended to ~/.cache/ai-config/push-check-bypass.log). Fails open with a visible note when gha cannot be fetched, a check times out or origin/main is missing. Covers repos that only call the reusable workflow, the gap warn-new-line-breaks-on-push.py leaves (ai-config#3747)."
+            "why": "Coordinator, 2026-10-26: lds#1409, lds#1422 and lds#1424 each failed CI's check-term-links or check-new-line-breaks within an hour because the thread skipped the local run that lds .claude/project-memory.md already prescribes. DENIES a `git push` when the repo's own doc checks fail locally. It reads the repo's caller workflows for Morrison-Lab/gha check-term-links, check-new-line-breaks and check-title-references jobs and their literal `with:` inputs, and every diff-scoped `.gha/run-check/run-check.sh` line of a bundled-checks workflow such as lds's cluster-checks.yml (ai-config#4986), so every notes repo is covered with no per-repo list, runs gha's own scripts at the pinned ref (a bundled line runs only its own check's script, with no arguments, from a named ref, with only its prefix and a fixed set of suffixes, each value held to the form its suffix allows) from a daily-refreshed cache in ~/.cache/ai-config/gha against origin/main, and names the findings. Clearable with an AI_CONFIG_SKIP_PUSH_CHECKS='<reason>' prefix (a bare 1 is refused; each bypass is appended to ~/.cache/ai-config/push-check-bypass.log). Fails open with a visible note when gha cannot be fetched, a check times out or origin/main is missing. Covers repos that only call the reusable workflow, the gap warn-new-line-breaks-on-push.py leaves (ai-config#3747)."
           },
           {
             "type": "command",
@@ -1461,6 +1482,13 @@
             "timeout": 10,
             "script": "no-cross-repo-copy.py",
             "why": "Ezra, 2026-11-16: \"don't copy; decompose\" (ai-config#5709). A session proposed copying lds and mlg's cluster render setup into mcsg instead of factoring it into one reusable component. DENIES a Write of a new file whose content mostly repeats (15+ shared lines, 70%+ of its lines over 3 characters) a same-named file in a sibling repository, or a Bash cp, rsync or install that copies a file of 15+ lines from one repository to a new path in another, a repository being identified by its common git dir so a linked worktree is not another repository. Vendored paths, a thin caller of a gha reusable workflow, a remote or existing destination, and a '# decompose: allow <reason>' comment pass. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-delete-flagged-term.py\"'",
+            "timeout": 60,
+            "script": "no-delete-flagged-term.py",
+            "why": "Ezra, 2026-11-20: \"never remove technical terms that get flagged as unlinked; always link to them to a definition instead, writing one if necessary\" (ai-config#6009). A session dropped 'finite' from an lds exercise (lds#3017) to quiet check-term-links, which then passed. DENIES a Write/Edit/MultiEdit of a .qmd or .md file, in a repository whose workflows call gha's check-term-links, that rewords lines (difflib ratio 0.5 or more) where the check flags a term as unlinked or undefined and leaves the file with fewer uses of that term. Pure deletions, wholesale rewrites and a term moved within the file pass. ALLOW_DELETE_FLAGGED_TERM=1 clears it. Fails open when there is no caller, no gha checkout, or the check errors."
           }
         ]
       },
@@ -1960,6 +1988,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-post-under-open-card.py\"'",
+            "timeout": 10,
+            "script": "no-post-under-open-card.py",
+            "why": "ai-config#5969. Ezra, 2026-11-19: 'sometimes a card moves while I'm clicking and I click the wrong choice; can we avoid that?' and 'if you want to post something after a card, delete the card and repost it last'. A pds thread posted a message and checklist under a request_decision card; it shifted and he tapped the wrong option. Denies post_message, reply, update_message, edit_message, update_progress_checklist, post_widget and request_decision while the transcript holds an open card (a request_decision tool_result named its message_id and no close_decision or decision-chosen wake has closed it), and says to withdraw it with close_decision, post, then re-post the card last. A deny, not a reminder, because the state is decidable from the transcript (ai-config#4741). ALLOW_POST_UNDER_CARD=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-plain-text-choice.py\"'",
             "timeout": 10,
             "script": "no-plain-text-choice.py",
@@ -1991,7 +2026,14 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mwc-ask-for-infra-pr.py\"'",
             "timeout": 10,
             "script": "no-mwc-ask-for-infra-pr.py",
-            "why": "ai-config#5097. Ezra, 2026-11-07, about lds#2009 (workflow-only): \"it's infra and shouldn't need my word. why didn't you realize that\" Blocks (deny) a user-visible reply tool call whose text mentions mwc and names a PR that is provably infrastructure (any PR in gha, macros or ai-config, or a Morrison-Lab PR whose changed paths all match no-unauthorized-merge.py INFRA_PATH_PATTERNS), unless the text says it merges under the infra grant. Fails open on any parse or lookup trouble."
+            "why": "ai-config#5097. Ezra, 2026-11-07, about lds#2009 (workflow-only): \"it's infra and shouldn't need my word. why didn't you realize that\" Blocks (deny) a user-visible reply tool call whose text mentions mwc and names a PR that is provably infrastructure (any PR in gha, macros or ai-config, or a Morrison-Lab PR whose changed paths all match no-unauthorized-merge.py INFRA_PATH_PATTERNS), unless the text says it merges under the infra grant. ai-config#6054 (Ezra, 2026-11-21: \"infra has permanent mwc in all repos\"): it also reads decision cards and coordinator relays, treats a merge question on a card or a merge ask in a message (\"want me to merge\", \"needs your go-ahead to merge\") as an ask, and denies one that calls its PRs infrastructure (\"caller PRs\", \"workflow PR\", \"infra PR\") without a lookup. Fails open on any parse or lookup trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-ask-to-slide-tag.py\"'",
+            "timeout": 10,
+            "script": "no-ask-to-slide-tag.py",
+            "why": "ai-config#6052. Ezra, 2026-11-20: \"never ask me before sliding an infra tag; always just do it\". Threads had held the gha v3 slide for a runner thread and the coordinator asked him. Denies a hearthbot message (post_message, reply, update_message, edit_message, request_decision, message_coordinator, message_thread) when one sentence names a tag slide and asks leave or hands the slide to someone else (the runner thread, the user), and any decision card that names a slide. A hold on a gate that names no person is allowed. Fails open on parse trouble."
           },
           {
             "type": "command",
@@ -2023,6 +2065,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/handoff-ask-needs-why.py\"'",
+            "timeout": 10,
+            "script": "handoff-ask-needs-why.py",
+            "why": "ai-config#6068. Ezra, 2026-11-21: \"when you ask me to do something you were supposed to do yourself, you must tell me why no other way would work\", then \"and tell me all the ways you tried\". The coordinator had asked him to press merge on ai-config#6066 after a classifier blocked a thread's merge, naming neither the block nor the routes tried. Blocks (deny) a user-visible hearthbot reply or decision card whose sentence hands the user one of the agent's own steps (merge, press a button, run, push, re-run, restart, edit and the like) unless the message says why no other way works and every way tried. A card passes when a message earlier in the same turn carried both. Secret, sign-in and connector asks are exempt. ALLOW_HANDOFF_WITHOUT_WHY=1 overrides. Fails open on parse trouble. ai-config#6075. Ezra, 2026-11-22: \"why not use tools to commit\", \"dont bs me\" (a relay said a thread had no other way to commit while the GitHub API tools could), then \"you must adversarially check every claim that my input is needed\". Also denies, in replies and relays (message_coordinator, message_thread), a claim that a step cannot be done that names no alternatives checked (a commit or push claim must name the GitHub API tools), and any claim that the user's input is needed (a needs-your sentence, a hand-off, or any decision card) unless a subagent launched this turn without error was briefed to refute it adversarially by finding a route without the user."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-leftover-cleanup-ask.py\"'",
             "timeout": 10,
             "script": "no-leftover-cleanup-ask.py",
@@ -2051,10 +2100,31 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unfixed-preexisting-failure.py\"'",
+            "timeout": 10,
+            "script": "no-unfixed-preexisting-failure.py",
+            "why": "Ezra, 2026-11-24, psw#703: \"why didn't you fix the missing curl package?\" An agent noted a lint failure as pre-existing and stopped while psw#707 had already fixed it on main. Blocks (deny) a reply, relay, PR body or forge comment whose paragraph calls a failure pre-existing, not this PR's, or also failing on main, unless the same paragraph names the fix (a PR or issue reference, or a merge of main). See shared/workflow/persistent-pr-loop.md. Fails open."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unfetched-pr-state-claim.py\"'",
             "timeout": 10,
             "script": "no-unfetched-pr-state-claim.py",
             "why": "ai-config#4834, PreToolUse binding of the Stop guard of the same name: a project thread posts through a hearthbot reply tool before the turn ends (ai-config#4830), so a Stop block arrives after the user has read the stale claim. Denies a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) that says a PR awaits merge or review, or that work is still to do, with no live read since the last user turn. Once per distinct text and at most twice per user turn; fails open."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-ready-before-preview.py\"'",
+            "timeout": 10,
+            "script": "no-ready-before-preview.py",
+            "why": "Refuses a reply calling a named PR ready for review or merge when no tool result since the last user turn and the last push shows that PR's deployed preview (Ezra, 2026-11-23: don't call a PR ready before its preview finishes deploying)."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-macro-claim-without-definition.py\"'",
+            "timeout": 10,
+            "script": "no-macro-claim-without-definition.py",
+            "why": "ai-config#6109, lds#3144, 2026-11-24. An agent told Ezra that a macro called vx \"prints a bold x\" (it prints x with an underset tilde) and that swapping Sigma for covmat would change a chapter's notation (covmat is defined as Sigma); both came from recall, not from reading macros.qmd. Denies a hearthbot reply tool call (reply, post_message, update_message, edit_message) whose sentence names a backslash macro and says what it prints, renders as, displays, typesets, looks like, is defined as or expands to, unless a Read, Grep, Bash or GitHub file-read result in the session shows that macro's definition (def, newcommand, renewcommand, providecommand). Backticks do not exempt it; built-in LaTeX commands and fenced code do. Fails open."
           }
         ]
       },
@@ -2079,6 +2149,18 @@
             "timeout": 10,
             "script": "no-update-branch-on-clean-pr.py",
             "why": "ai-config#5093, #5675. ids#47 lost its Clean verdict at head 98ed862a on 2026-11-07 when main was merged into it, and Ezra decided on 2026-11-14 that a PR behind only by other PRs' content merges on its current head. Denies update_pull_request_branch, gh api .../pulls/<N>/update-branch and gh pr update-branch <N> on a PR the transcript shows as FULLY CLEAN on its head, unless check-pr-fully-clean.py later reported that the branch needs the base (base drift adding a CI gate, a conflict, or a required up-to-date branch). A PR with no clean line in the transcript is untouched. Fails open on any parse trouble."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__github__update_pull_request_branch|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-routine-main-merge.py\"'",
+            "timeout": 10,
+            "script": "no-routine-main-merge.py",
+            "why": "ai-config#5988. Ezra, 2026-11-20, chose \"Make it permanent\" on stopping main merges: each one re-runs a PR's CI and voids its review, and routine merges helped queue 499 lds runs on 2026-11-19 (lds#2992). Denies git merge / git pull of main into another branch, and update_pull_request_branch, gh pr update-branch and gh api .../update-branch, unless the branch conflicts with main, main changed .github/workflows since the merge base (the checker's stale rule), or the command's MERGE_MAIN_FOR=<sha|#PR> prefix names a fix on main the branch lacks. No bare override. Fails open on parse or git trouble."
           }
         ]
       },
@@ -2115,6 +2197,13 @@
             "timeout": 10,
             "script": "no-ask-to-start-rc.py",
             "why": "Same rule as the hearthbot entry (Ezra, 2026-10-29: \"you can run remote control yourself\"): a forge comment, PR body or issue body that asks the user to start Remote Control is denied, and the denial points at start_remote_control."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unfixed-preexisting-failure.py\"'",
+            "timeout": 10,
+            "script": "no-unfixed-preexisting-failure.py",
+            "why": "Ezra, 2026-11-24, psw#703: \"why didn't you fix the missing curl package?\" An agent noted a lint failure as pre-existing and stopped while psw#707 had already fixed it on main. Blocks (deny) a reply, relay, PR body or forge comment whose paragraph calls a failure pre-existing, not this PR's, or also failing on main, unless the same paragraph names the fix (a PR or issue reference, or a merge of main). See shared/workflow/persistent-pr-loop.md. Fails open."
           }
         ]
       },
@@ -2150,7 +2239,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-ums-before-resolve.py\"'",
             "timeout": 10,
             "script": "require-ums-before-resolve.py",
-            "why": "A resolved thread loses its message box, so UMS must run first. Denies the first set_thread_resolved(true) of a thread when no UMS tool call follows the last user message; the retry is allowed (ai-config#4480)."
+            "why": "A resolved thread loses its message box, so UMS must run first. Denies a thread's own set_thread_resolved(true) when no UMS tool call follows the last user message, and a resolve by thread_id unless a read_thread of that thread shows its newest reply carrying a 'UMS executed' line; the caller's own UMS does not count there (ai-config#4480, #6027)."
           },
           {
             "type": "command",
@@ -2249,6 +2338,18 @@
         ]
       },
       {
+        "matcher": "Agent|Task|SendMessage|mcp__hearthbot__start_thread|mcp__hearthbot__message_thread|mcp__hearthbot__message_coordinator|mcp__hearthbot__start_remote_control|mcp__claude-code-remote__send_message|mcp__claude-code-remote__send_later|mcp__claude-code-remote__create_session|mcp__Claude_Code_Remote__create_session",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unrequested-sweep-in-brief.py\"'",
+            "timeout": 10,
+            "script": "no-unrequested-sweep-in-brief.py",
+            "why": "Ezra, 2026-11-20 23:56 PST: \"did I say to sweep?\", after he said \"do that\" to moving the ids equation-label check into gha and the coordinator's brief also told the new thread to label every unlabeled equation in all the notes repos and roll the check out everywhere. no-unrequested-sweep-pr.py fires only at the 11th PR, after the widened brief has handed over the work. DENIES a brief (subagent launch, SendMessage, thread start, thread or coordinator message, remote-control instructions, scheduled send) that says \"sweep\", pairs \"all/every ... repos\", \"everywhere\" or \"existing content\" with a content-edit verb, or names three or more notes repos beside an edit verb; read clause by clause, a question, an offer, a negation before the phrase or a PR/CI/merge/hook/branch clause passes, and a typed gia/gii/gip/gmd/ardia grants it, unless the user's own words since their latest message (never a coordinator note) ask for that breadth. See shared/workflow/no-sweeps-by-default.md. Fails open on a missing transcript."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__hearthbot__.*|mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment|mcp__github__add_comment_to_pending_review|mcp__github__pull_request_review_write|mcp__github__create_pull_request|mcp__github__update_pull_request|mcp__github__issue_write|Bash",
         "hooks": [
           {
@@ -2257,6 +2358,46 @@
             "timeout": 10,
             "script": "no-notes-blob-link.py",
             "why": "ai-config#5705. Ezra, 2026-11-16: 'when you hyperlink to content in the notes, can you prefer hyperlinking to the rendered github pages site (when the relevant content is up to date there)?' Denies a user-visible post, a forge comment, issue or PR body, or the --body/--title of a gh issue/pr post in Bash (ai-config#5706), that links github.com/Morrison-Lab/<notes repo>/blob/main/<path>.qmd, and suggests the rendered URL (a subfile maps to the page that includes it plus its first div id, read from a local checkout). Passes a link pinned to a branch or SHA, a non-.qmd or unrendered path (tools/, .github/, _extensions/, filters/, outtakes/), a #L or ?plain=1 source view, a URL in a code span or fence, and a line that says the content is not deployed yet or that the link points at source lines, text or file. A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_NOTES_BLOB_LINK=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-stale-pin-macro-excuse.py\"'",
+            "timeout": 10,
+            "script": "no-stale-pin-macro-excuse.py",
+            "why": "Ezra, 2026-11-20 23:22 PST: never skip a semantic macro (\\ccprod, \\stprod, \\soprod, \\oprod) because a repo's pinned latex-macros copy lacks it; bump the pin in the same PR and use the macro. \"Inconvenience is never a valid excuse.\" A backstop for common wordings: DENIES a user-visible post, forge comment, issue or PR body, gh issue/pr --body/--title/--body-file, or git commit -m/-am/-F message where one sentence or two adjacent ones name a macro and the pin, say the pin lacks it, and say the macro was kept out (kept, used, left, raw, until, for now). A window that moves the pin (bumped, synced, updated the submodule, stacked) with no negation or deferral, or quotes the rule, passes; a heredoc -F - message is not read. ALLOW_STALE_PIN_MACRO=1 overrides for a quote. See skills/use-math-macros/SKILL.md. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-tool-gap-excuse.py\"'",
+            "timeout": 10,
+            "script": "no-tool-gap-excuse.py",
+            "why": "Ezra, 2026-11-24, quoting an mlg thread reply \"LaTeX is too old for the exam template\": \"cai: never make excuses like this; install the software you need\" (and 2026-11-02: \"no excuses; always install what you need\"). flag-tool-gap-handling.py only warns at Stop, after the excuse reached the user, and never sees thread posts or forge text. DENIES a user-visible post, forge comment, issue or PR body, or gh issue/pr --body/--title where one sentence says work was skipped because a tool is missing or too old, unless the text says it was installed; sentence matching is flag-tool-gap-handling.py's excuse(). ALLOW_TOOL_GAP_EXCUSE=1 overrides for a quote or a tool that truly cannot be installed. See shared/workflow/growth-mindset.md. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-cai-reply-without-routing.py\"'",
+            "timeout": 10,
+            "script": "no-cai-reply-without-routing.py",
+            "why": "Ezra, 2026-11-24, mlg thread: after a reply to his \"cai: never make excuses like this; install the software you need\" said only that TeX was being installed, \"did you not recognize `cai:`\" and \"then why didn't you say you were going to do it in your original response to my original `cai: ` comment?\". no-user-correction-without-mechanism.py makes the turn build a mechanism before Stop but not tell the user so. DENIES an mcp__hearthbot__post_message when the user's latest message has a line starting cai: (or ca:), no post since then named the routing, and this one does not (ai-config, hook, skill, memory, AGENTS.md/CLAUDE.md, shared/*.md, check, or a Mechanism: line). Quoted, fenced and code-span cai: does not count (remind-encode-user-correction.py typed_text). ALLOW_CAI_REPLY_WITHOUT_ROUTING=1 overrides. See skills/config-ai/SKILL.md. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-status-line-answer-to-question.py\"'",
+            "timeout": 10,
+            "script": "no-status-line-answer-to-question.py",
+            "why": "Ezra, 2026-11-25 00:46 PST, after he asked \"why haven't you merged 2196?\" and the first reply was \"Running the clean check on gha#2196 now, then merging it\": \"cai: always answer my questions directly and immediately\" (ai-config#6129). DENIES the first mcp__hearthbot__post_message after a user question (a sentence ending in ?, or a line starting with why/what/did/have/has/is/are/can/how and similar) when the reply's first sentence is only a status or plan line (a gerund, I'll, I will, I'm going to, Let me) with no answer word (because, yes, no, not, never, hadn't, didn't, already...). Polite requests (can/could/would/will you, please) and later replies pass. ALLOW_STATUS_FIRST_REPLY=1 overrides. See shared/workflow/answer-questions-directly.md. Fails open on parse trouble."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Monitor|mcp__github__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-tight-github-polling.py\"'",
+            "timeout": 10,
+            "script": "no-tight-github-polling.py",
+            "why": "ai-config#5970. The account's shared 5,000-request hourly GitHub budget hit 0 twice on 2026-11-19, pausing every merge; the merge runner named CI watchers polling every few seconds in parallel threads. Ezra, 2026-11-19: \"you should be more proactive about fixing logjams like this\". DENIES gh pr checks --watch and gh run watch below a 120 s interval (gh defaults 10 s and 3 s), watch below it on a GitHub call, and while/until loops or sleeping for loops that call GitHub with under 120 s of sleep per pass; a for loop over at most five literal words (a retry) or one that never sleeps (a batch) passes. It also DENIES an identical GitHub read (an MCP read tool with the same arguments, or the same gh read command) repeated within 120 s in one session, 1800 s for check-run annotations, which the runner saw re-read several times per head; any GitHub write or git push clears the read log, and ALLOW_REPEAT_GITHUB_READ=1 overrides a Bash read. A deny, not a warning, because the guidance in monitor-pushed-heads.md (ai-config#5045) was read past (ai-config#4741). ALLOW_GITHUB_POLL=1 overrides; AI_CONFIG_GH_POLL_FLOOR tunes the floor. Fails open."
           }
         ]
       }
@@ -2336,6 +2477,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-ready-before-preview.py\"'",
+            "timeout": 10,
+            "script": "no-ready-before-preview.py",
+            "why": "Refuses a reply calling a named PR ready for review or merge when no tool result since the last user turn and the last push shows that PR's deployed preview (Ezra, 2026-11-23: don't call a PR ready before its preview finishes deploying)."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-red-own-pr-at-stop.py\"'",
             "timeout": 10,
             "script": "warn-red-own-pr-at-stop.py",
@@ -2388,7 +2536,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unmonitored-pr.py\"'",
             "timeout": 10,
             "script": "no-unmonitored-pr.py",
-            "why": "After opening a PR, uses a recorded model scheduler when available; otherwise starts a detached two-minute gh poller and injects changed state on the next prompt. Blocks only if neither mechanism can be armed."
+            "why": "After opening a PR, uses a recorded model scheduler or PR subscription when available; otherwise starts a detached two-minute gh poller and injects changed state on the next prompt. Blocks if neither can be armed, or if the closing reply waits on PR state, since the poller cannot wake the session (ai-config#4790)."
           },
           {
             "type": "command",
@@ -2424,6 +2572,25 @@
             "timeout": 10,
             "script": "no-placeholder-reply.py",
             "why": "CLAUDE.md 'Always produce a reply --- never end a turn silently' -- blocks a reply whose whole content is a placeholder (`No response requested.`, `N/A`, a bare acknowledgement). The rule names the exact string in a Do/Don't pair and the lapse still recurred three times in one session (ai-config#1579), each time on resuming after a context-window summary, which reads like a report and so makes the work it describes feel already reported. Anchored on the WHOLE message rather than a substring, because this corpus quotes the banned string constantly; and a claim about the WORK (`Nothing to report.`, `No change.`) is deliberately not matched, since a no-change tick is behaviour the same section requires."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-manual-step-ask.py\"'",
+            "timeout": 10,
+            "script": "no-manual-step-ask.py",
+            "why": "ai-config#5797. On 2026-11-17, in a Claude Code cloud session on Morrison-Lab/lds, the agent told Ezra twice to do a merge by hand (merge them in the GitHub UI; type mwc all in a local session) and Ezra answered \"I don't want to do things by hand\", then \"do not tell me to do this\". The PreToolUse registration of this script matches only mcp__hearthbot__ reply tools, and a plain final assistant message is no tool call, so nothing saw it. This Stop registration scans the final assistant message (fenced code blocks removed) with the same asks, and blocks the stop once per turn through stop_notice so the agent reads the reason and rewrites the message. A report that a merge was refused, naming no hand step, is left alone.",
+            "_note_activation": [
+              "Activation follows this file's uniform model (see the top-level",
+              "_comment and README): the plugin loads it on enable, and",
+              "install-hooks.py --fix registers it for a non-plugin install."
+            ]
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/handoff-ask-needs-why.py\"'",
+            "timeout": 10,
+            "script": "handoff-ask-needs-why.py",
+            "why": "ai-config#6068. The Stop half of handoff-ask-needs-why: a plain final message is no tool call, so the PreToolUse registration never sees it. Scans the final assistant message (fenced blocks removed) for the same hand-off asks and blocks the stop once per turn through stop_notice when the message does not say why no other way works and every way tried. ai-config#6075. Ezra, 2026-11-22: \"why not use tools to commit\", \"dont bs me\" (a relay said a thread had no other way to commit while the GitHub API tools could), then \"you must adversarially check every claim that my input is needed\". Also denies, in replies and relays (message_coordinator, message_thread), a claim that a step cannot be done that names no alternatives checked (a commit or push claim must name the GitHub API tools), and any claim that the user's input is needed (a needs-your sentence, a hand-off, or any decision card) unless a subagent launched this turn without error was briefed to refute it adversarially by finding a route without the user."
           },
           {
             "type": "command",

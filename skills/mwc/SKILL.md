@@ -28,6 +28,64 @@ without asking confirmation before every merge.
   So are their plain-English equivalents from the user (Ezra, 2026-10-23): "merge when ready", "merge them all", "merge it", "go ahead and merge", a bare "merge", and "mwc them all".
   `hooks/remind-plain-english-merge-word.py` recognizes these mechanically and injects the reminder, so a user never has to retype `mwc`.
   The bare word is listed here, not only in `CLAUDE.md`'s general "Bare keyword directives" convention, so this file is self-contained: a slash command is routed to this skill by the harness itself, while a bare word in prose is a convention the model must recognize on its own, and it recognizes it most reliably when the file governing the mechanics (`enable-mwc`, `check-mwc`, the Scope Limit) names the exact form it will see rather than only implying it maps here.
+- **`mwr` and `mwrs` are a different grant** (ai-config#3946).
+  Ezra decided it on 2026-11-19: "Skip review, keep green CI".
+  They let a merge go through without a clean review: no non-Claude read and no Claude CLEAN verdict.
+  Every required check must still pass, and a formal CHANGES_REQUESTED or REJECTED review still blocks.
+  A dismissed review blocks too, since dismissing a CHANGES_REQUESTED review removes it from the formal decision.
+  `mwr` never merges a PR that changes any file under `.github/`, since such a PR could edit the very CI that `mwr` relies on.
+  Nor does it merge a PR that changes the root `AGENTS.md`, which holds the `amwr` marker.
+  Merge that PR under `mwc`.
+  The `amwr` marker is the repository-wide form, step 3 of ai-config#3946.
+  A line that is exactly `<!-- amwr: on -->`, outside code blocks, in the root `AGENTS.md` of the repository's default branch, grants `mwr` for every PR of that repository (Ezra's card, 2026-11-20: "read from main only").
+  It is read from the default branch only, so a PR cannot grant itself, and a read that fails grants nothing.
+  A revocation in the session suspends it, after which only a later typed grant counts.
+  The [`mwr`](../mwr/SKILL.md) skill is the short form.
+  The checker fails closed when it cannot read the PR's file list.
+  Under `mwr` a human's answered "not clean" review body that is not a formal review no longer blocks, since only a formal CHANGES_REQUESTED does.
+  `mwr` covers the PRs its message names ("mwr owner/repo#N", "mwr repo#N", or the PR's URL), and `mwrs` covers the session.
+  A bare `mwr` names no PR, so it grants nothing.
+  This fails closed on purpose, although ai-config#3946 asked for `mwr` to cover "the single most relevant PR": a hook cannot tell which PR that is.
+  Ezra confirmed it on 2026-11-20: a bare `mwr` merges nothing, and the agent asks which PR.
+  `#N` (or "PR N") alone names no repository, so it grants nothing too: name the repository.
+  The agent chooses its working directory, so a checkout's origin cannot stand in for one.
+  A bare `repo#N` means `Morrison-Lab/repo#N`, whatever the working directory.
+  An issue reference ("mwr issue 5") is no PR reference, so it grants nothing.
+  It grants PR merges only, never a branch merge or an auto-merge.
+  Under `mwr` alone, the merge must be the MCP merge tool `mcp__github__merge_pull_request`, with `expectedHeadSha` set to the full 40-character head sha and no key outside the tool's schema, and `gh` or `curl` merges are refused.
+  The same holds for any merge the MERGE-READY line credits, under `mwc` or a named grant as well.
+  Only a merge that a FULLY CLEAN line for the pinned head credits, or the user's typed override, keeps every route.
+  A merge whose only checker evidence is the MERGE-READY line takes the strict MCP route even when its live review is clean.
+  The message must be only the grant: "mwr would skip review here" or "wait, mwr" is no grant.
+  Only the user's own message starts it, never a relay's cited copy of one.
+  Which transcript records can start it is a strict allowlist, and every other record can only end it.
+  The first kind is a typed CLI prompt: a `type: user` record that is not `isMeta`, with no `promptSource` key and no `origin` key, whose text does not open with `<` once leading whitespace is stripped.
+  The second kind is an SDK principal wake: `promptSource` "sdk", not `isMeta`, an `origin` whose `kind` is "human", and text that opens with `<wake` after leading whitespace.
+  Its `<message>` tag must have double-quoted attributes only, with `from="human"`, `trust="principal"` and `trigger="true"`.
+  A `promptSource` of "system", any other origin, an SDK record with no origin, and a record that opens with another tag can only end the grant, even when a principal wake sits inside it.
+  The `mwc` grant reads records more loosely.
+  That exposure is older and tracked in ai-config#5959.
+  Any later message that withdraws ("never mind", "cancel that") or mentions review ends it, one typed while the agent is working included.
+  A message typed while the agent is working can end the grant but never start it.
+  Only the typed tokens start it: "merge when ready" stays an `mwc` word.
+  The merge needs the `check-pr-fully-clean.py --mwr` MERGE-READY line for its head, and only under that grant does the line stand in for FULLY CLEAN.
+  Under an `mwr`-only grant, with no `mwc`, a FULLY CLEAN line does not count, and the merge rests on the MERGE-READY line and the live re-checks.
+  Here `mwc` means the user's typed `mwc`, never the `.mwc` marker, and a standing, infra-PR or named "merge PR N" grant also keeps the ordinary FULLY CLEAN path.
+  That line counts only from a run of the plugin root's own checker, `$CLAUDE_PLUGIN_ROOT/scripts/check-pr-fully-clean.py`, alone in its Bash command, never from a relay or the user's text.
+  No checkout's copy counts, not even an ai-config checkout's, since the checker loads its libraries from its own directory, and a plugin root that is itself a git checkout does not count either.
+  A run with `--from-json` does not count, since it scores a payload instead of live state.
+  Only the run's last non-empty line is read: it must be the checker's whole MERGE-READY line and name the command's own `-R` repository and PR number.
+  That line carries the full 40-character head sha, which must equal the sha the merge pins.
+  A checker older than this rule printed an 8-character prefix, and its line is refused until the plugin root's copy updates.
+  An edit to the plugin cache itself is not caught, which is tracked in ai-config#5959.
+  The checker runs before the merge, and the PR can change in between, so `hooks/enforce-mwc-review-gate.py` checks again at merge time, on live data it reads in the same hook call.
+  `hooks/block-merge-without-clean-checker.py` runs the same checks whenever the MERGE-READY line, not FULLY CLEAN, is what credits the merge, and so does the review gate even when its ordinary path would allow.
+  It denies when any review on the PR, not only each reviewer's latest, is DISMISSED, CHANGES_REQUESTED or REJECTED.
+  It denies when the files changed between the PR's live base sha and the pinned head (`compare/<base>...<head>`, renames' old names included) include anything under `.github/` or the root `AGENTS.md`, so retargeting the base after the checker run does not help.
+  It denies when the live head sha is not the pinned sha.
+  Any of this data that cannot be read denies too.
+  The checker's own `.github/` and dismissed-review checks stay as a second layer.
+  `hooks/remind-plain-english-merge-word.py` (`mwr_grant`) reads the words, and `no-unauthorized-merge.py` (`transcript_mwr_grant`) applies them.
 - **A bare `/mwc` means `/mwc all`** (Ezra, 2026-10-16).
   The grant covers every in-scope PR of the session or thread --- every PR the assistant has just named, opened, or been driving --- that becomes fully clean.
   Never answer the keyword by asking for PR numbers: the numbers are already in the thread, and the question reads as stalling.
@@ -545,6 +603,13 @@ So are the other `tools/` files: figure, data and content generators, and build 
 `scripts/merge-infra-pr` reads this same list from a fresh clone of ai-config's `main`, adding only `changelog.d/`.
 A change to the list therefore takes effect for the wrapper once it merges, not on its own PR.
 
+The path list cannot see a hyperlink-only, id-only or render-identical LaTeX PR, which counts as infrastructure under
+[`strict-merge-policy`](../../shared/workflow/strict-merge-policy.md#infrastructure-prs-standing-mwc-grant) (Ezra, 2026-11-21 and 2026-11-22)
+although its files are content.
+Read the diff, confirm that every changed line only adds, fixes, repoints or removes a link, adds, renames or deduplicates an id,
+or changes LaTeX without changing the rendered math (such as a macro swapped in for the raw LaTeX it expands to),
+and clear the guard with `ALLOW_MERGE=1` on that one pinned merge command, as that section says.
+
 The grant is decided by what the PR changes,
 so the guard reads the PR's file list from GitHub (`gh api .../pulls/N/files`,
 or direct REST via `urllib` when `gh` is not on `PATH`).
@@ -683,7 +748,20 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
 ## An mwc carries to a new head only for a named PR
 
 An mwc line covers the PRs it names.
-It carries to a new head of a named PR when the content is unchanged beyond a main merge.
+Both forms are lines: `mwc lds 2910`, with no SHA, and `mwc lds 2910 <sha>` (Ezra, 2026-11-19, on a project decision card, ai-config#5967).
+The approved head is the SHA the line names, or for a line without one, the head named in the post the line answers (`scripts/mwc-batch.py` prints it beside each line).
+An `mwc <repo> <pr>` line without a SHA that answers no post naming a head approves no head of that PR (a bare `mwc` is the separate session grant): ask for the line again in a post that names one.
+The line carries to a new head of a named PR when the content is unchanged beyond a main merge, and `python3 scripts/check-mwc-carry.py --pr <N> --approved-sha <approved head>`, run in a full clone of the PR's repository, decides that.
+It exits 0 (CARRIES) only when every commit added since the approved head is a clean merge of main whose tree is git's own automatic merge of its parents.
+Any other push voids the line: a new commit, a conflict-resolved or edited merge, a rebase or a force-push.
+The CARRIES line names the full head SHA it checked, and the merge pins exactly that SHA (`--match-head-commit` or `expectedHeadSha`), so a push after the check fails the merge instead of riding on the line.
+A carried line does not make the new head mergeable: the head must still pass every gate on this page, a fresh agy run included where the policy needs one.
+So a CI-caller merge that makes waiting PRs merge main costs them a CI cycle, not a new line from Ezra.
+Quote the CARRIES output when you report the merge.
+
+- **Do:** run `check-mwc-carry.py` on a moved head, and merge under the line, pinned to the head it printed, when it carries and the head is fully clean.
+- **Don't:** ask Ezra for a new line only because a main merge changed the SHA, carry a line across a push the script calls VOID, or pin a head other than the one it checked.
+
 It never extends to a PR that no mwc line names, however unchanged that PR's content is
 (the coordinator told the runner an earlier mwc covered an unnamed PR on 2026-11-10, ai-config#5275).
 No hook can enforce this: whether a line names a PR is a reading of Ezra's wording.
@@ -789,6 +867,7 @@ which is correct and easy to misread as the guard malfunctioning.
 It also requires `AI_SESSION_ID` or `CLAUDE_SESSION_ID` to be set; with neither
 set the function returns `False` and the guard denies even with a valid marker.
 Run `enable-mwc` and `check-mwc` from the repository of the session's working directory (where the merge command runs), not merely once per session or from the `-R` target repository.
+A scratchpad clone of the target repository is the same mistake: on psw#701 (2026-11-22) a marker written in a scratchpad psw clone left the guard reporting "found no ai-sessions directory", and the same command run in the project thread's primary checkout (`/home/user/lds`) let the merge through.
 
 **The grant does not expire, but its LIVENESS PROOF does, and a long session loses merge authority mid-session because of it.**
 This is the property most likely to bite, because the two facts that produce it are individually reassuring.

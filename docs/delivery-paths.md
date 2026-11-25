@@ -40,6 +40,10 @@ Status as of 2026-11-12.
   The Setup script runs once per container, and `refresh-stale-plugin-pin-cloud.py` keeps the plugin current in the sessions that reuse the container.
 - **The claude.ai account plugin sync failed from 2026-09-02 until a manual Sync on 2026-11-12** ([#3948](https://github.com/Morrison-Lab/ai-config/issues/3948)).
   The cloud path does not depend on it, because the Setup script installs from the marketplace.
+  A synced copy still loads beside the marketplace plugin, though, and its hooks still fire, so a stale one can deny what `main` allows: on 2026-11-20 it blocked two gha `v3` slides ([#6004](https://github.com/Morrison-Lab/ai-config/issues/6004)).
+  [`hooks/refresh-synced-plugin-copy.py`](../hooks/refresh-synced-plugin-copy.py) copies the marketplace plugin's files over the synced copy at each cloud `SessionStart`, so its hooks run current code.
+  When the environment never installed the marketplace plugin, the hook installs it first.
+  So once the synced copy carries the hook, after one account Sync, it keeps itself current however stale later Syncs get.
   Skills uploaded to claude.ai do not reach Claude Code at all.
 - **Codex runs no `SessionStart` hook**, since `codex-hooks.json` routes only `UserPromptSubmit`, `PreToolUse` and `Stop`, so `inject-core-rules.py` never runs there.
   No script registers the Codex plugin, and `bootstrap.sh`'s header still says Codex has no install path for skills, which this row contradicts ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)).

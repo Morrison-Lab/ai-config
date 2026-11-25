@@ -133,3 +133,51 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16, wit
   it asks whether the instruction belongs in this thread and suggests a separate one, and does not quietly do the instruction (Ezra, 2026-10-19).
   Questioning is not refusing: the user decides where the task goes.
   An explicit "switch to this" from the user is the exception, as in [`dont-get-sidetracked`](../shared/workflow/dont-get-sidetracked.md).
+
+## Project threads run the account-synced ai-config copy; fix delivery in a hook, not in the environment
+
+Measured 2026-11-21 ([#6004](https://github.com/Morrison-Lab/ai-config/issues/6004), [#6060](https://github.com/Morrison-Lab/ai-config/pull/6060)): a project thread's hooks came only from the claude.ai account-synced copy under `~/.claude/plugins/synced/`, which is as fresh as Ezra's last press of **Sync** on the plugin card in claude.ai's plugin settings (then 2026-11-12).
+The project's cloud environment had a Setup script older than the plugin-install step, so `ai-config@Morrison-Lab` was not installed.
+The stale `guard-slide-major-tag.py` denied two gha `v3` slides that `main`'s guard allows, and both waited on Ezra.
+
+The `update_environment` approval card cannot be approved from the Claude phone app ("This request can't be approved here.
+Review it on your computer."), and the service rejected the call twice that night.
+`hooks/refresh-synced-plugin-copy.py` now installs the marketplace plugin when it is missing and overwrites the synced copy at each cloud `SessionStart`.
+
+- **Do:** when a hook in a cloud thread denies something `main` would allow, re-run `main`'s copy of the hook on the same state before treating the deny as real.
+- **Do:** fix a delivery problem in a hook or PR;
+  when a one-time human step is unavoidable, name it exactly, such as "press Sync on the ai-config plugin card".
+- **Don't:** make an environment change the fix, or retry a rejected `update_environment` call.
+
+## Claude Projects: the merge guard cannot see a merge grant given in a thread
+
+Measured 2026-11-23 on [mds#865](https://github.com/Morrison-Lab/mds/pull/865).
+Ezra tapped "Merge it" on a decision card in the thread and then typed "mwr mds#865" there.
+`hooks/no-unauthorized-merge.py` refused the merge three times.
+It reads a grant only from a typed user record, or from a record with `promptSource=sdk` and `origin.kind=human`, and a project-thread wake is neither.
+The auto-mode classifier also denied `enable-mwc`.
+The gap is tracked in [ai-config#6096](https://github.com/Morrison-Lab/ai-config/issues/6096), filed 2026-11-24 once a retry was accepted.
+`hooks/no-unnamed-repo-pr.py` has the same gap: it denied this entry's PR after Ezra said "daytb" to opening it, because his words reached the thread only as a coordinator relay citing them.
+Ezra merged the PR himself with GitHub's Merge button.
+A decision-card tap does satisfy `hooks/no-unnamed-repo-pr.py`.
+On 2026-11-24 a thread configured only for lds ran UMS for its quota-retry lesson,
+and the hook denied the resulting ai-config PR twice.
+The PR, [ai-config#6111](https://github.com/Morrison-Lab/ai-config/pull/6111) (the `self-review-fallback.md` quota-retry rule), opened once Ezra tapped a card naming ai-config.
+The hook denied the PR even though the coordinator's note said ai-config was configured and other threads were opening PRs there.
+
+- **Do:** when a thread's configured repo is not ai-config, post a decision card naming ai-config before opening a UMS PR there.
+- **Don't:** take "other threads open PRs there" as evidence that this thread can.
+  Read the hook's denial instead.
+
+A link-only `.qmd` PR, [mds#882](https://github.com/Morrison-Lab/mds/pull/882), merged from the same thread under the standing "hyperlink changes count as infra" grant.
+The steps were:
+
+1. Run `check-pr-fully-clean.py` on a `build-pr-payload.py` payload.
+2. Post a PR comment that starts `Annotation dispositions for head <sha7>:`, and rerun the checker with `--annotations-read` set to the ids that `batch-read-annotations.py` printed.
+3. Run five `command -v` probes, each as its own command.
+4. Make one opencode curl attempt (the classifier denied it, which counts as the attempt), and post a waiver note on the PR.
+5. Merge through MCP with `allow_merge` and `expectedHeadSha`.
+
+- **Do:** when a content PR's merge grant arrives as a card tap or a typed "mwr" in a project thread, tell Ezra in one line that the guard cannot read thread grants, and ask him to press Merge on the PR.
+- **Do:** merge a link-only or id-only PR from a thread through the steps above, after reading the diff to confirm that it changes only links or ids.
+- **Don't:** retry the guarded merge, or route around it with `enable-mwc`, once the guard has refused a thread grant.

@@ -3,6 +3,8 @@
 import contextlib
 import importlib.util
 import io
+import json
+import tempfile
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
@@ -46,10 +48,11 @@ def fake_api(anns, remaining=4000, status=None, report=None, fail=False):
     return api, calls
 
 
-def run(argv, api, sleeps=None):
+def run(argv, api, sleeps=None, cache_dir=None):
     out, err, sleeps = io.StringIO(), io.StringIO(), [] if sleeps is None else sleeps
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = bra.main(["--repo", "o/r", "--sha", "a" * 40] + argv, api=api, sleep=sleeps.append)
+        code = bra.main(["--repo", "o/r", "--sha", "a" * 40] + argv, api=api,
+                        sleep=sleeps.append, cache_dir=cache_dir)
     return code, out.getvalue(), err.getvalue()
 
 
@@ -106,6 +109,30 @@ check("the floor stops the read (exit 3), names budget, reset and the unfinished
       and not any("/check-runs/13/" in c for c in calls))
 code, out, err = run([], fake_api(RUNS, fail=True)[0])
 check("a failed read exits 2 and prints no id list", code == 2 and out == "" and "HTTP 403" in err)
+
+# The cache keyed by check-run id (ai-config#6032).
+with tempfile.TemporaryDirectory() as cache:
+    api, calls = fake_api(RUNS)
+    first = run([], api, cache_dir=cache)
+    api, calls = fake_api(RUNS)
+    second = run([], api, cache_dir=cache)
+    check("a cached re-read spends no annotation or rate-limit calls and gives the same answer",
+          first[0] == 0 and second[1] == first[1]
+          and not any("/annotations" in c or c == "rate_limit" for c in calls))
+    path = Path(cache) / "o__r" / "14.json"
+    path.write_text(json.dumps([ann("x")] * 149), encoding="utf-8")
+    api, calls = fake_api(RUNS)
+    code, out, err = run([], api, cache_dir=cache)
+    check("a cached copy whose count disagrees is ignored and replaced by a live read",
+          code == 0 and any("/check-runs/14/annotations" in c for c in calls)
+          and len(json.loads(path.read_text(encoding="utf-8"))) == 150)
+    api, calls = fake_api({41: [ann("y")]}, status={41: "in_progress"})
+    run([], api, cache_dir=cache)
+    api, calls = fake_api({42: [ann("y"), ann("z")]}, report={42: 3})
+    run([], api, cache_dir=cache)
+    check("an unfinished run and a short read are never cached",
+          not (Path(cache) / "o__r" / "41.json").exists()
+          and not (Path(cache) / "o__r" / "42.json").exists())
 
 print(f"\n{passes} passed, {failures} failed")
 raise SystemExit(1 if failures else 0)

@@ -347,7 +347,7 @@ def _test_own_actions_job():
                 "is NOT clean, and no later comment supersedes it")
     human = "PR has active formal review state 'CHANGES_REQUESTED' from alice"
 
-    def run_main(env, review_issues, runs=only_own):
+    def run_main(env, review_issues, runs=only_own, drift=None):
         reset()
         route, _ = router(jobs)
 
@@ -374,7 +374,8 @@ def _test_own_actions_job():
                 patch.object(checker, "check_review_threads", return_value=(True, [])), \
                 patch.object(checker, "check_review_comments",
                              return_value=(not review_issues, review_issues)), \
-                patch.object(checker, "check_base_drift", return_value=(True, [])), \
+                patch.object(checker, "check_base_drift",
+                             return_value=(not drift, list(drift or []))), \
                 contextlib.redirect_stdout(out):
             try:
                 checker.main()
@@ -407,12 +408,87 @@ def _test_own_actions_job():
     check("a job in the repo whose check run is not on this head gets no reviewer note",
           code == 1 and note not in text)
 
+    # Base drift as the only blocker prints a distinct line and still exits 1;
+    # drift beside any other blocker does not (ai-config#6028).
+    # These run inside the PR's own CI job, so its in-progress run is not a blocker.
+    drift_issue = ("Base 'main' gained 1 commit(s) since this head, including a "
+                   "change under .github/workflows/")
+    code, text = run_main(_actions_env(**in_actions), [], drift=[drift_issue])
+    check("drift as the only blocker prints CLEAN EXCEPT BASE DRIFT and exits 1 (#6028)",
+          code == 1 and "CLEAN EXCEPT BASE DRIFT" in text and "FULLY CLEAN" not in text)
+    code, text = run_main(_actions_env(**in_actions), [human], drift=[drift_issue])
+    check("drift beside another blocker does not print CLEAN EXCEPT BASE DRIFT (#6028)",
+          code == 1 and "CLEAN EXCEPT BASE DRIFT" not in text)
+    code, text = run_main(_actions_env(**in_actions), [human])
+    check("a blocker with no drift does not print CLEAN EXCEPT BASE DRIFT (#6028)",
+          code == 1 and "CLEAN EXCEPT BASE DRIFT" not in text)
+
     # The prefixes are matched against message text built elsewhere in the
     # checker, so a reworded message would silently drop out of the note.
     source = (Path(__file__).parent / "check-pr-fully-clean.py").read_text(encoding="utf-8")
     check("every reviewer-replaceable prefix starts a real review message",
           all('f"' + p in source
               for p in checker.REVIEWER_REPLACEABLE_PREFIXES))
+
+
+def _test_stale_in_progress_check_run():
+    """A finished run whose `status` GitHub left at in_progress (ai-config#5637).
+
+    Outside Actions with no html_url, check_ci_runs needs no network.
+    """
+    stale_at = "2026-11-14T00:47:43Z"
+
+    def score(**fields):
+        run = {"id": 1, "name": "gather-context", "status": "in_progress",
+               "conclusion": None, "html_url": None, "completed_at": None,
+               "annotations_count": 0}
+        run.update(fields)
+        pr = types.SimpleNamespace(
+            head_sha="sha123", repo=TEST_REPO,
+            get_check_runs=lambda: [types.SimpleNamespace(**run)])
+        with patch.dict(os.environ, {}, clear=True):
+            return original_check_ci_runs(pr)
+
+    ok, issues = score(conclusion="success", completed_at=stale_at)
+    check("a stale in_progress run with a conclusion and completed_at passes (#5637)",
+          ok)
+    check("the stale run is named in a NOTE (#5637)",
+          any(i.startswith("NOTE: check run 'gather-context'")
+              and "in_progress" in i and "#5637" in i for i in issues))
+    ok, issues = score(conclusion="failure", completed_at=stale_at)
+    check("a stale in_progress run that concluded failure still blocks (#5637)",
+          not ok and any("conclusion 'failure'" in i for i in issues
+                         if not i.startswith("NOTE: ")))
+    ok, issues = score()
+    check("a genuinely in-progress run with no conclusion still blocks (#5637)",
+          not ok and "is still in status 'in_progress'" in " ".join(issues))
+    ok, issues = score(conclusion="success")
+    check("a conclusion without completed_at still blocks (#5637)", not ok)
+    ok, issues = score(completed_at=stale_at)
+    check("completed_at without a conclusion still blocks (#5637)", not ok)
+
+    # Mutation: with the condition removed the first case must flip to blocked.
+    source = (Path(__file__).parent / "check-pr-fully-clean.py").read_text(encoding="utf-8")
+    for old, new in (
+        ('cr["status"] != "completed" and cr.get("conclusion")',
+         'False and cr.get("conclusion")'),
+        ('and _completed_at(cr) is not None):\n            issues.append(\n                f"NOTE: check run',
+         'and False):\n            issues.append(\n                f"NOTE: check run'),
+    ):
+        mutant = types.ModuleType("mutant")
+        mutant.__file__ = str(Path(__file__).parent / "check-pr-fully-clean.py")
+        mutated = source.replace(old, new, 1)
+        check("mutation anchor is present: " + old[:40], old in source)
+        with patch.dict(os.environ, {}, clear=True):
+            exec(compile(mutated, mutant.__file__, "exec"), mutant.__dict__)
+            pr = types.SimpleNamespace(
+                head_sha="sha123", repo=TEST_REPO,
+                get_check_runs=lambda: [types.SimpleNamespace(
+                    id=1, name="gather-context", status="in_progress",
+                    conclusion="success", html_url=None, completed_at=stale_at,
+                    annotations_count=0)])
+            m_ok, _ = mutant.check_ci_runs(pr)
+        check("mutation flips the stale-run case to blocked: " + old[:40], not m_ok)
 
 
 def main() -> int:
@@ -4594,6 +4670,103 @@ def main() -> int:
                 "2115", relay_head, TEST_REPO)
             check(label, relay_ok == expect_ok and
                   (relay_issues == [] or not expect_ok))
+    # --- ai-config#6046 (Ezra's card, 2026-11-20, "Second free model breaks
+    # ties"): a relayed NOT CLEAN stops vetoing once a rebuttal record for
+    # that model names the head and a different model's later CLEAN does too.
+    tie_rebuttal = {
+        "createdAt": "2026-11-19T05:00:00Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "MEMBER",
+        "body": ("Rebuttals for model `kimi-k3` on head d917514:\n\n"
+                 "- **Finding 1** -- rebutted. The reviewer misread the diff."
+                 + relay_footer),
+    }
+    tie_other = dict(relay_other_model, createdAt="2026-11-19T05:02:00Z")
+    tie_other_early = dict(relay_other_model, createdAt="2026-11-19T04:59:00Z")
+    tie_other_free = dict(tie_other, body=tie_other["body"].replace(
+        "`glm-5.3`", "`kimi-k3-free`"))
+    tie_other_stale = dict(tie_other, body=tie_other["body"].replace(
+        "head d917514", "head 6870174"))
+    tie_rebuttal_stale = dict(tie_rebuttal, body=tie_rebuttal["body"].replace(
+        "d917514", "6870174"))
+    tie_rebuttal_wrong = dict(tie_rebuttal, body=tie_rebuttal["body"].replace(
+        "`kimi-k3`", "`glm-5.3`"))
+    tie_rebuttal_early = dict(tie_rebuttal, createdAt="2026-11-19T04:50:00Z")
+    tie_rebuttal_nofooter = dict(tie_rebuttal, body=tie_rebuttal[
+        "body"].replace(relay_footer, ""))
+    tie_rebuttal_contrib = dict(tie_rebuttal, authorAssociation="CONTRIBUTOR")
+    for label, rounds, expect_ok in (
+        ("a rebuttal record and a different model's later CLEAN on the head "
+         "break the tie (ai-config#6046)",
+         [relay_notclean, tie_rebuttal, tie_other, relay_bot], True),
+        ("without the rebuttal record, the other model's CLEAN does not "
+         "supersede (negative control)",
+         [relay_notclean, tie_other, relay_bot], False),
+        ("a CLEAN posted before the rebuttal does not break the tie",
+         [relay_notclean, tie_rebuttal, tie_other_early, relay_bot], False),
+        ("the same model under a free-tier suffix does not break the tie",
+         [relay_notclean, tie_rebuttal, tie_other_free, relay_bot], False),
+        ("a CLEAN naming an older head does not break the tie",
+         [relay_notclean, tie_rebuttal, tie_other_stale, relay_bot], False),
+        ("a rebuttal naming an older head does not count",
+         [relay_notclean, tie_rebuttal_stale, tie_other, relay_bot], False),
+        ("a rebuttal for another model does not count",
+         [relay_notclean, tie_rebuttal_wrong, tie_other, relay_bot], False),
+        ("a rebuttal posted before the NOT CLEAN does not count",
+         [tie_rebuttal_early, relay_notclean, tie_other, relay_bot], False),
+        ("a rebuttal without the disclosure footer does not count",
+         [relay_notclean, tie_rebuttal_nofooter, tie_other, relay_bot], False),
+        ("a rebuttal from a non-member does not count",
+         [relay_notclean, tie_rebuttal_contrib, tie_other, relay_bot], False),
+    ):
+        mock_tie = json.dumps({"comments": rounds, "reviews": []})
+        with patch.object(checker, "run_cmd", return_value=mock_tie):
+            tie_ok, tie_issues = checker.check_review_comments(
+                "2115", relay_head, TEST_REPO)
+            tie_pass = tie_ok == expect_ok and (
+                not expect_ok or all(i.startswith("NOTE: ") for i in tie_issues))
+            check(label, tie_pass)
+            if not tie_pass:
+                print(f"    issues: {tie_issues}")
+    check("a rebuttal record parses to its relay identity and sha",
+          checker.relay_rebuttal_record(tie_rebuttal["body"])
+          == ("relay:kimi-k3", "d917514"))
+    check("a rebuttal header split over two lines does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "on head", "on\nhead")) is None)
+    check("a rebuttal header after a leading blank line does not parse",
+          checker.relay_rebuttal_record("\n" + tie_rebuttal["body"]) is None)
+    check("a rebuttal header with text after the colon does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "d917514:", "d917514: all fine")) is None)
+    check("a rebuttal header without backticks on the model does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "`kimi-k3`", "kimi-k3")) is None)
+    check("a rebuttal record with no rebuttal line does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "- **Finding 1** -- rebutted. The reviewer misread the diff.",
+              "Nothing to add.")) is None)
+    check("a record whose only disposition is 'fixed' does not parse",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              "rebutted. The reviewer misread the diff.", "fixed.")) is None)
+    check("a footer quoted mid-body is not the record's footer",
+          checker.relay_rebuttal_record(tie_rebuttal["body"].replace(
+              relay_footer, "") + relay_footer + "\n\nMore text.") is None)
+    # Only a relayed model breaks the tie: Claude's clean on the head, with
+    # a rebuttal record, does not release a relay's NOT CLEAN.
+    tie_claude_only = [relay_notclean, tie_rebuttal,
+                       dict(relay_bot, createdAt="2026-11-19T05:05:00Z")]
+    with patch.object(checker, "run_cmd", return_value=json.dumps(
+            {"comments": tie_claude_only, "reviews": []})):
+        claude_ok, _ = checker.check_review_comments("2115", relay_head, TEST_REPO)
+        check("a Claude clean after the rebuttal does not break the tie "
+              "(only a relayed model does)", not claude_ok)
+    with patch.object(checker, "run_cmd", return_value=json.dumps(
+            {"comments": [relay_notclean, tie_rebuttal, tie_other, relay_bot],
+             "reviews": []})):
+        _, tie_notes = checker.check_review_comments("2115", relay_head, TEST_REPO)
+        check("the tie-break release is reported as a NOTE",
+              any("second free model breaks the tie" in n for n in tie_notes))
     mock_relay_solo = json.dumps({"comments": [relay_clean], "reviews": []})
     with patch.object(checker, "run_cmd", return_value=mock_relay_solo):
         relay_solo_ok, _ = checker.check_review_comments(
@@ -5292,6 +5465,7 @@ def main() -> int:
     )
 
     _test_own_actions_job()
+    _test_stale_in_progress_check_run()
 
     # Test 7: the repository is threaded, not hardcoded (#1243, #1338, #1346, #1391)
     #
@@ -10805,6 +10979,189 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ["1", "--annotations-read", "5", "--annotations-read", "6,7"])
     check("repeated --annotations-read keeps every value (ai-config#4980)",
           parsed.annotations_read == ["5", "6,7"])
+
+    # --mwr (ai-config#3946): review verdicts and quorum stop blocking, a
+    # formal objection and every other axis still block, and the pass line
+    # is never the FULLY CLEAN line an mwc gate keys on.
+    check("--mwr parses, and is off by default",
+          checker.parse_args(["1", "--mwr"]).mwr is True
+          and checker.parse_args(["1"]).mwr is False)
+
+    full_sha = "abcdef1234567890abcdef1234567890abcdef12"
+
+    def run_mwr(review_issues, mwr=True, ci=(True, []), ci_edits=(), reviews=()):
+        from types import SimpleNamespace
+        pr = PullRequest.__new__(PullRequest)
+        pr.pr_num, pr.repo = "7", TEST_REPO
+        pr._data = {"headRefOid": full_sha, "headRefName": "b",
+                    "state": "OPEN", "reviewDecision": "", "reviews": list(reviews)}
+        args = SimpleNamespace(from_json="", pr_number="7", repo=TEST_REPO,
+                               quorum=1, mwr=mwr)
+        out = io.StringIO()
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CODE_REMOTE"}
+        with patch.dict(os.environ, env, clear=True), \
+                patch.object(checker, "parse_args", return_value=args), \
+                patch.object(checker, "resolve_repo", return_value=TEST_REPO), \
+                patch.object(checker, "get_pr_info", return_value=pr), \
+                patch.object(checker, "check_ci_runs", return_value=ci), \
+                patch.object(checker, "check_review_threads", return_value=(True, [])), \
+                patch.object(checker, "check_maintainer_feedback", return_value=(True, [])), \
+                patch.object(checker, "check_review_comments",
+                             return_value=(not review_issues, list(review_issues))), \
+                patch.object(checker, "check_base_drift", return_value=(True, [])), \
+                patch.object(checker, "check_required_checks", return_value=(True, [])), \
+                patch.object(checker, "check_mwr_ci_edits", return_value=list(ci_edits)), \
+                contextlib.redirect_stdout(out):
+            try:
+                checker.main()
+                code = 0
+            except SystemExit as exc:
+                code = exc.code
+        return code, out.getvalue()
+
+    no_review = "No clean automated review found evaluating HEAD SHA abcdef12"
+    code, text = run_mwr([no_review])
+    check("--mwr passes a PR with no clean review, on a MERGE-READY line",
+          code == 0 and "is MERGE-READY under mwr" in text
+          and "FULLY CLEAN" not in text and "review verdicts and quorum were not evaluated" in text)
+    code, text = run_mwr([no_review], mwr=False)
+    check("without --mwr the same PR is not clean",
+          code == 1 and "MERGE-READY" not in text)
+    objection = "PR has active formal review state 'CHANGES_REQUESTED' from alice"
+    code, text = run_mwr([no_review, objection])
+    check("--mwr still blocks on a formal CHANGES_REQUESTED",
+          code == 1 and objection in text and no_review not in text)
+    code, text = run_mwr([], ci=(False, ["Check run 'validate' failed"]))
+    check("--mwr still blocks on failing CI",
+          code == 1 and "MERGE-READY" not in text)
+
+    # Round 6: the full head sha on the MERGE-READY line.
+    code, text = run_mwr([no_review])
+    check("--mwr prints the full 40-character head sha on the MERGE-READY line",
+          code == 0 and f"on HEAD {full_sha}!" in text)
+    code, text = run_mwr([], mwr=False)
+    check("the FULLY CLEAN line keeps the 8-hex prefix",
+          code == 0 and f"FULLY CLEAN on HEAD {full_sha[:8]}!" in text
+          and full_sha not in text.split("FULLY CLEAN", 1)[1])
+
+    # Round 6: a PR that edits `.github/` is never mwr-ready.
+    ci_edit = ("mwr cannot merge a PR that edits CI: it changes "
+               ".github/workflows/ci.yml")
+    code, text = run_mwr([no_review], ci_edits=[ci_edit])
+    check("--mwr blocks a PR that edits .github/",
+          code == 1 and ci_edit in text and "MERGE-READY" not in text)
+
+    def mwr_files_issues(payload_files, absent=False):
+        pr = PullRequest.__new__(PullRequest)
+        pr.pr_num, pr.repo = "7", TEST_REPO
+        payload = {} if absent else {"pr_files": payload_files}
+        with patch.object(checker, "_FETCHER", checker.PayloadFetcher(payload)):
+            return checker.check_mwr_ci_edits(pr)
+
+    edits = mwr_files_issues([{"filename": ".github/workflows/ci.yml"},
+                              {"filename": "README.md"}])
+    check("a changed workflow file blocks, and the issue names mwc",
+          len(edits) == 1 and "mwr cannot merge a PR that edits CI" in edits[0]
+          and ".github/workflows/ci.yml" in edits[0] and "mwc" in edits[0])
+    check("a non-workflow file under .github/ blocks too",
+          len(mwr_files_issues([".github/CODEOWNERS"])) == 1)
+    check("a rename out of .github/ blocks on its previous name",
+          len(mwr_files_issues([{"filename": "x.yml",
+                                 "previous_filename": ".github/workflows/x.yml"}])) == 1)
+    check("a PR touching no .github/ path passes the CI-edit gate",
+          mwr_files_issues(["README.md", "docs/.github-notes.md"]) == [])
+    check("a payload with no pr_files fails closed",
+          len(mwr_files_issues(None, absent=True)) == 1)
+    check("a recorded failed files read fails closed",
+          len(mwr_files_issues({"error": "fetch failed: 502"})) == 1)
+    check("an empty file list fails closed",
+          len(mwr_files_issues([])) == 1)
+    check("a file list at the endpoint's cap fails closed",
+          len(mwr_files_issues([f"f{i}" for i in range(checker.PR_FILES_CAP)])) == 1)
+    half = checker.PR_FILES_CAP // 2
+    check("renames count once each toward the cap, as the endpoint counts entries",
+          mwr_files_issues([{"filename": f"new{i}", "previous_filename": f"old{i}"}
+                            for i in range(half)]) == [])
+    check("a path that is .github itself blocks",
+          len(mwr_files_issues([".github"])) == 1)
+    check("a rename of .github itself blocks on its previous name",
+          len(mwr_files_issues([{"filename": "ci", "previous_filename": ".github"}])) == 1)
+    check("a sibling such as .githubx does not block",
+          mwr_files_issues([".githubx/a.yml", ".github-notes"]) == [])
+    # Round 16: an empty path names no file, so it fails closed.
+    check("an entry with an empty filename fails closed",
+          len(mwr_files_issues([{"filename": ""}, {"filename": "README.md"}])) == 1)
+    check("an empty string entry fails closed",
+          len(mwr_files_issues(["", "README.md"])) == 1)
+    # Step 3: the root AGENTS.md holds the repository's amwr marker, so an mwr
+    # merge never changes it, whatever case the name is in or however it arrives.
+    marker = mwr_files_issues(["AGENTS.md", "README.md"])
+    check("a change to the root AGENTS.md blocks, naming the amwr marker and mwc",
+          len(marker) == 1 and "AGENTS.md" in marker[0] and "amwr" in marker[0]
+          and "mwc" in marker[0] and "edits CI" not in marker[0])
+    check("a lowercase root agents.md blocks too",
+          len(mwr_files_issues(["agents.md"])) == 1)
+    check("a rename into the root AGENTS.md blocks",
+          len(mwr_files_issues([{"filename": "AGENTS.md",
+                                 "previous_filename": "docs/draft.md"}])) == 1)
+    check("a rename out of the root AGENTS.md blocks",
+          len(mwr_files_issues([{"filename": "docs/AGENTS.md",
+                                 "previous_filename": "AGENTS.md"}])) == 1)
+    check("a nested docs/AGENTS.md alone does not block",
+          mwr_files_issues(["docs/AGENTS.md", "AGENTS.md.bak"]) == [])
+    both = mwr_files_issues([".github/workflows/ci.yml", "AGENTS.md"])
+    check("a PR changing both CI and the root AGENTS.md reports both",
+          len(both) == 2 and "edits CI" in both[0] and "amwr" in both[1])
+    files_fetcher = checker.PayloadFetcher({"pr_files": ["README.md"]})
+    check("the payload answers the PR files route",
+          files_fetcher._api(f"repos/{TEST_REPO}/pulls/7/files") == "README.md")
+    try:
+        files_fetcher._api(f"repos/{TEST_REPO}/commits/abc/pulls/files")
+        loose = True
+    except checker.PayloadError:
+        loose = False
+    check("another path ending in /files is not answered with the PR's files",
+          not loose)
+
+    def gh_files_issues(stdout=None, error=None):
+        pr = PullRequest.__new__(PullRequest)
+        pr.pr_num, pr.repo = "7", TEST_REPO
+        seen = []
+
+        def fake(cmd):
+            seen.append(cmd)
+            if error:
+                raise RuntimeError(error)
+            return stdout
+        with patch.object(checker, "_FETCHER", None), \
+                patch.object(checker, "run_cmd", side_effect=fake):
+            return checker.check_mwr_ci_edits(pr), seen
+
+    issues, seen = gh_files_issues(".github/workflows/a.yml\nsrc/x.py\n")
+    check("the gh path reads every page of the PR's files",
+          len(issues) == 1 and seen and "--paginate" in seen[0]
+          and seen[0][2] == f"repos/{TEST_REPO}/pulls/7/files")
+    issues, _ = gh_files_issues("src/x.py\t.github/workflows/a.yml\n")
+    check("the gh path reads a rename's old path after the tab",
+          len(issues) == 1 and ".github/workflows/a.yml" in issues[0])
+    issues, _ = gh_files_issues(error="HTTP 502")
+    check("a failed gh files read fails closed",
+          len(issues) == 1 and "could not read the PR's changed files" in issues[0])
+
+    # Round 6: a dismissed review blocks under --mwr.
+    dismissed = {"state": "DISMISSED", "author": {"login": "alice"},
+                 "body": "", "commit": {"oid": full_sha}}
+    code, text = run_mwr([no_review], reviews=[dismissed])
+    check("--mwr blocks on a dismissed review",
+          code == 1 and "dismissed review from alice" in text
+          and "MERGE-READY" not in text)
+    approved = dict(dismissed, state="APPROVED")
+    code, text = run_mwr([no_review], reviews=[approved])
+    check("--mwr does not block on an approval",
+          code == 0 and "MERGE-READY" in text)
+    code, text = run_mwr([], mwr=False, reviews=[dismissed])
+    check("without --mwr the dismissed-review gate is not run",
+          "dismissed review" not in text)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

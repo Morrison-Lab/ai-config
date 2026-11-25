@@ -15,10 +15,38 @@ import sys
 import tempfile
 import time
 
-OPEN = re.compile(r"\bgh\s+pr\s+create\b|create_pull_request", re.I)
-SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|^schedule\b", re.I)
+GH_PR_CREATE = re.compile(r"\bgh\s+pr\s+create\b", re.I)
+CREATE_TOOL = re.compile(r"create_pull_request", re.I)
+SCHEDULE = re.compile(r"send_later|ScheduleWakeup|create_trigger|update_trigger|CronCreate|subscribe_pr_activity|^schedule\b", re.I)
+# A closing reply that says the session is waiting on PR state (ai-config#4790).
+# Each branch names the PR state and a future event, so a bare status word
+# ("no pending items", "after CI passed") does not match; "not", "no longer",
+# "without" and "than" right before "waiting" negate it.
+_PR_STATE = r"(?:CI|(?:the )?checks?|(?:the )?review|(?:the )?merge)"
+_FUTURE = (r"(?:passes|pass|finishes|finish|completes|complete|is clean|comes back"
+           r"|goes green|turns green|lands|is done|reports)")
+WAITING = re.compile(
+    r"(?<!not )(?<!no longer )(?<!without )(?<!than )\bwaiting (?:on|for) " + _PR_STATE
+    + r"|\b" + _PR_STATE + r" (?:is|are) still (?:running|pending|in progress)"
+    + r"|\b(?:once|when|after) " + _PR_STATE + r" " + _FUTURE + r"\b", re.I)
+WAKE_REASON = (
+    "This reply waits on PR state (CI, review or merge), but nothing recorded can "
+    "re-invoke this session: the detached poller only records state for the next "
+    "prompt (ai-config#4790). Arm a wake before ending the turn: send_later, "
+    "ScheduleWakeup, a trigger routine, or subscribe_pr_activity.")
 POLL_SECONDS = 120
 STATE_DIR = os.path.join(tempfile.gettempdir(), "claude-pr-monitors")
+
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from pr_view import gh_pr_view
+except Exception as _exc:  # broken install: no PR can be read
+    print(f"no-unmonitored-pr: cannot load scripts/lib/pr_view.py ({_exc}); "
+          "no PR state will be read", file=sys.stderr)
+    gh_pr_view = None
 
 
 
@@ -36,6 +64,21 @@ def unwrap_command(cmd):
             return cmd.replace('\\n', '\n').replace('\\"', '"')
     return cmd
 
+def opens_pr(name, args):
+    """True when a tool call opens a PR: a `create_pull_request` tool, or a
+    shell command running `gh pr create`.
+
+    Only the tool name and its command field are read. An Edit or Write whose
+    text mentions `gh pr create` opens nothing (ai-config#5979).
+    """
+    if CREATE_TOOL.search(name or ""):
+        return True
+    if not isinstance(args, dict):
+        return False
+    cmd = unwrap_command(args.get("command") or args.get("CommandLine") or args.get("cmd") or "")
+    return bool(GH_PR_CREATE.search(cmd))
+
+
 def records(path):
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
@@ -51,11 +94,11 @@ def records(path):
 def pending(path):
     opened = armed = False
     for record in records(path):
-        blobs = []
+        calls = []
         if record.get("type") == "assistant" or record.get("role") == "assistant":
             for block in (record.get("message") or {}).get("content") or record.get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
-                    blobs.append(block.get("name", "") + " " + json.dumps(block.get("input") or {}))
+                    calls.append((block.get("name", ""), block.get("input") or {}))
         if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
             for block in (record.get("tool_calls") or []):
                 if isinstance(block, dict):
@@ -70,13 +113,35 @@ def pending(path):
                         args = {}
                     cmd = args.get("CommandLine") or args.get("command") or args.get("cmd") or ""
                     cmd = unwrap_command(cmd)
-                    blobs.append(name + " " + json.dumps({**args, "command": cmd}))
-        for blob in blobs:
-            if OPEN.search(blob):
+                    calls.append((name, {**args, "command": cmd}))
+        for name, args in calls:
+            if opens_pr(name, args):
                 opened, armed = True, False
-            if opened and SCHEDULE.search(blob):
+            if opened and SCHEDULE.search(name + " " + json.dumps(args)):
                 armed = True
     return opened and not armed
+
+
+def last_reply(path):
+    """The text of the transcript's last assistant record that has text, or ''.
+
+    Claude Code writes each content block as its own record, so the closing
+    reply is often followed by a tool-only record (a final tool call). Those
+    records are skipped on purpose: the reply is the last text written.
+    """
+    text = ""
+    for record in records(path):
+        if record.get("type") != "assistant" and record.get("role") != "assistant":
+            continue
+        content = (record.get("message") or {}).get("content") or record.get("content") or []
+        if isinstance(content, str):
+            text = content
+            continue
+        parts = [block.get("text", "") for block in content
+                 if isinstance(block, dict) and block.get("type") == "text"]
+        if parts:
+            text = "\n".join(parts)
+    return text
 
 
 PR_URL = re.compile(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+")
@@ -87,7 +152,12 @@ def monitor_path(url):
 
 
 def extract_pr_urls(path):
-    """Extract PR URLs strictly produced by gh pr create / create_pull_request tool calls."""
+    """PR URLs from the results of PR-opening tool calls (see `opens_pr`).
+
+    A URL is read only from such a call's result, never from a tool's input,
+    so an Edit or a `gh pr view` that names a PR URL adds nothing
+    (ai-config#5979).
+    """
     urls = []
     pending_tool_ids = set()
     pending_open = False
@@ -106,13 +176,11 @@ def extract_pr_urls(path):
         if record.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or record.get("source") == "MODEL" or "tool_calls" in record:
             for tc in record.get("tool_calls") or []:
                 if isinstance(tc, dict):
-                    blob = (tc.get("name") or "") + " " + json.dumps(tc.get("args") or tc.get("input") or {})
-                    if OPEN.search(blob):
+                    args = tc.get("args") or tc.get("input") or {}
+                    if isinstance(args, str):
+                        args = {"command": args}
+                    if opens_pr(tc.get("name") or "", args):
                         pending_open = True
-                        for match in PR_URL.finditer(blob):
-                            u = match.group(0)
-                            if u not in urls:
-                                urls.append(u)
 
         # Antigravity tool result or generic output text
         if pending_open and (record.get("source") in {"MODEL", "SYSTEM"} or record.get("type") in {"GENERIC", "USER_INPUT"}):
@@ -130,17 +198,12 @@ def extract_pr_urls(path):
                 continue
             btype = block.get("type")
             if btype == "tool_use":
-                blob = block.get("name", "") + " " + json.dumps(block.get("input") or {})
-                if OPEN.search(blob):
+                if opens_pr(block.get("name", ""), block.get("input") or {}):
                     tool_id = block.get("id")
                     if tool_id:
                         pending_tool_ids.add(tool_id)
                     else:
                         pending_open = True
-                    for match in PR_URL.finditer(blob):
-                        u = match.group(0)
-                        if u not in urls:
-                            urls.append(u)
             elif btype == "tool_result":
                 tool_id = block.get("tool_use_id")
                 if (tool_id and tool_id in pending_tool_ids) or pending_open:
@@ -154,12 +217,28 @@ def extract_pr_urls(path):
     return urls
 
 
-def read_json(path):
-    try:
-        with open(path, encoding="utf-8") as stream:
-            return json.load(stream)
-    except Exception:
-        return {}
+READ_ATTEMPTS = 3
+
+
+def read_state(path):
+    """`(state, True)` for a readable or missing state file, `(None, False)`
+    when it exists but stays unreadable after READ_ATTEMPTS tries.
+
+    A live poller rewrites the file with `os.replace` every POLL_SECONDS, and
+    on Windows a read that overlaps the replace can fail. Reading that as
+    "no poller" spawned a duplicate each time, and the duplicates fed each
+    other (ai-config#4009), so an unreadable file means "unknown" here."""
+    for attempt in range(READ_ATTEMPTS):
+        try:
+            with open(path, encoding="utf-8") as stream:
+                state = json.load(stream)
+            return (state if isinstance(state, dict) else {}), True
+        except FileNotFoundError:
+            return {}, True
+        except (OSError, ValueError):
+            if attempt + 1 < READ_ATTEMPTS:
+                time.sleep(0.05)
+    return None, False
 
 
 def write_json(path, value):
@@ -221,22 +300,32 @@ NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x0800000
              if sys.platform == "win32" else {})
 
 
+POLL_FIELDS = ["url", "state", "updatedAt", "reviewDecision", "statusCheckRollup", "reviews",
+               "mergeable", "mergeStateStatus"]
+
+
+def _run(*args, **kwargs):
+    return subprocess.run(*args, **kwargs, **NO_WINDOW)
+
+
 def pr_url(cwd):
-    try:
-        result = subprocess.run(["gh", "pr", "view", "--json", "url", "--jq", ".url"],
-                                cwd=cwd, capture_output=True, text=True,
-                                timeout=5, check=True, **NO_WINDOW)
-    except (OSError, subprocess.SubprocessError):
+    # `gh_pr_view` reads over REST where a cloud session refuses GraphQL
+    # (ai-config#4733).
+    if gh_pr_view is None:
         return ""
-    return result.stdout.strip()
+    data, _error = gh_pr_view(["url"], cwd=cwd, timeout=5, run=_run)
+    return str((data or {}).get("url") or "").strip()
 
 
 def start_monitor_for_url(url, cwd):
     if not url:
         return None
     path = monitor_path(url)
-    if alive(read_json(path).get("pid")):
+    state, readable = read_state(path)
+    if readable and alive(state.get("pid")):
         return False
+    if not readable and recently_written(path):
+        return False  # a live poller may be mid-replace (ai-config#4009)
     try:
         process = subprocess.Popen([sys.executable, os.path.realpath(__file__), "--poll", url, path],
                                    cwd=cwd, stdin=subprocess.DEVNULL,
@@ -257,24 +346,50 @@ def start_monitor(cwd):
     return start_monitor_for_url(url, cwd)
 
 
+FRESH_SECONDS = 3 * POLL_SECONDS
+
+
+def recently_written(path):
+    """True when `path` was modified within FRESH_SECONDS. An unreadable
+    file that old has no poller behind it, so it no longer blocks a spawn."""
+    try:
+        return time.time() - os.path.getmtime(path) < FRESH_SECONDS
+    except OSError:
+        return False
+
+
+def other_poller(state):
+    """True when `state` names a different, live poller that has written
+    within FRESH_SECONDS, so this one should stand down."""
+    pid = state.get("pid")
+    if pid is None or str(pid) == str(os.getpid()) or not alive(pid):
+        return False
+    try:
+        seen = max(float(state.get("checked_at") or 0), float(state.get("started_at") or 0))
+    except (TypeError, ValueError):
+        return False
+    return time.time() - seen < FRESH_SECONDS
+
+
 def poll(url, path):
     consecutive_errors = 0
     while True:
-        state = read_json(path)
+        state, readable = read_state(path)
+        if readable and other_poller(state):
+            return  # converge to one poller per URL (ai-config#4009)
+        state = state if readable else {}
         state.update({"url": url, "pid": os.getpid(), "checked_at": time.time()})
-        try:
-            result = subprocess.run(["gh", "pr", "view", url, "--json",
-                                     "url,state,updatedAt,reviewDecision,statusCheckRollup,reviews,"
-                                     "mergeable,mergeStateStatus"],
-                                    capture_output=True, text=True, timeout=30, check=True,
-                                    **NO_WINDOW)
-            state["data"] = json.loads(result.stdout)
+        data, error = None, "scripts/lib/pr_view.py did not load"
+        if gh_pr_view is not None:
+            data, error = gh_pr_view(POLL_FIELDS, target=url, timeout=30, run=_run)
+        if isinstance(data, dict):
+            state["data"] = data
             state.pop("error", None)
             consecutive_errors = 0
-        except (OSError, ValueError, subprocess.SubprocessError) as error:
+        else:
             consecutive_errors += 1
             state.pop("data", None)
-            state["error"] = str(error)
+            state["error"] = str(error or "gh pr view answered something other than an object")
         write_json(path, state)
         if state.get("data", {}).get("state") in {"MERGED", "CLOSED"}:
             return
@@ -320,6 +435,16 @@ def main():
         else:
             all_monitored = False
 
+    # The loop above reads start_monitor_for_url's three results: True started a
+    # poller, False means the PR's recorded poller is already alive (it stays
+    # monitored), and None means none could start (all_monitored = False).
+    # The poller is a record, not a wake: a reply that waits on PR state still
+    # needs something that re-invokes the session. stop_hook_active means this
+    # hook already blocked once this turn, so it does not block again.
+    if ((any_started or all_monitored) and not payload.get("stop_hook_active")
+            and WAITING.search(last_reply(transcript_path))):
+        print(json.dumps({"decision": "block", "reason": WAKE_REASON}))
+        return
     if any_started:
         print(json.dumps({"systemMessage": "No model scheduler was recorded, so a detached two-minute PR poller was started. It records GitHub state and injects changes on the next prompt; it cannot wake a terminated session."}))
         return

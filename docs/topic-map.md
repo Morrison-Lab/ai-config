@@ -86,6 +86,7 @@ its description does not use (ai-config#949).
 | `skills/di/SKILL.md` | -> defer-issue. |  |
 | `skills/difm/SKILL.md` | -> do-it-for-me. |  |
 | `skills/discussions/SKILL.md` | Manage forge discussions. |  |
+| `skills/dissolve-page/SKILL.md` | Dissolve a notes page into its neighbors. |  |
 | `skills/dmmhyh/SKILL.md` | Stop over-asking. |  |
 | `skills/do-as-you-think-best/SKILL.md` | -> daytb. |  |
 | `skills/do-it-for-me/SKILL.md` | Do the step yourself; retry blocks, then lift auto mode. Aliases: difm. |  |
@@ -146,6 +147,7 @@ its description does not use (ai-config#949).
 | `skills/mma/SKILL.md` | Merge main into open PR branches. |  |
 | `skills/model-fit/SKILL.md` | -> assess-model-fit. |  |
 | `skills/mwc/SKILL.md` | Session merge grant with confidence gate. Aliases: maw, merge-at-will, merge-when-confident. |  |
+| `skills/mwr/SKILL.md` | Merge-when-ready grant: skip review, keep green CI. Covers mwr, mwrs and the amwr marker. |  |
 | `skills/next/SKILL.md` | Insert after in-flight task. |  |
 | `skills/oppo/SKILL.md` | -> opposition-research. |  |
 | `skills/opposition-research/SKILL.md` | Mine competitor community demand. Aliases: oppo. |  |
@@ -269,6 +271,7 @@ its description does not use (ai-config#949).
 | `shared/coding/per-operation-grouping.md` | When reviewing or writing `dplyr` code, prefer **per-operation grouping** (the `.by` argument) over persistent `group_by()` / `ungroup()` pairs. Apply it whe... |  |
 | `shared/coding/powershell-cli-safety.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/coding/prefer-packaged-functions.md` | Before writing a function, **perform a research step to look for an existing packaged one that already does the job** --- and prefer it over rolling your own: |  |
+| `shared/coding/prose-in-files.md` | A message of more than a few lines that a program prints, such as a hook's reminder or deny text, lives in a Markdown or text file that the program reads, no... |  |
 | `shared/coding/regex-backtracking-pitfalls.md` | When authoring regular expressions that handle variable user or reviewer text, ensure that repeated groups and quantifiers cannot backtrack catastrophically... |  |
 | `shared/coding/restore-global-state.md` | When a function has to change global state, restore it on the way out --- on every exit path, including the ones that throw. State a function changes and doe... |  |
 | `shared/coding/reuse-docs-and-args.md` | When writing or reviewing a function that wraps or closely relates to another function, prefer **reusing** that other function's documentation and argument l... |  |
@@ -306,6 +309,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/algorithmatize-checks.md` | Never spend LLM reasoning on a check a deterministic algorithm can decide. Whenever a verification, measurement, or classification step is decidable by compu... |  |
 | `shared/workflow/always-reply.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/answer-briefly-link-the-record.md` | Ezra, 2026-11-12 (#5591): "when I ask you a question that we have a recorded answer for, give me a brief direct answer and refer me to our recorded answer fo... |  |
+| `shared/workflow/answer-questions-directly.md` | Ezra, 2026-11-25 00:46 PST (#6129): "cai: always answer my questions directly and immediately". |  |
 | `shared/workflow/ardi.md` | Whenever you are working a PR/MR, run the full **ARDI** loop by default, without being asked: **A**ddress every flagged item, **R**ebut findings that are wro... |  |
 | `shared/workflow/ask-for-manual-approval.md` | Applies to every agent that runs under a permission classifier or approval mode. The measured case is Claude Code's auto mode. Codex approval modes, Gemini,... |  |
 | `shared/workflow/ask-when-instruction-contradicts-rule.md` | When the maintainer gives an instruction that seems to contradict a recorded rule or guideline, ask which of these it is, quoting the rule and linking where... |  |
@@ -425,7 +429,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/structured-data-in-structured-formats.md` | Ezra (d-morrison), 2026-10-13 (DATA 571 project, "Track every course resource" thread): store structured data in structured formats where feasible, and rende... |  |
 | `shared/workflow/subagent-core-rules.md` | `hooks/inject-subagent-rules.py` prints this file into every subagent's context at SubagentStart. A dispatched agent otherwise starts with only its brief, so... |  |
 | `shared/workflow/surface-merge-order.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
-| `shared/workflow/sync-with-main.md` | Whenever `main` has moved ahead of a PR branch you're working on, **merge `main` into the PR branch** before the next push or review trigger. Don't wait for... |  |
+| `shared/workflow/sync-with-main.md` | **Merge `main` into a PR branch only when the branch needs it**, in every repository (Ezra, 2026-11-20, chose "Make it permanent" on "should we stop main mer... |  |
 | `shared/workflow/terminate-superseded-tasks.md` | When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate th... |  |
 | `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568). `AGENTS.md`'s section of the same name states the rule and links here for the full pairs, the plat... |  |
 | `shared/workflow/track-useful-resources.md` | A notes repo is a site listed in `course-sequence` or in the notes repository registry of `send-notes`. Track every useful resource (textbooks, articles, sof... |  |

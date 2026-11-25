@@ -17,6 +17,9 @@ of resyncing one branch, resync **every currently-open PR** in the repo that pas
 against `main` (and each PR's own remote), so a burst of merges into `main`
 doesn't leave the rest of the queue stale and conflict-prone.
 
+Since 2026-11-20 a branch takes `main` only when it conflicts, needs a named fix, or is stale by the checker's workflow rule (ai-config#5988, [`sync-with-main`](../../shared/workflow/sync-with-main.md)), so this skill merges `main` only into the PRs where one of those holds and leaves the rest on their current heads.
+`hooks/no-routine-main-merge.py` denies the others.
+
 This is not a duplicate of `sync-pr-branch` — it's an orchestration layer on
 top of it. The per-branch mechanics (fetch, merge `origin/main`, merge
 `origin/<branch>`, resolve conflicts, run checks, push) are unchanged; only
@@ -35,13 +38,13 @@ fix for free.
 ## The procedure
 
 1. **List every open PR in the repo** (`mcp__github__list_pull_requests` /
-   `gh pr list --json number,headRefName,author,assignees`).
+   `gh pr list --limit 100 --json number,headRefName,author,assignees`).
    Note each PR's number, `headRefName`, `author`, and `assignees`.
-   Filter the list by `memories/reviewing-prs.md`'s scope test first, as
-   `ardia` step 1 does (opened by or assigned to the invoking user,
-   explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)), and report the PRs
-   dropped: a resync pushes a merge commit, which that memory forbids on any
-   other PR.
+   Filter the list by `memories/reviewing-prs.md`'s scope test first (opened by or assigned to the invoking user,
+   explicitly requested by name, or authored by the GitHub Actions app (`github-actions`)):
+   save that list unfiltered to a file and pipe it into `python3 scripts/pr-scope.py` with the `--user`, `--alias`, `--requested` and `--excluded` flags `ardia` step 1 defines,
+   and report the PRs dropped:
+   a resync pushes a merge commit, which that memory forbids on any other PR.
 
 2. **Check whether main is actually ahead** before touching anything:
    ```bash

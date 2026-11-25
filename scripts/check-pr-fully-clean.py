@@ -1016,6 +1016,20 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                    "annotations_count": cr.annotations_count} for cr in pr.get_check_runs()]
 
     issues = []
+    # GitHub sometimes leaves a finished check run's `status` at `in_progress`
+    # for tens of minutes while `conclusion` and `completed_at` are set
+    # (ai-config#5637). Treat it as completed, once, here, so the supersede
+    # and annotation logic below sees the same view; a run missing either
+    # field stays in progress.
+    for cr in check_runs:
+        if (cr["status"] != "completed" and cr.get("conclusion")
+                and _completed_at(cr) is not None):
+            issues.append(
+                f"NOTE: check run '{cr['name']}' has status '{cr['status']}' "
+                f"but conclusion '{cr['conclusion']}' and completed_at "
+                f"{cr['completed_at']}; GitHub's status is stale, so it is "
+                "counted as completed (ai-config#5637)")
+            cr["status"] = "completed"
     if not check_runs:
         if _repo_has_no_ci(repo, sha):
             return True, [
@@ -4079,6 +4093,54 @@ def _names_head(oid: str, body: str, head_oid: str) -> bool:
     return head_oid[:7].lower() in (body or "").lower()
 
 
+# A rebuttal record for one relayed reviewer's findings (ai-config#6046):
+# an agent-disclosed comment whose first line is exactly
+# "Rebuttals for model `<model>` on head <sha>:", with the disclosure footer
+# at the end. It is the agent's answer to that reviewer, never a verdict, so
+# it leaves the verdict scan. The header starts at the very first character
+# (no leading blank line) and ends that line; the model is in backticks and
+# the sha is bare, as fully-clean.md writes it.
+_RELAY_REBUTTAL_HEADER_RE = re.compile(
+    r"\ARebuttals[ \t]+for[ \t]+model[ \t]+`([A-Za-z0-9][\w.:/-]*)`[ \t]+"
+    r"on[ \t]+head[ \t]+([0-9a-f]{7,40})[ \t]*:[ \t]*(?:\r?\n|\Z)",
+    re.IGNORECASE,
+)
+# Free-tier suffixes name the same model as their base id.
+_FREE_MODEL_SUFFIX_RE = re.compile(r"[-:]free\Z", re.IGNORECASE)
+
+
+def relay_rebuttal_record(body: str) -> Optional[Tuple[str, str]]:
+    """``(relay identity, sha)`` for a rebuttal record, else None.
+
+    Needs the fixed header as the first line, the disclosure footer at the
+    end (``_AGENT_REPLY_FOOTER_RE`` is anchored at ``\\Z``), and at least one
+    disposition line (``_REPLY_DISPOSITION_LINE_RE``) whose disposition is a
+    rebuttal, so an empty record releases nothing. The checker cannot tell
+    whether every finding has a line; fully-clean.md leaves that to the
+    author.
+    """
+    if not body or not _AGENT_REPLY_FOOTER_RE.search(body):
+        return None
+    m = _RELAY_REBUTTAL_HEADER_RE.match(body)
+    if not m:
+        return None
+    rebuts = False
+    for line in body[m.end():].splitlines():
+        d = _REPLY_DISPOSITION_LINE_RE.match(line)
+        word = (d.group("word") or d.group("verb") or "").lower() if d else ""
+        if word.startswith("rebut"):
+            rebuts = True
+            break
+    if not rebuts:
+        return None
+    return RELAY_IDENTITY_PREFIX + m.group(1).lower(), m.group(2).lower()
+
+
+def _relay_model_key(identity: str) -> str:
+    """The model a relay identity names, with a free-tier suffix removed."""
+    return _FREE_MODEL_SUFFIX_RE.sub("", identity[len(RELAY_IDENTITY_PREFIX):].lower())
+
+
 def check_latest_verdict(
     all_items: List[Tuple[Any, ...]],
     approved_authors: Optional[Set[str]] = None,
@@ -4086,6 +4148,8 @@ def check_latest_verdict(
     head_oid: str = "",
     review_comments: Optional[List[Dict[str, Any]]] = None,
     out_of_quota: Optional[Iterable[str]] = None,
+    relay_rebuttals: Optional[List[Tuple[str, str, str]]] = None,
+    tie_released: Optional[Set[str]] = None,
 ) -> Tuple[bool, List[str]]:
     """Fail when any reviewer's latest verdict-bearing statement is not clean.
 
@@ -4114,6 +4178,21 @@ def check_latest_verdict(
     ([ai-config#5064](https://github.com/Morrison-Lab/ai-config/issues/5064)).
     The veto stays when that reviewer's not-clean verdict is on the live head
     itself, or when no substitute verdict on the live head exists.
+
+    A second free model breaks a tie (Ezra's card, 2026-11-20, "Second free
+    model breaks ties"; ai-config#6046). A relayed reviewer's not-clean
+    verdict stops vetoing when both of these hold:
+
+    - a rebuttal record for that model (``relay_rebuttals``, from
+      ``relay_rebuttal_record``) was posted after the verdict and names the
+      live head;
+    - a CLEAN relay from a different model, posted after that record, names
+      the live head.
+
+    Only relayed reviewers qualify, a model differing only by a free-tier
+    suffix is the same model, and a NOTE records the release. Each released
+    identity is added to ``tie_released`` when the caller passes a set, so
+    the HEAD criterion can drop that reviewer's verdict on the head too.
 
     Formal-review authors whose latest GitHub state is APPROVED have
     superseded their own earlier CHANGES_REQUESTED; pass those logins as
@@ -4318,6 +4397,45 @@ def check_latest_verdict(
                 return True
         return False
 
+    tie_notes: List[str] = []
+
+    def _tie_broken(identity: str, when: str) -> bool:
+        """True when a rebuttal and a different model's later clean on the
+        live head release this relayed reviewer's not-clean (ai-config#6046)."""
+        if not relay_rebuttals or not _is_relay_identity(identity):
+            return False
+        model = _relay_model_key(identity)
+        rebutted = sorted(
+            r_when for r_when, r_identity, r_sha in relay_rebuttals
+            if r_when > when
+            and _relay_model_key(r_identity) == model
+            and _names_head(r_sha, "", head_oid)
+        )
+        if not rebutted:
+            return False
+        for other, (o_verdict, o_when, _o_author) in sorted(per_reviewer.items()):
+            o_oid, o_body = per_reviewer_src.get(other, ("", ""))
+            if (
+                _is_relay_identity(other)
+                and _relay_model_key(other) != model
+                and o_verdict == "clean"
+                and o_when > rebutted[0]
+                and _names_head(o_oid, o_body, head_oid)
+            ):
+                note = (
+                    f"NOTE: {identity}'s NOT-clean verdict ({when}) no longer "
+                    f"vetoes: its findings were rebutted ({rebutted[0]}) and "
+                    f"{other} posted a clean verdict on live head "
+                    f"{head_oid[:8]} ({o_when}) -- second free model breaks "
+                    "the tie (ai-config#6046)"
+                )
+                if note not in tie_notes:
+                    tie_notes.append(note)
+                if tie_released is not None:
+                    tie_released.add(identity)
+                return True
+        return False
+
     latest_outage = unavailable_since.get(latest_identity, "")
     if (
         latest_verdict == "not-clean"
@@ -4340,6 +4458,8 @@ def check_latest_verdict(
         if _approval_clears(identity, author, approved_authors):
             continue
         if _quota_released(identity, author):
+            continue
+        if _tie_broken(identity, when):
             continue
         # The reviewer reported, AFTER this stale verdict, that it could not
         # review at all. It is unavailable rather than pending, so waiting on it
@@ -4378,6 +4498,7 @@ def check_latest_verdict(
     issues.extend(payload_notes)
     issues.extend(review_comment_notes)
     issues.extend(quota_notes)
+    issues.extend(tie_notes)
     blocking = [i for i in issues if not i.startswith("NOTE: ")]
     return len(blocking) == 0, issues
 
@@ -4870,12 +4991,21 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
 
     # Collect automated review reports only (filtering out human/author disposition comments)
     all_items = []
+    relay_rebuttals: List[Tuple[str, str, str]] = []
+    tie_released: Set[str] = set()
     superseded_replies = _superseded_agent_replies(comments, sha)
     for idx, c in enumerate(comments):
         body = c.get("body", "")
         author_login = (c.get("author") or {}).get("login", "")
 
         if is_ard_disposition_summary(body):
+            continue
+
+        # A rebuttal record answers a relayed reviewer; it is no verdict
+        # (ai-config#6046). Only the maintainer's account posts one.
+        record = relay_rebuttal_record(body)
+        if record and (c.get("authorAssociation") or "").upper() in ("OWNER", "MEMBER"):
+            relay_rebuttals.append((c.get("createdAt") or "", record[0], record[1]))
             continue
 
         # A workflow status notice is not a review, whoever posted it.
@@ -5022,6 +5152,8 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         head_oid=sha,
         review_comments=_lazy_rcs,
         out_of_quota=_OUT_OF_QUOTA,
+        relay_rebuttals=relay_rebuttals,
+        tie_released=tie_released,
     )
     issues.extend(verdict_issues)
 
@@ -5098,6 +5230,10 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         if classify_verdict(item[2], item[4], item[5] if len(item) > 5 else "") in ("clean", "not-clean") or _unresolved_finding_pattern(item[2]):
             provider = _reviewer_identity(item[2], item[5] if len(item) > 5 else "")
             latest_by_provider[provider] = item
+    # A relayed reviewer whose not-clean verdict a second model's clean
+    # released (ai-config#6046) no longer vetoes the head either.
+    for provider in tie_released:
+        latest_by_provider.pop(provider, None)
     matching_items = list(latest_by_provider.values())
 
     has_findings = False
@@ -5201,7 +5337,94 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
              "posted a clean verdict on the live head; it still vetoes if it "
              "is on the live head itself (ai-config#5064).",
     )
+    parser.add_argument(
+        "--mwr", action="store_true",
+        help="Skip the review-verdict axis and keep every other gate, for a "
+             "merge under a typed mwr or mwrs grant (ai-config#3946; the "
+             "per-repository amwr marker is a later step of that issue, and "
+             "this checker does not read it). Prints "
+             "a MERGE-READY line, never the FULLY CLEAN line an mwc merge needs.",
+    )
     return parser.parse_args(argv)
+
+
+# Review items that still block under --mwr: a formal objection on the PR.
+MWR_KEPT_REVIEW_PREFIXES = (
+    "PR formal review decision is ",
+    "PR has active formal review state ",
+)
+
+# The CI an mwr merge still requires is defined under `.github/`, so a PR that
+# edits it could make its own checks trivially green. mwr never merges one.
+MWR_CI_DIR = ".github/"
+# GitHub's pull-request files endpoint lists at most this many files.
+PR_FILES_CAP = 3000
+# The root AGENTS.md carries the per-repository amwr marker, which grants mwr
+# for every PR in the repository. mwr never merges a change to it, so an mwr
+# merge cannot switch the marker on (ai-config#3946).
+MWR_AMWR_FILE = "agents.md"
+
+
+def check_mwr_ci_edits(pr) -> List[str]:
+    """Under --mwr, block a PR that changes any file under `.github/`.
+
+    Fails closed: a file list that cannot be read, or that reaches the
+    endpoint's cap, blocks too. A rename counts on both its old and new path.
+    Each line is one file entry, with a rename's old path after a tab, so the
+    cap is counted in entries, as the endpoint counts it.
+    """
+    cmd = ["gh", "api", f"repos/{pr.repo}/pulls/{pr.pr_num}/files",
+           "--paginate", "--jq",
+           '.[] | [.filename, (.previous_filename // empty)] | join("\\t")']
+    try:
+        raw = fetch(cmd)
+    except (RuntimeError, PayloadError) as exc:
+        return [f"mwr could not read the PR's changed files ({exc}), so it cannot "
+                f"rule out a change to the CI under {MWR_CI_DIR}; merge it under "
+                "mwc instead (ai-config#3946)"]
+    entries = [line for line in str(raw or "").splitlines() if line.strip()]
+    names = [n.strip() for line in entries for n in line.split("\t") if n.strip()]
+    if not names:
+        return [f"mwr read no changed files for this PR, so it cannot rule out a "
+                f"change to the CI under {MWR_CI_DIR}; merge it under mwc instead "
+                "(ai-config#3946)"]
+    if len(entries) >= PR_FILES_CAP:
+        return [f"the PR's file list reached the endpoint's cap ({PR_FILES_CAP}), "
+                f"so mwr cannot rule out a change under {MWR_CI_DIR}; merge it "
+                "under mwc instead (ai-config#3946)"]
+    # A path that is `.github` itself (a submodule, or a file replacing the
+    # directory) changes the CI as surely as a path under it.
+    edits = sorted({n for n in names
+                    if n.lower() == MWR_CI_DIR.rstrip("/") or n.lower().startswith(MWR_CI_DIR)})
+    problems = []
+    if edits:
+        shown = ", ".join(edits[:5]) + (" ..." if len(edits) > 5 else "")
+        problems.append(
+            f"mwr cannot merge a PR that edits CI: it changes {shown}, and the CI "
+            "it requires could be made green by the PR itself. Merge it under "
+            "mwc, with a clean review (ai-config#3946)")
+    marker_edits = sorted({n for n in names if n.lower() == MWR_AMWR_FILE})
+    if marker_edits:
+        problems.append(
+            f"mwr cannot merge a PR that changes the root {marker_edits[0]}, which "
+            "holds the repository's amwr marker. Merge it under mwc, with a "
+            "clean review (ai-config#3946)")
+    return problems
+
+
+def check_mwr_dismissed_reviews(pr) -> List[str]:
+    """Under --mwr, block on any dismissed review.
+
+    Dismissing a CHANGES_REQUESTED review removes it from the formal review
+    decision, so without this an objection would vanish from an mwr run.
+    """
+    issues = []
+    for review in pr.get_reviews():
+        if review.state == "DISMISSED":
+            who = review.author_login or "an unknown author"
+            issues.append(f"PR has a dismissed review from {who}; mwr does not merge "
+                          "past a dismissed review. Merge it under mwc (ai-config#3946)")
+    return issues
 
 
 def _auto_build_payload(repo: str, pr_number: str) -> str:
@@ -5279,11 +5502,31 @@ def main():
     ci_ok, ci_issues = check_ci_runs(pr)
     threads_ok, thread_issues = check_review_threads(pr)
     feedback_ok, feedback_issues = check_maintainer_feedback(pr)
-    review_ok, review_issues = check_review_comments(pr, args.quorum)
+    # Under an `mwr` grant (ai-config#3946: "Skip review, keep green CI",
+    # Ezra 2026-11-19) a merge needs no clean review verdict and no quorum.
+    # A formal CHANGES_REQUESTED or REJECTED still blocks: it is somebody's
+    # recorded objection, not a missing approval. Every other axis still
+    # runs: CI, annotations, unresolved threads, a maintainer's unanswered
+    # feedback, base drift and required checks. The pass line differs from
+    # the FULLY CLEAN line on purpose, so no `mwc` gate that keys on that
+    # line can be satisfied by an mwr run.
+    mwr = bool(getattr(args, "mwr", False))
+    # The verdict below comes from the non-NOTE entries of all_issues, not
+    # from the boolean check_review_comments returns, so filtering the issue
+    # list is the whole of the --mwr change.
+    _, review_issues = check_review_comments(pr, args.quorum)
+    mwr_issues: List[str] = []
+    if mwr:
+        mwr_issues = check_mwr_ci_edits(pr) + check_mwr_dismissed_reviews(pr)
+        review_issues = [i for i in review_issues if i.startswith(MWR_KEPT_REVIEW_PREFIXES)]
+        review_issues.append(
+            "NOTE: --mwr: review verdicts and quorum were not evaluated (ai-config#3946); "
+            "a pass under --mwr authorizes a merge only under an mwr or mwrs grant")
     drift_ok, drift_issues = check_base_drift(pr)
     required_ok, required_issues = check_required_checks(pr)
 
-    all_issues = ci_issues + thread_issues + feedback_issues + review_issues + drift_issues + required_issues
+    all_issues = (ci_issues + thread_issues + feedback_issues + review_issues
+                  + mwr_issues + drift_issues + required_issues)
 
     # Inside a CI job whose own check run is on this head, some review items
     # describe the PR BEFORE that job posts anything: no review on this head
@@ -5321,8 +5564,23 @@ def main():
         print("\n\u274c PR is NOT fully clean:")
         for issue in blocking:
             print(f"  - {issue}")
+        # When base drift is the only blocker, every other criterion already
+        # passed on this head. Say so, so that a backlog of PRs behind one
+        # new workflow on the base is not each given a main merge (and a
+        # full CI cycle) long before its turn to merge (ai-config#6028).
+        # Still exit 1: the head has not run the new gate.
+        if all(i in drift_issues for i in blocking):
+            base = pr.base_ref or "the base branch"
+            print(f"\n\u23f8\ufe0f {repo}#{pr_num} is CLEAN EXCEPT BASE DRIFT on HEAD {sha[:8]}: "
+                  f"merge {base} into it only when it is next to merge (ai-config#6028)")
         sys.exit(1)
 
+    if mwr:
+        # The full 40-character sha, so the merge hook can require equality
+        # with the sha it pins rather than an 8-hex prefix (ai-config#3946).
+        print(f"\n\u2705 {repo}#{pr_num} is MERGE-READY under mwr (review not evaluated) "
+              f"on HEAD {sha}! [stale-base rule]")
+        sys.exit(0)
     print(f"\n\u2705 {repo}#{pr_num} is FULLY CLEAN on HEAD {sha[:8]}! [stale-base rule]")
     sys.exit(0)
 

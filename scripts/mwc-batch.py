@@ -6,7 +6,7 @@
 Before this script, every final head reached the maintainer by hand: an owner
 thread reported it, a coordinator relayed it to the runner session, the
 runner ran `check-pr-fully-clean.py`, and only then could the maintainer type
-`mwc <repo> <pr> <sha>`. Whether a head is ready is decidable from the API, so
+`mwc <repo> <pr>`. Whether a head is ready is decidable from the API, so
 per `shared/workflow/derive-dont-enumerate.md` this derives the set instead
 (ai-config#5578).
 
@@ -15,10 +15,13 @@ branch, skips any whose head still has a check run in progress or a genuine
 failure (a cheap prefilter, so the checker runs only on candidates), runs
 `check-pr-fully-clean.py` on the rest, and prints:
 
-  * `mwc <repo> <pr> <sha>` for each clean content PR, for the maintainer to
+  * `mwc <repo> <pr>` for each clean content PR, with its head SHA beside it
+    (the line carries across main merges, per check-mwc-carry.py), for the maintainer to
     type in the runner thread;
   * `merge-infra-pr <repo> <pr>` for each clean infra PR, which the runner's
-    standing infra grant covers;
+    standing infra grant covers, with CI-caller PRs (a changed
+    workflow file) in a group of their own, merged together in one
+    batch at each sweep (ai-config#5967);
   * one line per PR that is not ready, with the reason, so a sweep that found
     nothing reads differently from one that examined nothing.
 
@@ -72,6 +75,8 @@ ANNOTATIONS_ARG_RE = re.compile(r"([\w.-]+#\d+)=(all|\d+(?:,\d+)*)")
 INFRA_REPOS_RE = re.compile(r'^\s*([\w.|-]+)\)\s*scope="infra repository', re.M)
 CHANGELOG_RE = re.compile(r"changelog[.]d/.+")
 CANVAS_RE = re.compile(r"(^|/)canvas/")
+# check-pr-fully-clean.py's WORKFLOW_DIR: base drift counts any path under it.
+CI_CALLER_DIR = ".github/workflows/"
 
 
 def die(message: str) -> None:
@@ -118,6 +123,17 @@ def scope(repo_name: str, files: list[str], repos: set[str], patterns) -> str:
     if files and all(any(p.fullmatch(f) for p in patterns) for f in files):
         return "infra"
     return "content"
+
+
+def is_ci_caller(files: list[str]) -> bool:
+    """Whether an infra PR changes a workflow file, so its merge can add a check.
+
+    Merging one can make every waiting PR in the repository merge main
+    (check-pr-fully-clean.py's base-drift rule), so these merge together in one
+    batch (ai-config#5967). A step-only edit, which base drift lets through,
+    is batched too: holding it costs a short wait, not a main-merge round.
+    """
+    return any(f.startswith(CI_CALLER_DIR) for f in files)
 
 
 def ci_state(check_runs: list[dict]) -> str:
@@ -224,7 +240,10 @@ def sweep_repo(repo: str, repos: set[str], patterns, annotations_read: dict[str,
             results.append({**row, "status": "not clean", "reasons": reasons})
             continue
         files = pr_paths(repo, number)
-        results.append({**row, "status": scope(name, files, repos, patterns), "reasons": []})
+        status = scope(name, files, repos, patterns)
+        if status == "infra" and is_ci_caller(files):
+            status = "ci-caller"
+        results.append({**row, "status": status, "reasons": []})
     return results, drafts
 
 
@@ -232,9 +251,14 @@ def render(results: list[dict], repos_swept: list[str], drafts: int) -> str:
     out = [f"mwc-batch: {len(results)} open non-draft PRs examined in "
            f"{', '.join(repos_swept)} ({drafts} drafts skipped)"]
     groups = [
-        ("content", "Ready for the maintainer's mwc:",
-         lambda r: f"mwc {r['repo']} {r['number']} {r['sha'][:SHA_CHARS]}"),
+        ("content", "Ready for the maintainer's mwc (fence only `mwc <repo> <pr>`; "
+         "the line carries across main merges):",
+         lambda r: f"mwc {r['repo']} {r['number']}   (head {r['sha'][:SHA_CHARS]})"),
         ("infra", "Ready for merge-infra-pr (infra grant):",
+         lambda r: f"merge-infra-pr {r['repo']} {r['number']}"),
+        ("ci-caller", "CI-caller PRs, infra grant: merge them together in this pass, after "
+         "any content PR that already holds an mwc line, then have each waiting PR merge "
+         "main once:",
          lambda r: f"merge-infra-pr {r['repo']} {r['number']}"),
         ("canvas", "Clean but touches canvas/ (needs the maintainer's explicit ok):",
          lambda r: f"{r['repo']}#{r['number']} {r['sha'][:SHA_CHARS]}"),

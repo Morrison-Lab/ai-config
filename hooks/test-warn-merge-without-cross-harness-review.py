@@ -13,6 +13,18 @@ import tempfile
 
 HOOKS_DIR = os.path.dirname(os.path.realpath(__file__))
 HOOK = os.path.join(HOOKS_DIR, "warn-merge-without-cross-harness-review.py")
+sys.path.insert(0, os.path.join(os.path.dirname(HOOKS_DIR), "scripts", "lib"))
+from mwr_checker_fixture import trusted_checker_root  # noqa: E402
+
+# Stay offline: no amwr marker read (ai-config#3946, step 3). The off
+# switch only takes an amwr grant away; the amwr tests patch repo_amwr.
+os.environ["AI_CONFIG_AMWR_OFF"] = "1"
+
+# The plugin root the clean-checker hook trusts for an mwr merge (round 4,
+# finding 2): a fixture checkout whose checker blob is origin/main's.
+_MWR_ROOT_DIR = tempfile.TemporaryDirectory()
+MWR_ROOT = trusted_checker_root(_MWR_ROOT_DIR.name)
+os.environ["CLAUDE_PLUGIN_ROOT"] = MWR_ROOT
 
 PASSED = []
 FAILED = []
@@ -34,11 +46,18 @@ def transcript(steps):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
         for i, entry in enumerate(steps):
+            if isinstance(entry, dict) and "user" in entry:
+                fh.write(json.dumps({"type": "user", "message": {
+                    "role": "user", "content": entry["user"]}}) + "\n")
+                continue
             # A list is parallel tool calls: one assistant record holds them all.
             group = entry if isinstance(entry, list) else [entry]
             tids = [f"toolu_{i}_{j}" for j in range(len(group))]
+            # Run from the fixture plugin root, so a checker call is the
+            # plugin root's own copy (ai-config#3946, rounds 3 and 4).
             fh.write(json.dumps({
                 "type": "assistant", "isSidechain": group[0]["sidechain"],
+                "cwd": MWR_ROOT,
                 "message": {"content": [
                     {"type": "tool_use", "id": tid, "name": s["tool"],
                      "input": s["input"]} for tid, s in zip(tids, group)]},
@@ -90,7 +109,65 @@ AGENT = step("", tool="Agent",
                          "prompt": "codex review"})
 
 
+MWR_SHA = "8d7864c66c90ce495ae53deeaa8f1e86f3cf18b7"
+MWR_MERGE = f"gh pr merge 12 -R Morrison-Lab/ai-config --squash --match-head-commit {MWR_SHA}"
+MWR_MCP = dict(MCP_MERGE, expectedHeadSha=MWR_SHA)
+
+
+def user(text):
+    return {"user": text}
+
+
+def mwr_ready(sha=MWR_SHA, n=12):
+    """A `check-pr-fully-clean.py --mwr` run and its pass line (ai-config#3946)."""
+    return step(f"python3 scripts/check-pr-fully-clean.py {n} -R Morrison-Lab/ai-config --mwr",
+                out=(f"✅ Morrison-Lab/ai-config#{n} is MERGE-READY under mwr "
+                     f"(review not evaluated) on HEAD {sha}! [stale-base rule]"))
+
+
+def mwr_checks():
+    """The `mwr` grant skips the non-Claude read (ai-config#3946)."""
+    check("silent: 'mwr' and a MERGE-READY line let a gh merge through",
+          not run(MWR_MERGE, [user("mwr Morrison-Lab/ai-config#12"), mwr_ready()])[0])
+    check("silent: 'mwrs' and a MERGE-READY line let an MCP merge through",
+          not run("", [user("mwrs"), mwr_ready()],
+                  tool_name="mcp__github__merge_pull_request", tool_input=MWR_MCP)[0])
+    check("silent: 'mwr ai-config#12' and its MERGE-READY line let the merge through",
+          not run(MWR_MERGE, [user("mwr Morrison-Lab/ai-config#12"), mwr_ready()])[0])
+    check("warns: a bare 'mwr' names no PR, so it grants nothing",
+          run(MWR_MERGE, [user("mwr"), mwr_ready()])[0])
+    check("warns: 'wait, mwr ai-config#12' is not a whole-message grant",
+          run(MWR_MERGE, [user("wait, mwr ai-config#12"), mwr_ready()])[0])
+    # Round 3, finding 3: a relay tool result never supplies the MERGE-READY line.
+    relayed = step("", tool="mcp__hearthbot__read_thread", tool_input={},
+                   out=mwr_ready()["out"])
+    check("warns: a relayed MERGE-READY line under 'mwr Morrison-Lab/ai-config#12'",
+          run(MWR_MERGE, [user("mwr Morrison-Lab/ai-config#12"), relayed])[0])
+    check("warns: a MERGE-READY line with no mwr grant",
+          run(MWR_MERGE, [mwr_ready()])[0])
+    check("warns: a MERGE-READY line under 'mwc' only",
+          run(MWR_MERGE, [user("mwc"), mwr_ready()])[0])
+    check("warns: a MERGE-READY line under 'merge when ready'",
+          run(MWR_MERGE, [user("merge when ready"), mwr_ready()])[0])
+    check("warns: 'mwr' with no MERGE-READY line",
+          run(MWR_MERGE, [user("mwr Morrison-Lab/ai-config#12")])[0])
+    check("warns: 'mwr' with a MERGE-READY line for another head",
+          run(MWR_MERGE, [user("mwr Morrison-Lab/ai-config#12"), mwr_ready(sha="0" * 40)])[0])
+    check("warns: 'mwr' and a MERGE-READY line, merge pins no sha",
+          run(MERGE, [user("mwr Morrison-Lab/ai-config#12"), mwr_ready()])[0])
+    check("warns: 'mwr' revoked after the MERGE-READY line",
+          run(MWR_MERGE, [user("mwr Morrison-Lab/ai-config#12"), mwr_ready(), user("stop merging")])[0])
+    check("warns: a question about mwr is no grant",
+          run(MWR_MERGE, [user("what does mwr mean?"), mwr_ready()])[0])
+    check("warns: 'mwr ai-config#99' does not cover #12",
+          run(MWR_MERGE, [user("mwr Morrison-Lab/ai-config#99"), mwr_ready()])[0])
+    check("warns: 'mwr' does not clear arming auto-merge",
+          run("", [user("mwr Morrison-Lab/ai-config#12"), mwr_ready()],
+              tool_name="mcp__github__enable_pr_auto_merge", tool_input=MWR_MCP)[0])
+
+
 def main():
+    mwr_checks()
     # --- warns ------------------------------------------------------------
     fired, out = run(MERGE, [])
     check("warns on a merge with no reviewer run at all", fired)
@@ -448,9 +525,22 @@ def main():
     check("warns when the probe was refused and never ran", run(MERGE, [dict(
         probe("command -v " + clis4), rec={"toolDenialKind": "permission-rule"})] + oc)[0] and run(
         MERGE, [probe("command -v " + clis4, "\\n\n Permission for this action was denied")] + oc)[0])
-    check("warns when the opencode attempt was refused", run(MERGE, probe_all[:1] + [
+    check("warns when the opencode attempt was refused by the user or a rule", run(MERGE, probe_all[:1] + [
         dict(oc[0], out="The user doesn't want to proceed with this tool use")])[0] and run(
-        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"})])[0])
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "permission-rule"})])[0] and run(
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "permission-rule"}, out=(
+            "Permission for this action was denied by the Claude Code auto mode classifier."))])[0])
+    classifier = "Permission for this action was denied by the Claude Code auto mode classifier."
+    check("silent when the classifier refused the opencode attempt", not run(
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"})])[0]
+          and not run(MERGE, probe_all[:1] + [dict(oc[0], out=classifier)])[0])
+    check("warns when the classifier-refused opencode attempt predates the last push", run(
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"}),
+                                step("git push origin HEAD")])[0])
+    check("warns when the classifier refused a probe or another CLI's attempt", run(MERGE, [dict(
+        probe("command -v " + clis4), rec={"toolDenialKind": "automode-blocked"})] + oc)[0] and run(
+        MERGE, [probe("command -v agy gemini cursor-agent"), dict(probe(
+            "codex exec 'review the diff'"), rec={"toolDenialKind": "automode-blocked"})] + oc)[0])
     check("warns when the probe shares its call or exits other than 1", run(MERGE, [probe(
         "cd /nope && command -v " + clis4)] + oc)[0] and run(MERGE, [probe("command -v " + clis4, "Exit code 2")] + oc)[0]
           and all(run(MERGE, [probe(p + clis4)] + oc)[0] for p in ("which -s ", "command -V ")) and run(MERGE, [probe("which %s 2 > f" % clis4)] + oc)[0])

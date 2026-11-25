@@ -3,6 +3,7 @@
 import contextlib
 import importlib.util
 import io
+import tempfile
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
@@ -24,7 +25,7 @@ def ann(msg, path=".github", level="failure"):
     return {"annotation_level": level, "path": path, "message": msg}
 
 
-def fake_api(commits, report_runs=None, report_anns=None, status="completed"):
+def fake_api(commits, report_runs=None, report_anns=None, status="completed", calls=None):
     """commits: {sha: [(run name, [annotations])]}; ids are assigned here."""
     runs, anns, rid = {}, {}, 1000
     for sha, spec_runs in commits.items():
@@ -37,6 +38,8 @@ def fake_api(commits, report_runs=None, report_anns=None, status="completed"):
             anns[rid] = items
 
     def api(path):
+        if calls is not None:
+            calls.append(path)
         query = dict(kv.split("=") for kv in path.split("?")[1].split("&"))
         page, per = int(query["page"]), int(query["per_page"])
         window = slice((page - 1) * per, page * per)
@@ -48,10 +51,10 @@ def fake_api(commits, report_runs=None, report_anns=None, status="completed"):
     return api
 
 
-def run(argv, api):
+def run(argv, api, cache_dir=None):
     out = io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
-        code = dav.main(argv, api=api)
+        code = dav.main(argv, api=api, cache_dir=cache_dir)
     return code, out.getvalue()
 
 
@@ -122,6 +125,18 @@ def failing_api(path):
 
 code, out = run(ARGS, failing_api)
 check("a failed gh call exits 2", code == 2 and "HTTP 502" in out)
+
+# The base tip is read once across PRs through the cache (ai-config#6032).
+with tempfile.TemporaryDirectory() as cache:
+    calls = []
+    shared = {"b" * 40: [("lint", [ann("e")])], "a" * 40: [("lint", [ann("e")])]}
+    api = fake_api(shared, calls=calls)
+    first = run(ARGS, api, cache)
+    n_first = sum("/annotations" in c for c in calls)
+    second = run(ARGS, api, cache)
+    check("a second comparison of the same commits reads no annotations",
+          first[0] == 0 and second == first and n_first == 2
+          and sum("/annotations" in c for c in calls) == n_first)
 
 print(f"\n{passes} passed, {failures} failed")
 raise SystemExit(1 if failures else 0)

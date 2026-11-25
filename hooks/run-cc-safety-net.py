@@ -52,7 +52,7 @@ lease-pinned branches of a repository named by its full URL
 (`git push https://github.com/<owner>/<repo>
 --force-with-lease=refs/heads/<b>:<sha> ... --delete <b> ...`), is lifted
 when the user typed a line reading only `approve-push-delete <key>` in this
-session within the last 30 minutes, where `<key>` is the first 16 hex
+session within the last 30 minutes, where `<key>` is the first 32 hex
 digits of that exact command's sha256. The deny names the key, so the agent
 can quote it to the user. A decision-card tap, a relayed note and the
 agent's own words do not count. `scripts/lib/push_delete_approval.py` has
@@ -319,6 +319,25 @@ def _bash_command(data: dict) -> str:
     return command if isinstance(command, str) else ""
 
 
+def _is_deny(proc: subprocess.CompletedProcess) -> bool:
+    """Whether CC Safety Net denied: exit 2, or exit 0 with a JSON deny.
+
+    The pinned 2.7.12 release denies a `git push --delete` with exit 0 and
+    `permissionDecision: deny` on stdout (checked against the real release),
+    so requiring exit 2 alone would never lift its deny. Anything else (an
+    allow, an ask, a crash) is not a deny and is never rewritten.
+    """
+    if proc.returncode == 2:
+        return True
+    if proc.returncode != 0:
+        return False
+    try:
+        spec = json.loads(proc.stdout)["hookSpecificOutput"]
+    except (ValueError, KeyError, TypeError):
+        return False
+    return isinstance(spec, dict) and spec.get("permissionDecision") == "deny"
+
+
 def _deny_text(proc: subprocess.CompletedProcess) -> str:
     """CC Safety Net's deny as plain text: the JSON reason decoded, and stderr.
 
@@ -345,6 +364,8 @@ def push_delete_override(data: dict, proc: subprocess.CompletedProcess):
     the hint to add to the deny, naming the key the user would type. Any
     error keeps the deny unchanged.
     """
+    if not _is_deny(proc):
+        return None
     said = _deny_text(proc)
     if "git.push-delete" not in said:
         return None

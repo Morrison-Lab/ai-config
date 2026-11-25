@@ -18,7 +18,7 @@ when, and only when, all of these hold:
   GitHub itself. No other option, no shell operator, no expansion
   (`leased_delete_push`).
 - The user TYPED a line reading only `approve-push-delete <key>` in this
-  session within the last `WINDOW` seconds, where `<key>` is the first 16
+  session within the last `WINDOW` seconds, where `<key>` is the first 32
   hex digits of the command's sha256 (`approval_key`), hashed exactly as
   the command arrives. One changed byte, whitespace included, is a
   different key. A line that only mentions the approval ("do not
@@ -49,10 +49,11 @@ from datetime import datetime, timezone
 
 WINDOW = 1800
 PREFIX = "approve-push-delete"
+KEY_HEX = 32
 # The whole line, so a sentence that only mentions the approval is not one.
-RX_APPROVAL = re.compile(r"^[ \t]*approve-push-delete[ \t]+([0-9a-f]{16})[ \t]*$",
+RX_APPROVAL = re.compile(rf"^[ \t]*approve-push-delete[ \t]+([0-9a-f]{{{KEY_HEX}}})[ \t]*$",
                          re.IGNORECASE | re.MULTILINE)
-RX_LEASE = re.compile(r"\A--force-with-lease=refs/heads/([A-Za-z0-9._/-]+):([0-9a-f]{40})\Z")
+RX_LEASE = re.compile(r"\A--force-with-lease=refs/heads/([A-Za-z0-9._/-]+):([0-9a-fA-F]{40})\Z")
 RX_BRANCH = re.compile(r"\A[A-Za-z0-9._/-]+\Z")
 # The full URL, never a remote name: `origin` resolves through local git
 # config, so the key would not bind which repository loses the branches.
@@ -77,8 +78,8 @@ def sole_push_delete_deny(said: str) -> bool:
 
 
 def approval_key(command: str) -> str:
-    """The 16 hex digits the user types to approve exactly `command`."""
-    return hashlib.sha256(command.encode("utf-8")).hexdigest()[:16]
+    """The KEY_HEX hex digits the user types to approve exactly `command`."""
+    return hashlib.sha256(command.encode("utf-8")).hexdigest()[:KEY_HEX]
 
 
 def leased_delete_push(command: str) -> bool:

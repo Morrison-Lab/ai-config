@@ -43,6 +43,10 @@ if (cwd === '') {
   process.stdout.write(JSON.stringify({hookSpecificOutput: {
     hookEventName: 'PreToolUse', permissionDecision: 'deny',
     permissionDecisionReason: 'fake deny'}}));
+} else if (d.includes('--delete') && d.includes('ASKDELETE')) {
+  process.stdout.write(JSON.stringify({hookSpecificOutput: {
+    hookEventName: 'PreToolUse', permissionDecision: 'ask',
+    permissionDecisionReason: 'Reason: deletes refs.\\n\\nRule: git.push-delete'}}));
 } else if (d.includes('--delete') && d.includes('TWORULES')) {
   process.stdout.write(JSON.stringify({hookSpecificOutput: {
     hookEventName: 'PreToolUse', permissionDecision: 'deny',
@@ -341,6 +345,8 @@ class WhichCommandsQualify(unittest.TestCase):
         self.assertTrue(approval_lib().leased_delete_push(LEASED))
         self.assertTrue(approval_lib().leased_delete_push(
             f"git push {URL}.git --force-with-lease=refs/heads/a:{SHA_A} --delete a"))
+        self.assertTrue(approval_lib().leased_delete_push(
+            f"git push {URL} --force-with-lease=refs/heads/a:{'A' * 40} --delete a"))
 
     def test_these_do_not(self):
         cases = {
@@ -392,7 +398,7 @@ class WhichCommandsQualify(unittest.TestCase):
 
     def test_one_changed_byte_changes_the_key(self):
         lib = approval_lib()
-        self.assertEqual(len(lib.approval_key(LEASED)), 16)
+        self.assertEqual(len(lib.approval_key(LEASED)), 32)
         self.assertNotEqual(lib.approval_key(LEASED),
                             lib.approval_key(LEASED.replace("aaaa", "aaab", 1)))
         self.assertNotEqual(lib.approval_key(LEASED), lib.approval_key(LEASED + " "))
@@ -476,6 +482,8 @@ class TypedApprovalLiftsOnePushDelete(unittest.TestCase):
             "another command's key": [self.user(
                 "approve-push-delete " + approval_lib().approval_key("git push"))],
             "too old": [self.user(typed, seconds_ago=31 * 60)],
+            "dated in the future": [self.user(typed, seconds_ago=-10 * 60)],
+            "a 16-digit key": [self.user(typed[:len(typed) - 16])],
             "no timestamp": [{"type": "user", "message": {"content": typed}}],
             "the agent's words": [{"type": "assistant", "timestamp": iso(),
                                    "message": {"role": "assistant", "content": typed}}],
@@ -516,6 +524,12 @@ class TypedApprovalLiftsOnePushDelete(unittest.TestCase):
         proc = self.run_with([self.user(f"approve-push-delete {self.key}")])
         self.assertEqual(self.decision(proc), "deny")
         self.assertIn("answer stands", proc.stderr)
+
+    def test_an_ask_is_not_a_deny_and_is_left_alone(self):
+        proc = self.run_with([self.user(f"approve-push-delete {self.key}")],
+                             cwd=str(self.box.root / "ASKDELETE"))
+        self.assertEqual(self.decision(proc), "ask")
+        self.assertNotIn("approve-push-delete", proc.stdout)
 
     def test_a_deny_with_another_reason_too_is_never_lifted(self):
         for marker in ("TWORULES", "TWOREASONS"):

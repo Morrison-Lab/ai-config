@@ -48,10 +48,10 @@ TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
         r"|compilers?|runtimes?)\b")
 # Ezra, 2026-11-24, on "LaTeX is too old for the exam template":
 # "cai: never make excuses like this; install the software you need".
-_STALE = (r"(?:(?!not\b|never\b|no\b|longer\b|\w+n['’]?t\b)\S+\s+){0,3}?"
+_STALE = (r"(?:(?!not\b|never\b|no\b|longer\b|\w+n['\u2019]?t\b)\S+\s+){0,3}?"
           r"(?:outdated|out of date)\b")
-_NEG = (r"(?<!not )(?<!n't )(?<!n’t )(?<!not an )(?<!not a )"
-        r"(?<!n't an )(?<!n’t an )(?<!n't a )(?<!n’t a )(?<!no longer )")
+_NEG = (r"(?<!not )(?<!n't )(?<!n\u2019t )(?<!not an )(?<!not a )"
+        r"(?<!n't an )(?<!n\u2019t an )(?<!n't a )(?<!n\u2019t a )(?<!no longer )")
 OLD = (rf"{_NEG}\btoo old\b|\b(?:version|release)\s+{_STALE}|{TOOL}\s+{_STALE}"
        rf"|{_NEG}\b(?:outdated|out[- ]of[- ]date)\s+(?:version|release|copy|{TOOL})")
 MISSING = (r"(?:(?:isn['\u2019]?t|is not|aren['\u2019]?t|are not|wasn['\u2019]?t|not) installed"
@@ -154,7 +154,7 @@ def excuse(text):
 
 # Commas are not clause breaks: a rule description lists its targets with them
 # ("refuses any post, comment or PR body that excuses ...").
-CLAUSE_BREAK = re.compile(r"[;:]\s+|,?\s+(?:--|---|—|but|yet|so)\s+|,\s+and\s+")
+CLAUSE_BREAK = re.compile(r"[;:]\s+|,?\s+(?:--|---|\u2014|but|yet|so)\s+|,\s+and\s+")
 
 
 def _clauses_around(sentence, start, end):

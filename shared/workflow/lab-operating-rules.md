@@ -135,6 +135,8 @@ The rest are prose because no condition in the transcript can decide them.
   (Ezra, 2026-11-22: "you must adversarially check every claim that my input is needed").
   The same night's false claims were "no other way to commit", when the GitHub API tools could commit, and "waiting on your approval", when the thread was not stuck.
   Enforced by `hooks/handoff-ask-needs-why.py`, which reads the turn for a subagent whose brief asks for that refutation ([ai-config#6075](https://github.com/Morrison-Lab/ai-config/issues/6075)).
+  The hook also fires on a status line such as "which needs your merge once its preview renders", even for a content PR whose merge is Ezra's by standing rule.
+  In a status list, give the PR's own state ("preview still rendering"), and make the ask only once the work is ready and the refutation has run (Morrison-Lab/lds#3188, 2026-11-25).
 
 ## Questions and decisions
 

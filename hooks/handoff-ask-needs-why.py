@@ -158,17 +158,17 @@ FILLER = (
     r"(?:(?:just|quickly|manually|also|now|then|please|first|kindly|do|"
     r"go\s+ahead\s+and|go\s+and|approve\s+and|squash\s+and)\s+){0,2}"
 )
+# "If you can paste the links" hands the step back as a condition. Only the
+# modal forms are a lead here; a bare "if you <verb>" is caught in HANDOFF only
+# when an "I'll" clause follows, so "If you push to main, CI runs." passes.
+IF_LEAD = r"if\s+you(?:'d|\s+would|\s+can|\s+could)|"
 LEAD = (
     r"\b(?:please|kindly|can\s+you|could\s+you|would\s+you|will\s+you|"
     r"(?:I\s+)?need\s+you\s+to|needs\s+you\s+to|I'd\s+like\s+you\s+to|"
     r"you(?:'ll|\s+will|'d|\s+would)?\s+(?:need|have)\s+to|you\s+must|you\s+should|"
     r"you\s+can|you\s+could|over\s+to\s+you\s+to|(?:it's|it\s+is)\s+(?:yours|(?:up\s+)?to\s+you|on\s+you)\s+to|"
-    r"ask(?:ing)?\s+you\s+to|for\s+you\s+to|"
-    # "If you can paste the links" hands the step back as a condition. Only the
-    # modal forms are a lead here; a bare "if you <verb>" is caught below only
-    # when an "I'll" clause follows, so "If you push to main, CI runs." passes.
-    r"if\s+you(?:'d|\s+would|\s+can|\s+could)|"
-    r"(?:once|when|after|as\s+soon\s+as)\s+you(?:'ve|\s+have)?)\s+"
+    r"ask(?:ing)?\s+you\s+to|for\s+you\s+to|" + IF_LEAD
+    + r"(?:once|when|after|as\s+soon\s+as)\s+you(?:'ve|\s+have)?)\s+"
 )
 # The user named as the one who acts, anywhere in a sentence that names a step.
 ACTOR = re.compile(

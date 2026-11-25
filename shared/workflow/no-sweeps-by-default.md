@@ -54,6 +54,8 @@ Whoever writes the brief, a coordinator or an agent launching a subagent, is bou
   There is no agent-side bypass; the user's next message resets the count.
   The reviewer layer is "Unrequested sweeps" in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md).
 - `hooks/no-unnamed-repo-pr.py` denies a PR in a repository the user never named this session, other than the session's own checkout, though a repository named only as precedent still passes ([ai-config#5780](https://github.com/Morrison-Lab/ai-config/issues/5780)).
+  A GitHub repository owned by Morrison-Lab passes unnamed: Ezra, 2026-11-20 09:16 PST, "i shouldn't need to approve opening PRs" ([ai-config#6072](https://github.com/Morrison-Lab/ai-config/issues/6072)).
+  Merging stays gated as before.
 - `hooks/warn-sweep-pr-without-ask.py` warns when `gh pr create` or `mcp__github__create_pull_request` has "sweep" in the title (or, for `gh pr create` only, a `sweep` label) and no `Sweep authorized:` marker (followed by a message id or link).
   It warns rather than blocks because a title containing the word is not always a sweep, and a hook cannot read Ezra's intent.
 - gha's content checks (`check-new-line-breaks`, `check-def-commentary`, `check-exm-figures`, `check-one-div-per-subfile`, `check-tree-lists`, `check-visualization-figures`, `check-typos` and others) are diff-scoped by default (checked 2026-10-29), reflagging nothing already merged.

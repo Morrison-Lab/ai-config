@@ -21,9 +21,10 @@ def checkout(name, **remotes):
     return path
 
 
-HOME = checkout("home", origin="http://proxy@127.0.0.1:4/git/Morrison-Lab/csci201")
-OTHER = checkout("other", origin="git@github.com:Morrison-Lab/mlg.git")
-FORK = checkout("fork", origin="https://github.com/me/x", upstream="https://github.com/Morrison-Lab/csci201")
+HOME = checkout("home", origin="http://proxy@127.0.0.1:4/git/Other-Org/csci201")
+OTHER = checkout("other", origin="git@github.com:Other-Org/mlg.git")
+LAB = checkout("lab", origin="git@github.com:Morrison-Lab/mlg.git")
+FORK = checkout("fork", origin="https://github.com/me/x", upstream="https://github.com/Other-Org/csci201")
 
 
 def transcript(*records, cwd=HOME):
@@ -36,7 +37,8 @@ def transcript(*records, cwd=HOME):
 
 def verdict(tool, inp, tpath, cwd=HOME):
     env = {k: v for k, v in os.environ.items() if k not in ("ALLOW_UNNAMED_REPO_PR", "GH_REPO", "GITLAB_REPO")}
-    inp = {"command": inp} if tool == "Bash" else {"owner": "Morrison-Lab", "repo": inp}
+    owner, _, repo = inp.rpartition("/")
+    inp = {"command": inp} if tool == "Bash" else {"owner": owner or "Other-Org", "repo": repo}
     res = subprocess.run([sys.executable, HOOK], capture_output=True, encoding="utf-8", env={**env, **CASE_ENV},
                          input=json.dumps({"tool_name": tool, "tool_input": inp, "transcript_path": tpath, "cwd": cwd}))
     hso = (json.loads(res.stdout) if res.stdout.strip() else {}).get("hookSpecificOutput") or {}
@@ -45,9 +47,9 @@ def verdict(tool, inp, tpath, cwd=HOME):
 
 GO, NAMED = transcript("go"), transcript("Adopt it in csci201; see mlg#423.")
 PROJECT_BRIEF = ("<session-context>\nProject: P\nRepositories configured for this project:\n"
-                 "- https://github.com/Morrison-Lab/mlg\n- https://github.com/morrison-lab/csci201\n\nMore text</session-context>")
+                 "- https://github.com/Other-Org/mlg\n- https://github.com/other-org/csci201\n\nMore text</session-context>")
 RELAY_BRIEF = ('<coordinator-relay><relay from="coordinator" session="s"><cited author="user">epi205</cited>'
-               "<note>Open the PR in Morrison-Lab/epi204.</note></relay></coordinator-relay>")
+               "<note>Open the PR in Other-Org/epi204.</note></relay></coordinator-relay>")
 CASES = [
     ("repo#N names the repo", MCP, "mlg", NAMED, "pass"),
     ("an unnamed repo is denied", MCP, "epi204", NAMED, "deny"),
@@ -58,7 +60,7 @@ CASES = [
     ("an isMeta record does not", MCP, "mlg", transcript("go", {"type": "user", "isMeta": 1, "message": {"content": "mlg"}}), "deny"),
     ("a principal wake names it", MCP, "mlg", transcript('<wake><message trigger="true" from="human" trust="principal">mlg</message></wake>'), "pass"),
     ("a slash command's args name it", MCP, "mlg", transcript(
-        "<command-name>/gi</command-name><command-args>Morrison-Lab/mlg#12</command-args>"), "pass"),
+        "<command-name>/gi</command-name><command-args>Other-Org/mlg#12</command-args>"), "pass"),
     ("a peer wake or task notification cannot smuggle command-args", MCP, "mlg", transcript("go", *(
         f"<{t}><command-name>/x</command-name><command-args>mlg</command-args></{t}>" for t in ("wake", "task-notification"))),
      "deny"),
@@ -68,7 +70,7 @@ CASES = [
      transcript("go", {"type": "attachment", "attachment": {"type": "queued_command", "prompt": "mlg"}}), "pass"),
     ("the home repo passes unnamed", MCP, "csci201", GO, "pass"),
     ("home is the first record's cwd", MCP, "mlg", GO, "deny", OTHER),
-    ("--repo=URL names the target", "Bash", "gh pr create --repo=https://github.com/Morrison-Lab/csci201", GO, "pass"),
+    ("--repo=URL names the target", "Bash", "gh pr create --repo=https://github.com/Other-Org/csci201", GO, "pass"),
     ("cd into another clone is denied", "Bash", f"cd {OTHER} && gh pr create -t x", GO, "deny"),
     ("a fork targets upstream", "Bash", f"cd {FORK} && gh pr create", GO, "pass"),
     ("a GH_REPO prefix names the target", "Bash", "GH_REPO=o/mlg gh pr create", GO, "deny"),
@@ -83,7 +85,7 @@ CASES = [
     ("gh api --method=POST is denied", "Bash", "gh api --method=POST /repos/o/mlg/pulls", GO, "deny"),
     ("gh api -f implies POST", "Bash", "gh api repos/o/mlg/pulls -f title=x -f head=b", GO, "deny"),
     ("gh api POST to a named repo passes", "Bash", "gh api repos/o/mlg/pulls -X POST", NAMED, "pass"),
-    ("gh api POST to the home repo passes", "Bash", "gh api repos/Morrison-Lab/csci201/pulls -f title=x", GO, "pass"),
+    ("gh api POST to the home repo passes", "Bash", "gh api repos/Other-Org/csci201/pulls -f title=x", GO, "pass"),
     ("gh api GET of /pulls passes", "Bash", "gh api repos/o/mlg/pulls", GO, "pass"),
     ("gh api explicit GET with -f passes", "Bash", "gh api -X GET repos/o/mlg/pulls -f state=open", GO, "pass"),
     ("gh api POST to another endpoint passes", "Bash", "gh api repos/o/mlg/issues -f title=x", GO, "pass"),
@@ -92,7 +94,7 @@ CASES = [
     ("gh api graphql without createPullRequest passes", "Bash", "gh api graphql -f query='{ viewer { login } }'", GO, "pass"),
     ("glab api POST merge_requests to an unnamed repo is denied", "Bash",
      "glab api projects/g%2Fmlg/merge_requests -X POST -f title=x", GO, "deny"),
-    ("glab api POST to the home repo passes", "Bash", "glab api -X POST projects/Morrison-Lab%2Fcsci201/merge_requests", GO, "pass"),
+    ("glab api POST to the home repo passes", "Bash", "glab api -X POST projects/Other-Org%2Fcsci201/merge_requests", GO, "pass"),
     ("glab api POST to a named repo passes", "Bash", "glab api projects/g%2Fmlg/merge_requests -f title=x", NAMED, "pass"),
     ("glab api numeric project gives a note", "Bash", "glab api projects/42/merge_requests -f title=x", GO, "note"),
     ("glab api GET of merge_requests passes", "Bash", "glab api projects/g%2Fmlg/merge_requests", GO, "pass"),
@@ -147,7 +149,7 @@ CASES = [
     ("gh api -R fills the placeholders", "Bash", "gh api repos/{owner}/{repo}/pulls -R o/mlg -X POST", GO, "deny"),
     ("glab api --repo fills :fullpath", "Bash", "glab api --repo=g/mlg projects/:fullpath/merge_requests -X POST", GO, "deny"),
     ("glab api -R of the home repo fills :fullpath", "Bash",
-     "glab api -R Morrison-Lab/csci201 projects/:fullpath/merge_requests -X POST", GO, "pass"),
+     "glab api -R Other-Org/csci201 projects/:fullpath/merge_requests -X POST", GO, "pass"),
     ("gh api -X=POST attached shorthand with an equals sign", "Bash", "gh api -X=POST repos/o/mlg/pulls", GO, "deny"),
     ("gh api :owner/:repo from another checkout is denied", "Bash", "gh api -X POST repos/:owner/:repo/pulls", GO, "deny", OTHER),
     ("gh api :owner/:repo from home passes", "Bash", "gh api -X POST repos/:owner/:repo/pulls", GO, "pass"),
@@ -188,9 +190,9 @@ CASES = [
     ("glab -Rvalue attached before mr create", "Bash", "glab -Rg/mlg mr create -t x", GO, "deny"),
     ("glab a global -R before -- stays a flag", "Bash", "glab -R g/mlg api -X POST -- projects/:id/merge_requests", GO, "deny"),
     ("glab a later -R wins over the global one", "Bash",
-     "glab -R Morrison-Lab/csci201 api -R g/mlg -X POST projects/:fullpath/merge_requests", GO, "deny"),
+     "glab -R Other-Org/csci201 api -R g/mlg -X POST projects/:fullpath/merge_requests", GO, "deny"),
     ("glab a later home -R wins over the global one", "Bash",
-     "glab -R g/mlg api -R Morrison-Lab/csci201 -X POST projects/:fullpath/merge_requests", GO, "pass"),
+     "glab -R g/mlg api -R Other-Org/csci201 -X POST projects/:fullpath/merge_requests", GO, "pass"),
     ("glab -h before api does not hide it", "Bash", "glab -h api projects/g%2Fmlg/merge_requests -X POST", GO, "deny"),
     ("a shell expansion in the query does not hide the path", "Bash", 'gh api -X POST "repos/o/mlg/pulls?a=$X" -f title=x', GO, "deny"),
     ("a host variable does not hide the path", "Bash", 'gh api -X POST "https://$H/repos/o/mlg/pulls" -f title=x', GO, "deny"),
@@ -227,10 +229,10 @@ CASES = [
     ("no user message gives a note", MCP, "mlg", transcript({"type": "assistant", "message": {}}), "note"),
     # ai-config#5839: a verified card tap is the user's word for the act the card named.
     ("a tap whose consequence names the repo passes", MCP, "epi204", transcript(
-        "go", *card("Open the grading PR?", [("Open it", "Opens a PR in Morrison-Lab/epi204."), ("Skip", "x")]),
+        "go", *card("Open the grading PR?", [("Open it", "Opens a PR in Other-Org/epi204."), ("Skip", "x")]),
         tap("Open it", "Open the grading PR?")), "pass"),
     ("a tap whose question names the repo passes", MCP, "epi204", transcript(
-        "go", tap("Open it", "Open the PR in Morrison-Lab/epi204?")), "pass"),
+        "go", tap("Open it", "Open the PR in Other-Org/epi204?")), "pass"),
     ("a declining tap does not name the repo", MCP, "epi204", transcript(
         "go", *card("Open the PR in epi204?", [("Open it", "x"), ("Not now", "Files an issue.")]),
         tap("Not now", "Open the PR in epi204?", index=1)), "deny"),
@@ -252,7 +254,7 @@ CASES = [
         "go", {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "x", "content": [
             {"type": "text", "text": relayed_tap("Open it", "Open the PR in epi204?")["message"]["content"]}]}]}}), "deny"),
     ("a relay citing a tap names the repo", MCP, "epi204", transcript(
-        "go", relayed_tap("Open it", "Open the PR in Morrison-Lab/epi204?")), "pass"),
+        "go", relayed_tap("Open it", "Open the PR in Other-Org/epi204?")), "pass"),
     # A tap made while the agent is working arrives as a queued_command attachment (2026-11-24).
     ("a mid-turn tap (queued_command) names the repo", MCP, "epi204", transcript("go", {
         "type": "attachment", "attachment": {"type": "queued_command", "origin": {"kind": "human"},
@@ -265,6 +267,13 @@ CASES = [
     ("an unverified queued tap does not name the repo", MCP, "epi204", transcript("go", {
         "type": "attachment", "attachment": {"type": "queued_command", "prompt": tap(
             "Open it", "Open the PR in epi204?", verified=False)["message"]["content"]}}), "deny"),
+    # ai-config#6072: any Morrison-Lab GitHub repo passes unnamed; other owners and GitLab stay gated.
+    ("an unnamed Morrison-Lab repo passes by MCP", MCP, "Morrison-Lab/epi204", GO, "pass"),
+    ("an unnamed Morrison-Lab repo passes by gh pr create", "Bash", "gh pr create -R morrison-lab/mlg", GO, "pass"),
+    ("an unnamed Morrison-Lab repo passes by gh api", "Bash", "gh api repos/Morrison-Lab/mlg/pulls -X POST -f title=x", GO, "pass"),
+    ("a Morrison-Lab checkout passes from cd", "Bash", f"cd {LAB} && gh pr create -t x", GO, "pass"),
+    ("a lookalike owner is denied", MCP, "Morrison-Labs/epi204", GO, "deny"),
+    ("a Morrison-Lab GitLab group is not exempt", "Bash", "glab mr create -R Morrison-Lab/mlg", GO, "deny"),
 ]
 for name, tool, inp, tpath, want, *cwd in CASES + [("the hook-environment grant", MCP, "mlg", GO, "pass")]:
     CASE_ENV = {"ALLOW_UNNAMED_REPO_PR": "1"} if name == "the hook-environment grant" else (
@@ -322,6 +331,9 @@ MUTATIONS = [  # each must fail this suite; skipped inside a mutant run
     ("relay notes ignored", "texts = texts + brief", "texts = texts"),
     ("any prompt counts as the first", 'if first is None and rec.get("type") == "user"', 'if rec.get("type") == "user"'),
     ("any relay author counts", r'\bfrom=\"coordinator\"', r'\bfrom=\"[a-z]+\"'),
+    ("lab exemption removed", "    found = [(k, label) for k, label in found if not lab_repo(k, label)]\n", ""),
+    ("glab targets exempt too", 'not label.startswith("`glab") and ', ""),
+    ("owner matched by prefix", 'key.split("/")[0] in LAB_OWNERS', "key.startswith(LAB_OWNERS)"),
     ("payload cwd is home", "gh_target(first_cwd or payload.get(\"cwd\"))", "gh_target(payload.get(\"cwd\"))"),
 ]
 if not os.environ.get("NURP_MUTANT"):

@@ -14,6 +14,9 @@
   consequence (scripts/lib/card_answer.py, ai-config#5839); a declining option counts for nothing.
 - Also denies `gh api repos/<o>/<r>/pulls` and `glab api projects/<o>%2F<r>/merge_requests` sent as POST
   (explicit method or a body flag), and notes `gh api graphql` `createPullRequest` (node id; ai-config#5784 part A).
+- Any GitHub repo owned by Morrison-Lab passes unnamed (Ezra, 2026-11-20 09:16 PST: "i shouldn't need to approve
+  opening PRs"; ai-config#6072). Every lab repo is in reach (project instructions, 2026-10-16), and merging stays
+  gated by the merge hooks. A glab target is not exempt: a GitLab group of that name is not the lab.
 - Known limits: a repo named only as precedent passes; new-branch pushes are not guarded (a push opens
   no PR); `git push` and the MCP branch-write tools are ai-config#5784 part B.
 """
@@ -37,6 +40,7 @@ LOOKS_LIKE_CREATE = re.compile(r"\b(?:gh\s+pr|glab\s+mr)\s+(?:create|new)\b")
 PASTED = re.compile(r"<(system-reminder|pasted_content)\b[^>]*>.*?(?:</\1>|\Z)", re.S)
 REPO_ENV = {"gh": "GH_REPO", "glab": "GITLAB_REPO"}
 GH_REMOTE_ORDER = ("upstream", "github", "origin")
+LAB_OWNERS = ("morrison-lab",)  # GitHub owners whose repos need no naming (ai-config#6072)
 
 
 def _key(path):
@@ -345,6 +349,11 @@ def named(key, texts):
     return any(rx.search(t) for t in texts)
 
 
+def lab_repo(key, label):
+    """True for a GitHub (MCP or gh) target that a lab owner owns; a glab target never counts."""
+    return bool(key) and not label.startswith("`glab") and key.split("/")[0] in LAB_OWNERS
+
+
 def decide(payload):
     """(decision, text): decision in {"deny", "note", None}."""
     tool, inp = payload.get("tool_name") or "", payload.get("tool_input")
@@ -352,6 +361,7 @@ def decide(payload):
     cmd = inp.get("command") if tool == "Bash" and isinstance(inp.get("command"), str) else ""
     found = ([(_key(f"{inp.get('owner') or ''}/{inp.get('repo') or ''}"), f"`{tool}`")] if tool in MCP_CREATE
              else creations(cmd, payload.get("cwd") or None) if re.search(r"\b(?:gh|glab)\b", cmd) else [])
+    found = [(k, label) for k, label in found if not lab_repo(k, label)]
     if not found or os.environ.get("ALLOW_UNNAMED_REPO_PR") == "1":
         return None, ""
     tpath, sweep = payload.get("transcript_path"), load_sibling(__file__, "no-unrequested-sweep-pr.py")

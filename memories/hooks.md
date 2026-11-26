@@ -1209,4 +1209,12 @@ Three hook PRs in one wave surfaced gaps where a hook read a command differently
 - **Don't:** test a hook only from the repo root under a default git config, with every flag spelled out in full.
 - **Don't:** match a flag as a separate exact token, such as `-X`, when git or `gh` also accepts it inside a cluster or as a prefix.
 
+## `handoff-ask-needs-why` checks each turn, not each claim
+
+The hook denies a message_coordinator or post_message that says the user's input is needed unless an adversarial subagent ran in the same turn.
+A check from an earlier turn does not count, so restating an old blocker ("still waiting on Ezra's reply") is denied again (2026-11-26, lds CI-queue thread).
+
+- **Do:** when the blocker is unchanged, write "unchanged from my last report in this thread" rather than restating it.
+- **Don't:** repeat a waiting-on-user claim without a fresh adversarial check in that turn.
+
 See also `scripts/check-text-encoding.py`, which flags bare `write_text` (give `encoding=`), and `skills/mwc/SKILL.md`, which names the `expectedHeadSha` pin the GitHub MCP `merge_pull_request` takes.

@@ -35,6 +35,13 @@ and reads as prose to the person editing it.
 **How to apply:** `scripts/check-hook-prose-literals.py` fails a hook
 that gains a non-docstring string literal or f-string
 of 8 or more source lines.
+It counts implicitly concatenated adjacent strings as one literal,
+so a long regex counts too, comment lines between its parts included.
+Widening a hook regex by one alternative pushed `handoff-ask-needs-why.py`'s `LEAD` past the limit
+([ai-config#6133](https://github.com/Morrison-Lab/ai-config/pull/6133)).
+Split the new alternative into a named constant joined with `+`,
+and run `python3 scripts/run-local-validation.py --changed --base origin/main` before the push,
+since CI's `validate` stops at the first failing step.
 The hooks that already carry them are listed in
 `scripts/hook-prose-literals-known.txt`,
 a ratchet whose counts may only fall.

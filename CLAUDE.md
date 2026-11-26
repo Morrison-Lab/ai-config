@@ -284,6 +284,7 @@ Existing code is not a source.
 Style is decided explicitly in psc and psw: "imitating existing code style is not a good justification for style choices"
 and "all style decisions must be made explicitly by the repo maintainers and recorded in psc or psw" (Ezra, 2026-11-10).
 A style choice neither guide states is a question for Ezra on psc or psw, never copied from surrounding code or text, and reviewers flag style they do not support.
+When a rule replaces an older form, the same PR rewrites every instruction-file example of the old form, since agents copy the example in front of them (lds, 2026-11-26: "why are we still linking with the page prefix").
 
 ## Issue or discussion? Pick the venue by best practice, not by precedent
 

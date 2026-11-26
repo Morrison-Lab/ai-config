@@ -970,6 +970,11 @@ Preview deploys were replaced the same way, leaving a PR's preview missing after
 A job cancelled before it got a runner has no log: `get_job_logs` answers 404.
 Read the job's check-run annotations instead (`repos/<o>/<r>/check-runs/<job id>/annotations`), which carry the cancel reason.
 
+A `status=` filter on `actions/runs` is not a count of live runs.
+Measured 2026-11-26 on Morrison-Lab/lds: `status=in_progress` reported a `total_count` of 259, then 159, with an empty `workflow_runs` list each time.
+Paging the newest 4,000 unfiltered runs (back to 2026-11-25 19:13 UTC) found no run that was not `completed`.
+To find active runs, page the unfiltered list and filter on `.status` yourself, and read a nonzero filtered count with empty rows as stale, not as a backlog.
+
 - **Do:** give a rare, must-run job its own group, `queue: max` (see the `queue` section below), or a re-run on that annotation.
 - **Do:** re-run a replaced preview deploy when its PR's preview 404s after a green build.
 - **Don't:** read a job's absent log as a runner failure, or a cancelled cleanup as harmless because the next one will run.

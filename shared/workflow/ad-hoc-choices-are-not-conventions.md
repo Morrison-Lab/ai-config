@@ -42,6 +42,25 @@ It is not copied from a neighbouring file.
 - **Do:** when psc or psw is silent on a style choice, file an issue there asking Ezra, and follow his answer once it is in the guide.
 - **Don't:** justify a style choice by "the surrounding code or text does it this way".
 
+## A superseded form left in an instruction file is still taught
+
+When a rule replaces an older form, the instruction files that show the older form keep teaching it.
+Agents copy the example in front of them, and the links around the edit.
+So the PR that records the new rule also rewrites every example of the old form
+in the repository's instruction files (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `AUTHORING.md` and the rest),
+and adds a diff-scoped check that fails a PR adding the old form, where the form is decidable.
+It does not sweep the old form out of content, which needs Ezra's approval.
+
+The case: on 2026-11-24 lds's `CLAUDE.md` said a bare `[text](#id)` link needs no page name (lds#3125).
+`.github/copilot-instructions.md` still gave `[the gradient](gradient-descent.qmd#sol-the-gradient)` as its model,
+and `AUTHORING.md` still said a lab must name the chapter page.
+Two days later Ezra asked "why are we still linking with the page prefix":
+five open PRs had added page-prefixed links.
+[lds#3242](https://github.com/Morrison-Lab/lds/pull/3242) fixed both files and added `tools/check_page_prefixed_links.py`.
+
+- **Do:** when a rule changes, grep every instruction file for the old form and rewrite it in the same PR.
+- **Don't:** treat the newest rule line as enough while an older example in another file still shows the old form.
+
 ## Writer and reviewer instructions
 
 Writers follow the rule above.

@@ -73,8 +73,8 @@ TOOL_RX = re.compile(
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 _MODAL = (
-    r"\b(I|we)(\s*['’](ll|m going to|re going to)"
-    r"| will| shall| am going to| are going to| won['’]t| will not)\b"
+    r"\b(I|we)(\s*['\u2019](ll|m going to|re going to)"
+    r"| will| shall| am going to| are going to| won['\u2019]t| will not)\b"
 )
 FUTURE_RX = re.compile(
     r"\b(from now on|going forward|moving forward|henceforth|from here on"
@@ -83,7 +83,10 @@ FUTURE_RX = re.compile(
 )
 MODAL_RX = re.compile(_MODAL, re.I)
 HABIT_RX = re.compile(
-    _MODAL + r"( now)? (always|never|make sure|be sure to|remember to|make a point of)\b",
+    # "I'll always be here to help" is a courtesy, not a work commitment
+    # (review of ai-config#6159), so "always/never be" is left out.
+    _MODAL + r"( now)? ((always|never)\b(?! be\b)|make sure|be sure to|remember to"
+    r"|make a point of)",
     re.I,
 )
 STOPGAP_RX = re.compile(
@@ -92,7 +95,7 @@ STOPGAP_RX = re.compile(
     re.I,
 )
 # Quoted words are a report of someone's words, not this message's promise.
-QUOTED_RX = re.compile(r'"[^"\n]*"|“[^”\n]*”|^[ \t]*>.*$', re.M)
+QUOTED_RX = re.compile(r'"[^"\n]*"|\u201c[^\u201d\n]*\u201d|^[ \t]*>.*$', re.M)
 NAME_RX = re.compile(r"[\w./-]*?([\w-]+\.(?:py|sh|ya?ml|R))\b|\b([a-z]+(?:-[a-z0-9]+){1,})\b")
 
 

@@ -54,6 +54,9 @@ CASES = [
     ("The hook catches `from now on, I'll` phrasing.", False, "a code span passes"),
     ("In the future tense section, nothing changes.", False, "no modal passes"),
     ("Done.", False, "unrelated text passes"),
+    ("I'll always be here to help.", False, "a courtesy with 'always be' passes"),
+    ("I\u2019ll always read the PR first.", True, "a curly apostrophe is still refused"),
+    ("He said \u201cfrom now on, I'll check\u201d.", False, "curly-quoted words pass"),
 ]
 
 

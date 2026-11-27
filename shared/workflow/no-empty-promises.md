@@ -7,6 +7,12 @@ Every commitment of the form "going forward, I will X", "from now on I won't Y",
 "I'll always Z", "I won't do that again", "that is owed by me" must ship an **implemented
 accountability mechanism in the same turn** --- or not be made at all.
 
+A message to a person or a relay to the coordinator is held to a stricter form: a standing promise in it names, in the same paragraph, the hook, script or workflow file that already enforces it ("`no-unfetched-pr-state-claim.py` now refuses a ready claim with no mergeability read").
+A memory entry or a planned hook does not keep it.
+Build and merge the mechanism first, or state the fact without the promise.
+`hooks/no-unenforced-promise.py` denies a hearthbot message that breaks this (Ezra, 2026-11-26: "why haven't you written a check", after the coordinator sent "From now on, I'll check every PR for conflicts";
+ai-config#6157).
+
 The same rule applies to a concrete claim that automation will finish later:
 "GitLab will launch the next review round," "GitHub Actions will run CI," or
 "the review bot will post a review."

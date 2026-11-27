@@ -1766,7 +1766,9 @@ INFRA_GRANT_OWNERS = frozenset({"morrison-lab"})
 #     and lint, spell and link-check configuration;
 #   - agent configuration: CLAUDE.md, AGENTS.md and GEMINI.md at any depth,
 #     `.claude/`, and Copilot's instructions (both under `.github/`).
-#   - checkers: `tools/check_*` and `tools/check-*` scripts and `tools/tests/`.
+#   - checkers: `tools/check_*` and `tools/check-*` scripts, `tools/tests/`,
+#     and the `tools/<name>_known.txt` ratchet files checkers read
+#     (ai-config#6158).
 #     A blanket `tools/` is absent: lds keeps figure and data generators there,
 #     which change what readers see (ai-config#5102).
 #   - preview and CI helpers under `tools/`, by name: each one's job is what
@@ -1792,6 +1794,9 @@ INFRA_PATH_PATTERNS = tuple(re.compile(p) for p in (
     r"inst/WORDLIST",
     r"tools/check[_-][\w.-]+",
     r"tools/tests/.+",
+    # A checker's ratchet file (lds tools/calendar_refs_known.txt), which only
+    # that checker reads (ai-config#6158, lds#3251).
+    r"tools/[a-z0-9_]+_known\.txt",
     r"tools/skip(?:-pdf-in-previews|_pdf_in_previews)\.py",
     r"tools/rerun(?:-timed-out|_timed_out)\.py",
 ))

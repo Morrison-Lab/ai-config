@@ -91,7 +91,29 @@ READY = "PR mcsg#52 is ready to merge."
 HOMEWORK = "Next up is to draft Homework 2-6."
 
 # (pre-events, text, expected_block, label). Each runs in both modes.
+# The lds#3251 incident (ai-config#6157): called ready, had merge conflicts.
+LDS3251 = "lds#3251 is ready for your merge."
+GET3251_OK = [call("g1", name="mcp__github__pull_request_read", method="get",
+                   owner="Morrison-Lab", repo="lds", pullNumber=3251),
+              result("g1", '{"number": 3251, "mergeable": true, "mergeable_state": "clean"}')]
+GET3251_DIRTY = [call("g1", name="mcp__github__pull_request_read", method="get",
+                      owner="Morrison-Lab", repo="lds", pullNumber=3251),
+                 result("g1", '{"number": 3251, "mergeable": false, "mergeable_state": "dirty"}')]
+GET3251_PARTS = [call("g1", name="mcp__github__pull_request_read", method="get",
+                      owner="Morrison-Lab", repo="lds", pullNumber=3251),
+                 result("g1", [{"type": "text", "text": '{"mergeable_state": "dirty"}'}])]
+VIEW3251_CONFLICT = [call("b1", command="gh pr view 3251 -R Morrison-Lab/lds --json mergeable"),
+                     result("b1", '{"mergeable":"CONFLICTING"}')]
+
 CASES = [
+    ([USER], LDS3251, True, "the lds#3251 incident blocks with no read"),
+    ([USER] + LISTPRS, LDS3251, True, "the lds#3251 incident blocks after a state-only list"),
+    ([USER] + GET3251_OK, LDS3251, False, "a get showing mergeable passes"),
+    ([USER] + GET3251_DIRTY, LDS3251, True, "a get showing conflicts does not cover ready"),
+    ([USER] + GET3251_PARTS, LDS3251, True, "a dirty result in text parts does not cover ready"),
+    ([USER] + VIEW3251_CONFLICT, LDS3251, True, "gh pr view showing CONFLICTING does not cover"),
+    ([USER] + GET3251_DIRTY, "lds#3251 has merge conflicts.", False,
+     "reporting the conflicts passes"),
     # The incidents
     ([USER], INCIDENT, True, "the mcsg#52 incident blocks with no fetch"),
     ([USER], "It's waiting on your merge.", True, "unnumbered merge claim blocks"),
@@ -301,10 +323,11 @@ def main():
             out = run({"transcript_path": path, "tool_name": "mcp__hearthbot__post_message",
                        "tool_input": {"text": text}}, d).stdout
             return '"deny"' in out
-        first, second = deny(INCIDENT), deny(INCIDENT)
+        # Pending-state claims stay capped; merge-readiness ones are not (#6157).
+        first, second = deny("mcs#14 is still open."), deny("mcs#14 is still open.")
         check(first and not second, "sentinel refuses the same text only once")
-        third = deny("It's waiting on your merge.")
-        fourth = deny("I think it may be waiting on your merge.")
+        third = deny("#52 hasn't been merged yet.")
+        fourth = deny("I think #52 hasn't been merged yet.")
         check(third and not fourth, "a reworded claim is refused at most twice per turn")
     finally:
         os.unlink(path)
@@ -315,6 +338,25 @@ def main():
     finally:
         os.unlink(other)
     check('"deny"' in out, "another transcript's sentinel does not excuse this one")
+
+    # ai-config#6157: a merge-readiness claim is refused every time at
+    # PreToolUse, so resending the same "ready" cannot get it through, and it
+    # is refused on the relays that carry a thread's "ready" to the coordinator.
+    d = tempfile.mkdtemp()
+    path = write([USER])
+    try:
+        outs = [run({"transcript_path": path, "tool_name": "mcp__hearthbot__post_message",
+                     "tool_input": {"text": LDS3251}}, d).stdout for _ in range(4)]
+        check(all('"deny"' in o for o in outs), "a ready claim is not capped at PreToolUse")
+        for tool in ("mcp__hearthbot__message_coordinator", "mcp__hearthbot__message_thread"):
+            out = run({"transcript_path": path, "tool_name": tool,
+                       "tool_input": {"text": LDS3251}}, d).stdout
+            check('"deny"' in out and "ai-config#6157" in out, f"{tool} ready claim is refused")
+        out = run({"transcript_path": path, "tool_name": "mcp__hearthbot__message_coordinator",
+                   "tool_input": {"text": "#52 hasn't been merged yet."}}, d).stdout
+        check(not out.strip(), "a relay gets only the merge-readiness check")
+    finally:
+        os.unlink(path)
 
     bad = subprocess.run([sys.executable, HOOK], input="not json",
                          capture_output=True, text=True)

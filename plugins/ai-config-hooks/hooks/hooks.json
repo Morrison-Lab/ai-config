@@ -2121,6 +2121,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unenforced-promise.py\"'",
+            "timeout": 10,
+            "script": "no-unenforced-promise.py",
+            "why": "Ezra, 2026-11-26 23:01 PST, 'why haven't you written a check': the coordinator had told him 'From now on, I'll check every PR for conflicts' and 'Until the hook lands, I'll get the conflict check from a thread', with nothing enforcing either; no-empty-promise.py runs only at Stop, after a hearthbot post has reached the person, and a memory write discharges it. Denies a hearthbot post_message, reply, update_message, edit_message, message_thread or message_coordinator call whose paragraph makes a standing first-person promise (from now on / going forward ... I'll; I'll always, never or make sure; until X lands, I'll) unless that paragraph names a hook, script or workflow file that already exists in ai-config or the current repo. No resend escape; fails open."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-macro-claim-without-definition.py\"'",
             "timeout": 10,
             "script": "no-macro-claim-without-definition.py",

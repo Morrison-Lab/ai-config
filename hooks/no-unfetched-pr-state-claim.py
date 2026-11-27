@@ -45,7 +45,12 @@ Two kinds of claim, with different evidence:
      (with no `--jq`, or a `--jq` naming `mergeable`), `gh pr view N` asking
      for `mergeable` or `mergeStateStatus`, `build-pr-payload.py`, or
      `check-pr-fully-clean.py`. A sentence that calls the state "unverified"
-     passes, so the reply can say plainly what it could not check.
+     passes, so the reply can say plainly what it could not check. A read
+     whose result SHOWS conflicts (`"mergeable": false`, `CONFLICTING`,
+     `dirty`) does not cover the claim. This kind also runs on
+     `message_coordinator` and `message_thread`, which carry a thread's
+     "ready" to the coordinator, and at PreToolUse it is not capped, so
+     resending the same "ready" never gets it through.
 
 Text in code spans, in double or curly quotes, and on blockquote lines is a
 quotation rather than a claim, and is skipped.
@@ -93,6 +98,19 @@ REPLY_TOOL_RX = re.compile(
     r"^mcp__hearthbot__(reply|post_message|update_message|edit_message)$"
 )
 MAX_FIRES_PER_TURN = 2
+# The merge-readiness check also runs on the relays that carry a thread's
+# "ready" to the coordinator (ai-config#6157); the other checks do not.
+READY_TOOL_RX = re.compile(
+    r"^mcp__hearthbot__(reply|post_message|update_message|edit_message"
+    r"|message_coordinator|message_thread)$"
+)
+# A result showing the PR cannot merge cleanly (ai-config#6157).
+CONFLICT_RX = re.compile(
+    r"[\"']?mergeable[\"']?\s*[:=]\s*[\"']?(false|CONFLICTING)\b"
+    r"|mergeable_?state[\"']?\s*[:=]\s*[\"']?dirty\b"
+    r"|merge_?state_?status[\"']?\s*[:=]\s*[\"']?dirty\b",
+    re.I,
+)
 
 _WHO = r"(your|ezra'?s|the user'?s|the|a|an|human|their|his|her)"
 _PR_ACT = r"(merge|merging|mwc|review|approval|sign-?off|go-?ahead|merge words?)"
@@ -309,9 +327,22 @@ def classify_call(block):
     return prs, pr_list, work, merge
 
 
+def _result_text(block):
+    """The text of a tool_result block, whether a string or a list of parts."""
+    content = block.get("content")
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    return "\n".join(
+        c.get("text") for c in content
+        if isinstance(c, dict) and isinstance(c.get("text"), str)
+    )
+
+
 def turn_reads(path):
     """Live reads since the last user turn, whether a reply went through, and the turn's id."""
-    calls, errored, replies = {}, set(), set()
+    calls, errored, replies, conflicted = {}, set(), set(), set()
     turn = 0
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
@@ -324,6 +355,7 @@ def turn_reads(path):
                     continue
                 if _is_user_turn(m):
                     calls, errored, replies, turn = {}, set(), set(), idx
+                    conflicted = set()
                 for b in _blocks(m):
                     if not isinstance(b, dict):
                         continue
@@ -332,8 +364,13 @@ def turn_reads(path):
                             replies.add(b.get("id"))
                         else:
                             calls[b.get("id")] = classify_call(b)
-                    elif b.get("type") == "tool_result" and b.get("is_error"):
-                        errored.add(b.get("tool_use_id"))
+                    elif b.get("type") == "tool_result":
+                        if b.get("is_error"):
+                            errored.add(b.get("tool_use_id"))
+                        # A read that SHOWS conflicts is evidence against
+                        # "ready", not for it (ai-config#6157).
+                        if CONFLICT_RX.search(_result_text(b)):
+                            conflicted.add(b.get("tool_use_id"))
     except Exception:
         pass
     prs, pr_list, work, merge = set(), False, False, set()
@@ -341,7 +378,8 @@ def turn_reads(path):
         if cid in errored:
             continue
         prs |= p
-        merge |= mg
+        if cid not in conflicted:
+            merge |= mg
         pr_list = pr_list or lst
         work = work or w
     replied = any(r not in errored for r in replies)
@@ -412,26 +450,27 @@ def find_claim(prose, prs, pr_list, work, merge=frozenset()):
     return None
 
 
+# realpath, not abspath: the plugin registers hooks through a symlinked path
+# (scripts/check-hook-file-resolution.py).
+READY_MESSAGE = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                             "messages", "no-unfetched-pr-state-claim-ready.md")
+READY_FALLBACK = ("[hook: no-unfetched-pr-state-claim] This message calls a PR ready "
+                  "(\"{phrase}\") and nothing this turn read {which}'s mergeability. "
+                  "ai-config#6157, ai-config#4834.")
+
+
 def reason_for(kind, phrase, missing):
     if kind == "mergeable":
         which = (
             "PR " + ", ".join(f"{r or ''}#{n}" for r, n in missing)
             if missing else "the PR it names"
         )
-        return (
-            "[hook: no-unfetched-pr-state-claim] This message says a PR is ready "
-            f"or waits on a merge (\"{phrase.strip()}\"), and nothing since the "
-            f"last user turn read {which}'s mergeability. On 2026-11-26 lds#3251 "
-            "was on the user's merge list with merge conflicts (\"3251 has merge "
-            "conflicts; always check\"). A PR list, a search, hearthbot list_prs "
-            "or `gh pr view --json state` says it is open, not that it can "
-            "merge.\n\n"
-            "Read it now: GitHub MCP pull_request_read method get (mergeable_state), "
-            "`gh api repos/O/R/pulls/N`, `gh pr view N --json mergeable,mergeStateStatus`, "
-            "or build-pr-payload.py / check-pr-fully-clean.py. If it reads dirty, "
-            "resolve the conflicts first. If it cannot be read, say the state is "
-            "unverified. ai-config#6157, ai-config#4834."
-        )
+        try:
+            with open(READY_MESSAGE, encoding="utf-8") as fh:
+                template = fh.read().strip()
+        except Exception:
+            template = READY_FALLBACK
+        return template.replace("{which}", which).replace("{phrase}", phrase.strip())
     if kind == "pr":
         which = (
             "PR " + ", ".join(f"{r or ''}#{n}" for r, n in missing)
@@ -491,9 +530,11 @@ def main() -> int:
     path = payload.get("transcript_path") or ""
     tool_name = payload.get("tool_name")
 
+    relay_only = False
     if tool_name is not None:
-        if not REPLY_TOOL_RX.match(str(tool_name)):
+        if not READY_TOOL_RX.match(str(tool_name)):
             return 0
+        relay_only = not REPLY_TOOL_RX.match(str(tool_name))
         inp = payload.get("tool_input")
         text = inp.get("text") if isinstance(inp, dict) else None
         if not isinstance(text, str) or not text.strip():
@@ -508,8 +549,18 @@ def main() -> int:
             return 0
 
     prose = QUOTED_RX.sub(" ", strip_code(text))
-    hit = find_claim(prose, prs, pr_list, work, merge)
-    if not hit or not _may_fire(text, path, turn):
+    if relay_only:
+        hit = find_merge_claim(prose, merge)
+    else:
+        hit = find_claim(prose, prs, pr_list, work, merge)
+    if not hit:
+        return 0
+    # A merge-readiness denial at PreToolUse is not capped: resending the same
+    # "ready" must not get it through (ai-config#6157). A read, or saying the
+    # state is unverified, is the way past. Stop keeps the cap, so a session
+    # that cannot reach the forge is never wedged.
+    uncapped = hit[0] == "mergeable" and tool_name is not None
+    if not uncapped and not _may_fire(text, path, turn):
         return 0
     reason = reason_for(*hit)
     if tool_name is not None:

@@ -221,6 +221,28 @@ Selftest negative controls and runner notices have no fix to name, because nothi
 - **Do:** call each one a false positive and give the reason, for example "a negative control whose fixture is built to fail".
 - **Don't:** describe them as another PR's failures.
 
+A real finding with no fix in sight still passes the hook once the paragraph links a tracking issue.
+On [gha#2140](https://github.com/Morrison-Lab/gha/pull/2140) (2026-11-27) the fix that worked was filing [gha#2209](https://github.com/Morrison-Lab/gha/issues/2209) and linking it in that paragraph.
+- **Do:** file the issue first, then write the disposition with its link.
+- **Don't:** retry the same wording hoping the hook relents.
+
+## Reading annotations and fetching tags in a thread that refreshes a merged PR
+
+Learned on [gha#2140](https://github.com/Morrison-Lab/gha/pull/2140) (2026-11-27).
+
+- `scripts/batch-read-annotations.py` prints text, not JSON.
+  Its last stdout line is the comma-separated list of run ids to pass to `check-pr-fully-clean.py --annotations-read`.
+  With about 117 runs it took over 2 minutes.
+- **Do:** start it in the background, then read its output and paste the last line's ids literally into the checker command.
+- **Don't:** run it in the foreground and wait, or pipe it through `jq`.
+- After a merged PR's branch is deleted, a plain `git fetch --tags` in a clone made with `--single-branch` fails with exit 128, because the configured refspec names the deleted branch.
+- **Do:** fetch the tag explicitly: `git fetch --force origin refs/tags/v3:refs/tags/v3`.
+- **Don't:** re-run `git fetch --tags` and read the old local tag as the slid one.
+- A shallow single-branch clone has no `origin/main`, so `git merge-base` fails.
+- **Do:** deepen first with `git fetch --depth=100000 origin main <branch>`, in its own Bash call, then merge in the next call.
+  The merge hook refuses a fetch and merge chained in one command.
+- **Don't:** chain a fetch and a merge in one command.
+
 ## A card tap for a new repo, from a session older than the guard fix
 
 `no-unnamed-repo-pr` read only top-level user records, so a decision-card tap that arrived mid-turn, as a `queued_command` attachment, never named the repo for it.

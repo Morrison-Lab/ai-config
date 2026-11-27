@@ -185,6 +185,7 @@ Learned on [ai-config#5023](https://github.com/Morrison-Lab/ai-config/pull/5023)
 - Run `check-pr-fully-clean.py` as its own Bash call, with no `&&` and no pipe.
   Pass `--annotations-read=all` after `-R` only once you have read every listed annotation and posted a comment beginning `Annotation dispositions for head <sha7>:`, which the checker requires (ai-config#4893).
   The merge hook does not credit a compound or piped run.
+  After posting the dispositions comment, rebuild the `--from-json` payload with `build-pr-payload.py` before rerunning the checker: a payload built before the comment does not hold it, so the checker still fails on #4893 (ai-config#6166, 2026-11-27).
 - **Do:** in that dispositions comment, give each real warning its fix (link the tracking issue, such as [#5412](https://github.com/Morrison-Lab/ai-config/issues/5412) for the Node.js 20 `actions/checkout` pin), and call a negative-control fixture an expected outcome with nothing to fix.
 - **Don't:** write "not this PR's" or "pre-existing" with no fix named: `hooks/no-unfixed-preexisting-failure.py` denies the comment (ai-config#6142 and #6144, 2026-11-25).
 - `validate` runs twice on one head (pull_request and push events), and the checker blocks until both finish.

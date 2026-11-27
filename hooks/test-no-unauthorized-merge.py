@@ -1417,6 +1417,13 @@ _infra_case("tools/ checkers and their tests are infra", "allow",
 _infra_case("a checker plus its tools/ ratchet file is infra (ai-config#6158)", "allow",
             ["tools/check_calendar_refs.py", "tools/calendar_refs_known.txt"],
             f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("root instruction files are infra (lds#3279)", "allow",
+            ["AUTHORING.md", ".github/copilot-instructions.md", "CONTRIBUTING.md",
+             "CLAUDE.md", "AGENTS.md"],
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("a nested AUTHORING.md is not infra", "BLOCK",
+            ["chapters/AUTHORING.md"],
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a nested or non-txt _known file is not infra", "BLOCK",
             ["tools/data/x_known.txt", "tools/x_known.csv"],
             f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")

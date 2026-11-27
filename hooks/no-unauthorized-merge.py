@@ -1788,6 +1788,10 @@ INFRA_PATH_PATTERNS = tuple(re.compile(p) for p in (
     r"\.github/.+",
     r"\.claude/.+",
     r"(?:.+/)?(?:CLAUDE|AGENTS|GEMINI)\.md",
+    # A repo's own authoring or contributing instructions, at the root only
+    # (lds AUTHORING.md: lds#3246, lds#3279). A chapter named AUTHORING.md
+    # deeper in the tree is content, so the pattern is not path-prefixed.
+    r"(?:AUTHORING|CONTRIBUTING)\.md",
     r"\.lintr(?:\.R)?",
     r"lychee\.toml",
     r"_typos\.toml",

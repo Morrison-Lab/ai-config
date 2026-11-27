@@ -68,6 +68,10 @@ TWO_VIEWS = [call("b1", command="gh pr view 57 -R Morrison-Lab/dds --json state 
                                 "gh pr view 27 -R Morrison-Lab/dlg --json state -q .state"),
              result("b1")]
 GHVIEW_CUR = [call("b1", command="gh pr view --json state"), result("b1")]
+GHVIEW_MERGE = [call("b1", command="gh pr view 52 -R Morrison-Lab/mcsg --json mergeable,mergeStateStatus"),
+                result("b1")]
+CHECKER = [call("b1", command="python3 scripts/check-pr-fully-clean.py 52 -R Morrison-Lab/mcsg"),
+           result("b1")]
 GREP_PULLS = [call("b1", command="grep repos/Morrison-Lab/mcsg/pulls/52 notes.md"), result("b1")]
 ORIGIN_LOG = [call("b1", command="git log --oneline origin/main -5"), result("b1")]
 GH_MERGE = [call("b1", command="gh pr merge 52 --squash"), result("b1")]
@@ -82,6 +86,8 @@ ERRORED = [call("g1", name="mcp__github__pull_request_read", method="get",
            result("g1", "Not Found", is_error=True)]
 
 INCIDENT = "mcsg#52 is waiting on your merge."
+REVIEW = "PR mcsg#52 is awaiting review."
+READY = "PR mcsg#52 is ready to merge."
 HOMEWORK = "Next up is to draft Homework 2-6."
 
 # (pre-events, text, expected_block, label). Each runs in both modes.
@@ -115,10 +121,10 @@ CASES = [
 
     # A live read of the same PR passes
     ([USER] + GET52, INCIDENT, False, "pull_request_read get of #52 passes"),
-    ([USER] + GHVIEW, INCIDENT, False, "gh pr view 52 passes"),
+    ([USER] + GHVIEW, REVIEW, False, "gh pr view 52 passes a review claim"),
     ([USER] + GHAPI, INCIDENT, False, "gh api .../pulls/52 passes"),
-    ([USER] + LISTPRS, INCIDENT, False, "hearthbot list_prs passes"),
-    ([USER] + GHLIST, INCIDENT, False, "gh pr list passes"),
+    ([USER] + LISTPRS, REVIEW, False, "hearthbot list_prs passes a review claim"),
+    ([USER] + GHLIST, REVIEW, False, "gh pr list passes a review claim"),
     ([USER] + GET52, "It's waiting on your merge.", False,
      "unnumbered claim passes after a PR fetch"),
     # ...and a read of something else does not
@@ -128,18 +134,38 @@ CASES = [
     ([USER] + ERRORED, INCIDENT, True, "an errored fetch does not count"),
     ([USER] + FETCH, INCIDENT, True, "a git fetch does not read a PR's state"),
     ([USER] + OTHER_REPO, INCIDENT, True, "a fetch of another repo's #52 does not cover mcsg#52"),
-    ([USER] + SAME_REPO, INCIDENT, False, "a fetch of mcsg#52 by repo covers mcsg#52"),
-    ([USER] + GHVIEW_URL, INCIDENT, False, "gh pr view with a PR URL passes"),
-    ([USER] + TWO_VIEWS, "dlg#27 is waiting on your merge.", False,
+    ([USER] + SAME_REPO, REVIEW, False, "a fetch of mcsg#52 by repo covers mcsg#52"),
+    ([USER] + GHVIEW_URL, REVIEW, False, "gh pr view with a PR URL passes"),
+    ([USER] + GHVIEW_URL, INCIDENT, True,
+     "plain gh pr view output carries no mergeability"),
+    ([USER] + TWO_VIEWS, "dlg#27 is awaiting review.", False,
      "the second gh pr view in a chain counts under its own -R repo (#5694)"),
-    ([USER] + TWO_VIEWS, "dds#57 is waiting on your merge.", False,
+    ([USER] + TWO_VIEWS, "dds#57 is awaiting review.", False,
      "the first gh pr view in a chain still counts"),
-    ([USER] + TWO_VIEWS, "dds#27 is waiting on your merge.", True,
+    ([USER] + TWO_VIEWS, "dds#27 is awaiting review.", True,
      "the second view's number is not filed under the first view's repo"),
     ([USER] + GREP_PULLS, INCIDENT, True, "grep of a /pulls/52 string is not a fetch"),
-    ([USER] + GHVIEW_CUR, "It's waiting on your merge.", False,
+    ([USER] + GHVIEW_CUR, "It's awaiting review.", False,
      "numberless gh pr view covers an unnumbered claim"),
-    ([USER] + GHVIEW_CUR, INCIDENT, True, "numberless gh pr view does not cover #52"),
+    ([USER] + GHVIEW_CUR, REVIEW, True, "numberless gh pr view does not cover #52"),
+
+    # Merge readiness needs a live mergeability read (ai-config#6157, lds#3251)
+    ([USER], READY, True, "a ready-to-merge claim blocks with no read"),
+    ([USER] + LISTPRS, READY, True, "list_prs reports no mergeability"),
+    ([USER] + LISTPRS, INCIDENT, True, "list_prs does not cover an awaiting-merge claim"),
+    ([USER] + GHLIST, READY, True, "gh pr list reports no mergeability"),
+    ([USER] + GHVIEW, READY, True, "gh pr view --json state reports no mergeability"),
+    ([USER] + SAME_REPO, READY, True, "a jq filter without mergeable does not count"),
+    ([USER] + GET52, READY, False, "pull_request_read get reports mergeable_state"),
+    ([USER] + GHAPI, READY, False, "an unfiltered gh api pulls/52 reports mergeable_state"),
+    ([USER] + GHVIEW_MERGE, READY, False, "gh pr view --json mergeable passes"),
+    ([USER] + CHECKER, READY, False, "check-pr-fully-clean.py 52 passes"),
+    ([USER] + GET53, READY, True, "a mergeability read of #53 does not cover #52"),
+    ([USER], "#52 is ready for your review.", True, "ready for your review blocks"),
+    ([USER], "mcsg#52 looks mergeable.", True, "'looks mergeable' blocks"),
+    ([USER] + LISTPRS, "PR mcsg#52 is ready to merge (unverified).", False,
+     "a claim marked unverified passes after a state read"),
+    ([USER], "The spec is ready.", False, "'ready' with no PR reference passes"),
     ([STRING_USER] + [], INCIDENT, True,
      "a string user turn after a reminder prefix still resets the turn"),
     (GET52 + [STRING_USER], INCIDENT, True,
@@ -250,7 +276,7 @@ def main():
     out = run({"transcript_path": path, "tool_name": "mcp__hearthbot__post_message",
                "tool_input": {"text": INCIDENT}}).stdout
     os.unlink(path)
-    check("read PR mcsg#52 live" in out, "the reason names the unfetched PR and repo")
+    check("read PR mcsg#52" in out, "the reason names the unfetched PR and repo")
 
     # A non-reply tool is ignored at PreToolUse.
     path = write([USER])

@@ -434,3 +434,22 @@ The first, an escape inside an ordinary double-quoted string, is left literal by
 The second, `$'\u2014'`, is the case above.
 Both passed on the backslash not being a word character;
 `od -c` is what showed neither produced the glyph.)
+
+## The Write and Edit tools can decode an escape you typed
+
+The opposite failure also happens in Python source written through an agent's Write or Edit tool, or through a Bash heredoc.
+A backslash-u escape typed inside a regex or string literal,
+such as the four-hex-digit escape for U+2019 RIGHT SINGLE QUOTATION MARK,
+can land on disk as the literal glyph,
+and `check-ascii-punctuation.py` then fails the push.
+(This paragraph names the escape instead of writing it, for the same reason.)
+
+- **Do:** after writing a source file that needs a curly quote or apostrophe, run `python3 scripts/check-ascii-punctuation.py` before pushing.
+- **Do:** when the glyph landed, convert it with a short script that builds the escape from `chr(92) + "u2019"` and prints `repr()` of the changed lines.
+- **Don't:** retype the escape with the same tool and expect a different result.
+
+(Measured 2026-11-26 on ai-config#6159:
+`hooks/no-unenforced-promise.py` was written with escapes for U+2019, U+201C and U+201D,
+and CI found five literal glyphs in it;
+a second Edit with the same escape text reported no change,
+and the first draft of this section, written through a heredoc, decoded its own examples too.)

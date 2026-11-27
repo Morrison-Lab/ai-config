@@ -200,6 +200,15 @@ On a message or PR comment that calls a head final, check that the transcript or
 A verdict alone is not that evidence.
 See [`fully-clean`](../../shared/workflow/fully-clean.md#read-the-check-runs-before-calling-a-head-final).
 
+## Standing promises and ready claims in messages
+
+On a message, relay or PR comment that makes a standing first-person promise ("from now on, I'll", "I'll always", "until the hook lands, I'll"), check that the same paragraph names a hook, script or workflow file that exists on the default branch and does what the promise says.
+Flag a promise kept only by a memory entry, a planned hook or the agent's intention.
+On a message that calls a PR ready or waiting on a merge, check that the same turn read that PR's mergeability (`mergeable` or `mergeable_state`) and that the reading was clean;
+a PR list or a state-only read is not that evidence.
+Read the evidence yourself; do not report the output of `hooks/no-unenforced-promise.py` or `hooks/no-unfetched-pr-state-claim.py` as your finding.
+See [`no-empty-promises`](../../shared/workflow/no-empty-promises.md) (ai-config#6157).
+
 ## Annotation comparisons
 
 On a message or PR comment that says a head adds no annotations beyond the base branch, check that the comparison read every page of check runs and annotations on both commits and compared them per check-run name.

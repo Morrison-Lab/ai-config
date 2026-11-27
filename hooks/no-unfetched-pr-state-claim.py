@@ -34,6 +34,24 @@ Two kinds of claim, with different evidence:
      forge write, a local checkout, a remote-tracking ref read without a fetch,
      and a memory note do not count; those are where a stale claim comes from.
 
+  3. Merge readiness -- "#52 is ready to merge", "ready for your review",
+     "waiting on your merge", "mergeable". Needs a read of that PR's
+     MERGEABILITY, not just its state (ai-config#6157). On 2026-11-26 lds#3251
+     sat on the user's merge list with merge conflicts; the user answered
+     "3251 has merge conflicts; always check". A list, a search, hearthbot
+     `list_prs`, or `gh pr view N --json state` says the PR is open and
+     nothing about conflicts. What counts: GitHub MCP `pull_request_read`
+     method get (it returns `mergeable_state`), `gh api repos/O/R/pulls/N`
+     (with no `--jq`, or a `--jq` naming `mergeable`), `gh pr view N` asking
+     for `mergeable` or `mergeStateStatus`, `build-pr-payload.py`, or
+     `check-pr-fully-clean.py`. A sentence that calls the state "unverified"
+     passes, so the reply can say plainly what it could not check. A read
+     whose result SHOWS conflicts (`"mergeable": false`, `CONFLICTING`,
+     `dirty`) does not cover the claim. This kind also runs on
+     `message_coordinator` and `message_thread`, which carry a thread's
+     "ready" to the coordinator, and at PreToolUse it is not capped, so
+     resending the same "ready" never gets it through.
+
 Text in code spans, in double or curly quotes, and on blockquote lines is a
 quotation rather than a claim, and is skipped.
 
@@ -80,6 +98,19 @@ REPLY_TOOL_RX = re.compile(
     r"^mcp__hearthbot__(reply|post_message|update_message|edit_message)$"
 )
 MAX_FIRES_PER_TURN = 2
+# The merge-readiness check also runs on the relays that carry a thread's
+# "ready" to the coordinator (ai-config#6157); the other checks do not.
+READY_TOOL_RX = re.compile(
+    r"^mcp__hearthbot__(reply|post_message|update_message|edit_message"
+    r"|message_coordinator|message_thread)$"
+)
+# A result showing the PR cannot merge cleanly (ai-config#6157).
+CONFLICT_RX = re.compile(
+    r"[\"']?mergeable[\"']?\s*[:=]\s*[\"']?(false|CONFLICTING)\b"
+    r"|mergeable_?state[\"']?\s*[:=]\s*[\"']?dirty\b"
+    r"|merge_?state_?status[\"']?\s*[:=]\s*[\"']?dirty\b",
+    re.I,
+)
 
 _WHO = r"(your|ezra'?s|the user'?s|the|a|an|human|their|his|her)"
 _PR_ACT = r"(merge|merging|mwc|review|approval|sign-?off|go-?ahead|merge words?)"
@@ -100,6 +131,28 @@ PR_STRONG_RX = re.compile(
 )
 # Merge wording is about a PR by itself; review or approval wording is not.
 MERGE_WORD_RX = re.compile(r"merg|mwc", re.I)
+
+# A claim that the PR can merge now, or is the user's to merge (ai-config#6157).
+# The first alternatives carry merge wording and count on their own; the last
+# (ready, mergeable, ready for review) counts only beside a PR reference.
+_MERGE_ACT = r"(merge|merging|mwc|merge words?|merge go-?ahead)"
+MERGE_READY_RX = re.compile(
+    r"\b" + _WAIT + r" (on|for) (" + _WHO + r" )?" + _MERGE_ACT + r"\b"
+    r"|\b(awaits?|awaiting) (" + _WHO + r" )?" + _MERGE_ACT + r"\b"
+    r"|\bready (for (you|ezra|the user) )?to (be )?merged?\b"
+    r"|\bready for (" + _WHO + r" )?(merge|mwc)\b"
+    r"|\bup for (" + _WHO + r" )?merge\b"
+    r"|\bfor (you|ezra|the user) to merge\b"
+    r"|\bneeds? (" + _WHO + r" )?(merge|mwc)\b"
+    r"|\bpending merge\b",
+    re.I,
+)
+READY_CONTEXT_RX = re.compile(
+    r"\b(is|are|now|looks?|reads?)( now)? (ready|mergeable|merge-?ready)\b"
+    r"|\bready for (" + _WHO + r" )?review\b",
+    re.I,
+)
+UNVERIFIED_RX = re.compile(r"\bunverified\b|\bnot (yet )?(re-?)?(checked|verified)\b", re.I)
 
 PR_WEAK_RX = re.compile(
     r"\b(is|are|still|remains?|stays?|sitting|sits)( still)? (open|in review|under review|unmerged)\b",
@@ -200,6 +253,8 @@ WORK_CMD_RX = re.compile(
     r"|\bgh (issue (view|list)|pr (view|list|status|diff)|search|api|release (view|list))\b"
     r"|\bglab (issue (view|list)|mr (view|list)|api)\b|api\.github\.com"
 )
+MERGEABLE_FIELD_RX = re.compile(r"\bmergeable|\bmergeStateStatus\b|\bmerge_status\b", re.I)
+JQ_FLAG_RX = re.compile(r"\s(--jq|-q)\b")
 
 def _blocks(m):
     blocks = (m.get("message") or {}).get("content") or m.get("content")
@@ -213,16 +268,22 @@ def classify_call(block):
                number "*" stands for the current branch's PR
     pr_list -- True when it read a list or search of PRs (covers any number)
     work    -- True when it read live forge or remote state of any kind
+    merge   -- {(repo or None, number)} whose MERGEABILITY the call read
+               (ai-config#6157); always a subset of prs
     """
     name = str(block.get("name") or "")
     inp = block.get("input") if isinstance(block.get("input"), dict) else {}
-    prs, pr_list, work = set(), False, False
+    prs, pr_list, work, merge = set(), False, False, set()
     if PR_LIST_TOOL_RX.match(name):
         pr_list = work = True
     if PR_ONE_TOOL_RX.match(name) and str(inp.get("method") or "get") == "get":
         num = inp.get("pullNumber", inp.get("issue_number"))
         if num is not None:
-            prs.add(((str(inp.get("repo") or "").lower() or None), str(num).lstrip("#")))
+            ref = ((str(inp.get("repo") or "").lower() or None), str(num).lstrip("#"))
+            prs.add(ref)
+            # pull_request_read get returns mergeable_state; issue_read does not.
+            if name == "mcp__github__pull_request_read" and "pullNumber" in inp:
+                merge.add(ref)
     if WORK_TOOL_RX.match(name):
         work = True
     cmd = inp.get("command")
@@ -240,25 +301,48 @@ def classify_call(block):
         for v in GH_VIEW_RX.finditer(cmd):
             args = REPO_FLAG_RX.sub(" ", v.group(2))
             nums = [next(g for g in a.groups() if g) for a in VIEW_ARG_RX.finditer(args)]
-            prs.update((own_repo(v.group(2)), n) for n in (nums[:1] or ["*"]))
+            refs = {(own_repo(v.group(2)), n) for n in (nums[:1] or ["*"])}
+            prs.update(refs)
+            if MERGEABLE_FIELD_RX.search(v.group(2)):
+                merge.update(refs)
         for a in API_ONE_RX.finditer(cmd):
-            prs.add(((a.group(1) or "").lower() or None, a.group(2) or a.group(3)))
+            ref = ((a.group(1) or "").lower() or None, a.group(2) or a.group(3))
+            prs.add(ref)
+            # The whole object carries mergeable_state; a --jq filter keeps
+            # only what it names.
+            if not JQ_FLAG_RX.search(cmd) or MERGEABLE_FIELD_RX.search(cmd):
+                merge.add(ref)
         for s in SCRIPT_RX.finditer(cmd):
             n = re.search(r"\s#?(\d+)\b", REPO_FLAG_RX.sub(" ", s.group(1)))
             if n:
-                prs.add((own_repo(s.group(1)), n.group(1)))
+                ref = (own_repo(s.group(1)), n.group(1))
+                prs.add(ref)
+                merge.add(ref)
         if PR_LIST_CMD_RX.search(cmd):
             pr_list = True
     if isinstance(cmd, str) and not WRITE_CMD_RX.search(cmd) and WORK_CMD_RX.search(cmd):
         work = True
     if prs or pr_list:
         work = True
-    return prs, pr_list, work
+    return prs, pr_list, work, merge
+
+
+def _result_text(block):
+    """The text of a tool_result block, whether a string or a list of parts."""
+    content = block.get("content")
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    return "\n".join(
+        c.get("text") for c in content
+        if isinstance(c, dict) and isinstance(c.get("text"), str)
+    )
 
 
 def turn_reads(path):
     """Live reads since the last user turn, whether a reply went through, and the turn's id."""
-    calls, errored, replies = {}, set(), set()
+    calls, errored, replies, conflicted = {}, set(), set(), set()
     turn = 0
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
@@ -271,6 +355,7 @@ def turn_reads(path):
                     continue
                 if _is_user_turn(m):
                     calls, errored, replies, turn = {}, set(), set(), idx
+                    conflicted = set()
                 for b in _blocks(m):
                     if not isinstance(b, dict):
                         continue
@@ -279,19 +364,26 @@ def turn_reads(path):
                             replies.add(b.get("id"))
                         else:
                             calls[b.get("id")] = classify_call(b)
-                    elif b.get("type") == "tool_result" and b.get("is_error"):
-                        errored.add(b.get("tool_use_id"))
+                    elif b.get("type") == "tool_result":
+                        if b.get("is_error"):
+                            errored.add(b.get("tool_use_id"))
+                        # A read that SHOWS conflicts is evidence against
+                        # "ready", not for it (ai-config#6157).
+                        if CONFLICT_RX.search(_result_text(b)):
+                            conflicted.add(b.get("tool_use_id"))
     except Exception:
         pass
-    prs, pr_list, work = set(), False, False
-    for cid, (p, lst, w) in calls.items():
+    prs, pr_list, work, merge = set(), False, False, set()
+    for cid, (p, lst, w, mg) in calls.items():
         if cid in errored:
             continue
         prs |= p
+        if cid not in conflicted:
+            merge |= mg
         pr_list = pr_list or lst
         work = work or w
     replied = any(r not in errored for r in replies)
-    return prs, pr_list, work, replied, turn
+    return prs, pr_list, work, merge, replied, turn
 
 
 def _covered(ref, prs):
@@ -303,8 +395,33 @@ def _negated(prose, start):
     return bool(NEGATED_BEFORE_RX.search(prose[max(0, start - 30):start]))
 
 
-def find_claim(prose, prs, pr_list, work):
+def find_merge_claim(prose, merge):
+    """(kind, phrase, missing_refs) for a merge-readiness claim with no mergeability read."""
+    hits = [(m, True) for m in MERGE_READY_RX.finditer(prose)]
+    hits += [(m, False) for m in READY_CONTEXT_RX.finditer(prose)]
+    for m, merge_word in sorted(hits, key=lambda h: h[0].start()):
+        if _negated(prose, m.start()):
+            continue
+        sentence = sentence_around(prose, m.start(), m.end())
+        if not merge_word and not PR_CONTEXT_RX.search(sentence):
+            continue
+        if UNVERIFIED_RX.search(sentence):
+            continue
+        named = claim_refs(sentence)
+        missing = sorted((r for r in named if not _covered(r, merge)), key=lambda r: int(r[1]))
+        if named and not missing:
+            continue
+        if not named and merge:
+            continue
+        return "mergeable", m.group(0), missing
+    return None
+
+
+def find_claim(prose, prs, pr_list, work, merge=frozenset()):
     """(kind, phrase, missing_refs) for the first unsupported claim, or None."""
+    hit = find_merge_claim(prose, merge)
+    if hit:
+        return hit
     for rx, strong in ((PR_STRONG_RX, True), (PR_WEAK_RX, False)):
         for m in rx.finditer(prose):
             if _negated(prose, m.start()):
@@ -333,7 +450,27 @@ def find_claim(prose, prs, pr_list, work):
     return None
 
 
+# realpath, not abspath: the plugin registers hooks through a symlinked path
+# (scripts/check-hook-file-resolution.py).
+READY_MESSAGE = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                             "messages", "no-unfetched-pr-state-claim-ready.md")
+READY_FALLBACK = ("[hook: no-unfetched-pr-state-claim] This message calls a PR ready "
+                  "(\"{phrase}\") and nothing this turn read {which}'s mergeability. "
+                  "ai-config#6157, ai-config#4834.")
+
+
 def reason_for(kind, phrase, missing):
+    if kind == "mergeable":
+        which = (
+            "PR " + ", ".join(f"{r or ''}#{n}" for r, n in missing)
+            if missing else "the PR it names"
+        )
+        try:
+            with open(READY_MESSAGE, encoding="utf-8") as fh:
+                template = fh.read().strip()
+        except Exception:
+            template = READY_FALLBACK
+        return template.replace("{which}", which).replace("{phrase}", phrase.strip())
     if kind == "pr":
         which = (
             "PR " + ", ".join(f"{r or ''}#{n}" for r, n in missing)
@@ -393,25 +530,37 @@ def main() -> int:
     path = payload.get("transcript_path") or ""
     tool_name = payload.get("tool_name")
 
+    relay_only = False
     if tool_name is not None:
-        if not REPLY_TOOL_RX.match(str(tool_name)):
+        if not READY_TOOL_RX.match(str(tool_name)):
             return 0
+        relay_only = not REPLY_TOOL_RX.match(str(tool_name))
         inp = payload.get("tool_input")
         text = inp.get("text") if isinstance(inp, dict) else None
         if not isinstance(text, str) or not text.strip():
             return 0
-        prs, pr_list, work, _, turn = turn_reads(path)
+        prs, pr_list, work, merge, _, turn = turn_reads(path)
     else:
         text = last_assistant_text(path)
         if not text:
             return 0
-        prs, pr_list, work, replied, turn = turn_reads(path)
+        prs, pr_list, work, merge, replied, turn = turn_reads(path)
         if replied:
             return 0
 
     prose = QUOTED_RX.sub(" ", strip_code(text))
-    hit = find_claim(prose, prs, pr_list, work)
-    if not hit or not _may_fire(text, path, turn):
+    if relay_only:
+        hit = find_merge_claim(prose, merge)
+    else:
+        hit = find_claim(prose, prs, pr_list, work, merge)
+    if not hit:
+        return 0
+    # A merge-readiness denial at PreToolUse is not capped: resending the same
+    # "ready" must not get it through (ai-config#6157). A read, or saying the
+    # state is unverified, is the way past. Stop keeps the cap, so a session
+    # that cannot reach the forge is never wedged.
+    uncapped = hit[0] == "mergeable" and tool_name is not None
+    if not uncapped and not _may_fire(text, path, turn):
         return 0
     reason = reason_for(*hit)
     if tool_name is not None:

@@ -153,6 +153,14 @@ NAMED = re.compile(
     r"(?:(?:\s*,\s*(?:and\s+)?|\s+and\s+|\s*&\s*)#?\d+)*)\b",
     re.I,
 )
+# The lab's merge line, one per line (skills/mwc/SKILL.md, "Both forms are
+# lines"): `mwc lds 2910`, `mwc lds 2910 <sha>`, also `mwc lds#2910`. It
+# grants that one PR, so it is read with NAMED, never as a bare `mwc`.
+MWC_LINE = re.compile(
+    r"^[^\w/\n]*/?mwc[ \t]+(?:[\w.-]+/)?(?P<repo>[A-Za-z][\w.-]*)(?:[ \t]+#?|#)(?P<num>\d+)"
+    r"(?:[ \t]+[0-9a-f]{7,40})?[^\w?\n]*$",
+    re.I | re.M,
+)
 
 
 def named_merge_grants(prompt: str) -> set:
@@ -175,6 +183,8 @@ def named_merge_grants(prompt: str) -> set:
             repo = match.group("repo") or match.group("repo2")
             nums = match.group("nums") or match.group("nums2")
             grants |= {((repo or "").lower() or None, int(n)) for n in re.findall(r"\d+", nums)}
+        for match in MWC_LINE.finditer(text):
+            grants.add((match.group("repo").lower(), int(match.group("num"))))
     return grants
 
 

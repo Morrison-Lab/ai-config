@@ -157,8 +157,8 @@ NAMED = re.compile(
 # lines"): `mwc lds 2910`, `mwc lds 2910 <sha>`, also `mwc lds#2910`. It
 # grants that one PR, so it is read with NAMED, never as a bare `mwc`.
 MWC_LINE = re.compile(
-    r"^[^\w/]*/?mwc\s+(?:[\w.-]+/)?(?P<repo>[A-Za-z][\w.-]*)(?:\s+#?|#)(?P<num>\d+)"
-    r"(?:\s+[0-9a-f]{7,40})?[^\w?]*$",
+    r"^[^\w/\n]*/?mwc[ \t]+(?:[\w.-]+/)?(?P<repo>[A-Za-z][\w.-]*)(?:[ \t]+#?|#)(?P<num>\d+)"
+    r"(?:[ \t]+[0-9a-f]{7,40})?[^\w?\n]*$",
     re.I | re.M,
 )
 

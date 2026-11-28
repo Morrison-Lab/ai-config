@@ -282,6 +282,10 @@ NAMED_CASES = [
     ("mwc them all", set()),
     ("mwc lds 3208 tomorrow", set()),
     ("mwc lds 3208 and 3209", set()),
+    # Review of #6180: the line form never spans a line break.
+    ("mwc\nlds 3208", set()),
+    ("mwc lds\n3208", set()),
+    ("mwc lds 3208\nthanks", {("lds", 3208)}),
     # The older named form still grants.
     ("merge lds#12", {("lds", 12)}),
 ]

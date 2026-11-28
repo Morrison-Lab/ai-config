@@ -62,6 +62,13 @@ It needs an `x-opencode-session` header, and `"reasoning_effort": "none"` so tha
   `GET https://opencode.ai/zen/go/v1/models` lists the models, and the free ones end in `-free`.
 - **Don't:** redirect or filter the checker's output on the run you want credited.
 
+That free model is not a way through the gate on prose.
+Over three rounds on this PR it returned NOT_CLEAN with 7, 3, then 13 wording nits and no factual error, and the hook counts a reviewer that ran and was not clean as blocking, so the no-reviewer waiver does not apply.
+The coordinator held the PR for a fresh review from agy or a paid model (2026-11-28).
+
+- **Do:** fix its real findings once, rebut the rest on the PR, then report the refusal and hold the merge.
+- **Don't:** re-run the free model until it happens to say CLEAN.
+
 ## A stacked base whose findings are fixed only in its child cannot pass the gate
 
 The final-head gate judges each head on its own.

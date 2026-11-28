@@ -14,7 +14,8 @@ CC Safety Net's `git.push-delete` rule refuses every agent
   command's sha256 (`approval_key`), so one changed byte is another key.
   "Typed" is the merge hooks' `_typed_text`: reminders, coordinator notes,
   non-principal messages and card taps (whose label the agent wrote) are
-  removed.
+  removed. A line typed in a project thread arrives inside a principal
+  `<message>` element, which is opened first (ai-config#6177).
 
 The approval is not consumed: a push that failed on the network can be
 retried within the window, and one that ran fails at GitHub, its leased
@@ -45,6 +46,43 @@ RX_BRANCH = re.compile(r"\A[A-Za-z0-9._/-]+\Z")
 RX_REMOTE = re.compile(
     r"\Ahttps://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+?(?:\.git)?\Z")
 RX_UNSAFE = re.compile(r"[;&|`$<>(){}\\\n\r\v\f'\"*?!~#]")
+# A project-thread wake wraps the user's message in one element on one line
+# (`<message ... from="human" trust="principal" ...>approve-push-delete
+# <key></message>`), so the line-anchored match needs the element's body on
+# a line of its own (ai-config#6177). Only an element whose parsed attributes
+# say exactly `from="human"` and `trust="principal"` is opened; any other
+# stays wrapped and cannot match. The harness escapes `<` in a body, so
+# neither a body holding one nor an element nested inside another message
+# is opened: a tag there could not be the user's.
+RX_MESSAGE = re.compile(r"<message(\s[^<>]*)?>([^<]*)</message>", re.IGNORECASE)
+RX_ATTR = re.compile(r"\s+([\w-]+)=\"([^\"]*)\"")
+RX_MESSAGE_OPEN = re.compile(r"<message\b", re.IGNORECASE)
+RX_MESSAGE_CLOSE = re.compile(r"</message\s*>", re.IGNORECASE)
+
+
+def _principal_attrs(attrs: str) -> bool:
+    """Whether `attrs` parse wholly as attributes naming the human principal."""
+    pairs = RX_ATTR.findall(attrs)
+    if RX_ATTR.sub("", attrs).strip():
+        return False
+    names = [name.lower() for name, _ in pairs]
+    if names.count("from") != 1 or names.count("trust") != 1:
+        return False
+    values = {name.lower(): value for name, value in pairs}
+    return values["from"] == "human" and values["trust"] == "principal"
+
+
+def open_principal_messages(text: str) -> str:
+    """`text` with each top-level principal message's body on its own line."""
+    def opened(m):
+        before = text[:m.start()]
+        nested = len(RX_MESSAGE_OPEN.findall(before)) > len(RX_MESSAGE_CLOSE.findall(before))
+        if nested or not _principal_attrs(m.group(1) or ""):
+            return m.group(0)
+        return f"\n{m.group(2)}\n"
+    return RX_MESSAGE.sub(opened, text)
+
+
 RX_RULE = re.compile(r"\bRule:\s*([A-Za-z0-9._-]+)")
 RX_REASON = re.compile(r"\bReason:")
 LIFTED_RULE = "git.push-delete"
@@ -145,6 +183,7 @@ def typed_approval(records, blocks, typed_text, key: str, now: float) -> bool:
             if block.get("type") != "text":
                 continue
             text = typed_text(block.get("text") or "")
+            text = open_principal_messages(text)
             if any(m.group(1).lower() == key for m in RX_APPROVAL.finditer(text)):
                 return True
     return False

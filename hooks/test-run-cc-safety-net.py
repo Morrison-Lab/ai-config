@@ -470,8 +470,15 @@ class TypedApprovalLiftsOnePushDelete(unittest.TestCase):
             f' mention="true">{body}</message>\n  </thread>\n</wake>')
 
     def test_a_line_typed_in_a_project_thread_lifts_the_deny(self):
-        proc = self.run_with([self.wake(f"approve-push-delete {self.key}")])
-        self.assertEqual(self.decision(proc), "allow", proc.stdout + proc.stderr)
+        bodies = {
+            "the line alone": f"approve-push-delete {self.key}",
+            # The harness escapes markup a body holds, as in Ezra's quoting.
+            "escaped text around it": f"&lt;!-- ok --&gt;\n&gt; yes\napprove-push-delete {self.key}",
+        }
+        for why, body in bodies.items():
+            with self.subTest(why=why):
+                proc = self.run_with([self.wake(body)])
+                self.assertEqual(self.decision(proc), "allow", proc.stdout + proc.stderr)
 
     def test_a_thread_message_that_is_not_the_users_line_does_not(self):
         typed = f"approve-push-delete {self.key}"

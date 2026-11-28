@@ -306,7 +306,8 @@ so the pattern is load-bearing rather than a workaround invented for this PR.
 
 - **In a cloud session the gha v3 checks are already on disk at `~/.cache/ai-config/gha/v3/<check>/<check>.py`, so no gha clone is needed to run one locally.**
   Each check reads its inputs from environment variables with its own prefix (`CBN_` for `check-ball-neighborhoods`, `CEL_` for `check-equation-labels`), and with no `<PREFIX>_BASE_REF` it skips rather than checking.
-  An allow pragma such as `<!-- check-ball-neighborhoods: allow: <reason> -->` covers only its own line and the line directly below it, so put it right above a one-line display equation, not above a multi-line one.
+  The `check-ball-neighborhoods` pragma (`<!-- check-ball-neighborhoods: allow: <reason> -->`) covers only its own line and the line directly below it, so put it right above a one-line display equation, not above a multi-line one.
+  `check-equation-labels` differs: its pragma on a display's opening line or the line above the opener covers the whole display.
   - **Do:** run `CBN_BASE_REF=origin/main CBN_GLOBS='*.qmd *.Rmd *.md' CBN_FAIL=true python3 -I ~/.cache/ai-config/gha/v3/check-ball-neighborhoods/check-ball-neighborhoods.py` from the repo checkout before pushing.
   - **Don't:** read a local run with no base ref as a pass, or put the pragma two or more lines above the line it is meant to cover.
   ([Morrison-Lab/mds#866](https://github.com/Morrison-Lab/mds/pull/866), 2026-11-27: both checks went red on the first push and passed after the display was labelled and moved directly under the pragma.)

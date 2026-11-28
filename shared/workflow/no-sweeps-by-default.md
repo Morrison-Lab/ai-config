@@ -60,7 +60,7 @@ Whoever writes the brief, a coordinator or an agent launching a subagent, is bou
   It warns rather than blocks because a title containing the word is not always a sweep, and a hook cannot read Ezra's intent.
 - gha's content checks (`check-new-line-breaks`, `check-def-commentary`, `check-exm-figures`, `check-one-div-per-subfile`, `check-tree-lists`, `check-visualization-figures`, `check-typos` and others) are diff-scoped by default (checked 2026-10-29), reflagging nothing already merged.
   Where a whole-tree mode exists (a `whole-tree` input, which most of the checks above carry except `check-new-line-breaks` and `check-typos`), it is opt-in, so keep it off by default.
-- `hooks/no-oversized-pr-push.py` already caps any PR at 20 files and 600 lines ([`small-prs`](small-prs.md)), so an unrequested sweep that slips past the title check still cannot ship as one large PR.
+- `hooks/no-oversized-pr-push.py` already caps any PR at 40 files and 1200 lines ([`small-prs`](small-prs.md)), so an unrequested sweep that slips past the title check still cannot ship as one large PR.
 - The part with no mechanism: deciding that a fix is incremental, not a sweep, depends on whether the passage was already being edited.
   A hook cannot know that, so this prose carries it.
 

@@ -81,7 +81,7 @@ Then render the page to every format the site builds, and read the rendered outp
 
 ### 6. Ship
 
-- Small PRs: at most 20 files and 600 lines. Content and infrastructure never share one. Split a large page into stacked PRs (`stack-prs`).
+- Small PRs: at most 40 files and 1200 lines. A pure movement PR is exempt. Content and infrastructure never share one. Split a large page into stacked PRs (`stack-prs`).
 - Then `ardi` to clean. Do not merge without the merge grant in force (`mwc`).
 
 ### 7. Feed lessons back

@@ -49,18 +49,27 @@ RX_UNSAFE = re.compile(r"[;&|`$<>(){}\\\n\r\v\f'\"*?!~#]")
 # A project-thread wake wraps the user's message in one element on one line
 # (`<message ... from="human" trust="principal" ...>approve-push-delete
 # <key></message>`), so the line-anchored match needs the element's body on
-# a line of its own (ai-config#6177). Only an element declaring both the
-# human sender and principal trust is opened; any other stays wrapped and
-# cannot match. The harness escapes `<` in a body, so neither a body holding
-# one nor an element nested inside another message is opened: a tag there
-# could not be the user's.
-RX_PRINCIPAL_MESSAGE = re.compile(
-    r"<message\b(?=[^>]*(?<![\w-])from\s*=\s*[\"']?human[\"']?(?=[\s/>]))"
-    r"(?=[^>]*(?<![\w-])trust\s*=\s*[\"']?principal[\"']?(?=[\s/>]))"
-    r"[^>]*>([^<]*)</message>",
-    re.IGNORECASE)
+# a line of its own (ai-config#6177). Only an element whose parsed attributes
+# say exactly `from="human"` and `trust="principal"` is opened; any other
+# stays wrapped and cannot match. The harness escapes `<` in a body, so
+# neither a body holding one nor an element nested inside another message
+# is opened: a tag there could not be the user's.
+RX_MESSAGE = re.compile(r"<message(\s[^<>]*)?>([^<]*)</message>", re.IGNORECASE)
+RX_ATTR = re.compile(r"\s+([\w-]+)=\"([^\"]*)\"")
 RX_MESSAGE_OPEN = re.compile(r"<message\b", re.IGNORECASE)
 RX_MESSAGE_CLOSE = re.compile(r"</message\s*>", re.IGNORECASE)
+
+
+def _principal_attrs(attrs: str) -> bool:
+    """Whether `attrs` parse wholly as attributes naming the human principal."""
+    pairs = RX_ATTR.findall(attrs)
+    if RX_ATTR.sub("", attrs).strip():
+        return False
+    names = [name.lower() for name, _ in pairs]
+    if names.count("from") != 1 or names.count("trust") != 1:
+        return False
+    values = {name.lower(): value for name, value in pairs}
+    return values["from"] == "human" and values["trust"] == "principal"
 
 
 def open_principal_messages(text: str) -> str:
@@ -68,8 +77,12 @@ def open_principal_messages(text: str) -> str:
     def opened(m):
         before = text[:m.start()]
         nested = len(RX_MESSAGE_OPEN.findall(before)) > len(RX_MESSAGE_CLOSE.findall(before))
-        return m.group(0) if nested else f"\n{m.group(1)}\n"
-    return RX_PRINCIPAL_MESSAGE.sub(opened, text)
+        if nested or not _principal_attrs(m.group(1) or ""):
+            return m.group(0)
+        return f"\n{m.group(2)}\n"
+    return RX_MESSAGE.sub(opened, text)
+
+
 RX_RULE = re.compile(r"\bRule:\s*([A-Za-z0-9._-]+)")
 RX_REASON = re.compile(r"\bReason:")
 LIFTED_RULE = "git.push-delete"

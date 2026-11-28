@@ -14,7 +14,8 @@ CC Safety Net's `git.push-delete` rule refuses every agent
   command's sha256 (`approval_key`), so one changed byte is another key.
   "Typed" is the merge hooks' `_typed_text`: reminders, coordinator notes,
   non-principal messages and card taps (whose label the agent wrote) are
-  removed.
+  removed. A line typed in a project thread arrives inside a principal
+  `<message>` element, which is opened first (ai-config#6177).
 
 The approval is not consumed: a push that failed on the network can be
 retried within the window, and one that ran fails at GitHub, its leased
@@ -45,6 +46,17 @@ RX_BRANCH = re.compile(r"\A[A-Za-z0-9._/-]+\Z")
 RX_REMOTE = re.compile(
     r"\Ahttps://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+?(?:\.git)?\Z")
 RX_UNSAFE = re.compile(r"[;&|`$<>(){}\\\n\r\v\f'\"*?!~#]")
+# A project-thread wake wraps the user's message in one element on one line
+# (`<message ... from="human" trust="principal" ...>approve-push-delete
+# <key></message>`), so the line-anchored match needs the element's body on
+# a line of its own (ai-config#6177). Only an element declaring both the
+# human sender and principal trust is opened; any other stays wrapped and
+# cannot match.
+RX_PRINCIPAL_MESSAGE = re.compile(
+    r"<message\b(?=[^>]*(?<![\w-])from\s*=\s*[\"']?human[\"']?(?=[\s/>]))"
+    r"(?=[^>]*(?<![\w-])trust\s*=\s*[\"']?principal[\"']?(?=[\s/>]))"
+    r"[^>]*>(.*?)</message>",
+    re.IGNORECASE | re.DOTALL)
 RX_RULE = re.compile(r"\bRule:\s*([A-Za-z0-9._-]+)")
 RX_REASON = re.compile(r"\bReason:")
 LIFTED_RULE = "git.push-delete"
@@ -145,6 +157,7 @@ def typed_approval(records, blocks, typed_text, key: str, now: float) -> bool:
             if block.get("type") != "text":
                 continue
             text = typed_text(block.get("text") or "")
+            text = RX_PRINCIPAL_MESSAGE.sub(lambda m: f"\n{m.group(1)}\n", text)
             if any(m.group(1).lower() == key for m in RX_APPROVAL.finditer(text)):
                 return True
     return False

@@ -462,6 +462,29 @@ class TypedApprovalLiftsOnePushDelete(unittest.TestCase):
         proc = self.run_with([self.user(f"yes, go ahead\napprove-push-delete {self.key}")])
         self.assertEqual(self.decision(proc), "allow", proc.stdout + proc.stderr)
 
+    def wake(self, body, attrs='from="human" trust="principal"'):
+        # The shape a project-thread wake gives the user's message (#6177).
+        return self.user(
+            '<wake reason="mention">\n  <thread ts="cmsg_A">\n'
+            f'    <message trigger="true" {attrs} author="Ezra" id="cmsg_C"'
+            f' mention="true">{body}</message>\n  </thread>\n</wake>')
+
+    def test_a_line_typed_in_a_project_thread_lifts_the_deny(self):
+        proc = self.run_with([self.wake(f"approve-push-delete {self.key}")])
+        self.assertEqual(self.decision(proc), "allow", proc.stdout + proc.stderr)
+
+    def test_a_thread_message_that_is_not_the_users_line_does_not(self):
+        typed = f"approve-push-delete {self.key}"
+        cases = {
+            "a peer's message": self.wake(typed, 'from="human" trust="peer"'),
+            "a bot's message": self.wake(typed, 'from="bot" trust="principal"'),
+            "no trust declared": self.wake(typed, 'from="human"'),
+            "a mention mid-sentence": self.wake(f"should I type {typed}?"),
+        }
+        for why, record in cases.items():
+            with self.subTest(why=why):
+                self.assertEqual(self.decision(self.run_with([record])), "deny")
+
     def test_a_replay_inside_the_window_is_allowed_again(self):
         # Not consumed, by design: a push that failed on the network can be
         # retried, and one that ran fails at GitHub, its leased branches gone.

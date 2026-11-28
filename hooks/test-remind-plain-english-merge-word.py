@@ -260,6 +260,49 @@ def mwc_pin_checks():
     return fails, len(MWC_PIN)
 
 
+# (prompt, expected named_merge_grants()): the lab's `mwc <repo> <N> [sha]`
+# line grants that PR only (ai-config#4920).
+_WAKE = ('<wake reason="mention"><message trigger="true" from="human" trust="principal" '
+         'author="Ezra" id="cmsg_x">{}</message></wake>')
+NAMED_CASES = [
+    ("mwc lds 3208", {("lds", 3208)}),
+    ("mwc lds 3208 18b2b32f", {("lds", 3208)}),
+    ("mwc lds 3208 18b2b32f044bb058944ab79b99bdf432a4cd2f92", {("lds", 3208)}),
+    ("mwc lds#3208", {("lds", 3208)}),
+    ("/mwc pds 505", {("pds", 505)}),
+    ("mwc Morrison-Lab/mcs 210", {("mcs", 210)}),
+    ("mwc mcs 210\nmwc pds 505", {("mcs", 210), ("pds", 505)}),
+    (_WAKE.format("mwc lds 3302"), {("lds", 3302)}),
+    # Not the line form: a question, a quote, prose, a bare `mwc`, a non-sha tail.
+    ("mwc lds 3208?", set()),
+    ("should I type mwc lds 3208?", set()),
+    ("`mwc lds 3208`", set()),
+    ("I will mwc lds 3208 later", set()),
+    ("mwc", set()),
+    ("mwc them all", set()),
+    ("mwc lds 3208 tomorrow", set()),
+    ("mwc lds 3208 and 3209", set()),
+    # The older named form still grants.
+    ("merge lds#12", {("lds", 12)}),
+]
+
+
+def named_checks():
+    module = load_module()
+    fails = 0
+    for prompt, want in NAMED_CASES:
+        got = module.named_merge_grants(prompt)
+        ok = got == want
+        print(("  ok      " if ok else "  FAIL    ") + f"named_merge_grants({prompt[:60]!r}) == {want!r}"
+              + ("" if ok else f" (got {got!r})"))
+        fails += 0 if ok else 1
+    # A line grants that PR only, never a bare `mwc` for all.
+    ok = module.merge_word("mwc lds 3208", strict=True) is None
+    print(("  ok      " if ok else "  FAIL    ") + "'mwc lds 3208' is no bare mwc")
+    fails += 0 if ok else 1
+    return fails, len(NAMED_CASES) + 1
+
+
 def mwr_checks():
     """Fails for mwr_grant() and revokes() on the mwr words (ai-config#3946)."""
     module = load_module()
@@ -376,7 +419,9 @@ def main():
     fails += mwr_fails
     pin_fails, pin_total = mwc_pin_checks()
     fails += pin_fails
-    total = len(CASES) + 2 + mwr_total + pin_total
+    named_fails, named_total = named_checks()
+    fails += named_fails
+    total = len(CASES) + 2 + mwr_total + pin_total + named_total
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

@@ -1248,3 +1248,18 @@ A missing `cwd` key is fine.
 
 - **Do:** run `python3 scripts/test_cursor_hook_adapter.py` locally before pushing any new PreToolUse hook, and test the hook on a payload with `"cwd": ""`.
 - **Don't:** treat a hook's own self-test passing as evidence that the adapters' payloads work.
+
+## Three post_message hooks a PR status post trips, and the wording that passes
+
+On 2026-11-28 one status post about lds#3026's batch PRs needed four tries.
+Each try tripped a different hook:
+
+- `no-unfetched-pr-state-claim` read "still open" as a claim about every `repo#N` in the post, the issue lds#3026 included, even after all four PRs had been read with `pull_request_read`.
+  Reading the issue with `issue_read` method `get` cleared it.
+- `no-final-head-unread-checks` fires on "FINAL" next to a head unless that turn read `get_check_runs` on the sha.
+  "Still open with unchanged heads" reports the same fact without the claim.
+- `no-unlinked-session-mention` fires on a bare "session", including "The session isn't done" in a Stopping Point line.
+  "Work isn't done here" passes.
+
+- **Do:** before a status post, read every number it names, issues as well as PRs, and use "unchanged heads" unless you read the check runs in that turn.
+- **Don't:** repeat FINAL from an earlier report, or write "session" without a link.

@@ -211,7 +211,7 @@ expect("T34 caller NLB_/TERM_LINKS_ variables do not leak into a check",
        env_tl.get("TERM_LINKS_GLOBS"), None)
 
 terms_root = tempfile.mkdtemp(prefix="npc-terms-")
-for site in ("mds", "pds", "sds"):
+for site in ("mds", "pds", "sds", "lds"):
     os.makedirs(os.path.join(terms_root, site))
 lds = make_repo({"check-term-links.yml": WORKFLOW})
 git(lds, "remote", "add", "origin", "https://github.com/Morrison-Lab/lds.git")
@@ -227,7 +227,14 @@ run("git push origin feat", sds, 0, extra={"PUSH_CHECK_TERMS_ROOT": terms_root})
 env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
 expect("T37 sds gets only mds and pds (ssh remote parsed)",
        env_tl.get("TERM_LINKS_TERMS_DIRS"), " ".join(os.path.join(terms_root, s) for s in ("mds", "pds")))
-none = make_repo({"check-term-links.yml": WORKFLOW.replace("whole-tree:", "terms-from: none\n      whole-tree:")})
+dds = make_repo({"check-term-links.yml": WORKFLOW})
+git(dds, "remote", "add", "origin", "https://github.com/Morrison-Lab/dds.git")
+run("git push origin feat", dds, 0, extra={"PUSH_CHECK_TERMS_ROOT": terms_root})
+env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
+# ai-config#6173: gha gives dds the four sites it gives mlg.
+expect("T37b dds gets mds, pds, sds and lds as terms dirs, as CI does",
+       env_tl.get("TERM_LINKS_TERMS_DIRS"), " ".join(os.path.join(terms_root, s) for s in ("mds", "pds", "sds", "lds")))
+none =make_repo({"check-term-links.yml": WORKFLOW.replace("whole-tree:", "terms-from: none\n      whole-tree:")})
 git(none, "remote", "add", "origin", "https://github.com/Morrison-Lab/lds.git")
 run("git push origin feat", none, 0, extra={"PUSH_CHECK_TERMS_ROOT": terms_root})
 env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))

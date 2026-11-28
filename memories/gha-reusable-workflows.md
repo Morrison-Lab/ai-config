@@ -304,6 +304,14 @@ so the pattern is load-bearing rather than a workaround invented for this PR.
   ([Morrison-Lab/qbt#78](https://github.com/Morrison-Lab/qbt/pull/78), 2026-09-27: a PR asserted the gate had been "passing vacuously" on a reflowed `README.md`.
   The review showed it had never run on that file at all, and CI's log read `Examined 0 added line(s) across 0 file(s)` on both the PR head and its base.)
 
+- **In a cloud session the gha v3 checks are already on disk at `~/.cache/ai-config/gha/v3/<check>/<check>.py`, so no gha clone is needed to run one locally.**
+  Each check reads its inputs from environment variables with its own prefix (`CBN_` for `check-ball-neighborhoods`, `CEL_` for `check-equation-labels`), and with no `<PREFIX>_BASE_REF` it skips rather than checking.
+  The `check-ball-neighborhoods` pragma (`<!-- check-ball-neighborhoods: allow: <reason> -->`) covers only its own line and the line directly below it, so put it right above a one-line display equation, not above a multi-line one.
+  `check-equation-labels` differs: its pragma on a display's opening line or the line above the opener covers the whole display.
+  - **Do:** run `CBN_BASE_REF=origin/main CBN_GLOBS='*.qmd *.Rmd *.md' CBN_FAIL=true python3 -I ~/.cache/ai-config/gha/v3/check-ball-neighborhoods/check-ball-neighborhoods.py` from the repo checkout before pushing.
+  - **Don't:** read a local run with no base ref as a pass, or put the pragma two or more lines above the line it is meant to cover.
+  ([Morrison-Lab/mds#866](https://github.com/Morrison-Lab/mds/pull/866), 2026-11-27: both checks went red on the first push and passed after the display was labelled and moved directly under the pragma.)
+
 - **Historically, `check-new-line-breaks` did not see a sentence that opens with a digit or an opening parenthesis, so a two-sentence line passed silently.**
   Its `_SENT_BREAK_RE` lookahead class was `` [A-Z"'`*\[] ``, which admitted an uppercase letter or a markup character --- and neither a digit nor `(`.
   This corpus opens sentences with derived counts constantly, because `CLAUDE.md` asks for numbers derived rather than recalled --- "19 sites across ...", "308 cases passed ..." --- so the blind spot sat exactly where the prose most often lands.

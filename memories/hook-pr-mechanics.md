@@ -44,7 +44,7 @@ Reading the issue with `issue_read` (method `get`) cleared the refusal.
 - **Don't:** repeat FINAL from an earlier report, leave an issue the post names unread, or write "session" without a link.
 
 The annotation-dispositions comment on ai-config#6170 hit one more, `no-unfixed-preexisting-failure`, which denies "not this PR's" with no fix named.
-A selftest negative control has nothing to fix, so call it a false positive and give the reason.
+An annotation that a selftest negative control produces on purpose has nothing to fix, so call it a false positive and give the reason.
 A Node.js 20 deprecation warning did not stop the job, which ran on Node.js 24, so it is a false positive for this PR too.
 
 - **Do:** write "false positive: a selftest negative control, which passes by producing this failure", or "false positive: the runner forced the action onto Node.js 24 and it ran".
@@ -55,10 +55,11 @@ The merge hook credits a `check-pr-fully-clean.py` run only when it is the plugi
 A run sent to a file, or piped through `grep` with `${PIPESTATUS[0]}`, is not credited.
 `warn-merge-without-cross-harness-review` then wants a non-Claude review.
 In the cloud, `command -v` finds no agy, codex, cursor-agent, gemini or opencode.
-The OpenCode Go paid models were at their monthly limit (2026-11-28), but the free `hy4-flash-free` at `https://opencode.ai/inference/go/openai/v1/chat/completions` answered.
+This account's OpenCode Go paid models were at their monthly limit (2026-11-28), but the free `hy4-flash-free` at `https://opencode.ai/inference/go/openai/v1/chat/completions` answered.
 It needs an `x-opencode-session` header, and `"reasoning_effort": "none"` so that the answer is not empty.
 
-- **Do:** run the plugin-root checker alone before merging, and get a review from a free OpenCode Go model listed by `GET https://opencode.ai/zen/go/v1/models`.
+- **Do:** run the plugin-root checker alone before merging, and get a review from a free OpenCode Go model through that chat-completions endpoint;
+  `GET https://opencode.ai/zen/go/v1/models` lists the models, and the free ones end in `-free`.
 - **Don't:** redirect or filter the checker's output on the run you want credited.
 
 ## A stacked base whose findings are fixed only in its child cannot pass the gate

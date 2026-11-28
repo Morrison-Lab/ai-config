@@ -78,7 +78,9 @@ After the merge, `slide-major-tag.yml` refused the slide while main's own checks
 - **Don't:** dispatch the slide in the same minute as the merge, or read an empty parse of the review stream as "no findings" without looking at the raw stream.
 
 `warn-merge-without-cross-harness-review` counts a review only if it ran after the session's latest `git push`, to any repository.
-A CLEAN review of ai-config#6174 was refused at merge because pushes to lds and pds had followed it; re-running the same curl just before the merge passed.
+A CLEAN review of ai-config#6174 was refused at merge,
+because pushes to lds and pds had followed it.
+Re-running the same curl just before the merge passed.
 
 - **Do:** run the cross-harness review just before each merge call, after any other push in the session.
 - **Don't:** reuse a review from earlier in the session when another branch was pushed since.

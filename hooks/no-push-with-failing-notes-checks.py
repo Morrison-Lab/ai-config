@@ -113,6 +113,7 @@ TERMS_FROM_DEFAULTS = {
     "morrison-lab/lds": ["Morrison-Lab/mds", "Morrison-Lab/pds", "Morrison-Lab/sds"],
     "morrison-lab/rme": ["Morrison-Lab/mds", "Morrison-Lab/pds", "Morrison-Lab/sds"],
     "morrison-lab/mlg": ["Morrison-Lab/mds", "Morrison-Lab/pds", "Morrison-Lab/sds", "Morrison-Lab/lds"],
+    "morrison-lab/dds": ["Morrison-Lab/mds", "Morrison-Lab/pds", "Morrison-Lab/sds", "Morrison-Lab/lds"],
 }
 TERMS_CACHE = os.path.join(CACHE_ROOT, "terms-from")
 REMOTE_SLUG = re.compile(r"github\.com[:/]+([^/\s]+/[^/\s]+?)(?:\.git)?/?$")

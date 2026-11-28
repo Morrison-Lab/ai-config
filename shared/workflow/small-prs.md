@@ -6,16 +6,20 @@ do them in minimal batches", and "every PR should be as small and focused as it 
 ## The rule
 
 - A PR solves its stated task completely and nothing else.
-- A PR changes at most 20 files and 600 lines (added plus deleted).
-  Ezra raised it from 10 and 300 on 2026-11-19 ("we need to raise the pr size limit so you stop bothering me").
-  A line moved unchanged between files is not counted, nor is a file whose every changed line moved.
+- A PR changes at most 40 files and 1200 lines (added plus deleted).
+  Ezra doubled it from 20 and 600 on 2026-11-28 ("double the cap on pr size"),
+  after raising it from 10 and 300 on 2026-11-19 ("we need to raise the pr size limit so you stop bothering me").
   Generated, lock, `_freeze/`, image and data paths are not counted.
   A committed generator output counts until the repo's `.gitattributes` marks it `linguist-generated`;
   then neither the push hook nor gha's `check-pr-size` counts it, and GitHub folds it in review
   ([ai-config#5288](https://github.com/Morrison-Lab/ai-config/issues/5288), [gha#1959](https://github.com/Morrison-Lab/gha/issues/1959)).
-  The lines of a newly added `_fig-*` subfile are not counted either, but the file still counts toward the 10
+  The lines of a newly added `_fig-*` subfile are not counted either, but the file still counts toward the file cap
   ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928), Ezra "daytb", 2026-11-04):
   figure code in two languages made one decision into three PRs.
+- A pure movement PR is exempt at any size (Ezra, 2026-11-28: "pure movement prs are exempt from the cap").
+  A line moved unchanged, within a file or between files, is not counted, nor is a file whose every changed line moved,
+  in the push hook and in gha's `check-pr-size` alike, so a pure move needs no label or body phrase.
+  The blank lines and fences of a moved block move with it: a short line counts as moved only in a file whose other changed lines all moved.
 - A content-identical mechanical PR is exempt at any size: a pure move, rename, or split with no wording change
   ([ai-config#5128](https://github.com/Morrison-Lab/ai-config/issues/5128), Ezra "daytb", 2026-11-09).
   Its body must say "mechanical, content-identical".
@@ -49,7 +53,7 @@ that issue tracks both.
 - **Don't:** use `git checkout <ref> -- <paths>` for it, since CC Safety Net blocks it.
   In cc-safety-net 2.7.12 its message begins "git checkout <ref> -- <path> overwrites working tree with ref version".
 - **Do:** count `git diff --stat origin/main...HEAD` before the first push of a multi-skill edit, and plan the split then.
-  The pre-push hook caps a PR at 10 files and 300 lines (2026-11-19).
+  The pre-push hook caps a PR at 40 files and 1200 lines (2026-11-28).
 - **Don't:** find the cap after a reviewed head is refused.
 - **Do:** after a split, open each file a part cites at `origin/main` and confirm the cited rule is there.
   A citation checked against the unsplit branch can point at text that only an unmerged sibling PR adds
@@ -83,7 +87,7 @@ that issue tracks both.
 ## The mechanisms
 
 - `hooks/no-oversized-pr-push.py` denies a `git push` of a branch over the cap, before CI is spent.
-  A pure rename (no line changed) does not count toward the file cap, and lines moved between files do not count at all.
+  A pure rename (no line changed) does not count toward the file cap, and moved lines do not count at all.
   A stacked branch is measured against its open PR's base, or on a first push against the nearest remote branch in its history that `main` lacks, read from the server when the clone has no tracking ref for it.
   Clear it with an `ALLOW_LARGE_PR=1` prefix only for a stacked branch whose parent is not on the server or not in its history, or for a mechanical, content-identical PR the move detection misses, and state why in the reply.
   On 2026-11-19 the hook measured a stacked layer, [#5926](https://github.com/Morrison-Lab/ai-config/pull/5926), against `origin/main`,
@@ -93,7 +97,9 @@ that issue tracks both.
   The layer's push succeeded only after #5947 merged: once `origin/main` was merged into the layer, the hook's measured diff held only the layer's changes, under the cap, and the push needed no prefix.
 - gha's `check-pr-size` ([gha#1188](https://github.com/Morrison-Lab/gha/issues/1188)) fails the same PR in CI.
   The `size-exempt` label lifts it; put it on a mechanical, content-identical PR.
-- The caps are a decision, recorded here: 20 files and 600 lines since 2026-11-19, doubled from the 10 and 300 set after Ezra changed "waves" to "minimal batches".
-  The 300 was a starting value with no data behind it ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928)), and the doubling is a judgment call Ezra can adjust.
-  gha's moved-line rule is not mirrored yet, so a split pushed under the hook still needs "mechanical, content-identical" in its PR body for CI.
+- The caps are a decision, recorded here: 40 files and 1200 lines since 2026-11-28 ("double the cap on pr size"),
+  doubled from the 20 and 600 of 2026-11-19, which doubled the 10 and 300 set after Ezra changed "waves" to "minimal batches".
+  The 300 was a starting value with no data behind it ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928)), and each doubling is a judgment call Ezra can adjust.
+  gha's `check-pr-size` mirrors the hook's moved-line rule from [gha#2215](https://github.com/Morrison-Lab/gha/pull/2215) on, so a split the hook passes also passes CI.
   Change the caps and the `_fig-*` exemption in the hook, in the gha defaults and here together.
+  The hook's test sizes its fixtures from `MAX_FILES` and `MAX_LINES`, so a cap change needs no fixture edits.

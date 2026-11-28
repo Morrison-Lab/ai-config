@@ -34,14 +34,14 @@ Other first-try refusals from that run: a Python heredoc with a backslash, and `
 - **Do:** link the session once per paragraph or rephrase ("this work", "the brief"), link every PR even in the Stopping Point line, edit scripts with Edit or Write instead of a heredoc, and assign (not request review from) a PR author.
 - **Don't:** retry the same wording or form after a refusal.
 
-Three more, from one lds#3026 status post that took four tries on 2026-11-28.
+Three more, from one [lds#3026](https://github.com/Morrison-Lab/lds/issues/3026) status post that took four tries on 2026-11-28.
 `no-unfetched-pr-state-claim` treated the issue lds#3026, named near "still open", as an unread PR after all four PRs had been read.
 An `issue_read` method `get` cleared it.
 `no-final-head-unread-checks` fires on "FINAL" beside a head unless that turn read `get_check_runs` on the sha.
 `no-unlinked-session-mention` fires on a bare "session", including "The session isn't done" in a Stopping Point line.
 
 - **Do:** read every number the post names, issues included, write "unchanged heads" unless the check runs were read that turn, and write "work here" for the session.
-- **Don't:** repeat FINAL from an earlier report.
+- **Don't:** repeat FINAL from an earlier report, leave an issue the post names unread, or write "session" without a link.
 
 ## A stacked base whose findings are fixed only in its child cannot pass the gate
 

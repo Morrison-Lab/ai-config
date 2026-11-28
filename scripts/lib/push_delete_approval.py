@@ -51,12 +51,25 @@ RX_UNSAFE = re.compile(r"[;&|`$<>(){}\\\n\r\v\f'\"*?!~#]")
 # <key></message>`), so the line-anchored match needs the element's body on
 # a line of its own (ai-config#6177). Only an element declaring both the
 # human sender and principal trust is opened; any other stays wrapped and
-# cannot match.
+# cannot match. The harness escapes `<` in a body, so neither a body holding
+# one nor an element nested inside another message is opened: a tag there
+# could not be the user's.
 RX_PRINCIPAL_MESSAGE = re.compile(
     r"<message\b(?=[^>]*(?<![\w-])from\s*=\s*[\"']?human[\"']?(?=[\s/>]))"
     r"(?=[^>]*(?<![\w-])trust\s*=\s*[\"']?principal[\"']?(?=[\s/>]))"
-    r"[^>]*>(.*?)</message>",
-    re.IGNORECASE | re.DOTALL)
+    r"[^>]*>([^<]*)</message>",
+    re.IGNORECASE)
+RX_MESSAGE_OPEN = re.compile(r"<message\b", re.IGNORECASE)
+RX_MESSAGE_CLOSE = re.compile(r"</message\s*>", re.IGNORECASE)
+
+
+def open_principal_messages(text: str) -> str:
+    """`text` with each top-level principal message's body on its own line."""
+    def opened(m):
+        before = text[:m.start()]
+        nested = len(RX_MESSAGE_OPEN.findall(before)) > len(RX_MESSAGE_CLOSE.findall(before))
+        return m.group(0) if nested else f"\n{m.group(1)}\n"
+    return RX_PRINCIPAL_MESSAGE.sub(opened, text)
 RX_RULE = re.compile(r"\bRule:\s*([A-Za-z0-9._-]+)")
 RX_REASON = re.compile(r"\bReason:")
 LIFTED_RULE = "git.push-delete"
@@ -157,7 +170,7 @@ def typed_approval(records, blocks, typed_text, key: str, now: float) -> bool:
             if block.get("type") != "text":
                 continue
             text = typed_text(block.get("text") or "")
-            text = RX_PRINCIPAL_MESSAGE.sub(lambda m: f"\n{m.group(1)}\n", text)
+            text = open_principal_messages(text)
             if any(m.group(1).lower() == key for m in RX_APPROVAL.finditer(text)):
                 return True
     return False

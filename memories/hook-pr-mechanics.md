@@ -69,6 +69,14 @@ The coordinator held the PR for a fresh review from agy or a paid model (2026-11
 - **Do:** fix its real findings once, rebut the rest on the PR, then report the refusal and hold the merge.
 - **Don't:** re-run the free model until it happens to say CLEAN.
 
+Merging gha#2215 in a cloud session on 2026-11-28 added three more.
+`check-pr-fully-clean.py --annotations-read all` passes only when a PR comment begins `Annotation dispositions for head <sha7>:`, so a head pushed after the last disposition comment needs a new one.
+`https://opencode.ai/zen/go/v1/chat/completions` also serves the free models, and without an `x-opencode-session` header it returns a `MissingSessionID` error rather than a review.
+After the merge, `slide-major-tag.yml` refused the slide while main's own checks on the merge commit were still running ("119 of 186 check runs block the slide").
+
+- **Do:** post a disposition comment for each new head, send `x-opencode-session: <uuid4>` on every review call, and dispatch the slide only once main's checks on the merge commit have finished.
+- **Don't:** dispatch the slide in the same minute as the merge, or read an empty parse of the review stream as "no findings" without looking at the raw stream.
+
 ## A stacked base whose findings are fixed only in its child cannot pass the gate
 
 The final-head gate judges each head on its own.

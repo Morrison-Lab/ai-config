@@ -11,9 +11,10 @@ files changed and added plus deleted lines, not counting generated, lock,
 image and data paths, nor a path `.gitattributes` marks `linguist-generated`
 (a committed generator output, ai-config#5288), and not counting the lines of a newly added `_fig-*`
 subfile (it still counts as a file), and not counting a pure rename (no line
-changed). A line deleted in one place and added unchanged in another (a move
-or split between files) does not count, and neither does a file whose every
-changed line is such a move, so a pure movement PR passes at any size (Ezra,
+changed). A line deleted in one place and added unchanged in another, in the
+same file or another one (a move or split), does not count, and neither does a
+file whose every changed line is such a move; the blank lines and fences of a
+moved block move with it. So a pure movement PR passes at any size (Ezra,
 2026-11-28: "pure movement prs are exempt from the cap"). Over 40 files or
 1200 lines the push is denied (Ezra, 2026-11-28: "double the cap on pr size";
 it was 20 and 600 from 2026-11-19, and 10 and 300 before that).
@@ -166,15 +167,54 @@ def changed_lines(cwd, mb, tip):
     return files
 
 
+def is_short(text):
+    """A short or punctuation-only line: a brace, a fence, a blank."""
+    return len(text) < 8 or not re.search(r"\w", text)
+
+
 def move_budget(files):
     """How often each line text is both deleted and added: moved, as in a split
     (lds#2885, 38 files, needed an override).  Short or punctuation-only lines
-    (braces, fences, blanks) recur in any big edit, so they never count as moved."""
+    recur in any big edit, so they are not in this budget."""
     added, deleted = Counter(), Counter()
     for a, d in files.values():
-        added.update(t for t in a if len(t) >= 8 and re.search(r"\w", t))
+        added.update(t for t in a if not is_short(t))
         deleted.update(d)
     return added & deleted
+
+
+def unmoved_counts(files):
+    """{path: changed lines not paid for as moves}, for each path in `files`.
+
+    A substantive line is paid from `move_budget`. A short line is paid only in
+    a moving file, one whose substantive changed lines all moved, and only from
+    the short lines the moving files add and delete: the blank lines and fences
+    of a moved block move with it. Elsewhere every short line counts. Keep in
+    step with unmoved_counts in gha's check-pr-size.
+    """
+    plus, minus = move_budget(files), move_budget(files)
+    left, short, moving = {}, {}, []
+    for p, (a, d) in files.items():
+        long_a = [t for t in a if not is_short(t)]
+        long_d = [t for t in d if not is_short(t)]
+        left[p] = unmoved(long_a, plus) + unmoved(long_d, minus)
+        short[p] = ([t for t in a if is_short(t)], [t for t in d if is_short(t)])
+        if left[p] == 0 and (long_a or long_d):
+            moving.append(p)
+    short_added, short_deleted = Counter(), Counter()
+    for p in moving:
+        short_added.update(short[p][0])
+        short_deleted.update(short[p][1])
+    short_plus = short_added & short_deleted
+    short_minus = Counter(short_plus)
+    counts = {}
+    for p in files:
+        a, d = short[p]
+        if p in moving:
+            counts[p] = unmoved(a, short_plus) + unmoved(d, short_minus)
+        else:
+            counts[p] = left[p] + len(a) + len(d)
+    return counts
 
 
 def unmoved(lines, budget):
@@ -213,7 +253,7 @@ def measure(cwd, base, tip="HEAD"):
     rows = [r for r in rows if not skipped(new_path(r[2]), gen)]
     counted = {new_path(r[2]) for r in rows}
     texts = {path: t for path, t in texts.items() if path in counted}
-    plus, minus = move_budget(texts), move_budget(texts)
+    counts = unmoved_counts(texts)
     files = lines = 0
     for parts in rows:
         path = new_path(parts[2])
@@ -223,7 +263,7 @@ def measure(cwd, base, tip="HEAD"):
         n = None
         if path in texts:
             a, d = texts[path]
-            n = unmoved(a, plus) + unmoved(d, minus)
+            n = counts[path]
             # Every changed line was moved here from another file, or away.
             if n == 0 and (a or d):
                 continue

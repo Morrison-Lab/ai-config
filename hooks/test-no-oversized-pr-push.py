@@ -202,10 +202,13 @@ def main():
 
     # lds#2885 shape: one page over the line cap split into 20-line subfiles,
     # no wording change.
-    def split_repo(edit=0):
+    def split_repo(edit=0, blanks=False):
         n = L + 100
         d = make_repo({"page.qmd": n})
         text = [f"Sentence {j} of the page.\n" for j in range(n)]
+        if blanks:
+            # A real page: blank lines and div fences between the sentences.
+            text = [t if j % 2 else ("\n" if j % 4 else ":::\n") for j, t in enumerate(text)]
         with open(os.path.join(d, "page.qmd"), "w", encoding="utf-8") as f:
             f.write("".join(text))
         git(d, "commit", "-q", "-a", "--amend", "-m", "page")
@@ -222,6 +225,7 @@ def main():
         return d
 
     split = split_repo()
+    split_blanks = split_repo(blanks=True)
     split_edited = split_repo(edit=F + 1)
 
     # An ignored path's deleted lines must not pay for a counted file's added lines.
@@ -278,6 +282,8 @@ def main():
     cases = [
         ("a split of one page into subfiles is not counted (lds#2885)",
          run("git push", split), False),
+        ("a split's blank lines and fences move with it",
+         run("git push", split_blanks), False),
         ("a split plus over-cap new files is denied", run("git push", split_edited), True),
         ("lines moved out of an ignored path still count",
          run("git push", ignored_source), True),
@@ -376,7 +382,15 @@ def main():
                               "b": ([], ["}", ":::", "x = compute(y)"])})
     fails += check("braces and fences never count as moved",
                    dict(budget) == {"x = compute(y)": 1})
-    total = len(cases) + 6 + len(new_path_cases())
+    counts = mod.unmoved_counts({
+        "src.qmd": ([], ["a moved sentence.", ""]),
+        "dst.qmd": (["a moved sentence.", ""], []),
+        "edit.qmd": (["a sentence nobody wrote.", ""], [""]),
+        "blank.qmd": ([""], [""]),
+    })
+    fails += check("short lines count outside a moving file",
+                   counts == {"src.qmd": 0, "dst.qmd": 0, "edit.qmd": 3, "blank.qmd": 2})
+    total = len(cases) + 7 + len(new_path_cases())
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

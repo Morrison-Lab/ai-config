@@ -17,8 +17,9 @@ do them in minimal batches", and "every PR should be as small and focused as it 
   ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928), Ezra "daytb", 2026-11-04):
   figure code in two languages made one decision into three PRs.
 - A pure movement PR is exempt at any size (Ezra, 2026-11-28: "pure movement prs are exempt from the cap").
-  A line moved unchanged between files is not counted, nor is a file whose every changed line moved,
+  A line moved unchanged, within a file or between files, is not counted, nor is a file whose every changed line moved,
   in the push hook and in gha's `check-pr-size` alike, so a pure move needs no label or body phrase.
+  The blank lines and fences of a moved block move with it: a short line counts as moved only in a file whose other changed lines all moved.
 - A content-identical mechanical PR is exempt at any size: a pure move, rename, or split with no wording change
   ([ai-config#5128](https://github.com/Morrison-Lab/ai-config/issues/5128), Ezra "daytb", 2026-11-09).
   Its body must say "mechanical, content-identical".
@@ -86,7 +87,7 @@ that issue tracks both.
 ## The mechanisms
 
 - `hooks/no-oversized-pr-push.py` denies a `git push` of a branch over the cap, before CI is spent.
-  A pure rename (no line changed) does not count toward the file cap, and lines moved between files do not count at all.
+  A pure rename (no line changed) does not count toward the file cap, and moved lines do not count at all.
   A stacked branch is measured against its open PR's base, or on a first push against the nearest remote branch in its history that `main` lacks, read from the server when the clone has no tracking ref for it.
   Clear it with an `ALLOW_LARGE_PR=1` prefix only for a stacked branch whose parent is not on the server or not in its history, or for a mechanical, content-identical PR the move detection misses, and state why in the reply.
   On 2026-11-19 the hook measured a stacked layer, [#5926](https://github.com/Morrison-Lab/ai-config/pull/5926), against `origin/main`,

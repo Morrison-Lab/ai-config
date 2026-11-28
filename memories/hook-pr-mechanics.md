@@ -43,6 +43,12 @@ An `issue_read` method `get` cleared it.
 - **Do:** read every number the post names, issues included, write "unchanged heads" unless the check runs were read that turn, and write "work here" for the session.
 - **Don't:** repeat FINAL from an earlier report, leave an issue the post names unread, or write "session" without a link.
 
+The annotation-dispositions comment on ai-config#6170 hit one more, `no-unfixed-preexisting-failure`, which denies "not this PR's" with no fix named.
+Selftest negative controls and runner deprecation notices have nothing to fix, so call each a false positive and give the reason.
+
+- **Do:** write "false positive: a selftest negative control, which passes by producing this failure".
+- **Don't:** write "not this PR's" about an annotation unless the same paragraph links the fix.
+
 ## A stacked base whose findings are fixed only in its child cannot pass the gate
 
 The final-head gate judges each head on its own.

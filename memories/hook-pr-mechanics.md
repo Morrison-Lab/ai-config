@@ -34,6 +34,41 @@ Other first-try refusals from that run: a Python heredoc with a backslash, and `
 - **Do:** link the session once per paragraph or rephrase ("this work", "the brief"), link every PR even in the Stopping Point line, edit scripts with Edit or Write instead of a heredoc, and assign (not request review from) a PR author.
 - **Don't:** retry the same wording or form after a refusal.
 
+Three more, from one [lds#3026](https://github.com/Morrison-Lab/lds/issues/3026) status post that took four tries on 2026-11-28.
+`no-unfetched-pr-state-claim` treated the issue lds#3026, named near "still open", as an unread PR after all four PRs had been read.
+Reading the issue with `issue_read` (method `get`) cleared the refusal.
+`no-final-head-unread-checks` fires on "FINAL" beside a head unless that turn read `get_check_runs` on that head's sha.
+`no-unlinked-session-mention` fires on a bare "session", including "The session isn't done" in a Stopping Point line.
+
+- **Do:** read every number the post names, issues included, write "unchanged heads" unless the check runs were read that turn, and write "work here" for the session.
+- **Don't:** repeat FINAL from an earlier report, leave an issue the post names unread, or write "session" without a link.
+
+The annotation-dispositions comment on ai-config#6170 hit one more, `no-unfixed-preexisting-failure`, which denies "not this PR's" with no fix named.
+An annotation that a selftest negative control produces on purpose has nothing to fix, so call it a false positive and give the reason.
+A Node.js 20 deprecation warning did not stop the job, which ran on Node.js 24, so it is a false positive for this PR too.
+
+- **Do:** write "false positive: a selftest negative control, which passes by producing this failure", or "false positive: the runner forced the action onto Node.js 24 and it ran".
+- **Don't:** write "not this PR's" about an annotation unless the same paragraph links the fix.
+
+Merging that PR in a cloud session then hit two more gates.
+The merge hook credits a `check-pr-fully-clean.py` run only when it is the plugin root's copy, its output is printed, and the command holds nothing but a trailing `echo "exit=$?"`.
+A run sent to a file, or piped through `grep` with `${PIPESTATUS[0]}`, is not credited.
+`warn-merge-without-cross-harness-review` then wants a non-Claude review.
+In the cloud, `command -v` finds no agy, codex, cursor-agent, gemini or opencode.
+This account's OpenCode Go paid models were at their monthly limit (2026-11-28), but the free `hy4-flash-free` at `https://opencode.ai/inference/go/openai/v1/chat/completions` answered.
+It needs an `x-opencode-session` header, and `"reasoning_effort": "none"` so that the answer is not empty.
+
+- **Do:** run the plugin-root checker alone before merging, and get a review from a free OpenCode Go model through that chat-completions endpoint;
+  `GET https://opencode.ai/zen/go/v1/models` lists the models, and the free ones end in `-free`.
+- **Don't:** redirect or filter the checker's output on the run you want credited.
+
+That free model is not a way through the gate on prose.
+Over three rounds on this PR it returned NOT_CLEAN with 7, 3, then 13 wording nits and no factual error, and the hook counts a reviewer that ran and was not clean as blocking, so the no-reviewer waiver does not apply.
+The coordinator held the PR for a fresh review from agy or a paid model (2026-11-28).
+
+- **Do:** fix its real findings once, rebut the rest on the PR, then report the refusal and hold the merge.
+- **Don't:** re-run the free model until it happens to say CLEAN.
+
 ## A stacked base whose findings are fixed only in its child cannot pass the gate
 
 The final-head gate judges each head on its own.

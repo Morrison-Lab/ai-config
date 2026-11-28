@@ -40,6 +40,15 @@ The check works on its own: it does not depend on the scheduled task.
 Do not rely on `list_threads` with `state: "working"` alone, because it can return an empty list while threads are active (measured 2026-11-05).
 Also count any thread with a post or a PR event in the last 15 minutes, and read the live thread list rather than memory.
 
+## An idle loop counts only its own work as busy
+
+A thread or scheduled task that grabs an issue "if nothing is in progress" must read "in progress" as work that loop itself owns: its own claimed issue, its own open PR, its own running step.
+On 2026-11-26 the hourly grab task in the lds project counted any lds PR updated in the last 90 minutes as in progress.
+Other threads touch PRs every hour, so the task found itself busy at every firing and grabbed nothing from 05:18 to 16:55 PST, and Ezra asked "why hasn't it worked all day".
+
+- **Do:** define the busy test by ownership (this loop's claim comment, this loop's PR, this thread's own pending step), and grab when none of those is live.
+- **Don't:** treat repo-wide activity (any PR updated recently, any thread working) as a reason for this loop to wait.
+
 ## What the rule does not license
 
 - It does not license merges.

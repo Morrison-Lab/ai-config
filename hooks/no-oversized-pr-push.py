@@ -13,9 +13,10 @@ image and data paths, nor a path `.gitattributes` marks `linguist-generated`
 subfile (it still counts as a file), and not counting a pure rename (no line
 changed). A line deleted in one place and added unchanged in another (a move
 or split between files) does not count, and neither does a file whose every
-changed line is such a move. Over 20 files or 600 lines the push is denied
-(Ezra, 2026-11-19: "we need to raise the pr size limit so you stop bothering
-me"; the cap was 10 files and 300 lines).
+changed line is such a move, so a pure movement PR passes at any size (Ezra,
+2026-11-28: "pure movement prs are exempt from the cap"). Over 40 files or
+1200 lines the push is denied (Ezra, 2026-11-28: "double the cap on pr size";
+it was 20 and 600 from 2026-11-19, and 10 and 300 before that).
 
 A stacked branch is measured against the branch it is stacked on, not only
 the default branch: the open PR's base, or on a first push the nearest
@@ -61,8 +62,8 @@ import subprocess
 import sys
 from collections import Counter
 
-MAX_FILES = 20
-MAX_LINES = 600
+MAX_FILES = 40
+MAX_LINES = 1200
 # Keep in step with BUILTIN_IGNORE in gha's check-pr-size/check-pr-size.py.
 IGNORE = [
     r"(?:.*/)?[^/]*\.lock", r"(?:.*/)?package-lock\.json",

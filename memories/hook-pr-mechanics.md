@@ -75,7 +75,7 @@ The final-head gate judges each head on its own.
 When agy findings on a hook PR at the size cap went into its stacked child, the base's own head could never get a clean line: the runner could not send [ai-config#5974](https://github.com/Morrison-Lab/ai-config/pull/5974) for one (2026-11-19).
 The fix chosen was to retarget the child, [ai-config#5976](https://github.com/Morrison-Lab/ai-config/pull/5976), to `main` with the whole combined diff, to land alone (both still open when this was written).
 
-- **Do:** when the combined diff fits the cap (20 files, 600 lines), retarget the child to `main`, rewrite its body to cover the whole combined diff, and land only the child with a merge commit;
+- **Do:** when the combined diff fits the cap (40 files, 1200 lines), retarget the child to `main`, rewrite its body to cover the whole combined diff, and land only the child with a merge commit;
   GitHub marks a PR merged once its head commit reaches its base branch.
   Comment on the base that it must not merge alone.
 - **Don't:** plan "base first, then child" while the base still carries findings fixed only in the child.
